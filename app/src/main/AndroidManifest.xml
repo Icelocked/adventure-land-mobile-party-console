@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- INTERNET: required to reach the party-console server (home PC or a
+         remote host like a VPS), wherever the user has it deployed.
+         ACCESS_NETWORK_STATE: lets the live connection react to
+         connectivity changes instead of only relying on its own heartbeat
+         timeout to notice a dropped network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.PartyConsoleCompanion"
+        android:usesCleartextTraffic="true">
+        <!-- usesCleartextTraffic=true: deliberate. A server reached only
+             over Tailscale/a LAN is already encrypted/private at the
+             network layer, and plain HTTP to that kind of address is a
+             legitimate, common self-hosted-app setup (see README's
+             connection-security section) - the app's own connection
+             screen is what actually decides trust per-server, not a
+             blanket manifest restriction. -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PartyConsoleCompanion">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
