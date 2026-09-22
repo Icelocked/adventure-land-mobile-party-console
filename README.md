@@ -75,11 +75,14 @@ auth is still an open API to anyone who finds the address.
 
 ## Project status
 
-Early skeleton, built without ever running against a live party-console
-server (see the sibling `Adventureland-Team` repo's session notes for why -
-the actual account connection needs the user present). What's here:
+**Confirmed to actually build** (`./gradlew assembleDebug` → BUILD
+SUCCESSFUL, a real debug APK) - not just written and hoped to compile.
+Still never run against a live party-console server or a device/emulator
+(see the sibling `Adventureland-Team` repo's session notes for why - the
+actual account connection needs the user present), so the UI has never
+been visually verified, only the compile step. What's here:
 
-- Full Gradle project structure, ready to open in Android Studio.
+- Full Gradle project structure, verified to build end to end.
 - Connection screen with all three trust modes.
 - Live character list (name, level, HP/MP, one-line activity readout).
 - Character detail with Activity / Equipment / Inventory tabs.
@@ -105,10 +108,36 @@ What's deliberately not built yet, in rough priority order:
 
 ## Building
 
-Requires Android Studio (or the command-line SDK + JDK 17+) - neither was
-installed on the machine this was scaffolded on, so none of this has been
-compiled yet. Open the project root in Android Studio and let it sync;
-everything needed is declared in `app/build.gradle.kts`.
+**With Android Studio (recommended for actual development):** open the
+project root and let it sync; everything needed is declared in
+`app/build.gradle.kts`. Point its SDK Manager at JDK 17+ and the standard
+SDK components (platform 35, build-tools 35.0.0) if it doesn't already
+have them.
+
+**From the command line** (this is how the build was actually verified,
+without Android Studio installed): with a JDK 17+ on `PATH` and
+`local.properties` pointing `sdk.dir` at an Android SDK containing
+`platform-tools`, `platforms;android-35`, and `build-tools;35.0.0`:
+
+```
+./gradlew assembleDebug
+```
+
+Output APK: `app/build/outputs/apk/debug/app-debug.apk`.
+
+**A real gotcha hit during setup, worth knowing about on any machine with
+a nearly-full system drive:** Gradle's cache and temp directories default
+to the system drive (`%USERPROFILE%\.gradle` on Windows) regardless of
+where the JDK/SDK/Gradle distribution itself are installed. If that drive
+is low on space, `assembleDebug` can fail late (during dexing) with a
+disk-space `IOException` that has nothing to do with the app's code. Fix
+by redirecting both before building:
+
+```
+$env:GRADLE_USER_HOME = "D:\wherever\has\space\gradle-home"
+$env:TEMP = "D:\wherever\has\space\temp"
+$env:TMP = "D:\wherever\has\space\temp"
+```
 
 ## Relationship to Adventureland-Team
 
