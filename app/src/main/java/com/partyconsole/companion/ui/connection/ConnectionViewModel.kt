@@ -40,7 +40,7 @@ class ConnectionViewModel(private val store: ServerConfigStore) : ViewModel() {
     private val _checkState = MutableStateFlow<ConnectionCheckState>(ConnectionCheckState.Idle)
     val checkState: StateFlow<ConnectionCheckState> = _checkState.asStateFlow()
 
-    val savedSettings: StateFlow<ServerSettings?> = MutableStateFlow(null).also { flow ->
+    val savedSettings: StateFlow<ServerSettings?> = MutableStateFlow<ServerSettings?>(null).also { flow ->
         viewModelScope.launch { store.settings.collect { flow.value = it } }
     }.asStateFlow()
 

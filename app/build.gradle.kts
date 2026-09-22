@@ -30,6 +30,12 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // Card(onClick=...) and a few other Material3 entry points used
+        // across the UI screens are still marked experimental upstream -
+        // project-wide opt-in here instead of annotating every composable
+        // individually, matching how most Compose Material3 apps handle
+        // this until those APIs stabilize.
+        freeCompilerArgs += listOf("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
     }
 
     buildFeatures {

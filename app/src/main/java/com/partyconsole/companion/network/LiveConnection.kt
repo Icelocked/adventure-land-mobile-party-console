@@ -66,7 +66,24 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
         trySend(LiveEvent.ConnectionHealth(healthy))
     }
 
-    fun startConnection() {
+    // startConnection and scheduleReconnect call each other (a failed
+    // connection schedules a reconnect, which starts a new connection).
+    // Kotlin resolves local `fun` declarations top-to-bottom within a
+    // block - unlike class member functions, they can't forward-reference
+    // each other, confirmed by an actual compile error here. Declaring
+    // both as `var`s of function type first, then assigning both bodies
+    // afterward, sidesteps that: each body only needs the OTHER var to
+    // already be declared (not yet assigned) at the point it's written,
+    // since a lambda body only reads its captured variables when it's
+    // actually invoked later, not at declaration time.
+    var startConnection: () -> Unit = {}
+    var scheduleReconnect: () -> Unit = {}
+
+    // Anonymous `fun()` rather than a `{ }` lambda: a lambda stored in a
+    // var doesn't support a bare `return` (that's only valid as a
+    // non-local return out of an INLINE function's lambda) - an anonymous
+    // function does, so the early-return bodies below work unchanged.
+    startConnection = fun() {
         if (stopped) return
         lastHeartbeat.set(System.currentTimeMillis())
         val request = Request.Builder().url(settings.streamUrl).build()
@@ -107,7 +124,7 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
         )
     }
 
-    fun scheduleReconnect() {
+    scheduleReconnect = fun() {
         if (stopped || !reconnectPending.compareAndSet(false, true)) return
         scope.launch {
             delay(RECONNECT_DELAY_MS)
