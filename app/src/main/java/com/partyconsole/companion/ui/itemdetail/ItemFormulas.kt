@@ -23,6 +23,10 @@ import java.math.MathContext
 private fun JsonElement.asDoubleOrNull(): Double? = (this as? JsonPrimitive)?.doubleOrNull
 private fun JsonElement.asBooleanOrNull(): Boolean? = (this as? JsonPrimitive)?.booleanOrNull
 private fun JsonElement.asStringOrNull(): String? = (this as? JsonPrimitive)?.content
+
+// Matches the game server's can_equip_item types (item-actions.ts). Elixirs are consumed effects, not equipment.
+private val equipmentTypes = setOf("helmet", "pants", "chest", "weapon", "amulet", "earring", "shoes", "gloves", "ring", "shield", "belt", "source", "orb", "quiver", "cape", "misc_offhand", "tool")
+fun isEquipment(definition: Map<String, JsonElement>?): Boolean = equipmentTypes.contains(definition?.get("type")?.asStringOrNull() ?: "")
 private fun JsonElement.asIntListOrNull(): List<Int>? =
     (this as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull?.toInt() }
 

@@ -336,6 +336,8 @@ export interface PartyStateDynamic {
   // identity strings never parsed (only the values matter).
   autoNpcSales: Record<string, AutoNpcSaleRule>
   autoStandMarks: Record<string, AutoStandRule>
+  // Keyed by `${itemName}@${level}` (inventory-panel.tsx's autoExchangeKey) - presence alone marks the item for auto-exchange.
+  autoExchanges: Record<string, unknown>
   // Per character, then by rule key (see itemFromRuleKey).
   autoDeconstruction: Record<string, Record<string, AutoDeconstructionRule>>
   autoCompounds: Record<string, AutoCompoundRule[]>
@@ -443,6 +445,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   goldTargets: {},
   autoNpcSales: {},
   autoStandMarks: {},
+  autoExchanges: {},
   autoDeconstruction: {},
   autoCompounds: {},
   travelPlaces: [],

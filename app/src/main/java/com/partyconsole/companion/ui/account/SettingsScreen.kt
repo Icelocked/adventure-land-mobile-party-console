@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -23,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.RosterMember
@@ -50,6 +52,7 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var bankboiPrefix by remember { mutableStateOf<String?>(null) }
     var showRealms by remember { mutableStateOf(false) }
     var realmError by remember { mutableStateOf<String?>(null) }
+    var setHome by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val json = remember { Json { ignoreUnknownKeys = true } }
 
@@ -123,10 +126,14 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                         Text(if (showRealms) "Cancel" else "Switch realm...")
                     }
                     if (showRealms) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = setHome, onCheckedChange = { setHome = it })
+                            Text("Set as home realm", style = MaterialTheme.typography.labelSmall)
+                        }
                         for (option in realm.realms.filter { !it.pvp }) {
                             TextButton(onClick = {
                                 scope.launch {
-                                    when (val result = viewModel.api.switchRealm(option.key)) {
+                                    when (val result = viewModel.api.switchRealm(option.key, setHome)) {
                                         is ApiResult.Failure -> realmError = result.message
                                         is ApiResult.Success -> { realmError = null; showRealms = false }
                                     }

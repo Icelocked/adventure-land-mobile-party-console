@@ -407,6 +407,8 @@ data class PartyStateDynamic(
     // never needs to parse (only the values matter for display/removal).
     val autoNpcSales: Map<String, AutoNpcSaleRule> = emptyMap(),
     val autoStandMarks: Map<String, AutoStandRule> = emptyMap(),
+    // Keyed by "$itemName@$level" (inventory-panel.tsx's autoExchangeKey) - presence alone marks the item for auto-exchange.
+    val autoExchanges: Map<String, JsonElement> = emptyMap(),
     // Per character, then by rule key (see itemFromRuleKey).
     val autoDeconstruction: Map<String, Map<String, AutoDeconstructionRule>> = emptyMap(),
     val autoCompounds: Map<String, List<AutoCompoundRule>> = emptyMap(),
