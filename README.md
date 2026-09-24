@@ -1,15 +1,34 @@
-# Party Console Companion (Android)
+# Party Console Companion
 
-[![Download latest APK](https://img.shields.io/github/v/release/Icelocked/adventure-land-mobile-party-console?label=Download&style=for-the-badge)](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest)
+[![Download latest release](https://img.shields.io/github/v/release/Icelocked/adventure-land-mobile-party-console?label=Download&style=for-the-badge)](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest)
 
-An independent Android companion app for
-[Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console).
-It does not modify or depend on party-console's source code at all - it's a
-separate client of the same HTTP + Server-Sent-Events API party-console's
-own web dashboard talks to (`/party-api/*`, and `/party-api/dashboard-stream`
-for live updates). If you're already running party-console, you can install
-this app separately and point it at your own server; nothing here needs to
-be merged into or bundled with Ryan's project.
+An independent companion app for
+[Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console),
+available as a native **Android app** or a self-hosted **PWA (works on
+iPhone too)**. Neither modifies or depends on party-console's source code -
+they're separate clients of the same HTTP + Server-Sent-Events API
+party-console's own web dashboard talks to (`/party-api/*`, and
+`/party-api/dashboard-stream` for live updates). If you're already running
+party-console, you can install either client separately and point it at
+your own server; nothing here needs to be merged into or bundled with
+Ryan's project.
+
+## Choose how to install
+
+Both clients have full feature parity - same screens, same actions, same
+data. Pick whichever fits your platform.
+
+|  | **Android** | **PWA** (any platform, incl. iPhone) |
+|---|---|---|
+| **What it is** | A native Kotlin + Jetpack Compose app | A React web app you self-host and "Add to Home Screen" |
+| **Install** | Sideload the `.apk` from [Releases](../../releases/latest) | Self-host with Docker (5 min), then open it in your phone's browser |
+| **Works on** | Android only | Android, iPhone, iPad - anything with a browser |
+| **Setup** | Nothing extra - point the app at your server | Requires Docker (or similar) on the machine running party-console |
+| **Details** | [Installing (Android)](#installing-android) below | [DEPLOYMENT.md](DEPLOYMENT.md) (section 3b) |
+
+Either way, your phone first needs a network path to your party-console
+server - see "[Before you install](#before-you-install-your-phone-needs-a-path-to-your-server)"
+below.
 
 ## Why this exists
 
@@ -55,15 +74,25 @@ not a scaled-down subset.
 
 ## Architecture
 
-- **Not a WebView wrapper.** A real native Android app (Kotlin + Jetpack
-  Compose) with its own screens, because a wrapped browser tab doesn't
-  give a good mobile experience for "glance at a character card, tap into
-  their inventory."
+Two independent clients live in this repo, sharing nothing but the API
+they talk to and the design they're ported from - `app/` (Android, Kotlin
++ Jetpack Compose) and `web/` (the PWA, React + TypeScript + Vite). Neither
+depends on the other; a change to one doesn't require touching the other,
+though new features are generally ported to both.
+
+- **Not a WebView wrapper.** The Android app is a real native app with its
+  own Compose screens, and the PWA is a real React SPA - neither is a
+  wrapped browser tab pointed at party-console's own dashboard, because
+  that doesn't give a good mobile experience for "glance at a character
+  card, tap into their inventory."
 - **Talks to party-console's real API**, not a reimplementation of any of
   its logic. Several pieces are ported directly from party-console's own
   client source (`dashboard/features/party/`), deliberately kept faithful
-  rather than "improved", so this app's view of the world can never drift
-  from what the official web dashboard shows for the same server:
+  rather than "improved", so each client's view of the world can never
+  drift from what the official web dashboard shows for the same server.
+  The PWA (`web/src/`) ports the same logic straight into TypeScript,
+  closer to the original source since both are TS/JS. The Android app
+  (Kotlin) ports it one layer further:
   - `network/LiveProtocol.kt` ports `live-protocol.ts`'s snapshot/delta/
     heartbeat message reconciliation exactly.
   - `network/LiveConnection.kt` ports `dashboard-live.tsx`'s SSE connection
@@ -78,16 +107,23 @@ not a scaled-down subset.
   rather than guessing at what changed.
 - **No assumption about where the server lives.** party-console is
   explicitly designed to run standalone from its display (see its own
-  README) - a home PC, a Raspberry Pi, or a VPS. This app's connection
-  screen (`ui/connection/`) just asks for a server address and figures out
-  how to trust it from there; nothing here is Tailscale-specific,
-  domain-specific, or home-network-specific.
+  README) - a home PC, a Raspberry Pi, or a VPS. The Android app's
+  connection screen (`ui/connection/`) just asks for a server address and
+  figures out how to trust it from there; the PWA is served from wherever
+  party-console itself runs, so it never needs to ask. Nothing here is
+  Tailscale-specific, domain-specific, or home-network-specific.
 
 ## Connection security model
 
+**This section is about the Android app specifically.** The PWA has no
+connection screen at all - it's served *from* party-console's own machine
+(see [DEPLOYMENT.md](DEPLOYMENT.md) section 3b), so it always talks to the
+same origin it was loaded from; there's no address to configure or trust
+decision to make.
+
 There's no single right answer for how a self-hosted party-console server
 is reached - see `network/ServerConfig.kt`'s `TrustMode` for the reasoning.
-This app supports three, matching what similar self-hosted companion apps
+The Android app supports three, matching what similar self-hosted companion apps
 (Home Assistant, Syncthing, Jellyfin, Nextcloud) already do for the exact
 same problem:
 
@@ -120,11 +156,11 @@ why the others aren't documented step-by-step here).
 
 ## Before you install: your phone needs a path to your server
 
-This is the part that trips people up, so it's worth saying plainly:
-party-console runs on your gaming PC (or a server), reachable on your home
-network. Your phone, when you're out of the house, is **not** on that
-network - so before this app can do anything, you need *some* way for
-your phone to reach that machine from anywhere.
+This is the part that trips people up, so it's worth saying plainly, for
+**either** client: party-console runs on your gaming PC (or a server),
+reachable on your home network. Your phone, when you're out of the house,
+is **not** on that network - so before either client can do anything, you
+need *some* way for your phone to reach that machine from anywhere.
 
 **[Tailscale](https://tailscale.com) is the recommended, tested path** -
 install it on both your PC and your phone (both free), sign into the
@@ -134,14 +170,17 @@ configuration, no public exposure. **[`DEPLOYMENT.md`](DEPLOYMENT.md)
 walks through this exact setup end to end** - start there.
 
 A domain with a reverse proxy, or a raw port-forward, are also possible
-in principle (the connection screen supports both - see "Connection
-security model" above) but aren't documented here step-by-step, because
-doing either *correctly* - the right reverse-proxy config, firewall
+in principle (the Android app's connection screen supports both - see
+"Connection security model" above) but aren't documented here step-by-step,
+because doing either *correctly* - the right reverse-proxy config, firewall
 rules, and an actual authentication layer in front of an API that has
 none of its own - is real work that hasn't been set up and verified for
 this project yet. Tailscale sidesteps needing any of that.
 
-## Installing
+## Installing (Android)
+
+For the PWA, see [DEPLOYMENT.md](DEPLOYMENT.md) instead - self-hosting is
+the install step there, there's no separate app package to download.
 
 Once your phone has a way to reach your server (see above), grab the
 latest APK from this repo's [Releases](../../releases) page and install
@@ -160,6 +199,8 @@ server's address - see "Connection security model" above for what to
 enter depending on how you've set your server up.
 
 ## Building from source
+
+### Android
 
 **With Android Studio (recommended for development):** open the project
 root and let it sync; everything needed is declared in
@@ -191,6 +232,28 @@ $env:GRADLE_USER_HOME = "D:\wherever\has\space\gradle-home"
 $env:TEMP = "D:\wherever\has\space\temp"
 $env:TMP = "D:\wherever\has\space\temp"
 ```
+
+### PWA
+
+With Node 22+ on `PATH`:
+
+```
+cd web
+npm ci
+npm run build
+```
+
+Output: `web/dist/` - a static bundle that needs to be served alongside
+party-console itself for `/party-api/*` proxying to work (see
+[DEPLOYMENT.md](DEPLOYMENT.md) section 3b for the Dockerfile/nginx setup
+that does this - party-console's API has no CORS headers, so anything
+serving this bundle needs to proxy `/party-api/*` itself rather than
+letting the browser call party-console cross-origin).
+
+For local development (`npm run dev`), set `VITE_DEV_PROXY_TARGET` in a
+gitignored `web/.env.local` to your party-console server's address - Vite's
+own dev server proxies `/party-api/*` to it, mirroring what nginx does in
+production.
 
 ## Contributing
 

@@ -38,8 +38,30 @@ jobs:
       - name: Rename APK for the release asset
         run: cp app/build/outputs/apk/debug/app-debug.apk party-console-companion-${{ github.ref_name }}.apk
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # A prebuilt static bundle for anyone who'd rather skip `npm run
+      # build` themselves - still needs to be served via the Dockerfile/
+      # nginx.conf (or equivalent) for /party-api/* proxying to work, this
+      # is just the `dist/` output, not a full deployable image.
+      - name: Build PWA
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Zip PWA build
+        run: (cd web/dist && zip -r ../../party-console-companion-pwa-${{ github.ref_name }}.zip .)
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: party-console-companion-${{ github.ref_name }}.apk
+          files: |
+            party-console-companion-${{ github.ref_name }}.apk
+            party-console-companion-pwa-${{ github.ref_name }}.zip
           generate_release_notes: true
