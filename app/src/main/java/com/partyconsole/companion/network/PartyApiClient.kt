@@ -84,6 +84,12 @@ data class CommandResult(
     val error: String? = null,
 )
 
+@kotlinx.serialization.Serializable
+private data class AlDataKeyResponse(val key: String? = null, val error: String? = null)
+
+@kotlinx.serialization.Serializable
+private data class AlDataAuthResponse(val auth: String? = null, val error: String? = null)
+
 sealed interface ApiResult<out T> {
     data class Success<T>(val value: T) : ApiResult<T>
     data class Failure(val message: String) : ApiResult<Nothing>
@@ -813,6 +819,51 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
      *  server-generated cake-slice-trade advertisement to in-game chat right now. */
     suspend fun sendAnniversaryChatAdvertisement(): ApiResult<CommandResult> =
         post("anniversary/chat-advertise", JsonObject(emptyMap()))
+
+    /** POST /party-api/aldata/key - generates a fresh ALData publishing key
+     *  (replaces any existing one). */
+    suspend fun generateAlDataKey(): ApiResult<String> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(settings.apiBase.trimEnd('/') + "/aldata/key")
+            .post(json.encodeToString(JsonObject.serializer(), JsonObject(emptyMap())).toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        parseAlDataKeyResponse(request)
+    }
+
+    /** GET /party-api/aldata/key - reveals the already-generated key. */
+    suspend fun revealAlDataKey(): ApiResult<String> = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(settings.apiBase.trimEnd('/') + "/aldata/key").get().build()
+        parseAlDataKeyResponse(request)
+    }
+
+    private fun parseAlDataKeyResponse(request: Request): ApiResult<String> = try {
+        client.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            val parsed = runCatching { json.decodeFromString(AlDataKeyResponse.serializer(), text) }.getOrNull()
+            if (!response.isSuccessful) ApiResult.Failure(parsed?.error ?: "HTTP ${response.code}")
+            else if (parsed?.key != null) ApiResult.Success(parsed.key)
+            else ApiResult.Failure(parsed?.error ?: "ALData request failed")
+        }
+    } catch (e: java.io.IOException) {
+        ApiResult.Failure(e.message ?: "network error")
+    }
+
+    /** GET /party-api/aldata/auth - checks whether ALData has confirmed the
+     *  authentication mail yet ("NO" | "YES" | "CORRECT" | "WRONG"). */
+    suspend fun checkAlDataAuth(): ApiResult<String> = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(settings.apiBase.trimEnd('/') + "/aldata/auth").get().build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                val parsed = runCatching { json.decodeFromString(AlDataAuthResponse.serializer(), text) }.getOrNull()
+                if (!response.isSuccessful) ApiResult.Failure(parsed?.error ?: "HTTP ${response.code}")
+                else if (parsed?.auth != null) ApiResult.Success(parsed.auth)
+                else ApiResult.Failure(parsed?.error ?: "ALData request failed")
+            }
+        } catch (e: java.io.IOException) {
+            ApiResult.Failure(e.message ?: "network error")
+        }
+    }
 
     /** POST /party-api/merchant/send-mail (http/send-mail.ts). Server-side
      *  validation this app should match before calling: recipient

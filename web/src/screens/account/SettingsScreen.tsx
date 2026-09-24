@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Copy, Eye, EyeOff } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { Button } from '@/components/ui/button'
@@ -91,6 +92,8 @@ export function SettingsScreen() {
           </Button>
         </div>
 
+        <ALDataSection />
+
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-1 text-sm font-medium">PWA connection</div>
           <p className="mb-2 text-xs text-muted-foreground">Where this app fetches party data from - same-origin by default.</p>
@@ -144,6 +147,142 @@ export function SettingsScreen() {
         </div>
       </div>
     </AccountScreenScaffold>
+  )
+}
+
+/** party-inventory-panels.tsx's ALData key-management panel - generate/reveal/copy the
+ *  publishing key, check auth status, and "Prepare mail" (fills the fixed earthiverse/
+ *  aldata_auth authentication mail so the user can review postage and send it themselves,
+ *  same as the dashboard - this never auto-sends, since each message costs real gold). */
+function ALDataSection() {
+  const api = usePartyApi()
+  const dynamicState = useDynamicState()
+  const refreshNow = useRefreshDynamicStateNow()
+  const [key, setKey] = useState('')
+  const [keyVisible, setKeyVisible] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [preparingMail, setPreparingMail] = useState(false)
+  const aldata = dynamicState.aldata
+
+  return (
+    <div className="rounded-md border border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium">ALData</div>
+          <div className="font-mono text-[10px] uppercase text-muted-foreground">
+            Auth: {aldata?.auth ?? 'NO'} · Publish: {aldata?.publishStatus ?? 'idle'}
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setError(null)
+            const result = await api.checkAlDataAuth()
+            if (result.kind === 'failure') setError(result.message)
+            await refreshNow()
+            setBusy(false)
+          }}
+        >
+          Check status
+        </Button>
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <Input
+          readOnly
+          type={keyVisible ? 'text' : 'password'}
+          value={key}
+          placeholder={aldata?.hasKey ? 'Stored key - reveal to view' : 'No key generated'}
+          className="flex-1 font-mono text-xs"
+        />
+        <Button
+          size="icon"
+          variant="outline"
+          aria-label="Reveal key"
+          onClick={async () => {
+            if (!key) {
+              const result = await api.revealAlDataKey()
+              if (result.kind === 'success') setKey(result.value)
+              else setError(result.message)
+            }
+            setKeyVisible((v) => !v)
+          }}
+        >
+          {keyVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </Button>
+        <Button size="icon" variant="outline" aria-label="Copy key" disabled={!key} onClick={() => void navigator.clipboard.writeText(key)}>
+          <Copy className="size-4" />
+        </Button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setError(null)
+            const result = await api.generateAlDataKey()
+            if (result.kind === 'success') {
+              setKey(result.value)
+              setKeyVisible(true)
+            } else setError(result.message)
+            await refreshNow()
+            setBusy(false)
+          }}
+        >
+          Generate key
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={busy || !aldata?.hasKey}
+          onClick={async () => {
+            setBusy(true)
+            setError(null)
+            const result = key ? { kind: 'success' as const, value: key } : await api.revealAlDataKey()
+            if (result.kind === 'success') {
+              setKey(result.value)
+              setPreparingMail(true)
+            } else setError(result.message)
+            setBusy(false)
+          }}
+        >
+          Prepare mail
+        </Button>
+      </div>
+
+      {preparingMail && key && (
+        <div className="mt-3 rounded-md border border-border bg-background p-3">
+          <p className="text-xs text-muted-foreground">
+            To <span className="font-mono">earthiverse</span>, subject <span className="font-mono">aldata_auth</span>. Do not resend - each message costs gold.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button
+              size="sm"
+              onClick={async () => {
+                const result = await api.sendMail('earthiverse', 'aldata_auth', key)
+                if (result.kind === 'failure') setError(result.message)
+                else setPreparingMail(false)
+              }}
+            >
+              Send
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setPreparingMail(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 text-xs text-muted-foreground">
+        Public market browsing needs no key. Publishing requires authentication: generate a unique key, then Prepare mail to send it to ALData for verification. ALData stores this key in
+        plaintext - never reuse a password. Allow about a minute, then check status.
+      </p>
+      {(error ?? aldata?.error) && <p className="mt-2 text-xs text-destructive">{error ?? aldata?.error}</p>}
+    </div>
   )
 }
 
