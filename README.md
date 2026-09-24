@@ -30,6 +30,13 @@ Either way, your phone first needs a network path to your party-console
 server - see "[Before you install](#before-you-install-your-phone-needs-a-path-to-your-server)"
 below.
 
+**A PWA caveat specific to Android:** the basic self-hosted PWA setup (3b)
+works great on iPhone, but on Android, Chrome only offers a full "Install
+app" experience over real HTTPS - plain HTTP over your Tailscale IP gets
+you a working bookmark/shortcut instead of a true installed app. See
+DEPLOYMENT.md section 3c for the (optional) fix, using Tailscale's own
+free HTTPS certificates.
+
 ## Why this exists
 
 party-console's web dashboard is excellent at home, on the same machine or

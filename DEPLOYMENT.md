@@ -87,6 +87,75 @@ browser and use its "Add to Home Screen" (Chrome/Safari) - no address to
 type into the app itself, since it's already talking to the party-
 console instance it's deployed next to.
 
+**This gets you a fully working PWA on iPhone.** Safari's "Add to Home
+Screen" never required HTTPS or a service worker - just the manifest and
+icons, which this setup already serves correctly. **On Android, though,
+it's a smaller win than it could be:** Chrome only offers its full
+"Install app" experience (a real standalone window, not just a bookmark)
+to pages served over HTTPS with a registered service worker - and plain
+`http://<tailscale-ip>` doesn't qualify (browsers only treat `localhost`
+as a secure context, not Tailscale's `100.x` addresses). Without it,
+Chrome falls back to "Create shortcut," which just opens the site in an
+ordinary browser tab. The next section fixes that.
+
+## 3c. Optional: real HTTPS for full Android installability
+
+Tailscale can issue actual, browser-trusted TLS certificates for your
+tailnet's own MagicDNS name (`<machine>.<tailnet>.ts.net`) via `tailscale
+cert` - still never exposed publicly (only reachable over Tailscale), but
+genuine HTTPS, which is what unlocks Chrome's real "Install app" flow on
+Android. `web/Dockerfile` already ships support for this: it's inert by
+default (nothing changes unless you opt in) and activates automatically
+the moment a cert is mounted at the right path - verified this session by
+building the image and confirming both cases (no cert mounted → still
+plain HTTP-only on :80 exactly as before; cert mounted → :443 comes up
+serving the identical app over real TLS, `/party-api/*` proxying included).
+
+**One-time: enable HTTPS Certificates for your tailnet.** In the
+[Tailscale admin console → DNS](https://login.tailscale.com/admin/dns),
+turn on "HTTPS Certificates" (off by default). This is an account setting
+you have to do yourself in the admin console - nothing here can do it for
+you.
+
+**Find your machine's MagicDNS name** with `tailscale status` (look for
+your own device's `DNSName`, e.g. `desktop-abc123.tailXXXXXX.ts.net`).
+
+**Issue the certificate**, on the same machine that runs party-console:
+
+```bash
+tailscale cert --cert-file=tailscale.crt --key-file=tailscale.key desktop-abc123.tailXXXXXX.ts.net
+```
+
+This writes `tailscale.crt`/`tailscale.key` into your current directory -
+put them somewhere durable, e.g. `C:\tailscale-certs\`. **They expire
+(~90 days)** - re-run the same command periodically to renew (it's
+idempotent, same filenames), then recreate the container so it picks up
+the new files.
+
+**Mount them into the PWA container and publish 443**, alongside the
+existing service from section 3b:
+
+```yaml
+  party-console-pwa:
+    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#main:web
+    ports:
+      - "100.125.193.9:8080:80"    # replace with YOUR Tailscale IP
+      - "100.125.193.9:8443:443"   # same IP, HTTPS port
+    volumes:
+      - "C:/tailscale-certs:/etc/nginx/tailscale-certs:ro"   # replace with wherever you put the cert files (forward slashes even on Windows - YAML treats backslash as an escape character)
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d --force-recreate party-console-pwa
+```
+
+Then, **from your phone, open `https://<the-MagicDNS-name>:8443/`** -
+using the MagicDNS name, not the raw `100.x` IP, since the certificate is
+issued for that name specifically and a browser will warn if you use the
+IP instead. Chrome should now offer a real "Install app" prompt, not just
+"Create shortcut."
+
 ## Why not a domain or a public IP?
 
 Those are real options in general (any self-hosted app can be put behind
