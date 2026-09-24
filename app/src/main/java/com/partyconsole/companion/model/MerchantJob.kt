@@ -425,6 +425,8 @@ data class PartyStateDynamic(
     val autoItemMarks: Map<String, Map<String, String>> = emptyMap(),
     val autoUpgradeMarks: Map<String, Map<String, JsonElement>> = emptyMap(),
     val bankboiPrefix: String = "",
+    // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
+    val anniversaryAutoChat: Boolean = false,
     val realmControl: RealmControl? = null,
     // How much gold each character should carry - the merchant's own bank
     // errands automatically deposit the excess or withdraw the shortfall
