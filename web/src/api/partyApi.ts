@@ -425,6 +425,20 @@ export class PartyApiClient {
     return this.post('merchant/bid', { itemId, clear: true })
   }
 
+  /** `/party-api/command` type "upgrade-offering-rule" - creates (empty
+   *  `id`) or edits (existing `id`) a standing "use this offering instead
+   *  of scrolls during automatic upgrades in this level range" rule. The
+   *  server assigns a real id for new rules; the id sent back in the
+   *  response/next poll is authoritative, not whatever was sent. */
+  async saveOfferingRule(character: string, id: string, name: string, floor: number, ceiling: number, offering: string, required: boolean): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, { type: 'upgrade-offering-rule', rule: { id, name, floor, ceiling, offering, required } })
+  }
+
+  /** `/party-api/command` type "upgrade-offering-rule" with remove. */
+  async removeOfferingRule(character: string, id: string): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, { type: 'upgrade-offering-rule', rule: { id }, remove: true })
+  }
+
   /** POST /party-api/realm/switch - moves every active character to a
    *  different Adventure Land realm together. Server refuses PVP realms
    *  and refuses if a switch/bankboi transaction is already running -

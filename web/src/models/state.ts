@@ -367,6 +367,28 @@ export interface PartyStateDynamic {
   // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one standing
   // buy order per item id, automatically filled up to `price`.
   standBids: Record<string, StandBid>
+  // Upgrade offering rules (upgrade-offering-controls.tsx) - "use a
+  // Primling/Primordial Essence/Primordial X instead of scrolls" during
+  // AUTOMATIC upgrades within a level range, independent of the item's
+  // own upgrade-mark tier.
+  upgradeOfferingRules: UpgradeOfferingRule[]
+}
+
+/** upgrade-offerings.ts's UpgradeOfferingRule, ported verbatim. `name` is
+ *  the item's internal catalog id (e.g. "coat"), not its display name. */
+export type UpgradeOffering = 'offeringp' | 'offering' | 'offeringx'
+export const UPGRADE_OFFERING_LABELS: Record<UpgradeOffering, string> = {
+  offeringp: 'Primling',
+  offering: 'Primordial Essence',
+  offeringx: 'Primordial X',
+}
+export interface UpgradeOfferingRule {
+  id: string
+  name: string
+  floor: number
+  ceiling: number
+  offering: UpgradeOffering
+  required: boolean
 }
 
 export interface StandBid {
@@ -435,6 +457,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   monsterSearchRadiusByCharacter: {},
   huntBlacklist: {},
   standBids: {},
+  upgradeOfferingRules: [],
 })
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

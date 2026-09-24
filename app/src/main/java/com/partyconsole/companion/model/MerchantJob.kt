@@ -438,6 +438,31 @@ data class PartyStateDynamic(
     // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one
     // standing buy order per item id, automatically filled up to `price`.
     val standBids: Map<String, StandBid> = emptyMap(),
+    // Upgrade offering rules (upgrade-offering-controls.tsx) - "use a
+    // Primling/Primordial Essence/Primordial X instead of scrolls" during
+    // AUTOMATIC upgrades within a level range, independent of the item's
+    // own upgrade-mark tier.
+    val upgradeOfferingRules: List<UpgradeOfferingRule> = emptyList(),
+)
+
+/** upgrade-offerings.ts's table of the 3 offering item ids -> display
+ *  name, ported verbatim. */
+val UPGRADE_OFFERING_LABELS: Map<String, String> = linkedMapOf(
+    "offeringp" to "Primling",
+    "offering" to "Primordial Essence",
+    "offeringx" to "Primordial X",
+)
+
+/** upgrade-offerings.ts's UpgradeOfferingRule, ported verbatim. `name` is
+ *  the item's internal catalog id (e.g. "coat"), not its display name. */
+@Serializable
+data class UpgradeOfferingRule(
+    val id: String,
+    val name: String,
+    val floor: Int,
+    val ceiling: Int,
+    val offering: String,
+    val required: Boolean,
 )
 
 @Serializable

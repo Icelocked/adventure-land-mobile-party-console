@@ -20,6 +20,7 @@ import com.partyconsole.companion.ui.account.MailScreen
 import com.partyconsole.companion.ui.account.MarketScreen
 import com.partyconsole.companion.ui.account.HuntSettingsScreen
 import com.partyconsole.companion.ui.account.MerchantCommerceScreen
+import com.partyconsole.companion.ui.account.OfferingsScreen
 import com.partyconsole.companion.ui.account.RoutinesScreen
 import com.partyconsole.companion.ui.account.SettingsScreen
 import com.partyconsole.companion.ui.account.SkillsScreen
@@ -51,6 +52,7 @@ private object Routes {
     const val ACCOUNT_STAND = "account/stand"
     const val ACCOUNT_MARKET = "account/market"
     const val ACCOUNT_BANK = "account/bank"
+    const val ACCOUNT_OFFERINGS = "account/offerings"
     const val ACCOUNT_LOGS = "account/logs"
     const val ACCOUNT_SETTINGS = "account/settings"
     const val MERCHANT_COMMERCE = "merchant/{mode}"
@@ -165,6 +167,7 @@ fun AppNavigation(store: ServerConfigStore) {
                 onStand = { navController.navigate(Routes.ACCOUNT_STAND) },
                 onMarket = { navController.navigate(Routes.ACCOUNT_MARKET) },
                 onBank = { navController.navigate(Routes.ACCOUNT_BANK) },
+                onOfferings = { navController.navigate(Routes.ACCOUNT_OFFERINGS) },
                 onLogs = { navController.navigate(Routes.ACCOUNT_LOGS) },
                 onSettings = { navController.navigate(Routes.ACCOUNT_SETTINGS) },
             )
@@ -245,6 +248,12 @@ fun AppNavigation(store: ServerConfigStore) {
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             BankScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_OFFERINGS) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            OfferingsScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable(Routes.ACCOUNT_LOGS) { backStackEntry ->
             val active = settings ?: return@composable

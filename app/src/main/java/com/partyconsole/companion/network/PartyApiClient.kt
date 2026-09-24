@@ -652,6 +652,30 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
     suspend fun cancelBid(itemId: String): ApiResult<CommandResult> =
         post("merchant/bid", JsonObject(mapOf("itemId" to JsonPrimitive(itemId), "clear" to JsonPrimitive(true))))
 
+    /** `/party-api/command` type "upgrade-offering-rule" - creates (empty
+     *  `id`) or edits (existing `id`) a standing "use this offering
+     *  instead of scrolls during automatic upgrades in this level range"
+     *  rule. The server assigns a real id for new rules. */
+    suspend fun saveOfferingRule(character: String, id: String, name: String, floor: Int, ceiling: Int, offering: String, required: Boolean): ApiResult<CommandResult> {
+        val rule = JsonObject(
+            mapOf(
+                "id" to JsonPrimitive(id),
+                "name" to JsonPrimitive(name),
+                "floor" to JsonPrimitive(floor),
+                "ceiling" to JsonPrimitive(ceiling),
+                "offering" to JsonPrimitive(offering),
+                "required" to JsonPrimitive(required),
+            ),
+        )
+        return sendCommand(character, mapOf("type" to "upgrade-offering-rule", "rule" to rule))
+    }
+
+    /** `/party-api/command` type "upgrade-offering-rule" with remove. */
+    suspend fun removeOfferingRule(character: String, id: String): ApiResult<CommandResult> {
+        val rule = JsonObject(mapOf("id" to JsonPrimitive(id)))
+        return sendCommand(character, mapOf("type" to "upgrade-offering-rule", "rule" to rule, "remove" to true))
+    }
+
     /** `/party-api/command` type "character-travel" (navigation/manual-
      *  commands.ts's travel handler) - sends one character to a preset
      *  map location (see model/TravelPlace, sourced from state's

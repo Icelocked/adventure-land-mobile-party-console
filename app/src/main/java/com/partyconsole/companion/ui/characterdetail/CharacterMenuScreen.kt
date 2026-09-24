@@ -36,6 +36,7 @@ fun CharacterMenuScreen(
     onStand: () -> Unit,
     onMarket: () -> Unit,
     onBank: () -> Unit,
+    onOfferings: () -> Unit,
     onLogs: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -69,6 +70,7 @@ fun CharacterMenuScreen(
             MenuRow("Inspect Stand", onStand)
             MenuRow("View Market", onMarket)
             MenuRow("Inspect Bank", onBank)
+            MenuRow("Upgrade offerings", onOfferings)
             MenuRow("Logs", onLogs)
             MenuRow("Settings", onSettings)
         }
