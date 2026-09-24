@@ -1,44 +1,68 @@
 package com.partyconsole.companion.ui.characterdetail
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.partyconsole.companion.model.CharacterState
-import com.partyconsole.companion.model.EquippedEntry
-import com.partyconsole.companion.model.InventoryEntry
 import com.partyconsole.companion.ui.PartyViewModel
+import kotlinx.coroutines.launch
+import com.partyconsole.companion.ui.characterdetail.sections.AutoMarksSection
+import com.partyconsole.companion.ui.characterdetail.sections.EquipmentSection
+import com.partyconsole.companion.ui.characterdetail.sections.GoldTargetSection
+import com.partyconsole.companion.ui.characterdetail.sections.InventorySection
+import com.partyconsole.companion.ui.characterdetail.sections.LeaderFollowerSection
+import com.partyconsole.companion.ui.characterdetail.sections.MerchantQueueSection
+import com.partyconsole.companion.ui.characterdetail.sections.RestockSection
+import com.partyconsole.companion.ui.characterdetail.sections.TravelSection
+import com.partyconsole.companion.ui.characterdetail.sections.VitalsHeader
+import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
+import com.partyconsole.companion.ui.itempanel.ItemActionPanel
+import com.partyconsole.companion.ui.itempanel.ItemActionTarget
 
-private val TABS = listOf("Activity", "Equipment", "Inventory")
-
+/** Character focus screen: a sticky vitals header (VitalsHeader - never
+ *  scrolls out of view) over a scrollable body of section cards. Replaces
+ *  the old 3-tab layout per the mobile-redesign plan - "lock the basic
+ *  character information at the top... then as you scroll down you get
+ *  into all the features". Item taps (equipment/inventory) are wired to
+ *  the bottom item-action panel (ui/itempanel/ItemActionPanel.kt). */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CharacterDetailScreen(viewModel: PartyViewModel, characterName: String, onBack: () -> Unit) {
+fun CharacterDetailScreen(
+    viewModel: PartyViewModel,
+    characterName: String,
+    onBack: () -> Unit,
+    onSwitchCharacter: (String) -> Unit,
+    onOpenMenu: () -> Unit,
+) {
     val characters by viewModel.characters.collectAsState()
+    val dynamicState by viewModel.dynamicState.collectAsState()
+    val roster by viewModel.roster.collectAsState()
     val state = characters[characterName]
-    var tabIndex by remember { mutableIntStateOf(0) }
+    var actionTarget by remember { mutableStateOf<ItemActionTarget?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+    val catalogFor = rememberCatalogLookup(dynamicState.merchantCatalog)
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -49,115 +73,81 @@ fun CharacterDetailScreen(viewModel: PartyViewModel, characterName: String, onBa
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                    }
+                    IconButton(onClick = onOpenMenu) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    }
+                },
             )
         },
     ) { padding ->
+        val vitals = state?.vitals
+        if (vitals == null) {
+            Text(
+                "This character isn't reporting in right now.",
+                modifier = Modifier.padding(padding).padding(24.dp),
+            )
+            return@Scaffold
+        }
+
+        val accountGold = (dynamicState.bank?.gold ?: 0L) + characters.values.sumOf { it.vitals?.gold ?: 0L }
+
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (state == null) {
-                Text(
-                    "This character isn't reporting in right now.",
-                    modifier = Modifier.padding(24.dp),
+            CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
+            VitalsHeader(name = characterName, vitals = vitals, accountGold = accountGold)
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+            ) {
+                LeaderFollowerSection(characterName, dynamicState, viewModel)
+                TravelSection(
+                    characterName = characterName,
+                    isMerchant = vitals.ctype == "merchant",
+                    isLeader = dynamicState.leader == characterName,
+                    travelPlaces = dynamicState.travelPlaces,
+                    viewModel = viewModel,
                 )
-                return@Column
-            }
-            TabRow(selectedTabIndex = tabIndex) {
-                TABS.forEachIndexed { index, title ->
-                    Tab(selected = tabIndex == index, onClick = { tabIndex = index }, text = { Text(title) })
+                if (vitals.ctype == "merchant") {
+                    MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
                 }
-            }
-            when (tabIndex) {
-                0 -> ActivityTab(state)
-                1 -> EquipmentTab(state)
-                2 -> InventoryTab(state)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActivityTab(state: CharacterState) {
-    val vitals = state.vitals ?: return
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatRow("Level", "${vitals.level} ${vitals.ctype}")
-        StatRow("HP", "${vitals.hp} / ${vitals.maxHp}")
-        StatRow("MP", "${vitals.mp} / ${vitals.maxMp}")
-        StatRow("Gold", vitals.gold.toString())
-        StatRow("Location", "${vitals.map} (${vitals.x.toInt()}, ${vitals.y.toInt()})")
-        if (vitals.rip) StatRow("Status", "DEAD", isWarning = true)
-        vitals.farmingMode?.let { StatRow("Farming mode", it) }
-        if (vitals.conditions.isNotEmpty()) {
-            Text("Conditions", style = MaterialTheme.typography.titleSmall)
-            for (condition in vitals.conditions) {
-                Text("- ${condition.name}", style = MaterialTheme.typography.bodyMedium)
+                EquipmentSection(
+                    slots = state.inventory?.slots.orEmpty(),
+                    catalogFor = catalogFor,
+                    onSlotTap = { slotName, entry ->
+                        entry?.let { actionTarget = ItemActionTarget.EquipmentSlot(it.item, slotName) }
+                    },
+                )
+                InventorySection(
+                    items = state.inventory?.items.orEmpty(),
+                    merchantMarks = dynamicState.merchantMarked[characterName].orEmpty(),
+                    bankMarks = dynamicState.marked[characterName].orEmpty(),
+                    catalogFor = catalogFor,
+                    onItemTap = { index, entry ->
+                        entry?.let { actionTarget = ItemActionTarget.InventorySlot(it.item, index) }
+                    },
+                )
+                RestockSection(
+                    characterName,
+                    dynamicState.restockPolicies[characterName] ?: com.partyconsole.companion.model.RestockPolicy(),
+                    viewModel,
+                )
+                GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
+                AutoMarksSection(characterName, vitals.ctype == "merchant", dynamicState, viewModel, catalogFor)
             }
         }
-    }
-}
 
-@Composable
-private fun StatRow(label: String, value: String, isWarning: Boolean = false) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun EquipmentTab(state: CharacterState) {
-    val slots = state.inventory?.slots.orEmpty()
-    if (slots.isEmpty()) {
-        Text("No equipment data yet.", modifier = Modifier.padding(24.dp))
-        return
-    }
-    LazyVerticalGrid(columns = GridCells.Fixed(2), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
-        items(slots.entries.toList()) { (slotName, entry) ->
-            EquipmentCard(slotName, entry)
-        }
-    }
-}
-
-@Composable
-private fun EquipmentCard(slotName: String, entry: EquippedEntry?) {
-    Card(modifier = Modifier.fillMaxWidth().padding(6.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(slotName, style = MaterialTheme.typography.labelMedium)
-            if (entry == null) {
-                Text("empty", style = MaterialTheme.typography.bodySmall)
-            } else {
-                Text(entry.item.name, style = MaterialTheme.typography.bodyMedium)
-                entry.item.level?.let { Text("+$it", style = MaterialTheme.typography.bodySmall) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InventoryTab(state: CharacterState) {
-    val items = state.inventory?.items.orEmpty()
-    if (items.isEmpty()) {
-        Text("No inventory data yet.", modifier = Modifier.padding(24.dp))
-        return
-    }
-    LazyVerticalGrid(columns = GridCells.Fixed(4), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
-        items(items) { entry -> InventoryCell(entry) }
-    }
-}
-
-@Composable
-private fun InventoryCell(entry: InventoryEntry?) {
-    Card(modifier = Modifier.fillMaxWidth().padding(4.dp)) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            if (entry == null) {
-                Text(" ", style = MaterialTheme.typography.bodySmall)
-            } else {
-                Text(entry.item.name, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                entry.item.q?.let { if (it > 1) Text("x$it", style = MaterialTheme.typography.labelSmall) }
-                entry.item.level?.let { Text("+$it", style = MaterialTheme.typography.labelSmall) }
-            }
+        actionTarget?.let { target ->
+            ItemActionPanel(
+                target = target,
+                characterName = characterName,
+                isMerchant = vitals.ctype == "merchant",
+                roster = roster,
+                viewModel = viewModel,
+                sheetState = sheetState,
+                onDismiss = { actionTarget = null },
+            )
         }
     }
 }

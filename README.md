@@ -5,16 +5,51 @@ An independent Android companion app for
 It does not modify or depend on party-console's source code at all - it's a
 separate client of the same HTTP + Server-Sent-Events API party-console's
 own web dashboard talks to (`/party-api/*`, and `/party-api/dashboard-stream`
-for live updates). Anyone running party-console can install this app
-separately and point it at their own server; nothing here needs to be
-merged into or bundled with Ryan's project.
+for live updates). If you're already running party-console, you can install
+this app separately and point it at your own server; nothing here needs to
+be merged into or bundled with Ryan's project.
 
 ## Why this exists
 
 party-console's web dashboard is excellent at home, on the same machine or
-LAN as the game. This app is for checking on things (and sending simple
-commands) from a phone, away from home, while party-console keeps doing the
-real work on a PC or server somewhere.
+LAN as the game. This app is for checking on things - and acting on them -
+from a phone, away from home, while party-console keeps doing the real work
+on a PC or server somewhere. The goal is to make everything the web
+dashboard shows and does available from a phone in a touch-friendly layout,
+not a scaled-down subset.
+
+## What it does
+
+- **Character list** - class icon, level, HP/MP, one-line activity, gold
+  carried per character and the account total, pull-to-refresh.
+- **Character detail** - a sticky vitals header (HP/MP/XP with numbers and
+  percent, gold, realm) over a scrollable panel: leader/follower control,
+  quick-travel ("Send to...", "Return to leader", merchant's "Go home"),
+  the merchant job queue, an equipment grid, an inventory grid, restock
+  policy, gold target, and the full auto-mark rule management (view and
+  remove every standing NPC-sale/deconstruction/stand/upgrade/compound/
+  merchant/bank rule) - the same account-wide automation controls the web
+  dashboard exposes, not just a read-only view.
+- **Item details** - tapping any item (inventory, equipment, or the
+  catalog) opens the same rich item-details view as party-console's own
+  "left-click an item" dialog: eligible classes, a level-stat-preview
+  slider using the game's real upgrade/compound scaling curve, buy/sell
+  NPC prices, set bonuses, crafting recipes and what an item is used to
+  craft, monster drop tables, and NPC exchange/box odds - each shown only
+  when the item actually has that data, with tap-through navigation into
+  related items and monsters.
+- **Item actions** - equip/unequip, use, mark or auto-mark for bank/
+  merchant/stand/NPC-sale/deconstruction/upgrade/compound, stat-scroll
+  marking, give to another character - the same command set the web
+  dashboard's item context menu offers.
+- **Account-wide screens** (reachable from any character via the hamburger
+  menu): Mail (inbox, compose, collect attachments), Catalog (browse and
+  inspect every known item), Bestiary (monsters and their drop tables),
+  Skills (per-class skill reference), Inspect Stand, View Market (ALData/
+  Ponty listings plus a live player-stand search, with buying), Inspect
+  Bank (shared vault, gold breakdown, withdraw/sell/deconstruct), Logs
+  (combat, merchant activity, raw in-game chat/system log), and Settings
+  (pairing, bankboi prefix, realm switching, roster).
 
 ## Architecture
 
@@ -23,7 +58,7 @@ real work on a PC or server somewhere.
   give a good mobile experience for "glance at a character card, tap into
   their inventory."
 - **Talks to party-console's real API**, not a reimplementation of any of
-  its logic. Two things are ported directly from party-console's own
+  its logic. Several pieces are ported directly from party-console's own
   client source (`dashboard/features/party/`), deliberately kept faithful
   rather than "improved", so this app's view of the world can never drift
   from what the official web dashboard shows for the same server:
@@ -32,8 +67,11 @@ real work on a PC or server somewhere.
   - `network/LiveConnection.kt` ports `dashboard-live.tsx`'s SSE connection
     handling (heartbeat watchdog, reconnect-on-failure) using OkHttp's SSE
     support in place of the browser's native `EventSource`.
-  - `model/*.kt` mirror `char.tsx`/`item.tsx`/`condition.tsx`'s actual field
-    names and shapes.
+  - `ui/itemdetail/ItemFormulas.kt` ports the item-detail math (NPC sell
+    price, per-level stat scaling) verbatim from `npc-sale-value.tsx` /
+    `calculated-level-properties.tsx`.
+  - `model/*.kt` mirror the dashboard's own type shapes (`char.tsx`,
+    `item.tsx`, `item-meta.tsx`, `condition.tsx`, ...) field-for-field.
   If party-console's own client code changes, re-port from the new source
   rather than guessing at what changed.
 - **No assumption about where the server lives.** party-console is
@@ -73,51 +111,39 @@ your own authentication in front of it (e.g. your reverse proxy requiring
 a client certificate or HTTP auth) - a real domain with just TLS and no
 auth is still an open API to anyone who finds the address.
 
-## Project status
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for a full walkthrough of getting
+party-console itself running somewhere this app can reach it (domain,
+Tailscale, or a bare IP), including the trade-offs of each.
 
-**Confirmed to actually build** (`./gradlew assembleDebug` → BUILD
-SUCCESSFUL, a real debug APK) - not just written and hoped to compile.
-Still never run against a live party-console server or a device/emulator
-(see the sibling `Adventureland-Team` repo's session notes for why - the
-actual account connection needs the user present), so the UI has never
-been visually verified, only the compile step. What's here:
+## Installing
 
-- Full Gradle project structure, verified to build end to end.
-- Connection screen with all three trust modes.
-- Live character list (name, level, HP/MP, one-line activity readout).
-- Character detail with Activity / Equipment / Inventory tabs.
-- The ported live-update protocol and SSE connection handling.
+Grab the latest APK from this repo's
+[Releases](../../releases) page and install it - you'll need to allow
+"install unknown apps" for whatever app you download it with (Chrome,
+Files, etc.), since this isn't distributed through the Play Store.
 
-What's deliberately not built yet, in rough priority order:
-- Sending actual commands (the network layer's `PartyApiClient.sendCommand`
-  exists and is tested against the real route shape, but no UI button
-  calls it yet - add these as real party-console usage reveals which
-  commands are actually wanted from a phone, rather than building all ~70
-  `/party-api/*` routes' UI speculatively).
-- Verifying the live-protocol port against a REAL running coordinator (only
-  checked against its source, not live traffic) - do this first, before
-  adding more screens, since everything else depends on it being right.
-- Push notifications for events worth knowing about away from the phone
-  (a death, a completed upgrade run) - the SSE stream already carries
-  everything needed; this would be a foreground/background service layer
-  on top, not a new data source.
-- A nav-graph-scoped shared PartyViewModel so navigating between the list
-  and detail screens doesn't open a second live connection (see the TODO
-  in `ui/AppNavigation.kt`).
-- App icon (currently a placeholder vector shape).
+It's a debug-signed build, not signed with a dedicated release key -
+perfectly fine for sideloading, but if you ever uninstall and reinstall
+from a build signed by a different machine, Android will ask you to
+uninstall the old one first (it treats them as different apps for
+upgrade purposes even though they're the same app).
 
-## Building
+On first launch, the connection screen asks for your party-console
+server's address - see "Connection security model" above for what to
+enter depending on how you've set your server up.
 
-**With Android Studio (recommended for actual development):** open the
-project root and let it sync; everything needed is declared in
+## Building from source
+
+**With Android Studio (recommended for development):** open the project
+root and let it sync; everything needed is declared in
 `app/build.gradle.kts`. Point its SDK Manager at JDK 17+ and the standard
 SDK components (platform 35, build-tools 35.0.0) if it doesn't already
 have them.
 
-**From the command line** (this is how the build was actually verified,
-without Android Studio installed): with a JDK 17+ on `PATH` and
-`local.properties` pointing `sdk.dir` at an Android SDK containing
-`platform-tools`, `platforms;android-35`, and `build-tools;35.0.0`:
+**From the command line:** with a JDK 17+ on `PATH` and a
+`local.properties` file (gitignored, not included) pointing `sdk.dir` at
+an Android SDK containing `platform-tools`, `platforms;android-35`, and
+`build-tools;35.0.0`:
 
 ```
 ./gradlew assembleDebug
@@ -125,13 +151,13 @@ without Android Studio installed): with a JDK 17+ on `PATH` and
 
 Output APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
-**A real gotcha hit during setup, worth knowing about on any machine with
-a nearly-full system drive:** Gradle's cache and temp directories default
-to the system drive (`%USERPROFILE%\.gradle` on Windows) regardless of
-where the JDK/SDK/Gradle distribution itself are installed. If that drive
-is low on space, `assembleDebug` can fail late (during dexing) with a
-disk-space `IOException` that has nothing to do with the app's code. Fix
-by redirecting both before building:
+**A real gotcha worth knowing about on any machine with a nearly-full
+system drive:** Gradle's cache and temp directories default to the system
+drive (`%USERPROFILE%\.gradle` on Windows) regardless of where the JDK/SDK/
+Gradle distribution itself are installed. If that drive is low on space,
+`assembleDebug` can fail late (during dexing) with a disk-space
+`IOException` that has nothing to do with the app's code. Fix by
+redirecting both before building:
 
 ```
 $env:GRADLE_USER_HOME = "D:\wherever\has\space\gradle-home"
@@ -139,14 +165,15 @@ $env:TEMP = "D:\wherever\has\space\temp"
 $env:TMP = "D:\wherever\has\space\temp"
 ```
 
-## Relationship to Adventureland-Team
+## Contributing
 
-This project and [party-console](https://github.com/Ryan-Haines/adventureland-party-console)
-itself both exist because of a separate project,
-[Adventureland-Team](https://github.com/Icelocked/adventureland-team) - a
-fully-autonomous 4-character bot built over one long debugging session,
-which turned out to be more automation than was actually wanted. See that
-repo's `LEGACY.md` and `PARTY-CONSOLE-COMPARISON.md` for the full story and
-for hard-won logic worth drawing on if this app or party-console itself
-ever need it (gear-priority logic, reliability lessons from a similar
-live-update/timeout system).
+Issues and PRs welcome - this is a hobby project maintained alongside
+actually playing the game, so response time varies. If you're adding a
+new screen or command, check whether party-console's own dashboard source
+already has the equivalent (`dashboard/features/party/`) and port from
+there rather than guessing at field names or command shapes; several bugs
+this project has hit came from assuming a wire shape instead of checking.
+
+## License
+
+[MIT](LICENSE)

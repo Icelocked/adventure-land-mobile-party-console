@@ -1,0 +1,46 @@
+name: Release
+
+# Push a tag like "v0.2.0" to build the app and attach the APK to a new
+# GitHub Release automatically - the only supported way to get a prebuilt
+# APK without building from source yourself.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Debug-signed, not a dedicated release key - fine for direct
+      # sideload install (Android just needs SOME signature, not a
+      # specific one, unless you're upgrading in place from a build
+      # signed by a different key/machine - see README's install notes).
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Rename APK for the release asset
+        run: cp app/build/outputs/apk/debug/app-debug.apk party-console-companion-${{ github.ref_name }}.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: party-console-companion-${{ github.ref_name }}.apk
+          generate_release_notes: true

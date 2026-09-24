@@ -3,6 +3,12 @@ package com.partyconsole.companion.data
 import com.partyconsole.companion.model.CharacterInventory
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.CharacterVitals
+import com.partyconsole.companion.model.MailSnapshot
+import com.partyconsole.companion.model.PartyStateDynamic
+import com.partyconsole.companion.model.PartyStateGameLogs
+import com.partyconsole.companion.model.PartyStateRoster
+import com.partyconsole.companion.model.RosterMember
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.network.LiveEvent
 import com.partyconsole.companion.network.LiveRecordWire
 import com.partyconsole.companion.network.PartyApiClient
@@ -11,9 +17,11 @@ import com.partyconsole.companion.network.buildHttpClient
 import com.partyconsole.companion.network.intField
 import com.partyconsole.companion.network.liveEvents
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -36,6 +44,29 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
 
+    // Roster (name/ctype/level) is relatively static - fetched once with a
+    // short retry, not polled - see recordToState's roster override below.
+    private val _roster = MutableStateFlow<Map<String, RosterMember>>(emptyMap())
+    val roster: StateFlow<Map<String, RosterMember>> = _roster.asStateFlow()
+
+    // Unlike roster, merchant errands and party formation (leader/follow)
+    // change often, so this polls on the same ~6s cadence party-console's
+    // own account-info refresh uses (observed in its logs this session).
+    private val _dynamicState = MutableStateFlow(PartyStateDynamic())
+    val dynamicState: StateFlow<PartyStateDynamic> = _dynamicState.asStateFlow()
+
+    // Mail is its own route (GET /party-api/mail), not part of state -
+    // polled on the same cadence for the same reason (it changes whenever
+    // anyone sends anything, no push notification for it exists).
+    private val _mail = MutableStateFlow(MailSnapshot())
+    val mail: StateFlow<MailSnapshot> = _mail.asStateFlow()
+
+    // Raw in-game chat/system logs need a separate ?section=logs query
+    // (runtime/game-log-filters.ts) - not present on the plain /state
+    // payload used for everything else, so this is its own poll.
+    private val _gameLogs = MutableStateFlow<Map<String, List<com.partyconsole.companion.model.GameLogEntry>>>(emptyMap())
+    val gameLogs: StateFlow<Map<String, List<com.partyconsole.companion.model.GameLogEntry>>> = _gameLogs.asStateFlow()
+
     init {
         scope.launch {
             liveEvents(httpClient, settings).collect { event ->
@@ -43,6 +74,67 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
                     is LiveEvent.ConnectionHealth -> _connected.value = event.healthy
                     is LiveEvent.CharacterUpdated -> applyUpdate(event.name, event.record)
                 }
+            }
+        }
+        scope.launch { fetchRosterWithRetry() }
+        scope.launch { pollDynamicState() }
+    }
+
+    /** Call right after a successful formation/restock/item-action POST so
+     *  the UI reflects the change immediately instead of waiting up to 6s
+     *  for the next poll tick. */
+    suspend fun refreshDynamicStateNow() {
+        (api.get("state") as? ApiResult.Success)?.let { result ->
+            runCatching { json.decodeFromString(PartyStateDynamic.serializer(), result.value) }
+                .getOrNull()?.let { _dynamicState.value = it }
+        }
+        (api.get("mail") as? ApiResult.Success)?.let { result ->
+            runCatching { json.decodeFromString(MailSnapshot.serializer(), result.value) }
+                .getOrNull()?.let { _mail.value = it }
+        }
+        (api.get("state?catalog=0&dashboard=1&section=logs") as? ApiResult.Success)?.let { result ->
+            runCatching { json.decodeFromString(PartyStateGameLogs.serializer(), result.value) }
+                .getOrNull()?.let { _gameLogs.value = it.gameLogs }
+        }
+    }
+
+    private suspend fun fetchRosterWithRetry() {
+        repeat(3) { attempt ->
+            when (val result = api.get("state")) {
+                is ApiResult.Success -> {
+                    val decoded = runCatching {
+                        json.decodeFromString(PartyStateRoster.serializer(), result.value)
+                    }.getOrNull()
+                    if (decoded != null) {
+                        _roster.value = decoded.roster.associateBy { it.name }
+                        reapplyRosterToExistingCharacters()
+                        return
+                    }
+                }
+                is ApiResult.Failure -> Unit
+            }
+            if (attempt < 2) delay(2000)
+        }
+    }
+
+    private suspend fun pollDynamicState() {
+        while (true) {
+            refreshDynamicStateNow()
+            delay(6000)
+        }
+    }
+
+    /** The roster fetch and the live SSE stream race - a character's first
+     *  snapshot can arrive (and get decoded with defaulted ctype/level)
+     *  before the roster call completes. Once it does, patch every
+     *  already-known character rather than waiting for their next tick. */
+    private fun reapplyRosterToExistingCharacters() {
+        _characters.update { current ->
+            current.mapValues { (name, state) ->
+                val member = _roster.value[name] ?: return@mapValues state
+                val vitals = state.vitals?.copy(ctype = member.ctype, level = member.level, server = member.server)
+                    ?: return@mapValues state
+                state.copy(vitals = vitals)
             }
         }
     }
@@ -65,9 +157,15 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
      *  server adds tomorrow still merges correctly today, it just isn't
      *  surfaced in the UI until a model field is added for it. */
     private fun recordToState(name: String, record: LiveRecordWire): CharacterState {
-        val vitals = runCatching {
+        val decoded = runCatching {
             json.decodeFromJsonElement(CharacterVitals.serializer(), withName(record.vitals, name))
         }.getOrNull()
+        val member = _roster.value[name]
+        val vitals = if (decoded != null && member != null) {
+            decoded.copy(ctype = member.ctype, level = member.level, server = member.server)
+        } else {
+            decoded
+        }
         val slots = record.slots.mapValues { (_, value) ->
             runCatching {
                 json.decodeFromJsonElement(com.partyconsole.companion.model.EquippedEntry.serializer(), value)
