@@ -23,16 +23,23 @@ import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
 /** Ports merchant-card-controls.tsx's Buy/Craft/Exchange navigation,
- *  Force stand, Mining/Fishing, Send to party, Donate, Join giveaway, and
- *  Clear job queue - the rest of the merchant character's card that
- *  wasn't just the job queue widget (MerchantQueueSection). Only ever
- *  rendered for the merchant character. */
+ *  Force stand, Mining/Fishing, Send to party, Donate, Join giveaway,
+ *  Clear job queue, Clear stale orders, Clear activity history, and the
+ *  Merchant collection settings (bank-sort mode, collect thresholds) -
+ *  the rest of the merchant character's card that wasn't just the job
+ *  queue widget (MerchantQueueSection) or Routines (its own screen, too
+ *  big for an inline form). Only ever rendered for the merchant
+ *  character. */
 @Composable
 fun MerchantControlsSection(
     forceStand: Boolean,
     gatheringModes: List<String>,
+    threshold: Long,
+    itemCollectionThreshold: Int,
+    bankSortMode: String?,
     viewModel: PartyViewModel,
     onOpenCommerce: (String) -> Unit,
+    onOpenRoutines: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf<String?>(null) }
@@ -74,6 +81,7 @@ fun MerchantControlsSection(
         )
 
         Column {
+            TextButton(onClick = onOpenRoutines) { Text("Routines") }
             TextButton(onClick = { run { viewModel.api.sendMerchantToParty() } }) { Text("Send to party") }
 
             TextButton(onClick = { toggle("donate") }) { Text("Donate gold") }
@@ -85,6 +93,20 @@ fun MerchantControlsSection(
             if (expanded == "giveaway") {
                 GiveawayForm(onJoin = { realm, seller -> run { viewModel.api.joinGiveaway(seller, realm) } })
             }
+
+            TextButton(onClick = { toggle("settings") }) { Text("Collection settings") }
+            if (expanded == "settings") {
+                CollectionSettingsForm(
+                    threshold = threshold,
+                    itemCollectionThreshold = itemCollectionThreshold,
+                    bankSortMode = bankSortMode,
+                    onSetBankSortMode = { mode -> run { viewModel.api.setBankSortMode(mode) } },
+                    onSetThresholds = { t, i -> run { viewModel.api.setThresholds(t, i) } },
+                )
+            }
+
+            TextButton(onClick = { run { viewModel.api.clearStaleOrders() } }) { Text("Clear stale orders") }
+            TextButton(onClick = { run { viewModel.api.clearMerchantActivity() } }) { Text("Clear activity history") }
 
             if (confirmingClear) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -112,6 +134,45 @@ private fun DonateForm(onDonate: (Long) -> Unit) {
             modifier = Modifier.weight(1f),
         )
         Button(onClick = { amount.toLongOrNull()?.let(onDonate) }, enabled = amount.toLongOrNull() != null) { Text("Donate") }
+    }
+}
+
+@Composable
+private fun CollectionSettingsForm(
+    threshold: Long,
+    itemCollectionThreshold: Int,
+    bankSortMode: String?,
+    onSetBankSortMode: (String) -> Unit,
+    onSetThresholds: (Long?, Int?) -> Unit,
+) {
+    var thresholdInput by remember(threshold) { mutableStateOf(threshold.toString()) }
+    var slotsInput by remember(itemCollectionThreshold) { mutableStateOf(itemCollectionThreshold.toString()) }
+    Column {
+        Text("Bank sort", style = MaterialTheme.typography.labelSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(selected = (bankSortMode ?: "automatic") == "automatic", onClick = { onSetBankSortMode("automatic") }, label = { Text("Sort every visit") })
+            FilterChip(selected = bankSortMode == "request", onClick = { onSetBankSortMode("request") }, label = { Text("Request sorting") })
+        }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+            OutlinedTextField(
+                value = thresholdInput,
+                onValueChange = { new -> if (new.all { it.isDigit() }) thresholdInput = new },
+                label = { Text("Collect above (gold)") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Button(onClick = { onSetThresholds(thresholdInput.toLongOrNull() ?: 0L, null) }) { Text("Apply") }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+            OutlinedTextField(
+                value = slotsInput,
+                onValueChange = { new -> if (new.all { it.isDigit() }) slotsInput = new },
+                label = { Text("Marked slots required (1-42)") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Button(onClick = { onSetThresholds(null, (slotsInput.toIntOrNull() ?: 1).coerceIn(1, 42)) }) { Text("Apply") }
+        }
     }
 }
 

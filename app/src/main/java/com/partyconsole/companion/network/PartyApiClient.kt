@@ -500,6 +500,44 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
      *  activity log shown on the Logs screen. */
     suspend fun clearMerchantActivity(): ApiResult<CommandResult> = post("merchant/activity/clear", JsonObject(emptyMap()))
 
+    /** POST /party-api/merchant/routine-priorities - reorders/enables the
+     *  merchant's automatic-routine scheduling. `priorities` only needs
+     *  entries that actually changed (server merges), but sending the
+     *  full map is simplest and always valid. `enabled` only applies to
+     *  automatic routines - server ignores keys outside that set. */
+    suspend fun saveRoutinePriorities(priorities: Map<String, Int>, enabled: Map<String, Boolean>): ApiResult<CommandResult> {
+        val body = JsonObject(
+            mapOf(
+                "priorities" to JsonObject(priorities.mapValues { JsonPrimitive(it.value) }),
+                "enabled" to JsonObject(enabled.mapValues { JsonPrimitive(it.value) }),
+            ),
+        )
+        return post("merchant/routine-priorities", body)
+    }
+
+    /** POST /party-api/merchant/bank-sort - `mode: "automatic"` sorts
+     *  every visit; `mode: "request"` only sorts when a one-time request
+     *  is queued via `enabled: true`. */
+    suspend fun setBankSortMode(mode: String): ApiResult<CommandResult> =
+        post("merchant/bank-sort", JsonObject(mapOf("mode" to JsonPrimitive(mode))))
+
+    suspend fun requestBankSort(enabled: Boolean): ApiResult<CommandResult> =
+        post("merchant/bank-sort", JsonObject(mapOf("enabled" to JsonPrimitive(enabled))))
+
+    /** POST /party-api/config - either or both of `threshold` (gold-
+     *  carrying threshold before auto-banking) and `itemCollectionThreshold`
+     *  (1-42, marked-slot count before a collection trip queues) in one
+     *  call; pass null for whichever one isn't changing. */
+    suspend fun setThresholds(threshold: Long?, itemCollectionThreshold: Int?): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                threshold?.let { put("threshold", JsonPrimitive(it)) }
+                itemCollectionThreshold?.let { put("itemCollectionThreshold", JsonPrimitive(it)) }
+            },
+        )
+        return post("config", body)
+    }
+
     /** `/party-api/command` type "character-travel" (navigation/manual-
      *  commands.ts's travel handler) - sends one character to a preset
      *  map location (see model/TravelPlace, sourced from state's

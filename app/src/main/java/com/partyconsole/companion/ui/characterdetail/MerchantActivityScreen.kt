@@ -28,7 +28,13 @@ import com.partyconsole.companion.ui.characterdetail.sections.RestockSection
  *  (MerchantControlsSection: Buy/Craft/Exchange, force stand, gathering,
  *  donate, giveaway, ...) in one place. */
 @Composable
-fun MerchantActivityScreen(viewModel: PartyViewModel, characterName: String, onBack: () -> Unit, onOpenMerchantCommerce: (String) -> Unit) {
+fun MerchantActivityScreen(
+    viewModel: PartyViewModel,
+    characterName: String,
+    onBack: () -> Unit,
+    onOpenMerchantCommerce: (String) -> Unit,
+    onOpenRoutines: () -> Unit,
+) {
     val characters by viewModel.characters.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
     val vitals = characters[characterName]?.vitals
@@ -55,7 +61,11 @@ fun MerchantActivityScreen(viewModel: PartyViewModel, characterName: String, onB
                 return@Scaffold
             }
             MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
-            MerchantControlsSection(dynamicState.merchantForceStand, dynamicState.gatheringModes, viewModel, onOpenMerchantCommerce)
+            MerchantControlsSection(
+                dynamicState.merchantForceStand, dynamicState.gatheringModes,
+                dynamicState.threshold, dynamicState.itemCollectionThreshold, dynamicState.bankSortMode,
+                viewModel, onOpenMerchantCommerce, onOpenRoutines,
+            )
             RestockSection(
                 characterName,
                 dynamicState.restockPolicies[characterName] ?: com.partyconsole.companion.model.RestockPolicy(),

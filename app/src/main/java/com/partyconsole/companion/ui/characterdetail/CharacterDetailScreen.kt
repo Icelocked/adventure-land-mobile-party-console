@@ -56,6 +56,7 @@ fun CharacterDetailScreen(
     onSwitchCharacter: (String) -> Unit,
     onOpenMenu: () -> Unit,
     onOpenMerchantCommerce: (String) -> Unit,
+    onOpenRoutines: () -> Unit,
 ) {
     val characters by viewModel.characters.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -113,7 +114,11 @@ fun CharacterDetailScreen(
                 )
                 if (vitals.ctype == "merchant") {
                     MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
-                    MerchantControlsSection(dynamicState.merchantForceStand, dynamicState.gatheringModes, viewModel, onOpenMerchantCommerce)
+                    MerchantControlsSection(
+                        dynamicState.merchantForceStand, dynamicState.gatheringModes,
+                        dynamicState.threshold, dynamicState.itemCollectionThreshold, dynamicState.bankSortMode,
+                        viewModel, onOpenMerchantCommerce, onOpenRoutines,
+                    )
                 }
                 EquipmentSection(
                     slots = state.inventory?.slots.orEmpty(),

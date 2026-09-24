@@ -401,6 +401,10 @@ data class PartyStateDynamic(
     // AUTOMATIC routines (the ones with an enable checkbox) are on.
     val merchantRoutinePriorities: Map<String, Int> = emptyMap(),
     val merchantAutomations: Map<String, Boolean> = emptyMap(),
+    // Merchant collection settings (merchant-collection-settings.tsx).
+    val threshold: Long = 0,
+    val itemCollectionThreshold: Int = 1,
+    val bankSortMode: String? = null,
 )
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

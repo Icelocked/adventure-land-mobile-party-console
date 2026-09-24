@@ -330,6 +330,38 @@ export class PartyApiClient {
     return this.post('merchant/activity/clear', {})
   }
 
+  /** POST /party-api/merchant/routine-priorities - reorders/enables the
+   *  merchant's automatic-routine scheduling (routine-priorities-
+   *  dialog.tsx). `priorities` only needs entries that actually changed
+   *  (server merges), but sending the full map is simplest and always
+   *  valid. `enabled` only applies to automatic routines - server ignores
+   *  keys outside that set. */
+  async saveRoutinePriorities(priorities: Record<string, number>, enabled: Record<string, boolean>): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/routine-priorities', { priorities, enabled })
+  }
+
+  /** POST /party-api/merchant/bank-sort - `mode: "automatic"` sorts every
+   *  visit; `mode: "request"` only sorts when a one-time request is
+   *  queued via `enabled: true` (see also BankScreen's own simpler
+   *  "sort on next visit" toggle, which just sends `{enabled}`). */
+  async setBankSortMode(mode: 'automatic' | 'request'): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/bank-sort', { mode })
+  }
+  async requestBankSort(enabled: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/bank-sort', { enabled })
+  }
+
+  /** POST /party-api/config - either or both of `threshold` (gold-
+   *  carrying threshold before auto-banking) and `itemCollectionThreshold`
+   *  (1-42, marked-slot count before a collection trip queues) in one
+   *  call; omit whichever one isn't changing. */
+  async setThresholds(threshold?: number, itemCollectionThreshold?: number): Promise<ApiResult<CommandResult>> {
+    const body: Record<string, unknown> = {}
+    if (threshold !== undefined) body.threshold = threshold
+    if (itemCollectionThreshold !== undefined) body.itemCollectionThreshold = itemCollectionThreshold
+    return this.post('config', body)
+  }
+
   /** POST /party-api/realm/switch - moves every active character to a
    *  different Adventure Land realm together. Server refuses PVP realms
    *  and refuses if a switch/bankboi transaction is already running -

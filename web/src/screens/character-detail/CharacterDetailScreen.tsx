@@ -82,7 +82,15 @@ export function CharacterDetailScreen() {
               travelPlaces={dynamicState.travelPlaces}
             />
             {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
-            {vitals.ctype === 'merchant' && <MerchantControlsSection forceStand={dynamicState.merchantForceStand} gatheringModes={dynamicState.gatheringModes} />}
+            {vitals.ctype === 'merchant' && (
+              <MerchantControlsSection
+                forceStand={dynamicState.merchantForceStand}
+                gatheringModes={dynamicState.gatheringModes}
+                threshold={dynamicState.threshold}
+                itemCollectionThreshold={dynamicState.itemCollectionThreshold}
+                bankSortMode={dynamicState.bankSortMode}
+              />
+            )}
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}
               catalogFor={catalogFor}
