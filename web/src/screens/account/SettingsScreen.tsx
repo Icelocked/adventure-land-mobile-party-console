@@ -20,6 +20,7 @@ export function SettingsScreen() {
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
   const [showRealms, setShowRealms] = useState(false)
   const [realmError, setRealmError] = useState<string | null>(null)
+  const [setHome, setSetHome] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -87,6 +88,10 @@ export function SettingsScreen() {
             </button>
             {showRealms && (
               <div className="mt-1 flex flex-col gap-1">
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={setHome} onChange={(e) => setSetHome(e.target.checked)} className="size-4" />
+                  Set as home realm
+                </label>
                 {dynamicState.realmControl.realms
                   .filter((option) => !option.pvp)
                   .map((option) => (
@@ -94,7 +99,7 @@ export function SettingsScreen() {
                       key={option.key}
                       className="text-left text-xs text-primary underline"
                       onClick={async () => {
-                        const result = await api.switchRealm(option.key)
+                        const result = await api.switchRealm(option.key, setHome)
                         if (result.kind === 'failure') setRealmError(result.message)
                         else {
                           setRealmError(null)

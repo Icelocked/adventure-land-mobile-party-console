@@ -8,6 +8,10 @@ import type { ItemDropSource, ItemMeta, MerchantExchangeItem } from '@/models'
  *  (grade thresholds, stat-scroll multipliers, upgrade/compound tier
  *  multipliers) is copied verbatim rather than re-derived. */
 
+// Matches the game server's can_equip_item types (item-actions.ts). Elixirs are consumed effects, not equipment.
+const equipmentTypes = new Set(['helmet', 'pants', 'chest', 'weapon', 'amulet', 'earring', 'shoes', 'gloves', 'ring', 'shield', 'belt', 'source', 'orb', 'quiver', 'cape', 'misc_offhand', 'tool'])
+export const isEquipment = (definition?: Record<string, unknown>): boolean => equipmentTypes.has(String(definition?.type ?? ''))
+
 const asNumber = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
 const asBoolean = (value: unknown): boolean | undefined => (typeof value === 'boolean' ? value : undefined)
 const asString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)

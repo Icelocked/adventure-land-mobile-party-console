@@ -34,6 +34,7 @@ import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.itemdetail.ItemDetailBrowser
 import com.partyconsole.companion.ui.itemdetail.STAT_SCROLLS
 import com.partyconsole.companion.ui.itemdetail.compoundPassCost
+import com.partyconsole.companion.ui.itemdetail.isEquipment
 import com.partyconsole.companion.ui.itemdetail.itemMaximumLevel
 import com.partyconsole.companion.ui.itemdetail.primaryStatScrollCost
 import com.partyconsole.companion.ui.itemdetail.statScrollQuantity
@@ -42,6 +43,7 @@ import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 /** The bottom-docked item panel replacing left-click-details/right-click-
  *  menu (see the mobile-redesign plan): item details are the first thing
@@ -182,6 +184,7 @@ private fun InventoryActions(
     run: (suspend () -> ApiResult<*>) -> Unit,
     viewModel: PartyViewModel,
 ) {
+    val dynamicState by viewModel.dynamicState.collectAsState()
     val item = target.item
     val slot = target.slot
     val level = item.level ?: 0
@@ -192,6 +195,13 @@ private fun InventoryActions(
     val canUpgrade = hasMerchant && meta?.upgradeable == true && itemMaximumLevel(meta) > level
     val canCompound = hasMerchant && meta?.compoundable == true
     val canStatScroll = isMerchant && (meta?.definition?.get("stat") != null)
+    // "Buy another level 0" (upgrade-actions.tsx) only for non-merchant holders - the merchant buys
+    // directly via the commerce screen instead.
+    val canBuyAnother = !isMerchant && meta?.buyable == true
+    // exchangeable/autoExchangeMarked (inventory-panel.tsx) - NPC exchange only runs off the merchant's own inventory.
+    val exchangeable = isMerchant && ((meta?.definition?.get("e") as? JsonPrimitive)?.doubleOrNull ?: 0.0) > 0
+    val autoExchangeMarked = isMerchant && dynamicState.autoExchanges.containsKey("${item.name}@$level")
+    val canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
     Column {
         TapRow("Equip") { run { viewModel.api.itemCommand("equip", characterName, item) } }
         TapRow("Use item") { run { viewModel.api.itemCommand("use-item", characterName, item, JsonPrimitive(slot)) } }
@@ -266,17 +276,52 @@ private fun InventoryActions(
                 }
             }
         }
+        if (canBuyAnother) {
+            TapRow("Buy another level 0") { run { viewModel.api.itemCommand("buy-copy", characterName, item) } }
+        }
+        if (exchangeable) {
+            TapRow(if (autoExchangeMarked) "Auto exchange · already marked" else "Auto exchange") {
+                if (!autoExchangeMarked) {
+                    run { viewModel.api.itemCommand("auto-exchange", characterName, item, JsonPrimitive(slot)) }
+                }
+            }
+        }
         val others = roster.keys.filter { it != characterName }
         if (others.isNotEmpty()) {
             TapRow("Give to...") { onExpand(if (expanded == "give") null else "give") }
             if (expanded == "give") {
                 for (other in others) {
-                    TapRow("  → $other") {
-                        run {
-                            viewModel.api.itemCommand(
-                                "give", characterName, item, JsonPrimitive(slot),
-                                mapOf("target" to JsonPrimitive(other)),
-                            )
+                    if (canEquipOnDelivery) {
+                        Text(
+                            "→ $other",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                        )
+                        TapRow("  Don't equip") {
+                            run {
+                                viewModel.api.itemCommand(
+                                    "give", characterName, item, JsonPrimitive(slot),
+                                    mapOf("target" to JsonPrimitive(other), "equipOnDelivery" to JsonPrimitive(false)),
+                                )
+                            }
+                        }
+                        TapRow("  Equip") {
+                            run {
+                                viewModel.api.itemCommand(
+                                    "give", characterName, item, JsonPrimitive(slot),
+                                    mapOf("target" to JsonPrimitive(other), "equipOnDelivery" to JsonPrimitive(true)),
+                                )
+                            }
+                        }
+                    } else {
+                        TapRow("  → $other") {
+                            run {
+                                viewModel.api.itemCommand(
+                                    "give", characterName, item, JsonPrimitive(slot),
+                                    mapOf("target" to JsonPrimitive(other)),
+                                )
+                            }
                         }
                     }
                 }

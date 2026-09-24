@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
-import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS } from '@/lib/itemFormulas'
+import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment } from '@/lib/itemFormulas'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -152,6 +152,7 @@ function InventoryActions({
   run: (action: () => Promise<ApiResult<CommandResult>>) => void
 }) {
   const api = usePartyApi()
+  const dynamicState = useDynamicState()
   const { item, slot } = target
   const level = item.level ?? 0
   const others = Object.keys(roster).filter((name) => name !== characterName)
@@ -163,6 +164,13 @@ function InventoryActions({
   const canUpgrade = hasMerchant && !!meta?.upgradeable && itemMaximumLevel(meta) > level
   const canCompound = hasMerchant && !!meta?.compoundable
   const canStatScroll = isMerchant && !!meta?.definition.stat
+  // "Buy another level 0" (upgrade-actions.tsx) only for non-merchant holders - the merchant buys
+  // directly via the commerce screen instead.
+  const canBuyAnother = !isMerchant && !!meta?.buyable
+  // exchangeable/autoExchangeMarked (inventory-panel.tsx) - NPC exchange only runs off the merchant's own inventory.
+  const exchangeable = isMerchant && Number((meta?.definition.e as number | undefined) ?? 0) > 0
+  const autoExchangeMarked = isMerchant && !!dynamicState.autoExchanges[`${item.name}@${level}`]
+  const canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
 
   return (
     <div>
@@ -226,14 +234,36 @@ function InventoryActions({
           )}
         </>
       )}
+      {canBuyAnother && <TapRow label="Buy another level 0" onClick={() => run(() => api.itemCommand('buy-copy', characterName, item))} />}
+
+      {exchangeable && (
+        <TapRow
+          label={autoExchangeMarked ? 'Auto exchange · already marked' : 'Auto exchange'}
+          onClick={() => !autoExchangeMarked && run(() => api.itemCommand('auto-exchange', characterName, item, slot))}
+        />
+      )}
 
       {others.length > 0 && (
         <>
           <TapRow label="Give to..." onClick={() => toggle('give')} />
           {expanded === 'give' &&
-            others.map((other) => (
-              <TapRow key={other} label={`  → ${other}`} onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other }))} />
-            ))}
+            (canEquipOnDelivery
+              ? others.map((other) => (
+                  <div key={other} className="py-1 pl-4">
+                    <div className="py-1 text-xs text-muted-foreground">→ {other}</div>
+                    <TapRow
+                      label="  Don't equip"
+                      onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other, equipOnDelivery: false }))}
+                    />
+                    <TapRow
+                      label="  Equip"
+                      onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other, equipOnDelivery: true }))}
+                    />
+                  </div>
+                ))
+              : others.map((other) => (
+                  <TapRow key={other} label={`  → ${other}`} onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other }))} />
+                )))}
         </>
       )}
       <TapRow label="Clear marks" onClick={() => run(() => api.itemCommand('clear-item-marks', characterName, item, slot))} />
