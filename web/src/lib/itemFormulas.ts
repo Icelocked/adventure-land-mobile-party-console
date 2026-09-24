@@ -12,6 +12,39 @@ import type { ItemDropSource, ItemMeta, MerchantExchangeItem } from '@/models'
 const equipmentTypes = new Set(['helmet', 'pants', 'chest', 'weapon', 'amulet', 'earring', 'shoes', 'gloves', 'ring', 'shield', 'belt', 'source', 'orb', 'quiver', 'cape', 'misc_offhand', 'tool'])
 export const isEquipment = (definition?: Record<string, unknown>): boolean => equipmentTypes.has(String(definition?.type ?? ''))
 
+/** comparison-slots.tsx ported verbatim - which equip slot(s) a given item type could
+ *  replace, for gear-comparison-dialog.tsx's "Compare with equipped". */
+const COMPARISON_SLOTS: Record<string, string[]> = {
+  weapon: ['mainhand'],
+  shield: ['offhand'],
+  source: ['offhand'],
+  quiver: ['offhand'],
+  misc_offhand: ['offhand'],
+  chest: ['chest'],
+  pants: ['pants'],
+  helmet: ['helmet'],
+  gloves: ['gloves'],
+  shoes: ['shoes'],
+  cape: ['cape'],
+  belt: ['belt'],
+  orb: ['orb'],
+  amulet: ['amulet'],
+  ring: ['ring1', 'ring2'],
+  earring: ['earring1', 'earring2'],
+}
+
+/** comparison-slots-for.tsx ported verbatim - a 1-handed weapon can replace either hand,
+ *  matching the wielding character's own class (a 2-handed weapon only ever replaces
+ *  mainhand). */
+export function comparisonSlotsFor(meta: ItemMeta | undefined, characterCtype: string): string[] {
+  const type = String(meta?.definition.type ?? '')
+  if (type === 'weapon') {
+    const usage = meta?.usage?.classes.find((entry) => entry.id === characterCtype)
+    return usage?.hands === 1 ? ['mainhand', 'offhand'] : ['mainhand']
+  }
+  return COMPARISON_SLOTS[type] ?? []
+}
+
 const asNumber = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
 const asBoolean = (value: unknown): boolean | undefined => (typeof value === 'boolean' ? value : undefined)
 const asString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
@@ -286,7 +319,7 @@ const ITEM_DETAIL_PROPERTY_ORDER = [
   'reflection', 'crit', 'critdamage', 'lifesteal', 'manasteal', 'speed', 'luck', 'gold', 'xp',
   'ability', 'attr0', 'attr1', 'buy', 'id',
 ]
-const ITEM_DETAIL_PROPERTY_RANK = new Map(ITEM_DETAIL_PROPERTY_ORDER.map((key, index) => [key, index]))
+export const ITEM_DETAIL_PROPERTY_RANK = new Map(ITEM_DETAIL_PROPERTY_ORDER.map((key, index) => [key, index]))
 
 /** Keys item-details.tsx never shows in the stats table - either shown
  *  elsewhere already (name, explanation, level, g/buy price) or purely

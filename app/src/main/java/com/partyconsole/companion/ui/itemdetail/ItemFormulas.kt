@@ -27,6 +27,39 @@ private fun JsonElement.asStringOrNull(): String? = (this as? JsonPrimitive)?.co
 // Matches the game server's can_equip_item types (item-actions.ts). Elixirs are consumed effects, not equipment.
 private val equipmentTypes = setOf("helmet", "pants", "chest", "weapon", "amulet", "earring", "shoes", "gloves", "ring", "shield", "belt", "source", "orb", "quiver", "cape", "misc_offhand", "tool")
 fun isEquipment(definition: Map<String, JsonElement>?): Boolean = equipmentTypes.contains(definition?.get("type")?.asStringOrNull() ?: "")
+
+// comparison-slots.tsx ported verbatim - which equip slot(s) a given item type could
+// replace, for gear-comparison-dialog.tsx's "Compare with equipped".
+private val comparisonSlots = mapOf(
+    "weapon" to listOf("mainhand"),
+    "shield" to listOf("offhand"),
+    "source" to listOf("offhand"),
+    "quiver" to listOf("offhand"),
+    "misc_offhand" to listOf("offhand"),
+    "chest" to listOf("chest"),
+    "pants" to listOf("pants"),
+    "helmet" to listOf("helmet"),
+    "gloves" to listOf("gloves"),
+    "shoes" to listOf("shoes"),
+    "cape" to listOf("cape"),
+    "belt" to listOf("belt"),
+    "orb" to listOf("orb"),
+    "amulet" to listOf("amulet"),
+    "ring" to listOf("ring1", "ring2"),
+    "earring" to listOf("earring1", "earring2"),
+)
+
+/** comparison-slots-for.tsx ported verbatim - a 1-handed weapon can replace either hand,
+ *  matching the wielding character's own class (a 2-handed weapon only ever replaces
+ *  mainhand). */
+fun comparisonSlotsFor(meta: ItemMeta?, characterCtype: String): List<String> {
+    val type = meta?.definition?.get("type")?.asStringOrNull() ?: ""
+    if (type == "weapon") {
+        val usage = meta?.usage?.classes?.find { it.id == characterCtype }
+        return if (usage?.hands == 1) listOf("mainhand", "offhand") else listOf("mainhand")
+    }
+    return comparisonSlots[type] ?: emptyList()
+}
 private fun JsonElement.asIntListOrNull(): List<Int>? =
     (this as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull?.toInt() }
 
@@ -308,7 +341,7 @@ private val ITEM_DETAIL_PROPERTY_ORDER = listOf(
     "reflection", "crit", "critdamage", "lifesteal", "manasteal", "speed", "luck", "gold", "xp",
     "ability", "attr0", "attr1", "buy", "id",
 )
-private val ITEM_DETAIL_PROPERTY_RANK = ITEM_DETAIL_PROPERTY_ORDER.withIndex().associate { (i, k) -> k to i }
+val ITEM_DETAIL_PROPERTY_RANK = ITEM_DETAIL_PROPERTY_ORDER.withIndex().associate { (i, k) -> k to i }
 
 /** Keys item-details.tsx never shows in the stats table - either shown
  *  elsewhere already (name, explanation, level, g/buy price) or purely
