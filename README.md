@@ -1,5 +1,7 @@
 # Party Console Companion (Android)
 
+[![Download latest APK](https://img.shields.io/github/v/release/Icelocked/adventure-land-mobile-party-console?label=Download&style=for-the-badge)](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest)
+
 An independent Android companion app for
 [Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console).
 It does not modify or depend on party-console's source code at all - it's a
