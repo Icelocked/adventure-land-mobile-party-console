@@ -6,6 +6,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
+import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog, RosterMember } from '@/models'
 
@@ -38,6 +39,7 @@ export function ItemActionPanel({
   const catalogFor = useCatalogLookup(catalog)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [comparing, setComparing] = useState(false)
 
   const run = async (action: () => Promise<ApiResult<CommandResult>>) => {
     const result = await action()
@@ -73,6 +75,7 @@ export function ItemActionPanel({
   }, [characters, dynamicState.bank])
 
   return (
+    <>
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
         <div className="pb-1 pt-1">
@@ -111,12 +114,25 @@ export function ItemActionPanel({
             expanded={expanded}
             onExpand={setExpanded}
             run={run}
+            onCompare={isEquipment(meta?.definition) ? () => setComparing(true) : undefined}
           />
         ) : (
           <EquipmentActions target={target} meta={meta} characterName={characterName} isMerchant={isMerchant} run={run} />
         )}
       </SheetContent>
     </Sheet>
+
+    {comparing && (
+      <GearComparisonSheet
+        item={item}
+        meta={meta}
+        characterCtype={roster[characterName]?.ctype ?? ''}
+        equippedSlots={characters[characterName]?.inventory?.slots ?? {}}
+        catalogFor={catalogFor}
+        onClose={() => setComparing(false)}
+      />
+    )}
+    </>
   )
 }
 
@@ -139,6 +155,7 @@ function InventoryActions({
   expanded,
   onExpand,
   run,
+  onCompare,
 }: {
   target: Extract<ItemActionTarget, { kind: 'inventory' }>
   meta: ItemMeta | undefined
@@ -150,6 +167,7 @@ function InventoryActions({
   expanded: string | null
   onExpand: (value: string | null) => void
   run: (action: () => Promise<ApiResult<CommandResult>>) => void
+  onCompare?: () => void
 }) {
   const api = usePartyApi()
   const dynamicState = useDynamicState()
@@ -175,6 +193,7 @@ function InventoryActions({
   return (
     <div>
       <TapRow label="Equip" onClick={() => run(() => api.itemCommand('equip', characterName, item))} />
+      {onCompare && <TapRow label="Compare with equipped" onClick={onCompare} />}
       <TapRow label="Use item" onClick={() => run(() => api.itemCommand('use-item', characterName, item, slot))} />
       <TapRow label="Mark for Bank" onClick={() => run(() => api.itemCommand('mark', characterName, item, slot))} />
       <TapRow label="Auto-mark for Bank" onClick={() => run(() => api.itemCommand('auto-item-mark', characterName, item, undefined, { mode: 'bank' }))} />

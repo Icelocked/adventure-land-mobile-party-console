@@ -65,6 +65,7 @@ fun ItemActionPanel(
     val characters by viewModel.characters.collectAsState()
     var error by remember(target) { mutableStateOf<String?>(null) }
     var expanded by remember(target) { mutableStateOf<String?>(null) } // which inline form is open, if any
+    var comparing by remember(target) { mutableStateOf(false) }
 
     fun run(action: suspend () -> ApiResult<*>) {
         scope.launch {
@@ -117,12 +118,14 @@ fun ItemActionPanel(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            val onCompare: (() -> Unit)? = if (isEquipment(meta?.definition)) fun() { comparing = true } else null
             when (target) {
                 is ItemActionTarget.InventorySlot -> InventoryActions(
                     target, meta, characterName, isMerchant, roster,
                     buyable = dynamicState.merchantCatalog?.buyable ?: emptyList(),
                     statScrollInventory = statScrollInventory,
                     expanded = expanded, onExpand = { expanded = it }, run = ::run, viewModel = viewModel,
+                    onCompare = onCompare,
                 )
                 is ItemActionTarget.EquipmentSlot -> EquipmentActions(
                     target, meta, characterName, isMerchant, expanded,
@@ -130,6 +133,17 @@ fun ItemActionPanel(
                 )
             }
         }
+    }
+
+    if (comparing) {
+        GearComparisonSheet(
+            item = target.item,
+            meta = meta,
+            characterCtype = roster[characterName]?.ctype ?: "",
+            equippedSlots = characters[characterName]?.inventory?.slots ?: emptyMap(),
+            catalogFor = catalogFor,
+            onClose = { comparing = false },
+        )
     }
 }
 
@@ -183,6 +197,7 @@ private fun InventoryActions(
     onExpand: (String?) -> Unit,
     run: (suspend () -> ApiResult<*>) -> Unit,
     viewModel: PartyViewModel,
+    onCompare: (() -> Unit)? = null,
 ) {
     val dynamicState by viewModel.dynamicState.collectAsState()
     val item = target.item
@@ -204,6 +219,7 @@ private fun InventoryActions(
     val canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
     Column {
         TapRow("Equip") { run { viewModel.api.itemCommand("equip", characterName, item) } }
+        onCompare?.let { compare -> TapRow("Compare with equipped") { compare() } }
         TapRow("Use item") { run { viewModel.api.itemCommand("use-item", characterName, item, JsonPrimitive(slot)) } }
         TapRow("Mark for Bank") { run { viewModel.api.itemCommand("mark", characterName, item, JsonPrimitive(slot)) } }
         TapRow("Auto-mark for Bank") {
