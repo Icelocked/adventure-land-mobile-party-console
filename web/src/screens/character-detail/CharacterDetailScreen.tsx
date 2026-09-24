@@ -12,6 +12,7 @@ import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
 import { GoldTargetSection } from './sections/GoldTargetSection'
 import { AutoMarksSection } from './sections/AutoMarksSection'
+import { AccountMenu } from './AccountMenu'
 import { ItemActionPanel, type ItemActionTarget } from '@/screens/itempanel/ItemActionPanel'
 
 /** Character focus screen: a sticky vitals header (never scrolls out of
@@ -27,6 +28,7 @@ export function CharacterDetailScreen() {
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const roster = useRoster()
   const [actionTarget, setActionTarget] = useState<ItemActionTarget | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const state = characters[name]
   const vitals = state?.vitals
@@ -44,7 +46,7 @@ export function CharacterDetailScreen() {
           <button onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
           </button>
-          <button aria-label="Menu">
+          <button aria-label="Menu" onClick={() => setMenuOpen(true)}>
             <Menu className="size-5" />
           </button>
         </div>
@@ -109,6 +111,7 @@ export function CharacterDetailScreen() {
           onClose={() => setActionTarget(null)}
         />
       )}
+      {menuOpen && <AccountMenu onClose={() => setMenuOpen(false)} />}
     </div>
   )
 }
