@@ -5,7 +5,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import type { CatalogItem, CharacterState, InventoryEntry } from '@/models'
+import type { BankVault, CatalogItem, CharacterState, InventoryEntry } from '@/models'
 
 /** Shared bank vault browse - ported from ui/account/BankScreen.kt,
  *  grouped by pack: withdraw to a character, or sell/deconstruct
@@ -24,6 +24,7 @@ export function BankScreen() {
     <AccountScreenScaffold title={`Bank${bank ? ` · ${bank.gold.toLocaleString()}g` : ''}`} onRefresh={() => void refreshNow()}>
       <GoldBreakdown bankGold={bank?.gold ?? 0} characters={characters} />
       {dynamicState.bankSortMode === 'request' && <BankSortToggle pending={dynamicState.bankSortRequest} />}
+      <LockedVaultsSection bankVaults={dynamicState.bankVaults} unlockedPacks={bank?.packs} />
       {!bank || Object.keys(bank.packs).length === 0 ? (
         <EmptyState message="No bank data yet." />
       ) : (
@@ -101,6 +102,85 @@ function BankSortToggle({ pending }: { pending?: { status: 'queued' | 'sorting' 
         Sort on next visit · {pending ? 'On' : 'Off'}
       </Button>
       {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
+    </div>
+  )
+}
+
+/** bank-unlock.ts's locked-vault list, grouped by floor - the base "bank" floor's
+ *  vaults each just cost gold once accessible; a non-base floor (bank_b/bank_u)
+ *  needs its own first (0-gold) vault unlocked with an owned key before any
+ *  other vault on that floor opens. The server enforces that ordering; this UI
+ *  just offers whichever action a locked vault's own fields call for and
+ *  surfaces the server's error if it's out of order. */
+function LockedVaultsSection({ bankVaults, unlockedPacks }: { bankVaults: BankVault[]; unlockedPacks?: Record<string, unknown> }) {
+  const [expandedFloor, setExpandedFloor] = useState<string | null>(null)
+  const locked = bankVaults.filter((vault) => !unlockedPacks?.[vault.pack])
+  if (locked.length === 0) return null
+
+  const byFloor = new Map<string, BankVault[]>()
+  for (const vault of locked) {
+    const list = byFloor.get(vault.floor) ?? []
+    list.push(vault)
+    byFloor.set(vault.floor, list)
+  }
+
+  return (
+    <div className="mx-3 mb-3 flex flex-col gap-2 rounded-md border border-border bg-card p-3">
+      <span className="text-sm font-medium">Locked bank vaults ({locked.length})</span>
+      {[...byFloor.entries()].map(([floor, vaults]) => (
+        <div key={floor}>
+          <button className="text-xs text-primary underline" onClick={() => setExpandedFloor(expandedFloor === floor ? null : floor)}>
+            {floor} ({vaults.length})
+          </button>
+          {expandedFloor === floor && (
+            <div className="mt-1 flex flex-col gap-1 pl-1">
+              {vaults.map((vault) => (
+                <LockedVaultRow key={vault.pack} vault={vault} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function LockedVaultRow({ vault }: { vault: BankVault }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const needsKey = vault.gold === 0 && vault.key
+  const label = needsKey ? `Unlock with ${vault.key?.name ?? 'key'}` : `Unlock · ${vault.gold.toLocaleString()}g`
+
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-muted-foreground">{vault.pack}</span>
+      {confirming ? (
+        <div className="flex items-center gap-2">
+          <span className="text-destructive">Really {label.toLowerCase()}?</span>
+          <button
+            className="text-primary underline"
+            onClick={async () => {
+              setConfirming(false)
+              setError(null)
+              const result = await api.unlockBankVault(vault.pack, needsKey ? 'key' : undefined)
+              if (result.kind === 'failure') setError(result.message)
+              await refreshNow()
+            }}
+          >
+            Confirm
+          </button>
+          <button className="text-muted-foreground underline" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button className="text-primary underline" onClick={() => setConfirming(true)}>
+          {label}
+        </button>
+      )}
+      {error && <span className="text-destructive">{error}</span>}
     </div>
   )
 }

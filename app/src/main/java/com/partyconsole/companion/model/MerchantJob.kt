@@ -48,6 +48,28 @@ data class BankSnapshot(
     val packs: Map<String, List<InventoryEntry?>> = emptyMap(),
 )
 
+/** One bank pack's lock state (http/bank-unlock.ts / bank-sheet.tsx's BankVault) - every
+ *  pack the account could ever have, locked or not. A pack is unlocked once it shows up as
+ *  a key in BankSnapshot.packs; until then this describes what opens it: `floor == "bank"`
+ *  packs open for `gold` alone once accessible, but a non-base floor's first (gold = 0)
+ *  vault needs its own `key` item owned and unlocked with kind "key" before ANY vault on
+ *  that floor (including that one) becomes accessible - see bank-unlock.ts's access(). */
+@Serializable
+data class BankVaultKey(
+    val id: String,
+    val name: String? = null,
+    val sprite: Sprite? = null,
+)
+
+@Serializable
+data class BankVault(
+    val pack: String,
+    val floor: String,
+    val gold: Long = 0,
+    val shells: Long = 0,
+    val key: BankVaultKey? = null,
+)
+
 /** One drop-table entry within a BestiaryMonster - `rate` is the chance
  *  per kill (e.g. 0.0002 = 0.02%). */
 @Serializable
@@ -385,6 +407,9 @@ data class PartyStateDynamic(
     val followers: Map<String, Boolean> = emptyMap(),
     val restockPolicies: Map<String, RestockPolicy> = emptyMap(),
     val bank: BankSnapshot? = null,
+    // Every bank pack the account could ever have, locked or not (see BankVault) - locked ones
+    // aren't in bank.packs yet.
+    val bankVaults: List<BankVault> = emptyList(),
     val bestiaryCatalog: List<BestiaryMonster> = emptyList(),
     val skillCatalog: List<SkillClass> = emptyList(),
     val combatLogs: Map<String, List<ActivityEntry>> = emptyMap(),
