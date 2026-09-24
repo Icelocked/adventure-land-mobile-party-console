@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -49,17 +51,23 @@ fun AutoMarksSection(
     val npcEntries = dynamicState.autoNpcSales.entries
         .filter { (_, rule) -> if (isMerchant) rule.character == null else rule.character == characterName }
         .map { (key, rule) -> RuleEntry(key, rule.item, null) { viewModel.api.autoNpcSale(characterName, rule.item, remove = true) } }
+    val clearNpc: suspend () -> Unit = { viewModel.api.clearAllAutoNpcSales(if (isMerchant) null else characterName) }
 
     val deconEntries = dynamicState.autoDeconstruction[characterName].orEmpty().entries
         .map { (key, rule) -> RuleEntry(key, rule.item, null) { viewModel.api.autoDeconstruct(characterName, rule.item, remove = true) } }
+    // No bulk route for deconstruction (mark-commands.ts has one for bank/merchant marks, compound-
+    // commands.ts for upgrades/compounds, automatic-sales.ts for npc/stand - deconstruction doesn't) -
+    // inventory-panel.tsx's own clearAutomaticSection loops the existing per-rule remove the same way.
+    val clearDecon: suspend () -> Unit = { for (entry in deconEntries) entry.onRemove() }
 
     val bankEntries = dynamicState.autoItemMarks[characterName].orEmpty().entries
         .filter { (_, mode) -> mode == "bank" }
         .map { (key, _) -> RuleEntry(key, itemFromRuleKey(key), null) { viewModel.api.removeAutoItemMark(characterName, "bank", key) } }
+    val clearBank: suspend () -> Unit = { viewModel.api.clearAutoItemMarks(characterName, "bank") }
 
     SectionCard(title = "Automatic rules") {
-        AutoRuleGroup("Auto NPC sales", npcEntries, catalogFor)
-        AutoRuleGroup("Auto deconstruction", deconEntries, catalogFor)
+        AutoRuleGroup("Auto NPC sales", npcEntries, catalogFor, clearNpc)
+        AutoRuleGroup("Auto deconstruction", deconEntries, catalogFor, clearDecon)
 
         if (isMerchant) {
             val standEntries = dynamicState.autoStandMarks.entries
@@ -86,19 +94,20 @@ fun AutoMarksSection(
                 .filter { (_, mode) -> mode == "merchant" }
                 .map { (key, _) -> RuleEntry(key, itemFromRuleKey(key), null) { viewModel.api.removeAutoItemMark(characterName, "merchant", key) } }
 
-            AutoRuleGroup("Auto stand marks", standEntries, catalogFor)
-            AutoRuleGroup("Auto upgrades", upgradeEntries, catalogFor)
-            AutoRuleGroup("Auto compounds", compoundEntries, catalogFor)
-            AutoRuleGroup("Auto merchant marks", merchantMarkEntries, catalogFor)
+            AutoRuleGroup("Auto stand marks", standEntries, catalogFor) { viewModel.api.clearAllAutoStand() }
+            AutoRuleGroup("Auto upgrades", upgradeEntries, catalogFor) { viewModel.api.clearAutoUpgrades(characterName) }
+            AutoRuleGroup("Auto compounds", compoundEntries, catalogFor) { viewModel.api.clearAutoCompounds(characterName) }
+            AutoRuleGroup("Auto merchant marks", merchantMarkEntries, catalogFor) { viewModel.api.clearAutoItemMarks(characterName, "merchant") }
         }
 
-        AutoRuleGroup("Auto bank marks", bankEntries, catalogFor)
+        AutoRuleGroup("Auto bank marks", bankEntries, catalogFor, clearBank)
     }
 }
 
 @Composable
-private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (String) -> CatalogItem?) {
+private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (String) -> CatalogItem?, onClearAll: suspend () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    var confirmingClear by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -122,6 +131,33 @@ private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (
                     )
                     IconButton(onClick = { scope.launch { entry.onRemove() } }) {
                         Icon(Icons.Filled.Close, contentDescription = "Remove")
+                    }
+                }
+            }
+            if (entries.isNotEmpty()) {
+                if (confirmingClear) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            "Really clear all?",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        Button(onClick = {
+                            confirmingClear = false
+                            scope.launch { onClearAll() }
+                        }) { Text("Clear all") }
+                        OutlinedButton(onClick = { confirmingClear = false }) { Text("Cancel") }
+                    }
+                } else {
+                    androidx.compose.material3.TextButton(
+                        onClick = { confirmingClear = true },
+                        modifier = Modifier.padding(start = 8.dp),
+                    ) {
+                        Text("Clear all", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

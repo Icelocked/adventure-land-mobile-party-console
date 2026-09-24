@@ -417,6 +417,39 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         return post("merchant/auto-stand", body)
     }
 
+    /** POST /party-api/merchant/auto-npc-sale with action "clear-all"
+     *  (automatic-sales.ts) - drops every auto-NPC-sale rule scoped to
+     *  `character` (null clears the merchant's own account-wide rules,
+     *  matching how npcEntries filters by `rule.character == null`). */
+    suspend fun clearAllAutoNpcSales(character: String? = null): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                put("action", JsonPrimitive("clear-all"))
+                character?.let { put("character", JsonPrimitive(it)) }
+            },
+        )
+        return post("merchant/auto-npc-sale", body)
+    }
+
+    /** POST /party-api/merchant/auto-stand with action "clear-all" -
+     *  merchant-only, account-wide (no character scoping server-side). */
+    suspend fun clearAllAutoStand(): ApiResult<CommandResult> =
+        post("merchant/auto-stand", JsonObject(mapOf("action" to JsonPrimitive("clear-all"))))
+
+    /** `/party-api/command` type "clear-auto-upgrades"/"clear-auto-compounds"
+     *  (compound-commands.ts) - drops EVERY owner's rules at once; the
+     *  server requires `character` to be the configured merchant. */
+    suspend fun clearAutoUpgrades(merchantCharacter: String): ApiResult<CommandResult> =
+        sendCommand(merchantCharacter, mapOf("type" to "clear-auto-upgrades"))
+
+    suspend fun clearAutoCompounds(merchantCharacter: String): ApiResult<CommandResult> =
+        sendCommand(merchantCharacter, mapOf("type" to "clear-auto-compounds"))
+
+    /** `/party-api/command` type "clear-auto-item-marks" - drops `character`'s
+     *  own auto-bank/auto-merchant rules for the given mode. */
+    suspend fun clearAutoItemMarks(character: String, mode: String): ApiResult<CommandResult> =
+        sendCommand(character, mapOf("type" to "clear-auto-item-marks", "mode" to mode))
+
     /** POST /party-api/merchant/order (http/merchant-order.ts) - queues an
      *  NPC buy and/or crafting job. The server recomputes each buy line's
      *  upgrade-attempt budget itself before queuing - `level` (the desired
