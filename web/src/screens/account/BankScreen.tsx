@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { CatalogItem, CharacterState, InventoryEntry } from '@/models'
 
@@ -21,6 +23,7 @@ export function BankScreen() {
   return (
     <AccountScreenScaffold title={`Bank${bank ? ` · ${bank.gold.toLocaleString()}g` : ''}`} onRefresh={() => void refreshNow()}>
       <GoldBreakdown bankGold={bank?.gold ?? 0} characters={characters} />
+      {dynamicState.bankSortMode === 'request' && <BankSortToggle pending={dynamicState.bankSortRequest} />}
       {!bank || Object.keys(bank.packs).length === 0 ? (
         <EmptyState message="No bank data yet." />
       ) : (
@@ -78,6 +81,30 @@ function GoldBreakdown({ bankGold, characters }: { bankGold: number; characters:
   )
 }
 
+/** bank-sort-control.tsx's one-shot "Sort on next visit" toggle, distinct from the standing
+ *  automatic/on-request mode radio already ported into Collection settings - only shown while
+ *  that mode is "request". */
+function BankSortToggle({ pending }: { pending?: { status: 'queued' | 'sorting' | 'retry'; message?: string } | null }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const statusLabel = pending?.status === 'sorting' ? 'Sorting' : pending?.status === 'retry' ? `Retry pending${pending.message ? `: ${pending.message}` : ''}` : pending ? 'Queued' : ''
+  return (
+    <div className="mx-3 mb-3 flex items-center gap-3 rounded-md border border-border bg-card p-3">
+      <Button
+        size="sm"
+        variant={pending ? 'default' : 'outline'}
+        onClick={async () => {
+          await api.requestBankSort(!pending)
+          await refreshNow()
+        }}
+      >
+        Sort on next visit · {pending ? 'On' : 'Off'}
+      </Button>
+      {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
+    </div>
+  )
+}
+
 function BankRow({
   entry,
   pack,
@@ -96,6 +123,8 @@ function BankRow({
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [pickingWithdraw, setPickingWithdraw] = useState(false)
+  const [pickingStand, setPickingStand] = useState(false)
+  const [standPrice, setStandPrice] = useState('')
 
   return (
     <div className="rounded-md border border-border bg-card p-2">
@@ -108,10 +137,30 @@ function BankRow({
         </span>
       </button>
       {expanded &&
-        (!pickingWithdraw ? (
-          <div className="mt-1.5 flex gap-3 pl-1">
+        (pickingStand ? (
+          <div className="mt-1.5 flex items-end gap-2 pl-1">
+            <label className="flex-1 text-xs text-muted-foreground">
+              Price
+              <Input value={standPrice} onChange={(e) => /^\d*$/.test(e.target.value) && setStandPrice(e.target.value)} className="mt-1" />
+            </label>
+            <Button
+              size="sm"
+              onClick={async () => {
+                await api.markForStand(entry.item, entry.slot, Number(standPrice) || 0, { bankPack: pack })
+                setPickingStand(false)
+                await refreshNow()
+              }}
+            >
+              List
+            </Button>
+          </div>
+        ) : !pickingWithdraw ? (
+          <div className="mt-1.5 flex flex-wrap gap-3 pl-1">
             <button className="text-xs text-primary underline" onClick={() => setPickingWithdraw(true)}>
               Withdraw to...
+            </button>
+            <button className="text-xs text-primary underline" onClick={() => setPickingStand(true)}>
+              Mark for stand
             </button>
             <button
               className="text-xs text-primary underline"

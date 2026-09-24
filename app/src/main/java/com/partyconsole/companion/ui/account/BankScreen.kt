@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.partyconsole.companion.model.BankSortRequest
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.InventoryEntry
 import com.partyconsole.companion.model.RosterMember
@@ -52,6 +55,9 @@ fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
         onRefresh = { topScope.launch { viewModel.refreshDynamicStateNow() } },
     ) {
         GoldBreakdown(bankGold = bank?.gold ?: 0L, characters = characters)
+        if (state.bankSortMode == "request") {
+            BankSortToggle(pending = state.bankSortRequest, viewModel = viewModel)
+        }
         if (bank == null || bank.packs.isEmpty()) {
             EmptyState("No bank data yet.")
         } else {
@@ -111,6 +117,30 @@ private fun GoldBreakdown(bankGold: Long, characters: Map<String, CharacterState
     }
 }
 
+/** bank-sort-control.tsx's one-shot "Sort on next visit" toggle, distinct from the standing
+ *  automatic/on-request mode radio already ported into Collection settings - only shown while
+ *  that mode is "request". */
+@Composable
+private fun BankSortToggle(pending: BankSortRequest?, viewModel: PartyViewModel) {
+    val scope = rememberCoroutineScope()
+    val statusLabel = when (pending?.status) {
+        "sorting" -> "Sorting"
+        "retry" -> "Retry pending" + (pending.message?.let { ": $it" } ?: "")
+        null -> ""
+        else -> "Queued"
+    }
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Button(onClick = { scope.launch { viewModel.api.requestBankSort(pending == null) } }) {
+                Text("Sort on next visit · " + if (pending != null) "On" else "Off")
+            }
+            if (statusLabel.isNotEmpty()) {
+                Text(statusLabel, modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
 @Composable
 private fun BankRow(
     entry: InventoryEntry,
@@ -123,6 +153,8 @@ private fun BankRow(
 ) {
     val scope = rememberCoroutineScope()
     var pickingWithdraw by remember(expanded) { mutableStateOf(false) }
+    var pickingStand by remember(expanded) { mutableStateOf(false) }
+    var standPrice by remember(expanded) { mutableStateOf("") }
 
     Card(onClick = onToggle, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -136,9 +168,29 @@ private fun BankRow(
                 )
             }
             if (expanded) {
-                if (!pickingWithdraw) {
+                if (pickingStand) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = standPrice,
+                            onValueChange = { new -> if (new.all { it.isDigit() }) standPrice = new },
+                            label = { Text("Price") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(onClick = {
+                            scope.launch {
+                                viewModel.api.markForStand(entry.item, entry.slot, bankPack = pack, price = standPrice.toLongOrNull() ?: 0L)
+                                pickingStand = false
+                            }
+                        }) { Text("List") }
+                    }
+                } else if (!pickingWithdraw) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                         TextButton(onClick = { pickingWithdraw = true }) { Text("Withdraw to...") }
+                        TextButton(onClick = { pickingStand = true }) { Text("Mark for stand") }
                         TextButton(onClick = {
                             scope.launch { viewModel.api.sellBankItemToNpc(entry.item, pack, entry.slot) }
                         }) { Text("Sell to NPC") }
