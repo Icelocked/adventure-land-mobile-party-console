@@ -168,8 +168,26 @@ export interface CatalogItem {
   meta?: ItemMeta | null
 }
 
+/** merchantCatalog.buyable - NPC-purchasable items, including the
+ *  compound scrolls ("cscroll0".."cscroll3") whose real prices
+ *  compoundPassCost (itemFormulas.ts) looks up by id. */
+export interface MerchantBuyItem {
+  id: string
+  name: string
+  cost: number
+  seller: string
+  sprite?: Sprite | null
+  upgradeable?: boolean
+  compoundable?: boolean
+  upgradeGrade?: number
+  grades?: number[]
+  upgradeChances?: number[]
+  scrollCosts?: number[]
+}
+
 export interface MerchantCatalog {
   allItems: CatalogItem[]
+  buyable: MerchantBuyItem[]
   // NPC exchange/box tables - matched against an item by id+level to
   // build the item-details "Exchange price"/"reward"/"Reward in" sections.
   exchangeable: MerchantExchangeItem[]

@@ -118,6 +118,90 @@ export function itemMaximumLevel(meta: ItemMeta | undefined): number {
   return meta?.compoundable ? 7 : meta?.upgradeable ? 13 : 0
 }
 
+/** upgrade-scroll-cost.tsx ported verbatim, including its hardcoded
+ *  scroll-price fallback (not the live catalog price - this function has
+ *  no catalog access at its call site in the dashboard either, so the
+ *  approximation is intentional, not a bug to "fix" here). */
+export function upgradeScrollCost(meta: ItemMeta | undefined, startLevel: number, tiers: number): number {
+  const grades = asIntList(meta?.definition.grades) ?? [9, 10, 11, 12]
+  const scrollCosts = [1_000, 40_000, 1_600_000, 64_000_000]
+  let total = 0
+  for (let level = startLevel; level < startLevel + tiers; level += 1) {
+    const grade = level >= (grades[2] ?? 11) ? 3 : level >= (grades[1] ?? 10) ? 2 : level >= (grades[0] ?? 9) ? 1 : 0
+    total += scrollCosts[grade] || 0
+  }
+  return total
+}
+
+export interface CompoundCost {
+  gold: number
+  scrolls: number
+}
+
+/** lib/compound-cost.ts's compoundPassCost ported verbatim - minimum
+ *  scroll spend to build one target item entirely from +0 copies, using
+ *  real compound-scroll ("cscroll0".."cscroll3") prices from the live
+ *  merchant catalog rather than a hardcoded approximation. */
+export function compoundPassCost(grades: number[] | undefined, targetLevel: number, buyable: { id: string; cost: number }[]): CompoundCost | null {
+  const thresholds = Array.isArray(grades) ? grades : [9, 10, 11, 12]
+  const prices = new Map(buyable.map((item) => [item.id, item.cost]))
+  let gold = 0
+  let scrolls = 0
+  for (let level = 0; level < targetLevel; level += 1) {
+    let grade = 0
+    for (let index = 0; index < thresholds.length; index += 1) {
+      if (level >= thresholds[index]) grade = index + 1
+    }
+    const price = prices.get('cscroll' + grade)
+    if (price === undefined || !Number.isFinite(price) || price < 0) return null
+    const count = 3 ** (targetLevel - level - 1)
+    gold += count * price
+    scrolls += count
+  }
+  return { gold, scrolls }
+}
+
+/** stat-scrolls.tsx's table - `purchasable` stats (str/int/dex/vit) are
+ *  bought outright for gold; the rest require already owning the scroll
+ *  (stat-scroll-quantity.tsx/primary-stat-scroll-cost.tsx). */
+export const STAT_SCROLLS: { stat: string; scroll: string; label: string; purchasable: boolean }[] = [
+  { stat: 'str', scroll: 'strscroll', label: 'STR', purchasable: true },
+  { stat: 'int', scroll: 'intscroll', label: 'INT', purchasable: true },
+  { stat: 'dex', scroll: 'dexscroll', label: 'DEX', purchasable: true },
+  { stat: 'vit', scroll: 'vitscroll', label: 'VIT', purchasable: true },
+  { stat: 'for', scroll: 'forscroll', label: 'FOR', purchasable: false },
+  { stat: 'evasion', scroll: 'evasionscroll', label: 'Evasion', purchasable: false },
+  { stat: 'reflection', scroll: 'reflectionscroll', label: 'Reflection', purchasable: false },
+  { stat: 'gold', scroll: 'goldscroll', label: 'Gold', purchasable: false },
+  { stat: 'luck', scroll: 'luckscroll', label: 'Luck', purchasable: false },
+  { stat: 'xp', scroll: 'xpscroll', label: 'XP', purchasable: false },
+  { stat: 'armor', scroll: 'armorscroll', label: 'Armor', purchasable: false },
+  { stat: 'resistance', scroll: 'resistancescroll', label: 'Resistance', purchasable: false },
+  { stat: 'speed', scroll: 'speedscroll', label: 'Speed', purchasable: false },
+  { stat: 'lifesteal', scroll: 'lifestealscroll', label: 'Lifesteal', purchasable: false },
+  { stat: 'manasteal', scroll: 'manastealscroll', label: 'Manasteal', purchasable: false },
+  { stat: 'rpiercing', scroll: 'rpiercingscroll', label: 'Resistance piercing', purchasable: false },
+  { stat: 'apiercing', scroll: 'apiercingscroll', label: 'Armor piercing', purchasable: false },
+  { stat: 'crit', scroll: 'critscroll', label: 'Critical hit', purchasable: false },
+  { stat: 'dreturn', scroll: 'dreturnscroll', label: 'Damage return', purchasable: false },
+  { stat: 'frequency', scroll: 'frequencyscroll', label: 'Attack speed', purchasable: false },
+  { stat: 'mp_cost', scroll: 'mpcostscroll', label: 'MP cost reduction', purchasable: false },
+  { stat: 'output', scroll: 'outputscroll', label: 'Output', purchasable: false },
+]
+
+/** stat-scroll-quantity.tsx ported verbatim - how many scrolls of a stat
+ *  type a mark at this item's current level requires. */
+export function statScrollQuantity(meta: ItemMeta | undefined, level: number): number {
+  const grades = asIntList(meta?.definition.grades) ?? [9, 10, 11, 12]
+  const lvl = Math.max(0, level)
+  const grade = lvl >= (grades[2] ?? 11) ? 3 : lvl >= (grades[1] ?? 10) ? 2 : lvl >= (grades[0] ?? 9) ? 1 : 0
+  return [1, 10, 100, 1000][grade] || 1
+}
+
+export function primaryStatScrollCost(meta: ItemMeta | undefined, level: number): number {
+  return statScrollQuantity(meta, level) * 8_000
+}
+
 /** npc-sale-value.tsx ported verbatim - the exact upgrade/compound
  *  grade-tier gold curve the game itself uses, not an approximation. */
 export function npcSaleValue(level: number, gift: boolean, expires: unknown, meta: ItemMeta | undefined): number {

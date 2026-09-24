@@ -68,7 +68,16 @@ export default defineConfig(({ mode }) => {
         ? {
             '/party-api': {
               target: proxyTarget,
-              changeOrigin: true,
+              // changeOrigin must stay false (the default) here: party-
+              // console's own CORS check (tools/hosting/request-origin.ts)
+              // derives "where did this request come from" from the Host
+              // header IT receives, not a dedicated header - changeOrigin
+              // rewrites Host to the proxy target's own address, which
+              // makes every mutating command get rejected with "Game
+              // origin required" since that no longer matches the
+              // browser's real Origin header. See nginx.conf's matching
+              // `proxy_set_header Host $host` for the production version
+              // of this same fix.
               // /dashboard-stream is a long-lived SSE response - Vite's
               // proxy (http-proxy under the hood) streams it through
               // fine by default, nothing extra needed here.

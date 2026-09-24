@@ -135,6 +135,96 @@ fun itemMaximumLevel(meta: ItemMeta?): Int {
     return if (meta?.compoundable == true) 7 else if (meta?.upgradeable == true) 13 else 0
 }
 
+/** upgrade-scroll-cost.tsx ported verbatim, including its hardcoded
+ *  scroll-price fallback (not the live catalog price - this function has
+ *  no catalog access at its call site in the dashboard either, so the
+ *  approximation is intentional, not a bug to "fix" here). */
+fun upgradeScrollCost(meta: ItemMeta?, startLevel: Int, tiers: Int): Long {
+    val grades = meta?.definition?.get("grades")?.asIntListOrNull() ?: listOf(9, 10, 11, 12)
+    val scrollCosts = listOf(1_000L, 40_000L, 1_600_000L, 64_000_000L)
+    var total = 0L
+    for (level in startLevel until startLevel + tiers) {
+        val grade = when {
+            level >= (grades.getOrNull(2) ?: 11) -> 3
+            level >= (grades.getOrNull(1) ?: 10) -> 2
+            level >= (grades.getOrNull(0) ?: 9) -> 1
+            else -> 0
+        }
+        total += scrollCosts.getOrElse(grade) { 0L }
+    }
+    return total
+}
+
+data class CompoundCost(val gold: Long, val scrolls: Long)
+
+/** lib/compound-cost.ts's compoundPassCost ported verbatim - minimum
+ *  scroll spend to build one target item entirely from +0 copies, using
+ *  real compound-scroll ("cscroll0".."cscroll3") prices from the live
+ *  merchant catalog rather than a hardcoded approximation. */
+fun compoundPassCost(grades: List<Int>?, targetLevel: Int, buyable: List<com.partyconsole.companion.model.MerchantBuyItem>): CompoundCost? {
+    val thresholds = grades ?: listOf(9, 10, 11, 12)
+    val prices = buyable.associate { it.id to it.cost }
+    var gold = 0L
+    var scrolls = 0L
+    for (level in 0 until targetLevel) {
+        var grade = 0
+        for (index in thresholds.indices) {
+            if (level >= thresholds[index]) grade = index + 1
+        }
+        val price = prices["cscroll$grade"] ?: return null
+        val count = Math.pow(3.0, (targetLevel - level - 1).toDouble()).toLong()
+        gold += count * price
+        scrolls += count
+    }
+    return CompoundCost(gold, scrolls)
+}
+
+/** stat-scrolls.tsx's table - `purchasable` stats (str/int/dex/vit) are
+ *  bought outright for gold; the rest require already owning the scroll
+ *  (stat-scroll-quantity.tsx/primary-stat-scroll-cost.tsx). */
+data class StatScrollOption(val stat: String, val scroll: String, val label: String, val purchasable: Boolean)
+
+val STAT_SCROLLS = listOf(
+    StatScrollOption("str", "strscroll", "STR", true),
+    StatScrollOption("int", "intscroll", "INT", true),
+    StatScrollOption("dex", "dexscroll", "DEX", true),
+    StatScrollOption("vit", "vitscroll", "VIT", true),
+    StatScrollOption("for", "forscroll", "FOR", false),
+    StatScrollOption("evasion", "evasionscroll", "Evasion", false),
+    StatScrollOption("reflection", "reflectionscroll", "Reflection", false),
+    StatScrollOption("gold", "goldscroll", "Gold", false),
+    StatScrollOption("luck", "luckscroll", "Luck", false),
+    StatScrollOption("xp", "xpscroll", "XP", false),
+    StatScrollOption("armor", "armorscroll", "Armor", false),
+    StatScrollOption("resistance", "resistancescroll", "Resistance", false),
+    StatScrollOption("speed", "speedscroll", "Speed", false),
+    StatScrollOption("lifesteal", "lifestealscroll", "Lifesteal", false),
+    StatScrollOption("manasteal", "manastealscroll", "Manasteal", false),
+    StatScrollOption("rpiercing", "rpiercingscroll", "Resistance piercing", false),
+    StatScrollOption("apiercing", "apiercingscroll", "Armor piercing", false),
+    StatScrollOption("crit", "critscroll", "Critical hit", false),
+    StatScrollOption("dreturn", "dreturnscroll", "Damage return", false),
+    StatScrollOption("frequency", "frequencyscroll", "Attack speed", false),
+    StatScrollOption("mp_cost", "mpcostscroll", "MP cost reduction", false),
+    StatScrollOption("output", "outputscroll", "Output", false),
+)
+
+/** stat-scroll-quantity.tsx ported verbatim - how many scrolls of a stat
+ *  type a mark at this item's current level requires. */
+fun statScrollQuantity(meta: ItemMeta?, level: Int): Int {
+    val grades = meta?.definition?.get("grades")?.asIntListOrNull() ?: listOf(9, 10, 11, 12)
+    val lvl = maxOf(0, level)
+    val grade = when {
+        lvl >= (grades.getOrNull(2) ?: 11) -> 3
+        lvl >= (grades.getOrNull(1) ?: 10) -> 2
+        lvl >= (grades.getOrNull(0) ?: 9) -> 1
+        else -> 0
+    }
+    return listOf(1, 10, 100, 1000).getOrElse(grade) { 1 }
+}
+
+fun primaryStatScrollCost(meta: ItemMeta?, level: Int): Long = statScrollQuantity(meta, level) * 8_000L
+
 /** npc-sale-value.tsx ported verbatim - the exact upgrade/compound grade-
  *  tier gold curve the game itself uses, not an approximation. */
 fun npcSaleValue(level: Int, gift: Boolean, expires: JsonElement?, meta: ItemMeta?): Long {

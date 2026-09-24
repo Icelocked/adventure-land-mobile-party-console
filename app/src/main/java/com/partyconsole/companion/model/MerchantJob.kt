@@ -219,9 +219,28 @@ data class CatalogItem(
     val meta: ItemMeta? = null,
 )
 
+/** merchantCatalog.buyable - NPC-purchasable items, including the
+ *  compound scrolls ("cscroll0".."cscroll3") whose real prices
+ *  ItemFormulas.compoundPassCost looks up by id. */
+@Serializable
+data class MerchantBuyItem(
+    val id: String,
+    val name: String,
+    val cost: Long,
+    val seller: String? = null,
+    val sprite: Sprite? = null,
+    val upgradeable: Boolean = false,
+    val compoundable: Boolean = false,
+    val upgradeGrade: Int? = null,
+    val grades: List<Int>? = null,
+    val upgradeChances: List<Double>? = null,
+    val scrollCosts: List<Long>? = null,
+)
+
 @Serializable
 data class MerchantCatalog(
     val allItems: List<CatalogItem> = emptyList(),
+    val buyable: List<MerchantBuyItem> = emptyList(),
     // NPC exchange/box tables - matched against an item by id+level to
     // build the item-details "Exchange price"/"reward"/"Reward in"
     // sections (see ItemFormulas.exchangeSections).
