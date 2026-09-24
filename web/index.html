@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- iOS Safari ignores the manifest's icons entirely for "Add to
+         Home Screen" - it specifically needs this link tag with a real
+         PNG, which is why apple-touch-icon.png exists alongside the
+         manifest's own SVG-sourced PNGs (see vite.config.ts's PWA
+         manifest icons). -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1916" />
+    <meta name="description" content="Companion app for adventureland-party-console - check on your party and act on it from your phone." />
     <title>Party Console Companion</title>
   </head>
   <body>
