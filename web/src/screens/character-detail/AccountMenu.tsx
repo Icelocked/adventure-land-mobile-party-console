@@ -16,6 +16,7 @@ const ITEMS: { label: string; path: string }[] = [
   { label: 'Inspect Stand', path: '/stand' },
   { label: 'View Market', path: '/market' },
   { label: 'Inspect Bank', path: '/bank' },
+  { label: 'Upgrade offerings', path: '/offerings' },
   { label: 'Logs', path: '/logs' },
   { label: 'Settings', path: '/settings' },
 ]
