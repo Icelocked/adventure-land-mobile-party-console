@@ -41,7 +41,13 @@ function isCompleteVitals(vitals: Record<string, unknown>): boolean {
  *  present keys alone would silently compact the grid instead of showing
  *  real empty slots in their real positions. */
 function recordToState(name: string, record: LiveRecordWire, roster: Record<string, RosterMember>): CharacterState {
-  const withName = { ...record.vitals, name }
+  // ctype/level are never part of the live vitals payload at all (see
+  // module doc) - default them here (matching the Kotlin app's
+  // @Serializable default-value behavior) so a character rendered before
+  // the roster merge below has run still gets a safe "" / 0 rather than
+  // a genuinely-missing key that crashes anything assuming CharacterVitals'
+  // required fields are always actually present at runtime.
+  const withName = { ctype: '', level: 0, ...record.vitals, name }
   const decoded = isCompleteVitals(record.vitals) ? (withName as unknown as CharacterVitals) : null
   const member = roster[name]
   const vitals: CharacterVitals | null = decoded && member ? { ...decoded, ctype: member.ctype, level: member.level, server: member.server } : decoded

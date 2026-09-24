@@ -11,6 +11,7 @@ import { EquipmentSection } from './sections/EquipmentSection'
 import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
 import { GoldTargetSection } from './sections/GoldTargetSection'
+import { AutoMarksSection } from './sections/AutoMarksSection'
 import { ItemActionPanel, type ItemActionTarget } from '@/screens/itempanel/ItemActionPanel'
 
 /** Character focus screen: a sticky vitals header (never scrolls out of
@@ -92,6 +93,7 @@ export function CharacterDetailScreen() {
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? { hp: { min: 0, max: 0 }, mp: { min: 0, max: 0 } }} />
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
+            <AutoMarksSection characterName={name} isMerchant={vitals.ctype === 'merchant'} dynamicState={dynamicState} catalogFor={catalogFor} />
           </div>
         </>
       )}

@@ -4,8 +4,8 @@ import { Crosshair, Flame, HeartPulse, Shield, Sparkles, Store, User, type Lucid
  *  VitalsHeader.kt's classLook - falls back to a generic person icon for
  *  any ctype not in this list rather than failing. Shared by the
  *  character list and detail header so both agree on the same look. */
-export function classLook(ctype: string): { Icon: LucideIcon; color: string } {
-  switch (ctype.toLowerCase()) {
+export function classLook(ctype: string | undefined | null): { Icon: LucideIcon; color: string } {
+  switch ((ctype ?? '').toLowerCase()) {
     case 'warrior':
       return { Icon: Shield, color: '#CC5555' }
     case 'mage':
