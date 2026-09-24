@@ -6,6 +6,15 @@ import { loadServerSettings, saveServerSettings, clearServerSettings, SAME_ORIGI
 import { ServerSettingsDialogContext } from '@/lib/ServerSettingsDialogContext'
 import { CharacterListScreen } from '@/screens/CharacterListScreen'
 import { CharacterDetailScreen } from '@/screens/character-detail/CharacterDetailScreen'
+import { MailScreen } from '@/screens/account/MailScreen'
+import { CatalogScreen } from '@/screens/account/CatalogScreen'
+import { BestiaryScreen } from '@/screens/account/BestiaryScreen'
+import { SkillsScreen } from '@/screens/account/SkillsScreen'
+import { StandScreen } from '@/screens/account/StandScreen'
+import { MarketScreen } from '@/screens/account/MarketScreen'
+import { BankScreen } from '@/screens/account/BankScreen'
+import { LogsScreen } from '@/screens/account/LogsScreen'
+import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
 const queryClient = new QueryClient()
 
@@ -21,6 +30,15 @@ export default function App() {
             <Routes>
               <Route path="/" element={<CharacterListScreen />} />
               <Route path="/characters/:name" element={<CharacterDetailScreen />} />
+              <Route path="/mail" element={<MailScreen />} />
+              <Route path="/catalog" element={<CatalogScreen />} />
+              <Route path="/bestiary" element={<BestiaryScreen />} />
+              <Route path="/skills" element={<SkillsScreen />} />
+              <Route path="/stand" element={<StandScreen />} />
+              <Route path="/market" element={<MarketScreen />} />
+              <Route path="/bank" element={<BankScreen />} />
+              <Route path="/logs" element={<LogsScreen />} />
+              <Route path="/settings" element={<SettingsScreen />} />
             </Routes>
           </BrowserRouter>
         </ServerSettingsDialogContext.Provider>
