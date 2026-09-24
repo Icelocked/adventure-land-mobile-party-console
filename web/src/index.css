@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* Dark theme only for v1 - matches party-console's own dashboard look
+   (a near-black emerald-tinted background, per item-details.tsx's
+   bg-[#0b1916]) and the Android app's dark Material3 theme. Token names
+   match shadcn/ui's convention so generated components (button, dialog,
+   sheet, ...) pick these up with no per-component overrides needed. */
+:root {
+  --background: #0b1916;
+  --foreground: #ecfdf5;
+  --card: #10251f;
+  --card-foreground: #ecfdf5;
+  --popover: #07100f;
+  --popover-foreground: #ecfdf5;
+  --primary: #34d399;
+  --primary-foreground: #062017;
+  --secondary: #1f2937;
+  --secondary-foreground: #ecfdf5;
+  --muted: #132420;
+  --muted-foreground: #9ca3af;
+  --accent: #1f3b32;
+  --accent-foreground: #ecfdf5;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+  --border: #1f3b32;
+  --input: #1f3b32;
+  --ring: #34d399;
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
