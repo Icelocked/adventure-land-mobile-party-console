@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.BankSortRequest
+import com.partyconsole.companion.model.BankVault
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.InventoryEntry
 import com.partyconsole.companion.model.RosterMember
@@ -58,6 +59,7 @@ fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
         if (state.bankSortMode == "request") {
             BankSortToggle(pending = state.bankSortRequest, viewModel = viewModel)
         }
+        LockedVaultsSection(bankVaults = state.bankVaults, unlockedPacks = bank?.packs?.keys ?: emptySet(), viewModel = viewModel)
         if (bank == null || bank.packs.isEmpty()) {
             EmptyState("No bank data yet.")
         } else {
@@ -139,6 +141,68 @@ private fun BankSortToggle(pending: BankSortRequest?, viewModel: PartyViewModel)
             }
         }
     }
+}
+
+/** bank-unlock.ts's locked-vault list, grouped by floor - the base "bank" floor's
+ *  vaults each just cost gold once accessible; a non-base floor (bank_b/bank_u)
+ *  needs its own first (0-gold) vault unlocked with an owned key before any other
+ *  vault on that floor opens. The server enforces that ordering; this UI just
+ *  offers whichever action a locked vault's own fields call for and surfaces the
+ *  server's error if it's out of order. */
+@Composable
+private fun LockedVaultsSection(bankVaults: List<BankVault>, unlockedPacks: Set<String>, viewModel: PartyViewModel) {
+    var expandedFloor by remember { mutableStateOf<String?>(null) }
+    val locked = bankVaults.filter { it.pack !in unlockedPacks }
+    if (locked.isEmpty()) return
+    val byFloor = locked.groupBy { it.floor }
+
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("Locked bank vaults (${locked.size})", style = MaterialTheme.typography.bodyMedium)
+            for ((floor, vaults) in byFloor) {
+                TextButton(onClick = { expandedFloor = if (expandedFloor == floor) null else floor }) {
+                    Text("$floor (${vaults.size})", style = MaterialTheme.typography.labelMedium)
+                }
+                if (expandedFloor == floor) {
+                    Column(modifier = Modifier.padding(start = 12.dp)) {
+                        for (vault in vaults) {
+                            LockedVaultRow(vault, viewModel)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockedVaultRow(vault: BankVault, viewModel: PartyViewModel) {
+    val scope = rememberCoroutineScope()
+    var confirming by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val needsKey = vault.gold == 0L && vault.key != null
+    val label = if (needsKey) "Unlock with ${vault.key?.name ?: "key"}" else "Unlock · ${"%,d".format(vault.gold)}g"
+
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(vault.pack, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (confirming) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = {
+                    confirming = false
+                    error = null
+                    scope.launch {
+                        val result = viewModel.api.unlockBankVault(vault.pack, if (needsKey) "key" else null)
+                        if (result is com.partyconsole.companion.network.ApiResult.Failure) error = result.message
+                        viewModel.refreshDynamicStateNow()
+                    }
+                }) { Text("Confirm") }
+                TextButton(onClick = { confirming = false }) { Text("Cancel") }
+            }
+        } else {
+            TextButton(onClick = { confirming = true }) { Text(label, style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+    error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
 }
 
 @Composable

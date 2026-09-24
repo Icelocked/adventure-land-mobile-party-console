@@ -45,6 +45,21 @@ export interface BankSnapshot {
   packs: Record<string, (InventoryEntry | null)[]>
 }
 
+/** One bank pack's lock state (bank-unlock.ts / bank-sheet.tsx's BankVault) -
+ *  every pack the account could ever have, locked or not. A pack is unlocked once
+ *  it shows up as a key in BankSnapshot.packs; until then this describes what
+ *  opens it: `floor === "bank"` packs open for `gold` alone once accessible, but
+ *  a non-base floor's first (gold: 0) vault needs its `key` item owned and
+ *  unlocked with `kind: "key"` before ANY vault on that floor (including that
+ *  one) becomes accessible - see http/bank-unlock.ts's access(). */
+export interface BankVault {
+  pack: string
+  floor: string
+  gold: number
+  shells?: number
+  key?: { id: string; name?: string; sprite?: Sprite | null } | null
+}
+
 /** One drop-table entry within a BestiaryMonster - `rate` is the chance
  *  per kill (e.g. 0.0002 = 0.02%). */
 export interface BestiaryDrop {
@@ -310,6 +325,9 @@ export interface PartyStateDynamic {
   followers: Record<string, boolean>
   restockPolicies: Record<string, RestockPolicy>
   bank?: BankSnapshot | null
+  // Every bank pack the account could ever have, locked or not (see BankVault) - locked ones
+  // aren't in `bank.packs` yet.
+  bankVaults: BankVault[]
   bestiaryCatalog: BestiaryMonster[]
   skillCatalog: SkillClass[]
   combatLogs: Record<string, ActivityEntry[]>
@@ -432,6 +450,7 @@ export interface HuntSettings {
 
 export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   merchantQueue: [],
+  bankVaults: [],
   followers: {},
   restockPolicies: {},
   bestiaryCatalog: [],

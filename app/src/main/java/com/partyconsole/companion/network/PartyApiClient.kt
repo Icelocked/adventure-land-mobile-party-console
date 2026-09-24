@@ -343,6 +343,21 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         return post("merchant/npc-sale", body)
     }
 
+    /** POST /party-api/bank/unlock (http/bank-unlock.ts) - queues a merchant
+     *  errand to open one locked bank pack. `kind = "key"` unlocks a floor's
+     *  first (0-gold) vault using an owned key item; null spends the
+     *  vault's `gold` to open an already-accessible vault. The server
+     *  enforces ordering/ownership and returns a specific error otherwise. */
+    suspend fun unlockBankVault(pack: String, kind: String? = null): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                put("pack", JsonPrimitive(pack))
+                kind?.let { put("kind", JsonPrimitive(it)) }
+            },
+        )
+        return post("bank/unlock", body)
+    }
+
     /** POST /party-api/deconstruction/mark (merchant/bank-deconstruction.ts,
      *  triggered by `pack` being present) - marks a bank item for scrap
      *  without withdrawing it first. */

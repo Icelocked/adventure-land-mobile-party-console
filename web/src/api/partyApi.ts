@@ -189,6 +189,15 @@ export class PartyApiClient {
     return this.post('merchant/npc-sale', { source: 'bank', pack, slot, item, quantity, remove })
   }
 
+  /** POST /party-api/bank/unlock (http/bank-unlock.ts) - queues a merchant
+   *  errand to open one locked bank pack. `kind: 'key'` unlocks a floor's
+   *  first (0-gold) vault using an owned key item; omitted, it spends
+   *  `vault.gold` to open an already-accessible vault. The server enforces
+   *  ordering/ownership and returns a specific error otherwise. */
+  async unlockBankVault(pack: string, kind?: 'key'): Promise<ApiResult<CommandResult>> {
+    return this.post('bank/unlock', { pack, kind })
+  }
+
   /** POST /party-api/deconstruction/mark, triggered by `pack` being
    *  present - marks a bank item for scrap without withdrawing it first. */
   async markBankItemForDeconstruction(item: Item, pack: string, slot: number): Promise<ApiResult<CommandResult>> {
