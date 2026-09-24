@@ -7,11 +7,26 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 
 /** Ports merchant-card-controls.tsx's Buy/Craft/Exchange navigation,
- *  Force stand, Mining/Fishing, Send to party, Donate, Join giveaway, and
- *  Clear job queue - the rest of the merchant character's card that
- *  wasn't just the job queue widget (MerchantQueueSection). Only ever
- *  rendered for the merchant character. */
-export function MerchantControlsSection({ forceStand, gatheringModes }: { forceStand: boolean; gatheringModes: string[] }) {
+ *  Force stand, Mining/Fishing, Send to party, Donate, Join giveaway,
+ *  Clear job queue, Clear stale orders, Clear activity history, and the
+ *  Merchant collection settings (bank-sort mode, collect thresholds) -
+ *  the rest of the merchant character's card that wasn't just the job
+ *  queue widget (MerchantQueueSection) or Routines (its own screen, too
+ *  big for an inline form). Only ever rendered for the merchant
+ *  character. */
+export function MerchantControlsSection({
+  forceStand,
+  gatheringModes,
+  threshold,
+  itemCollectionThreshold,
+  bankSortMode,
+}: {
+  forceStand: boolean
+  gatheringModes: string[]
+  threshold: number
+  itemCollectionThreshold: number
+  bankSortMode?: 'automatic' | 'request'
+}) {
   const api = usePartyApi()
   const navigate = useNavigate()
   const refreshNow = useRefreshDynamicStateNow()
@@ -57,6 +72,7 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
       </div>
 
       <div className="mt-3 flex flex-col gap-1">
+        <TapButton label="Routines" onClick={() => navigate('/routines')} />
         <TapButton label="Send to party" onClick={() => void run(() => api.sendMerchantToParty())} />
 
         <TapButton label="Donate gold" onClick={() => toggle('donate')} />
@@ -64,6 +80,20 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
 
         <TapButton label="Join giveaway" onClick={() => toggle('giveaway')} />
         {expanded === 'giveaway' && <GiveawayForm onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))} />}
+
+        <TapButton label="Collection settings" onClick={() => toggle('settings')} />
+        {expanded === 'settings' && (
+          <CollectionSettingsForm
+            threshold={threshold}
+            itemCollectionThreshold={itemCollectionThreshold}
+            bankSortMode={bankSortMode}
+            onSetBankSortMode={(mode) => run(() => api.setBankSortMode(mode))}
+            onSetThresholds={(t, i) => run(() => api.setThresholds(t, i))}
+          />
+        )}
+
+        <TapButton label="Clear stale orders" onClick={() => void run(() => api.clearStaleOrders())} />
+        <TapButton label="Clear activity history" onClick={() => void run(() => api.clearMerchantActivity())} />
 
         {confirmingClear ? (
           <div className="flex items-center gap-2 py-1">
@@ -110,6 +140,57 @@ function DonateForm({ onDonate }: { onDonate: (amount: number) => void }) {
       <Button size="sm" disabled={!Number(amount)} onClick={() => onDonate(Number(amount))}>
         Donate
       </Button>
+    </div>
+  )
+}
+
+function CollectionSettingsForm({
+  threshold,
+  itemCollectionThreshold,
+  bankSortMode,
+  onSetBankSortMode,
+  onSetThresholds,
+}: {
+  threshold: number
+  itemCollectionThreshold: number
+  bankSortMode?: 'automatic' | 'request'
+  onSetBankSortMode: (mode: 'automatic' | 'request') => void
+  onSetThresholds: (threshold?: number, itemCollectionThreshold?: number) => void
+}) {
+  const [thresholdInput, setThresholdInput] = useState(String(threshold))
+  const [slotsInput, setSlotsInput] = useState(String(itemCollectionThreshold))
+
+  return (
+    <div className="flex flex-col gap-3 py-1 pl-3">
+      <div>
+        <p className="mb-1 text-xs text-muted-foreground">Bank sort</p>
+        <div className="flex gap-1.5">
+          <Chip selected={(bankSortMode ?? 'automatic') === 'automatic'} onClick={() => onSetBankSortMode('automatic')}>
+            Sort every visit
+          </Chip>
+          <Chip selected={bankSortMode === 'request'} onClick={() => onSetBankSortMode('request')}>
+            Request sorting
+          </Chip>
+        </div>
+      </div>
+      <div className="flex items-end gap-2">
+        <label className="flex-1 text-xs text-muted-foreground">
+          Collect above (gold)
+          <Input value={thresholdInput} onChange={(e) => /^\d*$/.test(e.target.value) && setThresholdInput(e.target.value)} className="mt-1" />
+        </label>
+        <Button size="sm" onClick={() => onSetThresholds(Number(thresholdInput) || 0, undefined)}>
+          Apply
+        </Button>
+      </div>
+      <div className="flex items-end gap-2">
+        <label className="flex-1 text-xs text-muted-foreground">
+          Marked slots required (1-42)
+          <Input value={slotsInput} onChange={(e) => /^\d*$/.test(e.target.value) && setSlotsInput(e.target.value)} className="mt-1" />
+        </label>
+        <Button size="sm" onClick={() => onSetThresholds(undefined, Math.min(42, Math.max(1, Number(slotsInput) || 1)))}>
+          Apply
+        </Button>
+      </div>
     </div>
   )
 }

@@ -331,6 +331,10 @@ export interface PartyStateDynamic {
   // AUTOMATIC routines (the ones with an enable checkbox) are on.
   merchantRoutinePriorities: Record<string, number>
   merchantAutomations: Record<string, boolean>
+  // Merchant collection settings (merchant-collection-settings.tsx).
+  threshold: number
+  itemCollectionThreshold: number
+  bankSortMode?: 'automatic' | 'request'
 }
 
 export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
@@ -358,6 +362,8 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   gatheringModes: [],
   merchantRoutinePriorities: {},
   merchantAutomations: {},
+  threshold: 0,
+  itemCollectionThreshold: 1,
 })
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

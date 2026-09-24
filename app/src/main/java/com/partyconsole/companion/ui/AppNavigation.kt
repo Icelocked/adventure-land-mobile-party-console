@@ -19,6 +19,7 @@ import com.partyconsole.companion.ui.account.LogsScreen
 import com.partyconsole.companion.ui.account.MailScreen
 import com.partyconsole.companion.ui.account.MarketScreen
 import com.partyconsole.companion.ui.account.MerchantCommerceScreen
+import com.partyconsole.companion.ui.account.RoutinesScreen
 import com.partyconsole.companion.ui.account.SettingsScreen
 import com.partyconsole.companion.ui.account.SkillsScreen
 import com.partyconsole.companion.ui.account.StandScreen
@@ -51,6 +52,7 @@ private object Routes {
     const val ACCOUNT_LOGS = "account/logs"
     const val ACCOUNT_SETTINGS = "account/settings"
     const val MERCHANT_COMMERCE = "merchant/{mode}"
+    const val ROUTINES = "routines"
 
     fun characterDetail(name: String) = "characters/$name"
     fun merchantCommerce(mode: String) = "merchant/$mode"
@@ -137,6 +139,7 @@ fun AppNavigation(store: ServerConfigStore) {
                 },
                 onOpenMenu = { navController.navigate(Routes.characterMenu(name)) },
                 onOpenMerchantCommerce = { commerceMode -> navController.navigate(Routes.merchantCommerce(commerceMode)) },
+                onOpenRoutines = { navController.navigate(Routes.ROUTINES) },
             )
         }
         composable(
@@ -193,6 +196,7 @@ fun AppNavigation(store: ServerConfigStore) {
                 viewModel, name,
                 onBack = { navController.popBackStack() },
                 onOpenMerchantCommerce = { commerceMode -> navController.navigate(Routes.merchantCommerce(commerceMode)) },
+                onOpenRoutines = { navController.navigate(Routes.ROUTINES) },
             )
         }
         composable(Routes.ACCOUNT_MAIL) { backStackEntry ->
@@ -258,6 +262,12 @@ fun AppNavigation(store: ServerConfigStore) {
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             MerchantCommerceScreen(viewModel, mode, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ROUTINES) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            RoutinesScreen(viewModel, onBack = { navController.popBackStack() })
         }
     }
 }
