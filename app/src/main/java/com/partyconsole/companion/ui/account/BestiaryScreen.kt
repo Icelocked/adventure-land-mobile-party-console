@@ -56,8 +56,11 @@ fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
 private fun MonsterRow(monster: BestiaryMonster, expanded: Boolean, onToggle: () -> Unit) {
     Card(onClick = onToggle, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(monster.name, style = MaterialTheme.typography.titleSmall)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SpriteIcon(monster.sprite, size = 28.dp)
+                    Text(monster.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 6.dp))
+                }
                 Text(
                     "HP ${monster.hp} · ATK ${monster.attack} · XP ${monster.xp}",
                     style = MaterialTheme.typography.labelSmall,

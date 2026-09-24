@@ -362,6 +362,42 @@ export class PartyApiClient {
     return this.post('config', body)
   }
 
+  /** POST /party-api/farming-mode - the account-wide farming strategy
+   *  (Auto/Default/Scatter/Hunt); unlike nearly everything else in this
+   *  client, this command takes no `character` field at all (confirmed
+   *  against runtime/coordinator/http/hunt-mode.ts) - it's one shared
+   *  value for the whole party. Hunt specifically requires a `backup`
+   *  (monster focus + a real spawn location) the first time, or whenever
+   *  changing it - the server 409s with `code:"backup_required"` if
+   *  Hunt is requested without one and none is already set. */
+  async setFarmingMode(mode: 'auto' | 'default' | 'scatter' | 'hunt', backup?: { monsterFocus: string[]; location: { map: string; x: number; y: number } }): Promise<ApiResult<CommandResult>> {
+    return this.post('farming-mode', backup ? { mode, backup } : { mode })
+  }
+
+  /** POST /party-api/focus - which monsters a character farms/hunts,
+   *  per-character (unlike farming-mode). Omitting `monsterSearchRadius`
+   *  leaves it unchanged server-side. */
+  async setFocus(character: string, monsterFocus: string[], monsterSearchRadius?: number): Promise<ApiResult<CommandResult>> {
+    const body: Record<string, unknown> = { character, monsterFocus }
+    if (monsterSearchRadius !== undefined) body.monsterSearchRadius = monsterSearchRadius
+    return this.post('focus', body)
+  }
+
+  /** POST /party-api/hunt-blacklist - `action:"clear"` drops everything,
+   *  `action:"remove"` drops one monster (needs `monsterId`), `action:
+   *  "add"` manually blacklists one (needs `monsterId`). */
+  async updateHuntBlacklist(action: 'add' | 'remove' | 'clear', monsterId?: string): Promise<ApiResult<CommandResult>> {
+    const body: Record<string, unknown> = { action }
+    if (monsterId !== undefined) body.monsterId = monsterId
+    return this.post('hunt-blacklist', body)
+  }
+
+  /** POST /party-api/hunt-settings - a partial patch (only send the
+   *  fields changing; server merges over the existing settings). */
+  async saveHuntSettings(patch: Partial<{ relocateIfCompeting: boolean; blacklistDeaths: boolean; deathThreshold: number; blacklistExpirations: boolean; expirationThreshold: number }>): Promise<ApiResult<CommandResult>> {
+    return this.post('hunt-settings', patch)
+  }
+
   /** POST /party-api/realm/switch - moves every active character to a
    *  different Adventure Land realm together. Server refuses PVP realms
    *  and refuses if a switch/bankboi transaction is already running -
