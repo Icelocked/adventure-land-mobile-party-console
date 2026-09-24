@@ -59,7 +59,17 @@ nginx.conf` build exactly that (static files + an nginx proxy for
 Add it as a second service in the **same `compose.yaml`** you already
 run party-console from (the service name `party-console` in the proxy
 config below must match whatever your `services:` block actually calls
-it - `party-console` is what this project's own local install uses):
+it - `party-console` is what this project's own local install uses).
+
+**This is pinned to a specific version by default, on purpose** - nothing
+about your setup changes until *you* decide to update, by changing one
+line and rebuilding. Add a `.env` file next to your `compose.yaml`:
+
+```
+PWA_VERSION=v0.2.0
+```
+
+and reference it in the service itself:
 
 ```yaml
 services:
@@ -67,20 +77,30 @@ services:
     # ... your existing party-console service, unchanged ...
 
   party-console-pwa:
-    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#main:web
+    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
       - "100.125.193.9:8080:80"   # replace with YOUR Tailscale IP
     restart: unless-stopped
 ```
 
-(Building straight from the git repo like this means `docker compose up`
-pulls the latest PWA source each time you recreate it - `git clone` the
-repo yourself first and use `build: ./adventure-land-mobile-party-console/web`
-instead if you'd rather pin to a specific checkout.)
-
 ```bash
 docker compose up -d party-console-pwa
 ```
+
+**To update later:** check the [Releases page](https://github.com/Icelocked/adventure-land-mobile-party-console/releases)
+for the newest tag, bump `PWA_VERSION` in `.env` to match, then:
+
+```bash
+docker compose build --pull party-console-pwa
+docker compose up -d --force-recreate party-console-pwa
+```
+
+If you'd rather always build whatever's newest on `main` instead of a
+specific tag (accepting that "newest" can occasionally mean "not yet
+released"), set `PWA_VERSION=main` instead - same rebuild command applies
+whenever you want to pick up new commits, since Compose doesn't do this
+on its own. See section 3d below if you'd like that check to happen
+automatically instead of by hand.
 
 Then on your phone, open `http://<your-pc's-tailscale-ip>:8080/` in the
 browser and use its "Add to Home Screen" (Chrome/Safari) - no address to
@@ -137,7 +157,7 @@ existing service from section 3b:
 
 ```yaml
   party-console-pwa:
-    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#main:web
+    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
       - "100.125.193.9:8080:80"    # replace with YOUR Tailscale IP
       - "100.125.193.9:8443:443"   # same IP, HTTPS port
@@ -155,6 +175,43 @@ using the MagicDNS name, not the raw `100.x` IP, since the certificate is
 issued for that name specifically and a browser will warn if you use the
 IP instead. Chrome should now offer a real "Install app" prompt, not just
 "Create shortcut."
+
+## 3d. Optional: automatic updates
+
+By default (3b/3c above), your PWA container is **pinned** to whatever
+`PWA_VERSION` you set - it will run that exact version forever until you
+manually bump it and rebuild. That's deliberate: nobody's code should
+change on your machine without you choosing it.
+
+If you'd rather not think about it and just always run the latest
+release, [`scripts/update-pwa.sh`](scripts/update-pwa.sh) automates the
+"check for a new release, bump `PWA_VERSION`, rebuild, restart" steps from
+the previous section. It only touches anything if a newer release
+actually exists - run it any time to check by hand:
+
+```bash
+curl -fsSLo update-pwa.sh https://raw.githubusercontent.com/Icelocked/adventure-land-mobile-party-console/main/scripts/update-pwa.sh
+chmod +x update-pwa.sh
+./update-pwa.sh
+```
+
+(run it from the same directory as your `compose.yaml`/`.env`, same as
+the manual update commands above)
+
+**To have that check happen on its own**, schedule it - entirely your
+call, and easy to undo (just remove the scheduled entry; your `.env`
+stays pinned to whatever version it last updated to):
+
+- **Linux/macOS (cron)** - `crontab -e`, add a line to check daily at 3am:
+  ```
+  0 3 * * * cd /path/to/your/compose/dir && ./update-pwa.sh >> update-pwa.log 2>&1
+  ```
+- **Windows (Task Scheduler)** - create a daily task running:
+  ```
+  bash.exe -c "cd /path/to/your/compose/dir && ./update-pwa.sh >> update-pwa.log 2>&1"
+  ```
+  (`bash.exe` from Git for Windows or WSL - whichever you already have;
+  Docker Desktop itself doesn't ship one)
 
 ## Why not a domain or a public IP?
 

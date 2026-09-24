@@ -37,6 +37,11 @@ you a working bookmark/shortcut instead of a true installed app. See
 DEPLOYMENT.md section 3c for the (optional) fix, using Tailscale's own
 free HTTPS certificates.
 
+**PWA updates are pinned and opt-in, never forced.** Your self-hosted PWA
+container stays on whatever version you set until you choose to update
+it - see DEPLOYMENT.md section 3d if you'd rather automate that check
+instead of doing it by hand.
+
 ## Why this exists
 
 party-console's web dashboard is excellent at home, on the same machine or
