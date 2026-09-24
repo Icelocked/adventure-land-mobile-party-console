@@ -127,11 +127,18 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
 
                 override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                     if (stopped) return
-                    val message = when {
-                        response != null -> "Server responded ${response.code} ${response.message}".trim()
-                        t != null -> "${t::class.simpleName}: ${t.message ?: "no details"}"
-                        else -> "Connection failed for an unknown reason"
+                    // okhttp-sse can hand back BOTH a response (e.g. a real
+                    // 200 OK, if it rejected the body for some other
+                    // reason - a content-type mismatch, a read error mid-
+                    // stream) AND a throwable explaining why it was
+                    // treated as a failure anyway - showing only whichever
+                    // was checked first silently threw away the other
+                    // half of the actual explanation.
+                    val parts = buildList {
+                        response?.let { add("HTTP ${it.code} ${it.message}".trim()) }
+                        t?.let { add("${it::class.simpleName}: ${it.message ?: "no details"}") }
                     }
+                    val message = parts.ifEmpty { listOf("Connection failed for an unknown reason") }.joinToString(" — ")
                     reportHealth(false, message)
                     scheduleReconnect()
                 }

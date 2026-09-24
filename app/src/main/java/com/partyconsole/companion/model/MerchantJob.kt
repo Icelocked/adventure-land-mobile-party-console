@@ -183,14 +183,15 @@ data class PontyState(
 )
 
 /** One tile within a shared sprite sheet (e.g. items/pack_20vt8.png) - x/y
- *  are grid COLUMN/ROW indices, not pixel offsets. `tileSize` (the
- *  sheet's real native pixel size per tile) matters for rendering: asking
- *  Coil to decode the whole sheet pre-scaled up to an arbitrary display
- *  size (size*columns, which for a 64-row sheet at a 56dp tile is a
- *  ~3584dp decode target) risks a silent OOM/decode-limit failure that
- *  looks exactly like "icon slot with nothing in it" - rendering at the
- *  sheet's own native size and scaling the already-decoded bitmap avoids
- *  that (see ui/itemicon/SpriteIcon.kt). */
+ *  are grid COLUMN/ROW indices, not pixel offsets. `tileSize` is carried
+ *  through because the server sends it, but ui/itemicon/SpriteIcon.kt
+ *  deliberately does NOT use it for crop math: it's only reliable for
+ *  item sheets (confirmed this session - raw_items.png really is
+ *  400x800px, exactly tileSize=20 * columns=20/rows=40), not for monster
+ *  sheets (monster2.png is really 720x512px, while tileSize=1 with
+ *  columns=12/rows=8 would imply 12x8). SpriteIcon instead derives the
+ *  real tile size from the loaded bitmap's own dimensions divided by
+ *  columns/rows, which is correct for both. */
 @Serializable
 data class Sprite(
     val url: String,
