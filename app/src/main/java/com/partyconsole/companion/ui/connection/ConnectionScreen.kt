@@ -46,11 +46,18 @@ fun ConnectionScreen(viewModel: ConnectionViewModel, onConnected: () -> Unit) {
                     "Tailscale address, or a domain if you've deployed it to a server.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Text(
+                "Reaching it over Tailscale or your home network (not a real domain)? " +
+                    "Type http:// in front of the address, e.g. http://100.x.x.x:3010 - " +
+                    "without it, this assumes a normal HTTPS domain instead.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
                 label = { Text("Server address") },
-                placeholder = { Text("party.example.com or 100.x.x.x:3010") },
+                placeholder = { Text("http://100.x.x.x:3010 or party.example.com") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
