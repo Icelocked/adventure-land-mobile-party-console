@@ -70,6 +70,11 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Item/monster sprite icons load directly from adventure.land's own
+    // hosted sprite sheets (Coil handles caching so the same sheet isn't
+    // re-fetched per item) - see ui/itemicon/SpriteIcon.kt.
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

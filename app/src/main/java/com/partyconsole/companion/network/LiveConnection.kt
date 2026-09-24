@@ -109,9 +109,14 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
                         return
                     }
                     if (!receiver.accept(message)) return
-                    if (message.type == "heartbeat" || message.type == "snapshot") {
-                        lastHeartbeat.set(System.currentTimeMillis())
-                    }
+                    // Any accepted message proves the connection is alive -
+                    // not just heartbeat/snapshot. The original bug here
+                    // only refreshed on those two types, so a character
+                    // actively sending delta updates (the normal case
+                    // during gameplay) never reset the watchdog; after
+                    // HEARTBEAT_TIMEOUT_MS of nothing but real data it
+                    // looked "silent" and forced a reconnect anyway.
+                    lastHeartbeat.set(System.currentTimeMillis())
                     if (message.type == "snapshot") reportHealth(true)
                 }
 

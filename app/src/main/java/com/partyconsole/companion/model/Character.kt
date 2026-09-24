@@ -16,8 +16,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CharacterVitals(
     val name: String,
-    val ctype: String,
-    val level: Int,
+    // ctype/level default here (not required) because they're not part of
+    // the live vitals stream at all (see live-protocol.ts's LiveRecord -
+    // vitals is an untyped bag of whatever changed) - PartyRepository
+    // overwrites these from the roster fetch (model/Roster.kt) once it
+    // completes. Left defaulted rather than made non-null so a slow/failed
+    // roster fetch still shows a usable (if blank) character instead of
+    // failing the whole vitals parse the way the old required fields did.
+    val ctype: String = "",
+    val level: Int = 0,
     val hp: Int,
     @SerialName("max_hp") val maxHp: Int,
     val mp: Int,
@@ -27,11 +34,16 @@ data class CharacterVitals(
     val x: Double,
     val y: Double,
     val rip: Boolean,
+    val xp: Long? = null,
+    @SerialName("max_xp") val maxXp: Long? = null,
+    val target: String? = null,
+    val server: String? = null,
+    val ping: Int? = null,
+    val primaryStat: String? = null,
     val banking: Boolean = false,
     val bankQueued: Boolean = false,
     val stocking: Boolean = false,
     val upgrading: Boolean = false,
-    val seenAt: Long,
     val farmingMode: String? = null,
     val conditions: List<Condition> = emptyList(),
     val inventorySize: Int? = null,

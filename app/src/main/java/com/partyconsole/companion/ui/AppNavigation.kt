@@ -12,15 +12,49 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.partyconsole.companion.network.ServerConfigStore
+import com.partyconsole.companion.ui.account.BankScreen
+import com.partyconsole.companion.ui.account.BestiaryScreen
+import com.partyconsole.companion.ui.account.CatalogScreen
+import com.partyconsole.companion.ui.account.LogsScreen
+import com.partyconsole.companion.ui.account.MailScreen
+import com.partyconsole.companion.ui.account.MarketScreen
+import com.partyconsole.companion.ui.account.SettingsScreen
+import com.partyconsole.companion.ui.account.SkillsScreen
+import com.partyconsole.companion.ui.account.StandScreen
 import com.partyconsole.companion.ui.characterdetail.CharacterDetailScreen
+import com.partyconsole.companion.ui.characterdetail.CharacterMenuScreen
+import com.partyconsole.companion.ui.characterdetail.EquipmentScreen
+import com.partyconsole.companion.ui.characterdetail.InventoryScreen
+import com.partyconsole.companion.ui.characterdetail.MerchantActivityScreen
 import com.partyconsole.companion.ui.characterlist.CharacterListScreen
 import com.partyconsole.companion.ui.connection.ConnectionScreen
 
+/** Every screen shares one PartyViewModel (one live SSE connection) via
+ *  getBackStackEntry(CHARACTER_LIST) scoping - see the comment on the
+ *  detail route below, which explains why this matters. */
 private object Routes {
     const val CONNECTION = "connection"
     const val CHARACTER_LIST = "characters"
     const val CHARACTER_DETAIL = "characters/{name}"
+    const val CHARACTER_MENU = "characters/{name}/menu"
+    const val INVENTORY = "characters/{name}/inventory"
+    const val EQUIPMENT = "characters/{name}/equipment"
+    const val ACTIVITY = "characters/{name}/activity"
+    const val ACCOUNT_MAIL = "account/mail"
+    const val ACCOUNT_CATALOG = "account/catalog"
+    const val ACCOUNT_BESTIARY = "account/bestiary"
+    const val ACCOUNT_SKILLS = "account/skills"
+    const val ACCOUNT_STAND = "account/stand"
+    const val ACCOUNT_MARKET = "account/market"
+    const val ACCOUNT_BANK = "account/bank"
+    const val ACCOUNT_LOGS = "account/logs"
+    const val ACCOUNT_SETTINGS = "account/settings"
+
     fun characterDetail(name: String) = "characters/$name"
+    fun characterMenu(name: String) = "characters/$name/menu"
+    fun inventory(name: String) = "characters/$name/inventory"
+    fun equipment(name: String) = "characters/$name/equipment"
+    fun activity(name: String) = "characters/$name/activity"
 }
 
 @Composable
@@ -80,19 +114,132 @@ fun AppNavigation(store: ServerConfigStore) {
         ) { backStackEntry ->
             val active = settings ?: return@composable
             val name = backStackEntry.arguments?.getString("name") ?: return@composable
-            // Reuses the character-list screen's ViewModel instance via the
-            // same navigation graph scope would be ideal (one live
-            // connection, not two) - left as a v1 simplification (a second
-            // PartyRepository/SSE connection opens per detail screen visit)
-            // with a clear TODO rather than a silent inefficiency: switch
-            // this to a nav-graph-scoped viewModel() once the app has more
-            // than these two screens to coordinate.
-            val viewModel: PartyViewModel = viewModel(factory = PartyViewModelFactory(active))
+            // Shares the character-list screen's ViewModel (and therefore
+            // its already-live SSE connection) instead of opening a second
+            // one from scratch - every other route below does the same,
+            // for the same reason (see this session's "isn't reporting in"
+            // bug this fixed originally).
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             CharacterDetailScreen(
                 viewModel = viewModel,
                 characterName = name,
                 onBack = { navController.popBackStack() },
+                onSwitchCharacter = { other ->
+                    // Replaces rather than stacks - switching repeatedly
+                    // shouldn't grow the back stack one entry per tap.
+                    navController.navigate(Routes.characterDetail(other)) {
+                        popUpTo(Routes.CHARACTER_DETAIL) { inclusive = true }
+                    }
+                },
+                onOpenMenu = { navController.navigate(Routes.characterMenu(name)) },
             )
+        }
+        composable(
+            Routes.CHARACTER_MENU,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val name = backStackEntry.arguments?.getString("name") ?: return@composable
+            CharacterMenuScreen(
+                characterName = name,
+                onBack = { navController.popBackStack() },
+                onInventory = { navController.navigate(Routes.inventory(name)) },
+                onEquipment = { navController.navigate(Routes.equipment(name)) },
+                onActivity = { navController.navigate(Routes.activity(name)) },
+                onMail = { navController.navigate(Routes.ACCOUNT_MAIL) },
+                onCatalog = { navController.navigate(Routes.ACCOUNT_CATALOG) },
+                onBestiary = { navController.navigate(Routes.ACCOUNT_BESTIARY) },
+                onSkills = { navController.navigate(Routes.ACCOUNT_SKILLS) },
+                onStand = { navController.navigate(Routes.ACCOUNT_STAND) },
+                onMarket = { navController.navigate(Routes.ACCOUNT_MARKET) },
+                onBank = { navController.navigate(Routes.ACCOUNT_BANK) },
+                onLogs = { navController.navigate(Routes.ACCOUNT_LOGS) },
+                onSettings = { navController.navigate(Routes.ACCOUNT_SETTINGS) },
+            )
+        }
+        composable(
+            Routes.INVENTORY,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val active = settings ?: return@composable
+            val name = backStackEntry.arguments?.getString("name") ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            InventoryScreen(viewModel, name, onBack = { navController.popBackStack() })
+        }
+        composable(
+            Routes.EQUIPMENT,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val active = settings ?: return@composable
+            val name = backStackEntry.arguments?.getString("name") ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            EquipmentScreen(viewModel, name, onBack = { navController.popBackStack() })
+        }
+        composable(
+            Routes.ACTIVITY,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val active = settings ?: return@composable
+            val name = backStackEntry.arguments?.getString("name") ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            MerchantActivityScreen(viewModel, name, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_MAIL) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            MailScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_CATALOG) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            CatalogScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_BESTIARY) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            BestiaryScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_SKILLS) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            SkillsScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_STAND) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            StandScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_MARKET) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            MarketScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_BANK) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            BankScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_LOGS) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            LogsScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_SETTINGS) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            SettingsScreen(viewModel, onBack = { navController.popBackStack() })
         }
     }
 }

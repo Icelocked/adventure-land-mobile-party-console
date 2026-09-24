@@ -4,6 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.partyconsole.companion.data.PartyRepository
 import com.partyconsole.companion.model.CharacterState
+import com.partyconsole.companion.model.GameLogEntry
+import com.partyconsole.companion.model.MailSnapshot
+import com.partyconsole.companion.model.PartyStateDynamic
+import com.partyconsole.companion.model.RosterMember
 import com.partyconsole.companion.network.ServerSettings
 import kotlinx.coroutines.flow.StateFlow
 
@@ -16,5 +20,11 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     private val repository = PartyRepository(settings, viewModelScope)
     val characters: StateFlow<Map<String, CharacterState>> = repository.characters
     val connected: StateFlow<Boolean> = repository.connected
+    val roster: StateFlow<Map<String, RosterMember>> = repository.roster
+    val dynamicState: StateFlow<PartyStateDynamic> = repository.dynamicState
+    val mail: StateFlow<MailSnapshot> = repository.mail
+    val gameLogs: StateFlow<Map<String, List<GameLogEntry>>> = repository.gameLogs
     val api get() = repository.api
+
+    suspend fun refreshDynamicStateNow() = repository.refreshDynamicStateNow()
 }

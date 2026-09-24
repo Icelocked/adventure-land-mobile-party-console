@@ -12,3 +12,10 @@ app/release/
 *.keystore
 *.jks
 build-log.txt
+
+# Personal local-deployment helper (serves the debug APK over this
+# machine's own network address) and built APKs - never meant to be
+# tracked; releases are published via .github/workflows/release.yml
+# instead.
+/dist/
+*.apk
