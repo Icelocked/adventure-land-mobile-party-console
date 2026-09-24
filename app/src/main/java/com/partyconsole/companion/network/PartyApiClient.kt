@@ -20,18 +20,14 @@ import javax.net.ssl.X509TrustManager
 
 private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
-/** Builds the OkHttpClient for one server connection, applying exactly the
- *  TrustMode the user chose on the connection screen (network/ServerConfig.kt) -
- *  this is the one place that decides how (or whether) the server's TLS
- *  certificate gets verified, so every request (REST calls here, and the
- *  SSE stream in LiveConnection.kt, which is built from the same client)
- *  is consistent. */
-fun buildHttpClient(settings: ServerSettings): OkHttpClient {
-    val builder = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS) // 0 = no timeout - the SSE stream is meant to stay open indefinitely
-        .callTimeout(0, TimeUnit.SECONDS)
-
+/** Applies exactly the TrustMode the user chose on the connection screen
+ *  (network/ServerConfig.kt) - the one place that decides how (or
+ *  whether) the server's TLS certificate gets verified. Shared by both
+ *  [buildHttpClient] and [buildSseHttpClient] so REST calls and the SSE
+ *  stream always trust the server the same way; only their timeouts
+ *  differ (see each function's doc). */
+private fun baseHttpClientBuilder(settings: ServerSettings): OkHttpClient.Builder {
+    val builder = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
     when (settings.trustMode) {
         TrustMode.SYSTEM, TrustMode.CLEARTEXT -> {
             // Ordinary platform trust store. For CLEARTEXT the URL itself
@@ -52,8 +48,34 @@ fun buildHttpClient(settings: ServerSettings): OkHttpClient {
             builder.hostnameVerifier(HostnameVerifier { _, _ -> true })
         }
     }
-    return builder.build()
+    return builder
 }
+
+/** For ordinary one-shot REST calls (roster fetch, state polling, item
+ *  commands) - a real, bounded timeout, so a request that stalls after
+ *  connecting (a network hiccup, the phone handing off from WiFi to
+ *  cellular mid-request) actually fails and lets the caller's own retry
+ *  logic (e.g. PartyRepository.fetchRosterWithRetry) kick in, instead of
+ *  hanging forever with nothing to time it out. This client used to be
+ *  shared with the SSE stream's readTimeout=0/callTimeout=0 - correct for
+ *  a connection meant to stay open indefinitely, but silently disabled
+ *  timeouts for every REST call too, which could hang the whole
+ *  "Connecting..." screen with no error and no recovery. */
+fun buildHttpClient(settings: ServerSettings): OkHttpClient =
+    baseHttpClientBuilder(settings)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        .build()
+
+/** For the SSE stream specifically (LiveConnection.kt) - genuinely no
+ *  read/call timeout, since the connection is meant to stay open
+ *  indefinitely; LiveConnection's own heartbeat watchdog (not OkHttp) is
+ *  what detects a stalled-but-not-closed stream. */
+fun buildSseHttpClient(settings: ServerSettings): OkHttpClient =
+    baseHttpClientBuilder(settings)
+        .readTimeout(0, TimeUnit.SECONDS)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .build()
 
 @kotlinx.serialization.Serializable
 data class CommandResult(
