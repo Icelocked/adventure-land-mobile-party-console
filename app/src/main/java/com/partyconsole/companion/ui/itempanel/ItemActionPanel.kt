@@ -5,12 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -27,11 +25,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.partyconsole.companion.model.Item
+import com.partyconsole.companion.model.ItemMeta
+import com.partyconsole.companion.model.MerchantBuyItem
 import com.partyconsole.companion.model.RosterMember
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.itemdetail.ItemDetailBrowser
+import com.partyconsole.companion.ui.itemdetail.STAT_SCROLLS
+import com.partyconsole.companion.ui.itemdetail.compoundPassCost
+import com.partyconsole.companion.ui.itemdetail.itemMaximumLevel
+import com.partyconsole.companion.ui.itemdetail.primaryStatScrollCost
+import com.partyconsole.companion.ui.itemdetail.statScrollQuantity
+import com.partyconsole.companion.ui.itemdetail.upgradeScrollCost
+import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 
 /** The bottom-docked item panel replacing left-click-details/right-click-
@@ -51,6 +60,7 @@ fun ItemActionPanel(
 ) {
     val scope = rememberCoroutineScope()
     val dynamicState by viewModel.dynamicState.collectAsState()
+    val characters by viewModel.characters.collectAsState()
     var error by remember(target) { mutableStateOf<String?>(null) }
     var expanded by remember(target) { mutableStateOf<String?>(null) } // which inline form is open, if any
 
@@ -64,6 +74,26 @@ fun ItemActionPanel(
                 }
             }
         }
+    }
+
+    val catalogFor = rememberCatalogLookup(dynamicState.merchantCatalog)
+    val meta = catalogFor(target.item.name)?.meta
+
+    // stat-scroll-mark needs to know which secondary-stat scrolls are
+    // actually held (use-party-console.tsx's statScrollInventory) - summed
+    // across the merchant character's own inventory plus the shared bank,
+    // since that's who/where a stat-scroll-mark command actually draws from.
+    val statScrollInventory = remember(characters, dynamicState.bank) {
+        val quantities = mutableMapOf<String, Int>()
+        fun add(entryItem: Item?) {
+            if (entryItem != null && STAT_SCROLLS.any { it.scroll == entryItem.name }) {
+                quantities[entryItem.name] = (quantities[entryItem.name] ?: 0) + maxOf(1, entryItem.q ?: 1)
+            }
+        }
+        val merchant = characters.values.find { it.vitals?.ctype == "merchant" }
+        merchant?.inventory?.items?.forEach { add(it?.item) }
+        dynamicState.bank?.packs?.values?.forEach { pack -> pack.forEach { add(it?.item) } }
+        quantities
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -87,11 +117,13 @@ fun ItemActionPanel(
 
             when (target) {
                 is ItemActionTarget.InventorySlot -> InventoryActions(
-                    target, characterName, isMerchant, roster, expanded,
-                    onExpand = { expanded = it }, run = ::run, viewModel = viewModel,
+                    target, meta, characterName, isMerchant, roster,
+                    buyable = dynamicState.merchantCatalog?.buyable ?: emptyList(),
+                    statScrollInventory = statScrollInventory,
+                    expanded = expanded, onExpand = { expanded = it }, run = ::run, viewModel = viewModel,
                 )
                 is ItemActionTarget.EquipmentSlot -> EquipmentActions(
-                    target, characterName, isMerchant, expanded,
+                    target, meta, characterName, isMerchant, expanded,
                     onExpand = { expanded = it }, run = ::run, viewModel = viewModel,
                 )
             }
@@ -139,9 +171,12 @@ private fun TapRow(label: String, onClick: () -> Unit) {
 @Composable
 private fun InventoryActions(
     target: ItemActionTarget.InventorySlot,
+    meta: ItemMeta?,
     characterName: String,
     isMerchant: Boolean,
     roster: Map<String, RosterMember>,
+    buyable: List<MerchantBuyItem>,
+    statScrollInventory: Map<String, Int>,
     expanded: String?,
     onExpand: (String?) -> Unit,
     run: (suspend () -> ApiResult<*>) -> Unit,
@@ -149,6 +184,14 @@ private fun InventoryActions(
 ) {
     val item = target.item
     val slot = target.slot
+    val level = item.level ?: 0
+    // inventory-panel.tsx only offers upgrade/compound actions when the
+    // account has a merchant character at all (upgrading always routes
+    // through them), independent of which character's item this is.
+    val hasMerchant = roster.values.any { it.ctype == "merchant" }
+    val canUpgrade = hasMerchant && meta?.upgradeable == true && itemMaximumLevel(meta) > level
+    val canCompound = hasMerchant && meta?.compoundable == true
+    val canStatScroll = isMerchant && (meta?.definition?.get("stat") != null)
     Column {
         TapRow("Equip") { run { viewModel.api.itemCommand("equip", characterName, item) } }
         TapRow("Use item") { run { viewModel.api.itemCommand("use-item", characterName, item, JsonPrimitive(slot)) } }
@@ -184,22 +227,44 @@ private fun InventoryActions(
         TapRow("Auto-deconstruct") {
             run { viewModel.api.autoDeconstruct(characterName, item) }
         }
-        TapRow("Mark for Upgrade") {
-            run { viewModel.api.itemCommand("upgrade-mark", characterName, item, JsonPrimitive(slot), mapOf("tiers" to JsonPrimitive(1))) }
+        if (canUpgrade) {
+            TapRow("Mark for Upgrade") { onExpand(if (expanded == "upgrade") null else "upgrade") }
+            if (expanded == "upgrade") {
+                UpgradeTierPicker(meta, level) { tiers ->
+                    run { viewModel.api.itemCommand("upgrade-mark", characterName, item, JsonPrimitive(slot), mapOf("tiers" to JsonPrimitive(tiers))) }
+                }
+            }
+            TapRow("Auto-mark for Upgrade") { onExpand(if (expanded == "autoupgrade") null else "autoupgrade") }
+            if (expanded == "autoupgrade") {
+                UpgradeTierPicker(meta, level) { tiers ->
+                    run { viewModel.api.itemCommand("auto-upgrade-mark", characterName, item, JsonPrimitive(slot), mapOf("tiers" to JsonPrimitive(tiers))) }
+                }
+            }
         }
-        TapRow("Auto-mark for Upgrade") {
-            run { viewModel.api.itemCommand("auto-upgrade-mark", characterName, item, JsonPrimitive(slot), mapOf("tiers" to JsonPrimitive(1))) }
+        if (canCompound) {
+            TapRow("Mark for Compound") {
+                run { viewModel.api.itemCommand("compound-mark", characterName, item, JsonPrimitive(slot)) }
+            }
+            TapRow("Auto-mark for Compound") { onExpand(if (expanded == "autocompound") null else "autocompound") }
+            if (expanded == "autocompound") {
+                CompoundTierPicker(meta, level, buyable) { targetTier ->
+                    run { viewModel.api.itemCommand("auto-compound-mark", characterName, item, null, mapOf("targetTier" to JsonPrimitive(targetTier))) }
+                }
+            }
         }
-        TapRow("Mark for Compound") {
-            run { viewModel.api.itemCommand("compound-mark", characterName, item, JsonPrimitive(slot)) }
-        }
-        TapRow("Auto-mark for Compound") { onExpand(if (expanded == "autocompound") null else "autocompound") }
-        if (expanded == "autocompound") {
-            AutoCompoundForm(characterName, item, viewModel, run)
-        }
-        TapRow("Stat scroll mark") { onExpand(if (expanded == "statscroll") null else "statscroll") }
-        if (expanded == "statscroll") {
-            StatScrollForm(characterName, item, slot, viewModel, run)
+        if (canStatScroll) {
+            val label = item.statType?.let { "Change stat scroll · ${it.uppercase()}" } ?: "Add stat scroll"
+            TapRow(label) { onExpand(if (expanded == "statscroll") null else "statscroll") }
+            if (expanded == "statscroll") {
+                StatScrollPicker(meta, item, statScrollInventory) { statType ->
+                    run {
+                        viewModel.api.itemCommand(
+                            "stat-scroll-mark", characterName, item, JsonPrimitive(slot),
+                            mapOf("statType" to JsonPrimitive(statType)),
+                        )
+                    }
+                }
+            }
         }
         val others = roster.keys.filter { it != characterName }
         if (others.isNotEmpty()) {
@@ -226,6 +291,7 @@ private fun InventoryActions(
 @Composable
 private fun EquipmentActions(
     target: ItemActionTarget.EquipmentSlot,
+    meta: ItemMeta?,
     characterName: String,
     isMerchant: Boolean,
     expanded: String?,
@@ -234,131 +300,141 @@ private fun EquipmentActions(
     viewModel: PartyViewModel,
 ) {
     val item = target.item
+    val level = item.level ?: 0
+    val canUpgrade = meta?.upgradeable == true && itemMaximumLevel(meta) > level
+    // Equipped-item commands need the real equip-slot name (e.g. "chest")
+    // as `slot`, with `equipped: true` as an ADDITIONAL flag - the server's
+    // markRequest() validator (runtime/coordinator/inventory/upgrade-
+    // commands.ts) requires a string slot matching /^[a-z0-9_]+$/ whenever
+    // equipped is true; a missing/null slot fails validation with a plain
+    // "invalid command" 400, confirmed against the live server this
+    // session (every equipped-item upgrade/clear-marks call was silently
+    // failing before this fix).
+    val slotArg = JsonPrimitive(target.slotName)
     Column {
-        TapRow("Unequip") {
-            run {
-                viewModel.api.itemCommand(
-                    "unequip", characterName, item, JsonPrimitive(target.slotName),
-                )
+        if (target.slotName != "elixir") {
+            TapRow("Unequip") {
+                run { viewModel.api.itemCommand("unequip", characterName, item, slotArg) }
             }
         }
-        TapRow("Mark for Upgrade") {
-            run {
-                viewModel.api.itemCommand(
-                    "upgrade-mark", characterName, item, null,
-                    mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(1)),
-                )
+        if (canUpgrade) {
+            TapRow("Mark for Upgrade") { onExpand(if (expanded == "upgrade") null else "upgrade") }
+            if (expanded == "upgrade") {
+                UpgradeTierPicker(meta, level) { tiers ->
+                    run {
+                        viewModel.api.itemCommand(
+                            "upgrade-mark", characterName, item, slotArg,
+                            mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(tiers)),
+                        )
+                    }
+                }
             }
-        }
-        TapRow("Auto-mark for Upgrade") {
-            run {
-                viewModel.api.itemCommand(
-                    "auto-upgrade-mark", characterName, item, null,
-                    mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(1)),
-                )
+            TapRow("Auto-mark for Upgrade") { onExpand(if (expanded == "autoupgrade") null else "autoupgrade") }
+            if (expanded == "autoupgrade") {
+                UpgradeTierPicker(meta, level) { tiers ->
+                    run {
+                        viewModel.api.itemCommand(
+                            "auto-upgrade-mark", characterName, item, slotArg,
+                            mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(tiers)),
+                        )
+                    }
+                }
             }
         }
         if (isMerchant) {
             TapRow("Buy copy") { run { viewModel.api.itemCommand("buy-copy", characterName, item) } }
         }
         TapRow("Clear marks") {
-            run { viewModel.api.itemCommand("clear-item-marks", characterName, item, null, mapOf("equipped" to JsonPrimitive(true))) }
+            run { viewModel.api.itemCommand("clear-item-marks", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true))) }
         }
     }
 }
 
-/** All 22 server-accepted stat_type values (runtime/coordinator/inventory/
- *  stat-scroll-commands.ts's `supported` set) - str/int/dex/vit need no
- *  scroll-quantity check, the rest require owning the matching scroll
- *  item. Primary four shown first since they're the common case. */
-private val PRIMARY_STAT_TYPES = listOf("str", "int", "dex", "vit")
-private val OTHER_STAT_TYPES = listOf(
-    "for", "evasion", "reflection", "gold", "luck", "xp", "armor", "resistance",
-    "speed", "lifesteal", "manasteal", "rpiercing", "apiercing", "crit", "dreturn",
-    "frequency", "mp_cost", "output",
-)
-
+/** upgrade-actions.tsx's tier submenu ported as an inline expandable list
+ *  (this panel's tap-only pattern has no context-menu submenu equivalent)
+ *  - one row per achievable target tier, "+N → +N+tiers" with the scroll
+ *  gold cost, instead of silently always marking a single tier. */
 @Composable
-private fun StatScrollForm(
-    characterName: String,
-    item: com.partyconsole.companion.model.Item,
-    slot: Int,
-    viewModel: PartyViewModel,
-    run: (suspend () -> ApiResult<*>) -> Unit,
-) {
-    var showMore by remember { mutableStateOf(false) }
-    fun mark(stat: String) {
-        run {
-            viewModel.api.itemCommand(
-                "stat-scroll-mark", characterName, item, JsonPrimitive(slot),
-                mapOf("statType" to JsonPrimitive(stat)),
-            )
-        }
-    }
-    Column(modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            for (stat in PRIMARY_STAT_TYPES) {
-                FilterChip(selected = false, onClick = { mark(stat) }, label = { Text(stat) })
-            }
-            TextButton(onClick = { showMore = !showMore }) { Text(if (showMore) "less" else "more") }
-        }
-        if (showMore) {
+private fun UpgradeTierPicker(meta: ItemMeta?, level: Int, onPick: (Int) -> Unit) {
+    val max = maxOf(0, itemMaximumLevel(meta) - level)
+    if (max <= 0) return
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        for (tiers in 1..max) {
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                for (stat in OTHER_STAT_TYPES) {
-                    FilterChip(selected = false, onClick = { mark(stat) }, label = { Text(stat) })
+                TextButton(onClick = { onPick(tiers) }, modifier = Modifier.weight(1f)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("+$level → +${level + tiers}")
+                        Text(
+                            "${"%,d".format(upgradeScrollCost(meta, level, tiers))}g",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-/** auto-compound-mark needs targetTier (1-7, the tier to compound UP TO)
- *  and quantity (how many finished copies to maintain) rather than a
- *  slot - it's a standing rule for the item type, not one instance. */
+/** The compound equivalent of UpgradeTierPicker - inventory-panel.tsx's
+ *  "Auto compound" submenu, one row per tier up to itemMaximumLevel (7 for
+ *  compoundables) with the real compound-scroll cost (compoundPassCost),
+ *  not a free-form number input the way this used to work. */
 @Composable
-private fun AutoCompoundForm(
-    characterName: String,
-    item: com.partyconsole.companion.model.Item,
-    viewModel: PartyViewModel,
-    run: (suspend () -> ApiResult<*>) -> Unit,
-) {
-    var targetTier by remember { mutableStateOf("1") }
-    var quantity by remember { mutableStateOf("1") }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedTextField(
-            value = targetTier,
-            onValueChange = { new -> if (new.all { it.isDigit() }) targetTier = new },
-            label = { Text("Target tier (1-7)") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-        OutlinedTextField(
-            value = quantity,
-            onValueChange = { new -> if (new.all { it.isDigit() }) quantity = new },
-            label = { Text("Quantity") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-        Button(onClick = {
-            run {
-                viewModel.api.itemCommand(
-                    "auto-compound-mark", characterName, item, null,
-                    mapOf(
-                        "targetTier" to JsonPrimitive(targetTier.toIntOrNull()?.coerceIn(1, 7) ?: 1),
-                        "quantity" to JsonPrimitive(quantity.toIntOrNull() ?: 1),
-                    ),
-                )
+private fun CompoundTierPicker(meta: ItemMeta?, level: Int, buyable: List<MerchantBuyItem>, onPick: (Int) -> Unit) {
+    val max = maxOf(0, itemMaximumLevel(meta) - level)
+    if (max <= 0) return
+    val grades = meta?.definition?.get("grades")?.let { element ->
+        (element as? JsonArray)?.mapNotNull {
+            (it as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt()
+        }
+    }
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        for (tier in (level + 1)..(level + max)) {
+            val cost = compoundPassCost(grades, tier, buyable)
+            TextButton(onClick = { onPick(tier) }, modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("+$tier")
+                    Text(
+                        cost?.let { "${"%,d".format(it.gold)}g" } ?: "Price unavailable",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-        }) { Text("Set") }
+        }
+    }
+}
+
+/** stat-scroll-mark's option list, ported with the same purchasable-vs-
+ *  owned split as inventory-panel.tsx: str/int/dex/vit are always shown
+ *  (bought outright for gold), every other stat only shows up once you
+ *  already own enough of its scroll - not as an always-visible chip with
+ *  no indication of cost or whether you can actually do it. */
+@Composable
+private fun StatScrollPicker(meta: ItemMeta?, item: Item, statScrollInventory: Map<String, Int>, onPick: (String) -> Unit) {
+    val level = item.level ?: 0
+    val required = statScrollQuantity(meta, level)
+    val cost = primaryStatScrollCost(meta, level)
+    val choices = STAT_SCROLLS.filter { it.purchasable || (statScrollInventory[it.scroll] ?: 0) >= required }
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        for (choice in choices) {
+            val owned = statScrollInventory[choice.scroll] ?: 0
+            val current = item.statType == choice.stat
+            TextButton(onClick = { if (!current) onPick(choice.stat) }, enabled = !current, modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(choice.label + if (current) " · current" else "")
+                    Text(
+                        if (choice.purchasable) "${"%,d".format(cost)}g · $required scroll${if (required == 1) "" else "s"}" else "$owned/$required owned",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }
 
