@@ -179,6 +179,12 @@ export const emptyStandSearchState = (): StandSearchState => ({ status: 'idle', 
 
 export interface AlDataState {
   listings: MarketListing[]
+  // Publish/auth fields (aldata-state.tsx) - public market browsing needs neither; these only
+  // matter for the merchant publishing their own listings to ALData.
+  hasKey?: boolean
+  auth?: 'NO' | 'YES' | 'CORRECT' | 'WRONG'
+  publishStatus?: string
+  error?: string | null
 }
 
 export interface PontyState {

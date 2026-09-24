@@ -223,6 +223,12 @@ data class StandSearchState(
 @Serializable
 data class AlDataState(
     val listings: List<MarketListing> = emptyList(),
+    // Publish/auth fields (aldata-state.tsx) - public market browsing needs neither; these only
+    // matter for the merchant publishing their own listings to ALData.
+    val hasKey: Boolean = false,
+    val auth: String? = null,
+    val publishStatus: String? = null,
+    val error: String? = null,
 )
 
 @Serializable

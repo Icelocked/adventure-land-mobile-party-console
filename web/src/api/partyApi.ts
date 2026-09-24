@@ -526,6 +526,40 @@ export class PartyApiClient {
     return this.post('anniversary/chat-advertise', {})
   }
 
+  /** POST /party-api/aldata/key - generates a fresh ALData publishing key
+   *  (replaces any existing one). */
+  async generateAlDataKey(): Promise<ApiResult<string>> {
+    return this.parseAlDataKeyResponse(await postJson(this.url('aldata/key'), {}))
+  }
+
+  /** GET /party-api/aldata/key - reveals the already-generated key. */
+  async revealAlDataKey(): Promise<ApiResult<string>> {
+    return this.parseAlDataKeyResponse(await getText(this.url('aldata/key')))
+  }
+
+  private parseAlDataKeyResponse(result: ApiResult<string>): ApiResult<string> {
+    if (result.kind === 'failure') return result
+    try {
+      const parsed = JSON.parse(result.value) as { key?: string; error?: string }
+      return typeof parsed.key === 'string' ? ok(parsed.key) : fail(parsed.error ?? 'ALData request failed')
+    } catch {
+      return fail('ALData request failed')
+    }
+  }
+
+  /** GET /party-api/aldata/auth - checks whether ALData has confirmed the
+   *  authentication mail yet ("NO" | "YES" | "CORRECT" | "WRONG"). */
+  async checkAlDataAuth(): Promise<ApiResult<string>> {
+    const result = await getText(this.url('aldata/auth'))
+    if (result.kind === 'failure') return result
+    try {
+      const parsed = JSON.parse(result.value) as { auth?: string; error?: string }
+      return typeof parsed.auth === 'string' ? ok(parsed.auth) : fail(parsed.error ?? 'ALData request failed')
+    } catch {
+      return fail('ALData request failed')
+    }
+  }
+
   /** POST /party-api/merchant/send-mail. Server-side validation this app
    *  should match before calling: recipient ^[A-Za-z0-9_]{1,40}$,
    *  subject 1-74 chars, message <=1000 chars. No item/gold attachment

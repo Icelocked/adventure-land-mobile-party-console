@@ -8,10 +8,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -26,6 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.RosterMember
 import com.partyconsole.companion.network.ApiResult
@@ -152,6 +161,8 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
             }
         }
 
+        ALDataSection(viewModel)
+
         dynamicState.realmControl?.let { realm ->
             Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -194,6 +205,147 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
         )
         LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp)) {
             items(roster.values.toList(), key = { it.name }) { RosterRow(it) }
+        }
+    }
+}
+
+/** party-inventory-panels.tsx's ALData key-management panel - generate/reveal/copy the
+ *  publishing key, check auth status, and "Prepare mail" (fills the fixed earthiverse/
+ *  aldata_auth authentication mail so the user can review postage and send it themselves,
+ *  same as the dashboard - this never auto-sends, since each message costs real gold). */
+@Composable
+private fun ALDataSection(viewModel: PartyViewModel) {
+    val dynamicState by viewModel.dynamicState.collectAsState()
+    val aldata = dynamicState.aldata
+    val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    var key by remember { mutableStateOf("") }
+    var keyVisible by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var preparingMail by remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("ALData", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Auth: ${aldata?.auth ?: "NO"} · Publish: ${aldata?.publishStatus ?: "idle"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(
+                    enabled = !busy,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            error = null
+                            val result = viewModel.api.checkAlDataAuth()
+                            if (result is ApiResult.Failure) error = result.message
+                            viewModel.refreshDynamicStateNow()
+                            busy = false
+                        }
+                    },
+                ) { Text("Check status") }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = if (keyVisible) key else if (key.isNotEmpty()) "•".repeat(key.length) else "",
+                    onValueChange = {},
+                    readOnly = true,
+                    singleLine = true,
+                    placeholder = { Text(if (aldata?.hasKey == true) "Stored key - reveal to view" else "No key generated") },
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = {
+                    scope.launch {
+                        if (key.isEmpty()) {
+                            when (val result = viewModel.api.revealAlDataKey()) {
+                                is ApiResult.Success -> key = result.value
+                                is ApiResult.Failure -> error = result.message
+                            }
+                        }
+                        keyVisible = !keyVisible
+                    }
+                }) {
+                    Icon(if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "Reveal key")
+                }
+                IconButton(enabled = key.isNotEmpty(), onClick = { clipboard.setText(AnnotatedString(key)) }) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy key")
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            error = null
+                            when (val result = viewModel.api.generateAlDataKey()) {
+                                is ApiResult.Success -> { key = result.value; keyVisible = true }
+                                is ApiResult.Failure -> error = result.message
+                            }
+                            viewModel.refreshDynamicStateNow()
+                            busy = false
+                        }
+                    },
+                ) { Text("Generate key") }
+                Button(
+                    enabled = !busy && aldata?.hasKey == true,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            error = null
+                            val revealed = if (key.isNotEmpty()) ApiResult.Success(key) else viewModel.api.revealAlDataKey()
+                            when (revealed) {
+                                is ApiResult.Success -> { key = revealed.value; preparingMail = true }
+                                is ApiResult.Failure -> error = revealed.message
+                            }
+                            busy = false
+                        }
+                    },
+                ) { Text("Prepare mail") }
+            }
+
+            if (preparingMail && key.isNotEmpty()) {
+                Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "To earthiverse, subject aldata_auth. Do not resend - each message costs gold.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                scope.launch {
+                                    when (val result = viewModel.api.sendMail("earthiverse", "aldata_auth", key)) {
+                                        is ApiResult.Failure -> error = result.message
+                                        is ApiResult.Success -> preparingMail = false
+                                    }
+                                }
+                            }) { Text("Send") }
+                            OutlinedButton(onClick = { preparingMail = false }) { Text("Cancel") }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                "Public market browsing needs no key. Publishing requires authentication: generate a unique key, then Prepare mail to send it to ALData for verification. " +
+                    "ALData stores this key in plaintext - never reuse a password. Allow about a minute, then check status.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            (error ?: aldata?.error)?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
+            }
         }
     }
 }
