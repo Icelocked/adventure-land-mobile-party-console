@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -> Unit) {
     val characters by viewModel.characters.collectAsState()
     val connected by viewModel.connected.collectAsState()
+    val lastConnectionError by viewModel.lastConnectionError.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
     val accountGold = (dynamicState.bank?.gold ?: 0L) + characters.values.sumOf { it.vitals?.gold ?: 0L }
     val scope = rememberCoroutineScope()
@@ -75,7 +76,16 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                     Text(
                         if (connected) "No characters online yet." else "Connecting...",
                         style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 12.dp),
                     )
+                    if (!connected && lastConnectionError != null) {
+                        Text(
+                            lastConnectionError ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                 }
             } else {
                 LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {

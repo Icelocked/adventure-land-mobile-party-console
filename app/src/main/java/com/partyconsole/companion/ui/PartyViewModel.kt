@@ -20,6 +20,7 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     private val repository = PartyRepository(settings, viewModelScope)
     val characters: StateFlow<Map<String, CharacterState>> = repository.characters
     val connected: StateFlow<Boolean> = repository.connected
+    val lastConnectionError: StateFlow<String?> = repository.lastConnectionError
     val roster: StateFlow<Map<String, RosterMember>> = repository.roster
     val dynamicState: StateFlow<PartyStateDynamic> = repository.dynamicState
     val mail: StateFlow<MailSnapshot> = repository.mail
