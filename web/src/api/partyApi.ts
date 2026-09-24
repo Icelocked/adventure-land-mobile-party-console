@@ -398,6 +398,33 @@ export class PartyApiClient {
     return this.post('hunt-settings', patch)
   }
 
+  /** POST /party-api/merchant/bid - places or edits a standing "buy this
+   *  item automatically, up to this price" order (wtborder-dialog.tsx).
+   *  `minimumQuality` is the item's +level (only meaningful for
+   *  upgradeable/compoundable items - the server itself zeroes it
+   *  otherwise). `replaceStandEntry` answers a 409 "stand is full" retry
+   *  by bouncing that occupant id - omit it on the first attempt. */
+  async saveBid(
+    itemId: string,
+    price: number,
+    quantity: number,
+    minimumQuality: number,
+    priorityOverride: number | null,
+    useStandSlot: boolean,
+    acceptHigherLevels: boolean,
+    replaceStandEntry?: string,
+  ): Promise<ApiResult<CommandResult>> {
+    const body: Record<string, unknown> = { itemId, price, quantity, minimumQuality, useStandSlot, acceptHigherLevels }
+    if (priorityOverride !== null) body.priorityOverride = priorityOverride
+    if (replaceStandEntry !== undefined) body.replaceStandEntry = replaceStandEntry
+    return this.post('merchant/bid', body)
+  }
+
+  /** POST /party-api/merchant/bid with `clear: true` - cancels a WTB order. */
+  async cancelBid(itemId: string): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/bid', { itemId, clear: true })
+  }
+
   /** POST /party-api/realm/switch - moves every active character to a
    *  different Adventure Land realm together. Server refuses PVP realms
    *  and refuses if a switch/bankboi transaction is already running -

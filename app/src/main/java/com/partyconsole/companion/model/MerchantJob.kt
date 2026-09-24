@@ -435,6 +435,20 @@ data class PartyStateDynamic(
     val monsterSearchRadiusByCharacter: Map<String, Int> = emptyMap(),
     val huntBlacklist: Map<String, HuntBlacklistEntry> = emptyMap(),
     val huntSettings: HuntSettings? = null,
+    // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one
+    // standing buy order per item id, automatically filled up to `price`.
+    val standBids: Map<String, StandBid> = emptyMap(),
+)
+
+@Serializable
+data class StandBid(
+    val revision: Int? = null,
+    val price: Long = 0,
+    val quantity: Int = 1,
+    val minimumQuality: Int? = null,
+    val priorityOverride: Int? = null,
+    val useStandSlot: Boolean? = null,
+    val acceptHigherLevels: Boolean? = null,
 )
 
 /** hunt-blacklist-label.ts's source entry - a monster currently skipped

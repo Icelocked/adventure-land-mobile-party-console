@@ -364,6 +364,19 @@ export interface PartyStateDynamic {
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
   huntSettings?: HuntSettings | null
+  // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one standing
+  // buy order per item id, automatically filled up to `price`.
+  standBids: Record<string, StandBid>
+}
+
+export interface StandBid {
+  revision?: number
+  price: number
+  quantity: number
+  minimumQuality?: number
+  priorityOverride?: number
+  useStandSlot?: boolean
+  acceptHigherLevels?: boolean
 }
 
 /** hunt-blacklist-label.ts's source entry - a monster currently skipped
@@ -421,6 +434,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   monsterFocusByCharacter: {},
   monsterSearchRadiusByCharacter: {},
   huntBlacklist: {},
+  standBids: {},
 })
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

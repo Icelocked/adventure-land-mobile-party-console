@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
  *  Real field sources confirmed against a live GET /party-api/state this
  *  session: `aldata.listings`, `ponty.listings`, `standSearch`. */
 @Composable
-fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
+fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
     val scope = rememberCoroutineScope()
     var searchTerm by remember { mutableStateOf("") }
@@ -43,6 +43,9 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     val listings = (state.aldata?.listings.orEmpty()) + (state.ponty?.listings.orEmpty())
 
     AccountScreenScaffold("Market", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
+        androidx.compose.material3.OutlinedButton(onClick = onOpenWtb, modifier = Modifier.padding(start = 12.dp, top = 8.dp)) {
+            Text(if (state.standBids.isNotEmpty()) "Manage WTB orders (${state.standBids.size})" else "Manage WTB orders")
+        }
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             OutlinedTextField(
                 value = searchTerm,
