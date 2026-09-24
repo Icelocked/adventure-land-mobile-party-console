@@ -18,9 +18,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # ubuntu-latest already ships a full Android SDK with licenses
+      # pre-accepted (github.com/actions/runner-images) - the
+      # android-actions/setup-android third-party action is unnecessary
+      # and, in practice, less reliable than just using what's already
+      # there. ANDROID_HOME is already set; the Gradle plugin auto-
+      # downloads compileSdk 35 / build-tools 35.0.0 on first use.
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
