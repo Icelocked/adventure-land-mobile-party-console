@@ -514,6 +514,18 @@ export class PartyApiClient {
     return this.post('dashboard-preferences', { bankboiPrefix: prefix })
   }
 
+  /** POST /party-api/dashboard-preferences - "Send anniversary chat message
+   *  when receiving cake from a kiss" (anniversary-dialog.tsx's autoChat toggle). */
+  async setAnniversaryAutoChat(enabled: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('dashboard-preferences', { anniversaryAutoChat: enabled })
+  }
+
+  /** POST /party-api/anniversary/chat-advertise - manually sends the
+   *  server-generated cake-slice-trade advertisement to in-game chat right now. */
+  async sendAnniversaryChatAdvertisement(): Promise<ApiResult<CommandResult>> {
+    return this.post('anniversary/chat-advertise', {})
+  }
+
   /** POST /party-api/merchant/send-mail. Server-side validation this app
    *  should match before calling: recipient ^[A-Za-z0-9_]{1,40}$,
    *  subject 1-74 chars, message <=1000 chars. No item/gold attachment

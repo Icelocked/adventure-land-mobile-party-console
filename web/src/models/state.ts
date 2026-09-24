@@ -343,6 +343,8 @@ export interface PartyStateDynamic {
   autoItemMarks: Record<string, Record<string, string>>
   autoUpgradeMarks: Record<string, Record<string, unknown>>
   bankboiPrefix: string
+  // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
+  anniversaryAutoChat: boolean
   realmControl?: RealmControl | null
   // How much gold each character should carry - the merchant's own bank
   // errands automatically deposit the excess or withdraw the shortfall to
@@ -464,6 +466,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   autoItemMarks: {},
   autoUpgradeMarks: {},
   bankboiPrefix: '',
+  anniversaryAutoChat: false,
   goldTargets: {},
   autoNpcSales: {},
   autoStandMarks: {},

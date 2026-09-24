@@ -112,6 +112,46 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
             }
         }
 
+        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text("Anniversary auto-chat", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Send anniversary chat message when receiving cake from a kiss",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = dynamicState.anniversaryAutoChat,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            viewModel.api.setAnniversaryAutoChat(checked)
+                            viewModel.refreshDynamicStateNow()
+                        }
+                    },
+                )
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Anniversary chat advertisement", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Sends the cake-slice trade advertisement to in-game chat right now.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                androidx.compose.material3.OutlinedButton(
+                    modifier = Modifier.padding(top = 8.dp),
+                    onClick = { scope.launch { viewModel.api.sendAnniversaryChatAdvertisement() } },
+                ) { Text("Send in-game chat now") }
+            }
+        }
+
         dynamicState.realmControl?.let { realm ->
             Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {

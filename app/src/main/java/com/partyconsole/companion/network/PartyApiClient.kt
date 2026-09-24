@@ -804,6 +804,16 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
     suspend fun setBankboiPrefix(prefix: String): ApiResult<CommandResult> =
         post("dashboard-preferences", JsonObject(mapOf("bankboiPrefix" to JsonPrimitive(prefix))))
 
+    /** POST /party-api/dashboard-preferences - "Send anniversary chat message
+     *  when receiving cake from a kiss" (anniversary-dialog.tsx's autoChat toggle). */
+    suspend fun setAnniversaryAutoChat(enabled: Boolean): ApiResult<CommandResult> =
+        post("dashboard-preferences", JsonObject(mapOf("anniversaryAutoChat" to JsonPrimitive(enabled))))
+
+    /** POST /party-api/anniversary/chat-advertise - manually sends the
+     *  server-generated cake-slice-trade advertisement to in-game chat right now. */
+    suspend fun sendAnniversaryChatAdvertisement(): ApiResult<CommandResult> =
+        post("anniversary/chat-advertise", JsonObject(emptyMap()))
+
     /** POST /party-api/merchant/send-mail (http/send-mail.ts). Server-side
      *  validation this app should match before calling: recipient
      *  ^[A-Za-z0-9_]{1,40}$, subject 1-74 chars, message <=1000 chars. No

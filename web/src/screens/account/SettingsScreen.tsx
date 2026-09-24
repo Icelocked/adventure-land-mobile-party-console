@@ -70,6 +70,27 @@ export function SettingsScreen() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
+          <div>
+            <div className="text-sm font-medium">Anniversary auto-chat</div>
+            <div className="text-xs text-muted-foreground">Send anniversary chat message when receiving cake from a kiss</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={dynamicState.anniversaryAutoChat}
+            onChange={(e) => void api.setAnniversaryAutoChat(e.target.checked).then(() => refreshNow())}
+            className="size-5"
+          />
+        </div>
+
+        <div className="rounded-md border border-border bg-card p-4">
+          <div className="mb-1 text-sm font-medium">Anniversary chat advertisement</div>
+          <p className="mb-2 text-xs text-muted-foreground">Sends the cake-slice trade advertisement to in-game chat right now.</p>
+          <Button variant="outline" onClick={() => void api.sendAnniversaryChatAdvertisement()}>
+            Send in-game chat now
+          </Button>
+        </div>
+
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-1 text-sm font-medium">PWA connection</div>
           <p className="mb-2 text-xs text-muted-foreground">Where this app fetches party data from - same-origin by default.</p>
