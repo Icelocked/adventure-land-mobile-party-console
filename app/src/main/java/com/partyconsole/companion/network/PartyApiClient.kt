@@ -411,6 +411,95 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         return post("merchant/auto-stand", body)
     }
 
+    /** POST /party-api/merchant/order (http/merchant-order.ts) - queues an
+     *  NPC buy and/or crafting job. The server recomputes each buy line's
+     *  upgrade-attempt budget itself before queuing - `level` (the desired
+     *  target level for an upgradeable buy) is the only field worth
+     *  sending from here; any client-side cost estimate is display-only. */
+    suspend fun submitMerchantOrder(
+        buys: List<com.partyconsole.companion.model.MerchantOrderBuyLine>,
+        crafts: List<com.partyconsole.companion.model.MerchantOrderCraftLine>,
+        removeAutoBankMark: Boolean = false,
+    ): ApiResult<CommandResult> {
+        val body = JsonObject(
+            mapOf(
+                "buys" to json.encodeToJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(com.partyconsole.companion.model.MerchantOrderBuyLine.serializer()),
+                    buys,
+                ),
+                "crafts" to json.encodeToJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(com.partyconsole.companion.model.MerchantOrderCraftLine.serializer()),
+                    crafts,
+                ),
+                "removeAutoBankMark" to JsonPrimitive(removeAutoBankMark),
+            ),
+        )
+        return post("merchant/order", body)
+    }
+
+    /** POST /party-api/merchant/exchange-order - NPC exchange/box
+     *  operations, a separate endpoint from buy/craft (no `type` field). */
+    suspend fun submitExchangeOrder(exchanges: List<com.partyconsole.companion.model.MerchantExchangeLine>): ApiResult<CommandResult> {
+        val body = JsonObject(
+            mapOf(
+                "exchanges" to json.encodeToJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(com.partyconsole.companion.model.MerchantExchangeLine.serializer()),
+                    exchanges,
+                ),
+            ),
+        )
+        return post("merchant/exchange-order", body)
+    }
+
+    /** POST /party-api/merchant/force-stand - pauses ALL merchant work and
+     *  returns them home to run the stand exclusively; disabling lets
+     *  queued work resume. */
+    suspend fun setForceStand(enabled: Boolean): ApiResult<CommandResult> =
+        post("merchant/force-stand", JsonObject(mapOf("enabled" to JsonPrimitive(enabled))))
+
+    /** POST /party-api/merchant/gather - toggles a standing gathering
+     *  mode (mining/fishing) the merchant does between other jobs. */
+    suspend fun setGathering(mode: String, enabled: Boolean): ApiResult<CommandResult> =
+        post("merchant/gather", JsonObject(mapOf("mode" to JsonPrimitive(mode), "enabled" to JsonPrimitive(enabled))))
+
+    /** POST /party-api/merchant/job/retry - clears a realm-blocked queued
+     *  job's retry backoff so it's attempted again immediately. */
+    suspend fun retryMerchantJob(id: String): ApiResult<CommandResult> =
+        post("merchant/job/retry", JsonObject(mapOf("id" to JsonPrimitive(id))))
+
+    /** POST /party-api/merchant/clear - drops the ENTIRE merchant job
+     *  queue and gathering modes, not just one job (see merchant/job/
+     *  cancel for that). No confirmation server-side, so callers should
+     *  confirm first. */
+    suspend fun clearMerchantQueue(): ApiResult<CommandResult> = post("merchant/clear", JsonObject(emptyMap()))
+
+    /** POST /party-api/merchant/donate - queues an in-game gold donation. */
+    suspend fun donateGold(amount: Long): ApiResult<CommandResult> =
+        post("merchant/donate", JsonObject(mapOf("amount" to JsonPrimitive(amount))))
+
+    /** POST /party-api/merchant/join-giveaway - realm is normalized
+     *  server-side ("US I"/"EU II" style input both work). */
+    suspend fun joinGiveaway(seller: String, realm: String): ApiResult<CommandResult> =
+        post("merchant/join-giveaway", JsonObject(mapOf("seller" to JsonPrimitive(seller), "realm" to JsonPrimitive(realm))))
+
+    /** POST /party-api/bank-party - has the merchant visit party members
+     *  to collect gold/items. Omitting `group` auto-selects when the
+     *  account only has one party group (the common case); with more than
+     *  one, the server 409s with the group list rather than guessing -
+     *  surfaced as a plain error here rather than a group picker (not
+     *  built yet). */
+    suspend fun sendMerchantToParty(group: String? = null): ApiResult<CommandResult> =
+        post("bank-party", JsonObject(if (group != null) mapOf("group" to JsonPrimitive(group)) else emptyMap()))
+
+    /** POST /party-api/merchant/stale-orders/clear - drops delivery/bank-
+     *  mark records for items no longer actually in the merchant's
+     *  inventory (a recovery action, not a normal workflow step). */
+    suspend fun clearStaleOrders(): ApiResult<CommandResult> = post("merchant/stale-orders/clear", JsonObject(emptyMap()))
+
+    /** POST /party-api/merchant/activity/clear - clears the merchant
+     *  activity log shown on the Logs screen. */
+    suspend fun clearMerchantActivity(): ApiResult<CommandResult> = post("merchant/activity/clear", JsonObject(emptyMap()))
+
     /** `/party-api/command` type "character-travel" (navigation/manual-
      *  commands.ts's travel handler) - sends one character to a preset
      *  map location (see model/TravelPlace, sourced from state's

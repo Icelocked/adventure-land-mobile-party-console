@@ -1,6 +1,6 @@
 import type { Item, InventoryEntry } from './item'
 import type { Sprite } from './sprite'
-import type { ItemMeta, MerchantExchangeItem } from './itemDetail'
+import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
 
 export type { Sprite }
 
@@ -185,9 +185,20 @@ export interface MerchantBuyItem {
   scrollCosts?: number[]
 }
 
+/** merchantCatalog.craftable - recipes buyable via the merchant crafting
+ *  workflow (merchant-commerce-dialog.tsx "craft" mode). */
+export interface MerchantCraftRecipe {
+  id: string
+  name: string
+  cost: number
+  sprite?: Sprite | null
+  materials: CraftMaterial[]
+}
+
 export interface MerchantCatalog {
   allItems: CatalogItem[]
   buyable: MerchantBuyItem[]
+  craftable: MerchantCraftRecipe[]
   // NPC exchange/box tables - matched against an item by id+level to
   // build the item-details "Exchange price"/"reward"/"Reward in" sections.
   exchangeable: MerchantExchangeItem[]
@@ -311,6 +322,15 @@ export interface PartyStateDynamic {
   autoDeconstruction: Record<string, Record<string, AutoDeconstructionRule>>
   autoCompounds: Record<string, AutoCompoundRule[]>
   travelPlaces: TravelPlace[]
+  // Merchant Card Controls (merchant-card-controls.tsx): force-stand
+  // pauses all other merchant work; gatheringModes is the standing
+  // mining/fishing toggle set, each independently on or off.
+  merchantForceStand: boolean
+  gatheringModes: string[]
+  // Routine priorities dialog - reason -> 0-100 priority, and which
+  // AUTOMATIC routines (the ones with an enable checkbox) are on.
+  merchantRoutinePriorities: Record<string, number>
+  merchantAutomations: Record<string, boolean>
 }
 
 export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
@@ -334,6 +354,10 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   autoDeconstruction: {},
   autoCompounds: {},
   travelPlaces: [],
+  merchantForceStand: false,
+  gatheringModes: [],
+  merchantRoutinePriorities: {},
+  merchantAutomations: {},
 })
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

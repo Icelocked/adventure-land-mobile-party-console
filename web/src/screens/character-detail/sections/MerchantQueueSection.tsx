@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { RotateCw, X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { SectionCard } from '../SectionCard'
 import type { MerchantJob } from '@/models'
@@ -6,8 +6,8 @@ import type { MerchantJob } from '@/models'
 const jobLabel = (job: MerchantJob): string => job.routine ?? job.reason
 
 /** Ports merchant-card-controls.tsx's "Merchant logistics" widget -
- *  current job + queued jobs, each cancellable. Only ever rendered for
- *  the merchant character. */
+ *  current job + queued jobs, each cancellable, a realm-blocked job also
+ *  retryable. Only ever rendered for the merchant character. */
 export function MerchantQueueSection({ current, queue }: { current?: MerchantJob | null; queue: MerchantJob[] }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -27,15 +27,28 @@ export function MerchantQueueSection({ current, queue }: { current?: MerchantJob
               {jobLabel(job)} → {job.target}
               {job.realmBlockedReason ? ` (${job.realmBlockedReason})` : ''}
             </span>
-            <button
-              aria-label="Cancel job"
-              onClick={async () => {
-                await api.post('merchant/job/cancel', { id: job.id ?? '' })
-                await refreshNow()
-              }}
-            >
-              <X className="size-4 text-muted-foreground" />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {job.realmBlockedReason && (
+                <button
+                  aria-label="Retry job"
+                  onClick={async () => {
+                    if (job.id) await api.retryMerchantJob(job.id)
+                    await refreshNow()
+                  }}
+                >
+                  <RotateCw className="size-4 text-muted-foreground" />
+                </button>
+              )}
+              <button
+                aria-label="Cancel job"
+                onClick={async () => {
+                  await api.post('merchant/job/cancel', { id: job.id ?? '' })
+                  await refreshNow()
+                }}
+              >
+                <X className="size-4 text-muted-foreground" />
+              </button>
+            </div>
           </div>
         ))}
       </div>

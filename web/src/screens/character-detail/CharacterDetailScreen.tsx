@@ -7,6 +7,7 @@ import { VitalsHeader } from './VitalsHeader'
 import { LeaderFollowerSection } from './sections/LeaderFollowerSection'
 import { TravelSection } from './sections/TravelSection'
 import { MerchantQueueSection } from './sections/MerchantQueueSection'
+import { MerchantControlsSection } from './sections/MerchantControlsSection'
 import { EquipmentSection } from './sections/EquipmentSection'
 import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
@@ -81,6 +82,7 @@ export function CharacterDetailScreen() {
               travelPlaces={dynamicState.travelPlaces}
             />
             {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
+            {vitals.ctype === 'merchant' && <MerchantControlsSection forceStand={dynamicState.merchantForceStand} gatheringModes={dynamicState.gatheringModes} />}
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}
               catalogFor={catalogFor}

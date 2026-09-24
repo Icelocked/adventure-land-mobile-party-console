@@ -237,10 +237,22 @@ data class MerchantBuyItem(
     val scrollCosts: List<Long>? = null,
 )
 
+/** merchantCatalog.craftable - recipes buyable via the merchant crafting
+ *  workflow (MerchantCommerceScreen "craft" mode). */
+@Serializable
+data class MerchantCraftRecipe(
+    val id: String,
+    val name: String,
+    val cost: Long,
+    val sprite: Sprite? = null,
+    val materials: List<CraftMaterial> = emptyList(),
+)
+
 @Serializable
 data class MerchantCatalog(
     val allItems: List<CatalogItem> = emptyList(),
     val buyable: List<MerchantBuyItem> = emptyList(),
+    val craftable: List<MerchantCraftRecipe> = emptyList(),
     // NPC exchange/box tables - matched against an item by id+level to
     // build the item-details "Exchange price"/"reward"/"Reward in"
     // sections (see ItemFormulas.exchangeSections).
@@ -380,6 +392,15 @@ data class PartyStateDynamic(
     val autoDeconstruction: Map<String, Map<String, AutoDeconstructionRule>> = emptyMap(),
     val autoCompounds: Map<String, List<AutoCompoundRule>> = emptyMap(),
     val travelPlaces: List<TravelPlace> = emptyList(),
+    // Merchant Card Controls (merchant-card-controls.tsx): force-stand
+    // pauses all other merchant work; gatheringModes is the standing
+    // mining/fishing toggle set, each independently on or off.
+    val merchantForceStand: Boolean = false,
+    val gatheringModes: List<String> = emptyList(),
+    // Routine priorities dialog - reason -> 0-100 priority, and which
+    // AUTOMATIC routines (the ones with an enable checkbox) are on.
+    val merchantRoutinePriorities: Map<String, Int> = emptyMap(),
+    val merchantAutomations: Map<String, Boolean> = emptyMap(),
 )
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

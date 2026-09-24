@@ -18,6 +18,7 @@ import com.partyconsole.companion.ui.account.CatalogScreen
 import com.partyconsole.companion.ui.account.LogsScreen
 import com.partyconsole.companion.ui.account.MailScreen
 import com.partyconsole.companion.ui.account.MarketScreen
+import com.partyconsole.companion.ui.account.MerchantCommerceScreen
 import com.partyconsole.companion.ui.account.SettingsScreen
 import com.partyconsole.companion.ui.account.SkillsScreen
 import com.partyconsole.companion.ui.account.StandScreen
@@ -49,8 +50,10 @@ private object Routes {
     const val ACCOUNT_BANK = "account/bank"
     const val ACCOUNT_LOGS = "account/logs"
     const val ACCOUNT_SETTINGS = "account/settings"
+    const val MERCHANT_COMMERCE = "merchant/{mode}"
 
     fun characterDetail(name: String) = "characters/$name"
+    fun merchantCommerce(mode: String) = "merchant/$mode"
     fun characterMenu(name: String) = "characters/$name/menu"
     fun inventory(name: String) = "characters/$name/inventory"
     fun equipment(name: String) = "characters/$name/equipment"
@@ -133,6 +136,7 @@ fun AppNavigation(store: ServerConfigStore) {
                     }
                 },
                 onOpenMenu = { navController.navigate(Routes.characterMenu(name)) },
+                onOpenMerchantCommerce = { commerceMode -> navController.navigate(Routes.merchantCommerce(commerceMode)) },
             )
         }
         composable(
@@ -185,7 +189,11 @@ fun AppNavigation(store: ServerConfigStore) {
             val name = backStackEntry.arguments?.getString("name") ?: return@composable
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
-            MerchantActivityScreen(viewModel, name, onBack = { navController.popBackStack() })
+            MerchantActivityScreen(
+                viewModel, name,
+                onBack = { navController.popBackStack() },
+                onOpenMerchantCommerce = { commerceMode -> navController.navigate(Routes.merchantCommerce(commerceMode)) },
+            )
         }
         composable(Routes.ACCOUNT_MAIL) { backStackEntry ->
             val active = settings ?: return@composable
@@ -240,6 +248,16 @@ fun AppNavigation(store: ServerConfigStore) {
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             SettingsScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(
+            Routes.MERCHANT_COMMERCE,
+            arguments = listOf(navArgument("mode") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val active = settings ?: return@composable
+            val mode = backStackEntry.arguments?.getString("mode") ?: "buy"
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            MerchantCommerceScreen(viewModel, mode, onBack = { navController.popBackStack() })
         }
     }
 }
