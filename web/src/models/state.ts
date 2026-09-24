@@ -355,6 +355,9 @@ export interface PartyStateDynamic {
   threshold: number
   itemCollectionThreshold: number
   bankSortMode?: 'automatic' | 'request'
+  // BankScreen's own one-shot "sort on next visit" trigger (bank-sort-control.tsx), distinct from
+  // bankSortMode's standing automatic/on-request choice - only relevant while mode is "request".
+  bankSortRequest?: { id: string; status: 'queued' | 'sorting' | 'retry'; message?: string } | null
   // Farming/Hunting (farming-mode-control.tsx). `farmingPolicy` is the
   // account-wide CURRENT mode - unlike almost everything else here,
   // /farming-mode takes no `character` field, so this is one shared

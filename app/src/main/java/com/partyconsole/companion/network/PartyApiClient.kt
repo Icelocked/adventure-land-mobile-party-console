@@ -262,7 +262,10 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
     }
 
     /** POST /party-api/merchant/stand (http/stand-marks.ts) - list an
-     *  inventory item on the merchant's stand. Own route, not /command. */
+     *  inventory item on the merchant's stand, or edit an existing listing
+     *  in place by passing its `id` (stand-marks.ts's update() finds the
+     *  existing mark by id/pack/slot/item and reuses the same slot rather
+     *  than creating a new one). */
     suspend fun markForStand(
         item: Item,
         slot: Int,
@@ -270,9 +273,11 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         price: Long,
         quantity: Int = 1,
         remove: Boolean = false,
+        id: String? = null,
     ): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
+                id?.let { put("id", JsonPrimitive(it)) }
                 put("item", json.encodeToJsonElement(Item.serializer(), item))
                 put("slot", JsonPrimitive(slot))
                 bankPack?.let { put("bankPack", JsonPrimitive(it)) }

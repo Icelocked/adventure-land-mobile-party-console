@@ -136,6 +136,13 @@ data class ActivityEntry(
  *  with remove=true) - distinct from `tradeSlot` (the stand UI position,
  *  not modeled here since nothing in this app needs it yet). */
 @Serializable
+data class BankSortRequest(
+    val id: String,
+    val status: String,
+    val message: String? = null,
+)
+
+@Serializable
 data class StandListing(
     val id: String? = null,
     val slot: Int? = null,
@@ -426,6 +433,9 @@ data class PartyStateDynamic(
     val threshold: Long = 0,
     val itemCollectionThreshold: Int = 1,
     val bankSortMode: String? = null,
+    // BankScreen's own one-shot "sort on next visit" trigger (bank-sort-control.tsx), distinct
+    // from bankSortMode's standing automatic/on-request choice - only relevant while mode is "request".
+    val bankSortRequest: BankSortRequest? = null,
     // Farming/Hunting (farming-mode-control.tsx). `farmingPolicy` is the
     // account-wide CURRENT mode - unlike almost everything else here,
     // /farming-mode takes no `character` field, so this is one shared

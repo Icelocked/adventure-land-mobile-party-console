@@ -163,10 +163,17 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/merchant/stand - list an inventory item on the
-   *  merchant's stand. Own route, not /command. */
-  async markForStand(item: Item, slot: number, price: number, options: { bankPack?: string; quantity?: number; remove?: boolean } = {}): Promise<ApiResult<CommandResult>> {
-    const { bankPack, quantity = 1, remove = false } = options
-    return this.post('merchant/stand', { item, slot, bankPack, price, quantity, remove })
+   *  merchant's stand, or edit an existing listing in place by passing its
+   *  `id` (stand-marks.ts's update() finds the existing mark by id/pack/
+   *  slot/item and reuses the same slot rather than creating a new one). */
+  async markForStand(
+    item: Item,
+    slot: number,
+    price: number,
+    options: { bankPack?: string; quantity?: number; remove?: boolean; id?: string } = {},
+  ): Promise<ApiResult<CommandResult>> {
+    const { bankPack, quantity = 1, remove = false, id } = options
+    return this.post('merchant/stand', { id, item, slot, bankPack, price, quantity, remove })
   }
 
   /** POST /party-api/merchant/npc-sale - source is always "character"

@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { CatalogItem, StandListing } from '@/models'
 
@@ -30,25 +33,53 @@ export function StandScreen() {
 function StandRow({ listing, catalogFor }: { listing: StandListing; catalogFor: (id: string) => CatalogItem | undefined }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const [editing, setEditing] = useState(false)
+  const [price, setPrice] = useState(String(listing.price))
+
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-card p-3">
-      <span className="text-sm font-medium">
-        {displayName(listing.item.name, catalogFor)}
-        {listing.item.level != null ? ` +${listing.item.level}` : ''}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        {listing.price}g × {listing.quantity}
-      </span>
+    <div className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">
+          {displayName(listing.item.name, catalogFor)}
+          {listing.item.level != null ? ` +${listing.item.level}` : ''}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {listing.price}g × {listing.quantity}
+        </span>
+      </div>
       {listing.slot != null && (
-        <button
-          className="text-xs text-primary underline"
-          onClick={async () => {
-            await api.markForStand(listing.item, listing.slot!, listing.price, { remove: true })
-            await refreshNow()
-          }}
-        >
-          Remove
-        </button>
+        <div className="flex items-center gap-3">
+          <button className="text-xs text-primary underline" onClick={() => setEditing((v) => !v)}>
+            {editing ? 'Cancel' : 'Edit price'}
+          </button>
+          <button
+            className="text-xs text-primary underline"
+            onClick={async () => {
+              await api.markForStand(listing.item, listing.slot!, listing.price, { remove: true })
+              await refreshNow()
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      )}
+      {editing && listing.slot != null && (
+        <div className="flex items-end gap-2">
+          <label className="flex-1 text-xs text-muted-foreground">
+            Price
+            <Input value={price} onChange={(e) => /^\d*$/.test(e.target.value) && setPrice(e.target.value)} className="mt-1" />
+          </label>
+          <Button
+            size="sm"
+            onClick={async () => {
+              await api.markForStand(listing.item, listing.slot!, Number(price) || 0, { quantity: listing.quantity, id: listing.id })
+              setEditing(false)
+              await refreshNow()
+            }}
+          >
+            Save
+          </Button>
+        </div>
       )}
     </div>
   )
