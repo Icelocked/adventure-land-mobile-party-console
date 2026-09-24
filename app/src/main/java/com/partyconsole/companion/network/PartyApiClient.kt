@@ -621,6 +621,37 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         return post("hunt-settings", body)
     }
 
+    /** POST /party-api/merchant/bid - places or edits a standing "buy this
+     *  item automatically, up to this price" order. `minimumQuality` is
+     *  the item's +level (only meaningful for upgradeable/compoundable
+     *  items - the server itself zeroes it otherwise). */
+    suspend fun saveBid(
+        itemId: String,
+        price: Long,
+        quantity: Int,
+        minimumQuality: Int,
+        priorityOverride: Int?,
+        useStandSlot: Boolean,
+        acceptHigherLevels: Boolean,
+    ): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                put("itemId", JsonPrimitive(itemId))
+                put("price", JsonPrimitive(price))
+                put("quantity", JsonPrimitive(quantity))
+                put("minimumQuality", JsonPrimitive(minimumQuality))
+                put("useStandSlot", JsonPrimitive(useStandSlot))
+                put("acceptHigherLevels", JsonPrimitive(acceptHigherLevels))
+                priorityOverride?.let { put("priorityOverride", JsonPrimitive(it)) }
+            },
+        )
+        return post("merchant/bid", body)
+    }
+
+    /** POST /party-api/merchant/bid with `clear: true` - cancels a WTB order. */
+    suspend fun cancelBid(itemId: String): ApiResult<CommandResult> =
+        post("merchant/bid", JsonObject(mapOf("itemId" to JsonPrimitive(itemId), "clear" to JsonPrimitive(true))))
+
     /** `/party-api/command` type "character-travel" (navigation/manual-
      *  commands.ts's travel handler) - sends one character to a preset
      *  map location (see model/TravelPlace, sourced from state's

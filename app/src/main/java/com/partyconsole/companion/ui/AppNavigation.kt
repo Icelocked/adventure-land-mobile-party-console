@@ -24,6 +24,7 @@ import com.partyconsole.companion.ui.account.RoutinesScreen
 import com.partyconsole.companion.ui.account.SettingsScreen
 import com.partyconsole.companion.ui.account.SkillsScreen
 import com.partyconsole.companion.ui.account.StandScreen
+import com.partyconsole.companion.ui.account.WtbScreen
 import com.partyconsole.companion.ui.characterdetail.CharacterDetailScreen
 import com.partyconsole.companion.ui.characterdetail.CharacterMenuScreen
 import com.partyconsole.companion.ui.characterdetail.EquipmentScreen
@@ -55,6 +56,7 @@ private object Routes {
     const val MERCHANT_COMMERCE = "merchant/{mode}"
     const val ROUTINES = "routines"
     const val HUNT_SETTINGS = "hunt-settings"
+    const val WTB = "wtb"
 
     fun characterDetail(name: String) = "characters/$name"
     fun merchantCommerce(mode: String) = "merchant/$mode"
@@ -236,7 +238,7 @@ fun AppNavigation(store: ServerConfigStore) {
             val active = settings ?: return@composable
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
-            MarketScreen(viewModel, onBack = { navController.popBackStack() })
+            MarketScreen(viewModel, onBack = { navController.popBackStack() }, onOpenWtb = { navController.navigate(Routes.WTB) })
         }
         composable(Routes.ACCOUNT_BANK) { backStackEntry ->
             val active = settings ?: return@composable
@@ -277,6 +279,12 @@ fun AppNavigation(store: ServerConfigStore) {
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             HuntSettingsScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.WTB) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            WtbScreen(viewModel, onBack = { navController.popBackStack() })
         }
     }
 }

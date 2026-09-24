@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { Input } from '@/components/ui/input'
@@ -12,14 +13,21 @@ export function MarketScreen() {
   const dynamicState = useDynamicState()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const navigate = useNavigate()
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const [searchTerm, setSearchTerm] = useState('')
 
   const listings = [...(dynamicState.aldata?.listings ?? []), ...(dynamicState.ponty?.listings ?? [])]
   const search = dynamicState.standSearch
+  const wtbCount = Object.keys(dynamicState.standBids).length
 
   return (
     <AccountScreenScaffold title="Market" onRefresh={() => void refreshNow()}>
+      <div className="px-3 pt-2">
+        <Button variant="outline" size="sm" onClick={() => navigate('/wtb')}>
+          Manage WTB orders{wtbCount > 0 ? ` (${wtbCount})` : ''}
+        </Button>
+      </div>
       <div className="flex items-end gap-2 p-3">
         <label className="flex-1 text-xs text-muted-foreground">
           Search a live player stand for an item id
