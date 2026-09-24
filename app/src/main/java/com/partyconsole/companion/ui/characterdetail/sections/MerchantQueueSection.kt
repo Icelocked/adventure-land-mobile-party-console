@@ -8,6 +8,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,17 +43,30 @@ fun MerchantQueueSection(current: MerchantJob?, queue: List<MerchantJob>, viewMo
                         "${jobLabel(job)} → ${job.target}${job.realmBlockedReason?.let { " ($it)" } ?: ""}",
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
+                        modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = {
-                        scope.launch {
-                            viewModel.api.post(
-                                "merchant/job/cancel",
-                                JsonObject(mapOf("id" to JsonPrimitive(job.id ?: ""))),
-                            )
-                            viewModel.refreshDynamicStateNow()
+                    Row {
+                        if (job.realmBlockedReason != null) {
+                            IconButton(onClick = {
+                                scope.launch {
+                                    job.id?.let { viewModel.api.retryMerchantJob(it) }
+                                    viewModel.refreshDynamicStateNow()
+                                }
+                            }) {
+                                Icon(Icons.Filled.Refresh, contentDescription = "Retry job")
+                            }
                         }
-                    }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Cancel job")
+                        IconButton(onClick = {
+                            scope.launch {
+                                viewModel.api.post(
+                                    "merchant/job/cancel",
+                                    JsonObject(mapOf("id" to JsonPrimitive(job.id ?: ""))),
+                                )
+                                viewModel.refreshDynamicStateNow()
+                            }
+                        }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Cancel job")
+                        }
                     }
                 }
             }

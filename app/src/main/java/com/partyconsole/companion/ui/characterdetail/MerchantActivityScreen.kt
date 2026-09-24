@@ -19,17 +19,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.characterdetail.sections.MerchantControlsSection
 import com.partyconsole.companion.ui.characterdetail.sections.MerchantQueueSection
 import com.partyconsole.companion.ui.characterdetail.sections.RestockSection
 
 /** The hamburger menu's "Activity" entry for the merchant character -
- *  full job queue + restock policy in one place. Buy/craft/exchange order
- *  submission (merchant-commerce-dialog.tsx) needs its exact submit
- *  endpoint confirmed before wiring - not guessed blind, same reasoning
- *  as CatalogScreen - so this screen is the queue/restock view for v1,
- *  not the full commerce dialog port the mobile-redesign plan describes. */
+ *  full job queue + restock policy + the rest of the merchant controls
+ *  (MerchantControlsSection: Buy/Craft/Exchange, force stand, gathering,
+ *  donate, giveaway, ...) in one place. */
 @Composable
-fun MerchantActivityScreen(viewModel: PartyViewModel, characterName: String, onBack: () -> Unit) {
+fun MerchantActivityScreen(viewModel: PartyViewModel, characterName: String, onBack: () -> Unit, onOpenMerchantCommerce: (String) -> Unit) {
     val characters by viewModel.characters.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
     val vitals = characters[characterName]?.vitals
@@ -56,15 +55,11 @@ fun MerchantActivityScreen(viewModel: PartyViewModel, characterName: String, onB
                 return@Scaffold
             }
             MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
+            MerchantControlsSection(dynamicState.merchantForceStand, dynamicState.gatheringModes, viewModel, onOpenMerchantCommerce)
             RestockSection(
                 characterName,
                 dynamicState.restockPolicies[characterName] ?: com.partyconsole.companion.model.RestockPolicy(),
                 viewModel,
-            )
-            Text(
-                "Buy/craft/exchange ordering is coming soon.",
-                modifier = Modifier.padding(16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

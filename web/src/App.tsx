@@ -13,6 +13,7 @@ import { SkillsScreen } from '@/screens/account/SkillsScreen'
 import { StandScreen } from '@/screens/account/StandScreen'
 import { MarketScreen } from '@/screens/account/MarketScreen'
 import { BankScreen } from '@/screens/account/BankScreen'
+import { MerchantCommerceScreen } from '@/screens/account/MerchantCommerceScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/stand" element={<StandScreen />} />
               <Route path="/market" element={<MarketScreen />} />
               <Route path="/bank" element={<BankScreen />} />
+              <Route path="/merchant/:mode" element={<MerchantCommerceScreen />} />
               <Route path="/logs" element={<LogsScreen />} />
               <Route path="/settings" element={<SettingsScreen />} />
             </Routes>

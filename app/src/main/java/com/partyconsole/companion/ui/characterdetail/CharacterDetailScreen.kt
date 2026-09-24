@@ -32,6 +32,7 @@ import com.partyconsole.companion.ui.characterdetail.sections.EquipmentSection
 import com.partyconsole.companion.ui.characterdetail.sections.GoldTargetSection
 import com.partyconsole.companion.ui.characterdetail.sections.InventorySection
 import com.partyconsole.companion.ui.characterdetail.sections.LeaderFollowerSection
+import com.partyconsole.companion.ui.characterdetail.sections.MerchantControlsSection
 import com.partyconsole.companion.ui.characterdetail.sections.MerchantQueueSection
 import com.partyconsole.companion.ui.characterdetail.sections.RestockSection
 import com.partyconsole.companion.ui.characterdetail.sections.TravelSection
@@ -54,6 +55,7 @@ fun CharacterDetailScreen(
     onBack: () -> Unit,
     onSwitchCharacter: (String) -> Unit,
     onOpenMenu: () -> Unit,
+    onOpenMerchantCommerce: (String) -> Unit,
 ) {
     val characters by viewModel.characters.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -111,6 +113,7 @@ fun CharacterDetailScreen(
                 )
                 if (vitals.ctype == "merchant") {
                     MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
+                    MerchantControlsSection(dynamicState.merchantForceStand, dynamicState.gatheringModes, viewModel, onOpenMerchantCommerce)
                 }
                 EquipmentSection(
                     slots = state.inventory?.slots.orEmpty(),
