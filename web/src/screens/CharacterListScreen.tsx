@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CloudOff, RefreshCw, Settings } from 'lucide-react'
-import { useCharacters, useConnected, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
+import { Button } from '@/components/ui/button'
 import type { CharacterState } from '@/models'
 
 /** Party overview - ported from ui/characterlist/CharacterListScreen.kt:
@@ -38,6 +40,8 @@ export function CharacterListScreen() {
 
       {!connected && <div className="h-0.5 w-full animate-pulse bg-primary/60" />}
 
+      {names.length > 0 && <PartyControls />}
+
       {names.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <p className="text-muted-foreground">{connected ? 'No characters online yet.' : 'Connecting...'}</p>
@@ -49,6 +53,48 @@ export function CharacterListScreen() {
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+/** party-workspace.tsx's two party-wide (not per-character) buttons: "Send party to
+ *  town" (bulk /town-party) and "Escape" (escape-control.tsx's polled emergency-
+ *  recovery command - needs one online warrior/mage/priest, the server owns the
+ *  whole staged rendezvous/convoy-fallback sequence, this just triggers + shows
+ *  `stage`/`error`). */
+function PartyControls() {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const escape = useEscapeStatus()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const running = !!escape && !['complete', 'failed-hold', 'released'].includes(escape.stage)
+  const failed = !!error || (!!escape && escape.stage !== 'released' && (!!escape.error || escape.stage === 'failed-hold'))
+  const label = failed ? 'Escape · failed' : escape?.stage === 'complete' ? 'Escape · success' : 'Escape'
+
+  return (
+    <div className="flex gap-2 px-3 pt-3">
+      <Button variant="outline" size="sm" className="flex-1" onClick={() => void api.sendPartyToTown()}>
+        Send party to town
+      </Button>
+      <Button
+        variant={failed ? 'destructive' : 'outline'}
+        size="sm"
+        className="flex-1"
+        disabled={busy || running}
+        onClick={async () => {
+          setBusy(true)
+          setError(null)
+          const result = await api.triggerEscape()
+          if (result.kind === 'failure') setError(result.message)
+          await refreshNow()
+          setBusy(false)
+        }}
+      >
+        {(busy || running) && <span className="mr-2 size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+        {label}
+      </Button>
     </div>
   )
 }

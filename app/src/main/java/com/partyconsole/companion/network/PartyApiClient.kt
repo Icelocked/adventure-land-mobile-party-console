@@ -751,6 +751,17 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
     suspend fun returnToLeader(character: String): ApiResult<CommandResult> =
         sendCommand(character, mapOf("type" to "return-leader"))
 
+    /** POST /party-api/town-party (party-actions.ts's town()) - sends EVERY
+     *  active character to town at once, distinct from character-travel's
+     *  per-character command. */
+    suspend fun sendPartyToTown(): ApiResult<CommandResult> = post("town-party", JsonObject(emptyMap()))
+
+    /** POST /party-api/escape (party-actions.ts's escape()) - the party-wide
+     *  emergency-recovery command: needs one online warrior/mage/priest, the
+     *  server owns the whole staged rendezvous/convoy-fallback sequence.
+     *  Poll GET /party-api/escape (PartyRepository.escape) for stage/error. */
+    suspend fun triggerEscape(): ApiResult<CommandResult> = post("escape", JsonObject(emptyMap()))
+
     /** `/party-api/command` type "remove-auto-item-mark" (inventory/mark-
      *  commands.ts) - removes one standing auto-bank/auto-merchant rule
      *  by its rule key. Deliberately no `item` field: the real dashboard

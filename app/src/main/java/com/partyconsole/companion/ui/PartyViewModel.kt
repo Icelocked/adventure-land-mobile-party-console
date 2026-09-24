@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.partyconsole.companion.data.PartyRepository
 import com.partyconsole.companion.model.CharacterState
+import com.partyconsole.companion.model.EscapeStatus
 import com.partyconsole.companion.model.GameLogEntry
 import com.partyconsole.companion.model.MailSnapshot
 import com.partyconsole.companion.model.PartyStateDynamic
@@ -25,6 +26,7 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     val dynamicState: StateFlow<PartyStateDynamic> = repository.dynamicState
     val mail: StateFlow<MailSnapshot> = repository.mail
     val gameLogs: StateFlow<Map<String, List<GameLogEntry>>> = repository.gameLogs
+    val escape: StateFlow<EscapeStatus?> = repository.escape
     val api get() = repository.api
 
     suspend fun refreshDynamicStateNow() = repository.refreshDynamicStateNow()

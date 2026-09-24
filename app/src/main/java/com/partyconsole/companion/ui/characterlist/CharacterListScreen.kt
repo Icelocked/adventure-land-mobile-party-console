@@ -15,23 +15,30 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.CharacterState
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.activityLine
 import com.partyconsole.companion.ui.characterdetail.sections.classLook
@@ -66,6 +73,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (!connected) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            if (characters.isNotEmpty()) PartyControls(viewModel)
             if (characters.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -94,6 +102,49 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                     }
                 }
             }
+        }
+    }
+}
+
+/** party-workspace.tsx's two party-wide (not per-character) buttons: "Send party to
+ *  town" (bulk /town-party) and "Escape" (escape-control.tsx's polled emergency-
+ *  recovery command - needs one online warrior/mage/priest, the server owns the
+ *  whole staged rendezvous/convoy-fallback sequence, this just triggers + shows
+ *  stage/error). */
+@Composable
+private fun PartyControls(viewModel: PartyViewModel) {
+    val escape by viewModel.escape.collectAsState()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val running = escape != null && escape?.stage !in listOf("complete", "failed-hold", "released")
+    val failed = error != null || (escape != null && escape?.stage != "released" && (escape?.error != null || escape?.stage == "failed-hold"))
+    val label = if (failed) "Escape · failed" else if (escape?.stage == "complete") "Escape · success" else "Escape"
+
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { scope.launch { viewModel.api.sendPartyToTown() } }, modifier = Modifier.weight(1f)) {
+            Text("Send party to town")
+        }
+        Button(
+            onClick = {
+                scope.launch {
+                    busy = true
+                    error = null
+                    val result = viewModel.api.triggerEscape()
+                    if (result is ApiResult.Failure) error = result.message
+                    viewModel.refreshDynamicStateNow()
+                    busy = false
+                }
+            },
+            enabled = !busy && !running,
+            colors = if (failed) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors(),
+            modifier = Modifier.weight(1f),
+        ) {
+            if (busy || running) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp).padding(end = 6.dp), strokeWidth = 2.dp)
+            }
+            Text(label)
         }
     }
 }

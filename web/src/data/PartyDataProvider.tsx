@@ -8,6 +8,7 @@ import type {
   CharacterState,
   CharacterVitals,
   EquippedEntry,
+  EscapeStatus,
   GameLogEntry,
   InventoryEntry,
   MailSnapshot,
@@ -95,6 +96,11 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       if (logsResult.kind === 'success') {
         const parsed = JSON.parse(logsResult.value) as { gameLogs?: Record<string, GameLogEntry[]> }
         queryClient.setQueryData(QK.gameLogs, parsed.gameLogs ?? {})
+      }
+      const escapeResult = await api.get('escape')
+      if (escapeResult.kind === 'success') {
+        const parsed = JSON.parse(escapeResult.value) as { escape?: EscapeStatus | null }
+        queryClient.setQueryData(QK.escape, parsed.escape ?? null)
       }
     },
     [api, queryClient],
@@ -212,3 +218,4 @@ export const useRoster = (): Record<string, RosterMember> => useCachedValue(QK.r
 export const useDynamicState = (): PartyStateDynamic => useCachedValue(QK.dynamicState, emptyPartyStateDynamic())
 export const useMail = (): MailSnapshot => useCachedValue(QK.mail, { messages: [], count: 0 })
 export const useGameLogs = (): Record<string, GameLogEntry[]> => useCachedValue(QK.gameLogs, {})
+export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.escape, null)

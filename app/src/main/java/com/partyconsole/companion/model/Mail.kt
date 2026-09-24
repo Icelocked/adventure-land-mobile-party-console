@@ -27,3 +27,25 @@ data class ReceivedMail(
     // safe-default pattern for fields with more than one possible shape.
     val taken: JsonElement? = null,
 )
+
+/** escape-status.tsx's shape for GET/POST /party-api/escape - the party-wide
+ *  emergency-recovery command (needs one online warrior/mage/priest; the server
+ *  owns the whole staged rendezvous/convoy-fallback sequence, this app only
+ *  triggers it and shows [stage]/[error]). */
+@Serializable
+data class EscapeStatus(
+    val id: String,
+    val stage: String,
+    val error: String? = null,
+    val progress: Map<String, EscapeProgress> = emptyMap(),
+)
+
+@Serializable
+data class EscapeProgress(
+    val error: String? = null,
+)
+
+@Serializable
+data class EscapeResponse(
+    val escape: EscapeStatus? = null,
+)
