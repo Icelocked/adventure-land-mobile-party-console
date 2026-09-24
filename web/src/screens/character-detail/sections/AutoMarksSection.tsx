@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { displayName } from '@/lib/catalogLookup'
+import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
 import type { CatalogItem, Item, PartyStateDynamic } from '@/models'
 import { itemFromRuleKey } from '@/models'
@@ -34,16 +35,22 @@ export function AutoMarksSection({
   const npcEntries: RuleEntry[] = Object.entries(dynamicState.autoNpcSales)
     .filter(([, rule]) => (isMerchant ? rule.character == null : rule.character === characterName))
     .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(characterName, rule.item, true) }))
+  const clearNpc = () => api.clearAllAutoNpcSales(isMerchant ? undefined : characterName)
 
   const deconEntries: RuleEntry[] = Object.entries(dynamicState.autoDeconstruction[characterName] ?? {}).map(([key, rule]) => ({
     key,
     item: rule.item,
     onRemove: () => api.autoDeconstruct(characterName, rule.item, true),
   }))
+  // No bulk route for deconstruction (mark-commands.ts has one for bank/merchant marks, compound-
+  // commands.ts for upgrades/compounds, automatic-sales.ts for npc/stand - deconstruction doesn't) -
+  // inventory-panel.tsx's own clearAutomaticSection loops the existing per-rule remove the same way.
+  const clearDecon = () => Promise.all(deconEntries.map((entry) => entry.onRemove()))
 
   const bankEntries: RuleEntry[] = Object.entries(dynamicState.autoItemMarks[characterName] ?? {})
     .filter(([, mode]) => mode === 'bank')
     .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, 'bank', key) }))
+  const clearBank = () => api.clearAutoItemMarks(characterName, 'bank')
 
   let standEntries: RuleEntry[] = []
   let upgradeEntries: RuleEntry[] = []
@@ -83,26 +90,41 @@ export function AutoMarksSection({
       .filter(([, mode]) => mode === 'merchant')
       .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, 'merchant', key) }))
   }
+  const clearStand = () => api.clearAllAutoStand()
+  const clearUpgrades = () => api.clearAutoUpgrades(characterName)
+  const clearCompounds = () => api.clearAutoCompounds(characterName)
+  const clearMerchantMarks = () => api.clearAutoItemMarks(characterName, 'merchant')
 
   return (
     <SectionCard title="Automatic rules">
-      <AutoRuleGroup title="Auto NPC sales" entries={npcEntries} catalogFor={catalogFor} />
-      <AutoRuleGroup title="Auto deconstruction" entries={deconEntries} catalogFor={catalogFor} />
+      <AutoRuleGroup title="Auto NPC sales" entries={npcEntries} catalogFor={catalogFor} onClearAll={clearNpc} />
+      <AutoRuleGroup title="Auto deconstruction" entries={deconEntries} catalogFor={catalogFor} onClearAll={clearDecon} />
       {isMerchant && (
         <>
-          <AutoRuleGroup title="Auto stand marks" entries={standEntries} catalogFor={catalogFor} />
-          <AutoRuleGroup title="Auto upgrades" entries={upgradeEntries} catalogFor={catalogFor} />
-          <AutoRuleGroup title="Auto compounds" entries={compoundEntries} catalogFor={catalogFor} />
-          <AutoRuleGroup title="Auto merchant marks" entries={merchantMarkEntries} catalogFor={catalogFor} />
+          <AutoRuleGroup title="Auto stand marks" entries={standEntries} catalogFor={catalogFor} onClearAll={clearStand} />
+          <AutoRuleGroup title="Auto upgrades" entries={upgradeEntries} catalogFor={catalogFor} onClearAll={clearUpgrades} />
+          <AutoRuleGroup title="Auto compounds" entries={compoundEntries} catalogFor={catalogFor} onClearAll={clearCompounds} />
+          <AutoRuleGroup title="Auto merchant marks" entries={merchantMarkEntries} catalogFor={catalogFor} onClearAll={clearMerchantMarks} />
         </>
       )}
-      <AutoRuleGroup title="Auto bank marks" entries={bankEntries} catalogFor={catalogFor} />
+      <AutoRuleGroup title="Auto bank marks" entries={bankEntries} catalogFor={catalogFor} onClearAll={clearBank} />
     </SectionCard>
   )
 }
 
-function AutoRuleGroup({ title, entries, catalogFor }: { title: string; entries: RuleEntry[]; catalogFor: (id: string) => CatalogItem | undefined }) {
+function AutoRuleGroup({
+  title,
+  entries,
+  catalogFor,
+  onClearAll,
+}: {
+  title: string
+  entries: RuleEntry[]
+  catalogFor: (id: string) => CatalogItem | undefined
+  onClearAll: () => Promise<unknown>
+}) {
   const [expanded, setExpanded] = useState(false)
+  const [confirmingClear, setConfirmingClear] = useState(false)
   const refreshNow = useRefreshDynamicStateNow()
 
   return (
@@ -130,6 +152,30 @@ function AutoRuleGroup({ title, entries, catalogFor }: { title: string; entries:
               </button>
             </div>
           ))}
+          {entries.length > 0 &&
+            (confirmingClear ? (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="flex-1 text-xs text-destructive">Really clear all?</span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={async () => {
+                    setConfirmingClear(false)
+                    await onClearAll()
+                    await refreshNow()
+                  }}
+                >
+                  Clear all
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setConfirmingClear(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <button className="mt-1 text-left text-xs text-destructive underline" onClick={() => setConfirmingClear(true)}>
+                Clear all
+              </button>
+            ))}
         </div>
       )}
     </div>

@@ -220,6 +220,36 @@ export class PartyApiClient {
     return this.post('merchant/auto-stand', { character, item, price, action: remove ? 'remove' : 'set' })
   }
 
+  /** POST /party-api/merchant/auto-npc-sale with action "clear-all"
+   *  (automatic-sales.ts) - drops every auto-NPC-sale rule scoped to
+   *  `character` (undefined clears the merchant's own account-wide rules,
+   *  matching how npcEntries filters by `rule.character == null`). */
+  async clearAllAutoNpcSales(character?: string): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/auto-npc-sale', { action: 'clear-all', character })
+  }
+
+  /** POST /party-api/merchant/auto-stand with action "clear-all" -
+   *  merchant-only, account-wide (no character scoping server-side). */
+  async clearAllAutoStand(): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/auto-stand', { action: 'clear-all' })
+  }
+
+  /** `/party-api/command` type "clear-auto-upgrades"/"clear-auto-compounds"
+   *  (compound-commands.ts) - drops EVERY owner's rules at once; the
+   *  server requires `character` to be the configured merchant. */
+  async clearAutoUpgrades(merchantCharacter: string): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(merchantCharacter, { type: 'clear-auto-upgrades' })
+  }
+  async clearAutoCompounds(merchantCharacter: string): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(merchantCharacter, { type: 'clear-auto-compounds' })
+  }
+
+  /** `/party-api/command` type "clear-auto-item-marks" - drops `character`'s
+   *  own auto-bank/auto-merchant rules for the given mode. */
+  async clearAutoItemMarks(character: string, mode: 'bank' | 'merchant'): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, { type: 'clear-auto-item-marks', mode })
+  }
+
   /** POST /party-api/merchant/order - queues an NPC buy and/or crafting
    *  job. The server recomputes each buy line's upgrade-attempt budget
    *  itself (runtime/coordinator/http/merchant-order.ts's estimate())
