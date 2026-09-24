@@ -29,6 +29,7 @@ import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 import com.partyconsole.companion.ui.characterdetail.sections.AutoMarksSection
 import com.partyconsole.companion.ui.characterdetail.sections.EquipmentSection
+import com.partyconsole.companion.ui.characterdetail.sections.FarmingSection
 import com.partyconsole.companion.ui.characterdetail.sections.GoldTargetSection
 import com.partyconsole.companion.ui.characterdetail.sections.InventorySection
 import com.partyconsole.companion.ui.characterdetail.sections.LeaderFollowerSection
@@ -57,6 +58,7 @@ fun CharacterDetailScreen(
     onOpenMenu: () -> Unit,
     onOpenMerchantCommerce: (String) -> Unit,
     onOpenRoutines: () -> Unit,
+    onOpenHuntSettings: () -> Unit,
 ) {
     val characters by viewModel.characters.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -112,6 +114,17 @@ fun CharacterDetailScreen(
                     travelPlaces = dynamicState.travelPlaces,
                     viewModel = viewModel,
                 )
+                if (vitals.ctype != "merchant") {
+                    FarmingSection(
+                        characterName = characterName,
+                        farmingPolicy = dynamicState.farmingPolicy,
+                        monsterFocus = dynamicState.monsterFocusByCharacter[characterName] ?: emptyList(),
+                        monsterSearchRadius = dynamicState.monsterSearchRadiusByCharacter[characterName] ?: 400,
+                        bestiaryCatalog = dynamicState.bestiaryCatalog,
+                        viewModel = viewModel,
+                        onOpenHuntSettings = onOpenHuntSettings,
+                    )
+                }
                 if (vitals.ctype == "merchant") {
                     MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
                     MerchantControlsSection(

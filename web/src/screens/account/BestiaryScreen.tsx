@@ -29,9 +29,12 @@ export function BestiaryScreen() {
 function MonsterRow({ monster, expanded, onToggle }: { monster: BestiaryMonster; expanded: boolean; onToggle: () => void }) {
   return (
     <div className="rounded-md border border-border bg-card p-3">
-      <button className="flex w-full items-center justify-between" onClick={onToggle}>
-        <span className="text-sm font-medium">{monster.name}</span>
-        <span className="text-xs text-muted-foreground">
+      <button className="flex w-full items-center justify-between gap-2" onClick={onToggle}>
+        <span className="flex min-w-0 items-center gap-2">
+          <SpriteIcon sprite={monster.sprite} size={28} />
+          <span className="truncate text-sm font-medium">{monster.name}</span>
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">
           HP {monster.hp.toLocaleString()} · ATK {monster.attack.toLocaleString()} · XP {monster.xp.toLocaleString()}
         </span>
       </button>

@@ -4,6 +4,7 @@ import com.partyconsole.companion.model.Item
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -536,6 +537,88 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
             },
         )
         return post("config", body)
+    }
+
+    /** POST /party-api/farming-mode - the account-wide farming strategy
+     *  (Auto/Default/Scatter/Hunt); unlike nearly everything else in this
+     *  client, this command takes no `character` field at all (confirmed
+     *  against runtime/coordinator/http/hunt-mode.ts) - it's one shared
+     *  value for the whole party. Hunt specifically requires a `backup`
+     *  (monster focus + a real spawn location) the first time, or
+     *  whenever changing it - the server 409s with `code:"backup_required"`
+     *  if Hunt is requested without one and none is already set. */
+    suspend fun setFarmingMode(mode: String, backupMonsterFocus: List<String>? = null, backupMap: String? = null, backupX: Double? = null, backupY: Double? = null): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                put("mode", JsonPrimitive(mode))
+                if (backupMonsterFocus != null && backupMap != null && backupX != null && backupY != null) {
+                    put(
+                        "backup",
+                        JsonObject(
+                            mapOf(
+                                "monsterFocus" to JsonArray(backupMonsterFocus.map { JsonPrimitive(it) }),
+                                "location" to JsonObject(
+                                    mapOf(
+                                        "map" to JsonPrimitive(backupMap),
+                                        "x" to JsonPrimitive(backupX),
+                                        "y" to JsonPrimitive(backupY),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    )
+                }
+            },
+        )
+        return post("farming-mode", body)
+    }
+
+    /** POST /party-api/focus - which monsters a character farms/hunts,
+     *  per-character (unlike farming-mode). Omitting `monsterSearchRadius`
+     *  leaves it unchanged server-side. */
+    suspend fun setFocus(character: String, monsterFocus: List<String>, monsterSearchRadius: Int? = null): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                put("character", JsonPrimitive(character))
+                put("monsterFocus", JsonArray(monsterFocus.map { JsonPrimitive(it) }))
+                monsterSearchRadius?.let { put("monsterSearchRadius", JsonPrimitive(it)) }
+            },
+        )
+        return post("focus", body)
+    }
+
+    /** POST /party-api/hunt-blacklist - `action:"clear"` drops everything,
+     *  `action:"remove"` drops one monster (needs `monsterId`), `action:
+     *  "add"` manually blacklists one (needs `monsterId`). */
+    suspend fun updateHuntBlacklist(action: String, monsterId: String? = null): ApiResult<CommandResult> {
+        val body = JsonObject(
+            buildMap {
+                put("action", JsonPrimitive(action))
+                monsterId?.let { put("monsterId", JsonPrimitive(it)) }
+            },
+        )
+        return post("hunt-blacklist", body)
+    }
+
+    /** POST /party-api/hunt-settings - a partial patch (only send the
+     *  fields changing; server merges over the existing settings). */
+    suspend fun saveHuntSettings(
+        relocateIfCompeting: Boolean,
+        blacklistDeaths: Boolean,
+        deathThreshold: Int,
+        blacklistExpirations: Boolean,
+        expirationThreshold: Int,
+    ): ApiResult<CommandResult> {
+        val body = JsonObject(
+            mapOf(
+                "relocateIfCompeting" to JsonPrimitive(relocateIfCompeting),
+                "blacklistDeaths" to JsonPrimitive(blacklistDeaths),
+                "deathThreshold" to JsonPrimitive(deathThreshold),
+                "blacklistExpirations" to JsonPrimitive(blacklistExpirations),
+                "expirationThreshold" to JsonPrimitive(expirationThreshold),
+            ),
+        )
+        return post("hunt-settings", body)
     }
 
     /** `/party-api/command` type "character-travel" (navigation/manual-

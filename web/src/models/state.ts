@@ -55,6 +55,22 @@ export interface BestiaryDrop {
   sprite?: Sprite | null
 }
 
+/** One entry in a BestiaryMonster's spawnRecords - a real map location
+ *  this monster spawns at, confirmed against a live GET /party-api/state
+ *  capture (farming-area-picker.tsx's `farmingAreas()` groups these same
+ *  records client-side using a separate static lib/farming-areas.ts data
+ *  file this app doesn't port - picking a plain spawn record directly is
+ *  simpler and uses only server-sourced data). */
+export interface MonsterSpawnRecord {
+  map: string
+  mapName?: string
+  x: number
+  y: number
+  count?: number
+  boundary?: [number, number, number, number]
+  restrictions?: string[]
+}
+
 /** bestiary-dialog.tsx's monster reference entry. */
 export interface BestiaryMonster {
   id: string
@@ -63,7 +79,9 @@ export interface BestiaryMonster {
   attack: number
   xp: number
   threat: number
+  sprite?: Sprite | null
   drops: BestiaryDrop[]
+  spawnRecords: MonsterSpawnRecord[]
 }
 
 /** skills-dialog.tsx's per-class skill list. */
@@ -335,6 +353,41 @@ export interface PartyStateDynamic {
   threshold: number
   itemCollectionThreshold: number
   bankSortMode?: 'automatic' | 'request'
+  // Farming/Hunting (farming-mode-control.tsx). `farmingPolicy` is the
+  // account-wide CURRENT mode - unlike almost everything else here,
+  // /farming-mode takes no `character` field, so this is one shared
+  // value, not per-character (confirmed against the real route source,
+  // runtime/coordinator/http/hunt-mode.ts). Monster focus IS per-
+  // character, keyed by character name.
+  farmingPolicy: string
+  monsterFocusByCharacter: Record<string, string[]>
+  monsterSearchRadiusByCharacter: Record<string, number>
+  huntBlacklist: Record<string, HuntBlacklistEntry>
+  huntSettings?: HuntSettings | null
+}
+
+/** hunt-blacklist-label.ts's source entry - a monster currently skipped
+ *  by Hunt mode, either automatically (deaths/expirations threshold) or
+ *  manually. */
+export interface HuntBlacklistEntry {
+  monsterId: string
+  at: number
+  deaths: number
+  reason: string
+  expirations?: number
+  characters?: string[]
+  lastDeathAt?: number
+}
+
+/** hunt-settings-control.tsx's config - when Hunt mode should relocate to
+ *  avoid a competing party, and when a monster should get auto-
+ *  blacklisted (too many character deaths or quest expirations to it). */
+export interface HuntSettings {
+  relocateIfCompeting: boolean
+  blacklistDeaths: boolean
+  deathThreshold: number
+  blacklistExpirations: boolean
+  expirationThreshold: number
 }
 
 export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
@@ -364,6 +417,10 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   merchantAutomations: {},
   threshold: 0,
   itemCollectionThreshold: 1,
+  farmingPolicy: 'auto',
+  monsterFocusByCharacter: {},
+  monsterSearchRadiusByCharacter: {},
+  huntBlacklist: {},
 })
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

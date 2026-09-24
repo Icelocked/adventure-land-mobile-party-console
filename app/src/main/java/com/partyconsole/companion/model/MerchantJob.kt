@@ -59,6 +59,23 @@ data class BestiaryDrop(
     val sprite: Sprite? = null,
 )
 
+/** One entry in a BestiaryMonster's spawnRecords - a real map location
+ *  this monster spawns at, confirmed against a live GET /party-api/state
+ *  capture (farming-area-picker.tsx's `farmingAreas()` groups these same
+ *  records client-side using a separate static lib/farming-areas.ts data
+ *  file this app doesn't port - picking a plain spawn record directly is
+ *  simpler and uses only server-sourced data). */
+@Serializable
+data class MonsterSpawnRecord(
+    val map: String,
+    val mapName: String? = null,
+    val x: Double = 0.0,
+    val y: Double = 0.0,
+    val count: Int? = null,
+    val boundary: List<Double>? = null,
+    val restrictions: List<String> = emptyList(),
+)
+
 /** bestiary-dialog.tsx's monster reference entry. `definition` (raw skill/
  *  achievement data) stays untyped/unsurfaced for v1 - drops are the
  *  concrete, actionable data players actually look this screen up for. */
@@ -70,7 +87,9 @@ data class BestiaryMonster(
     val attack: Long = 0,
     val xp: Long = 0,
     val threat: Double = 0.0,
+    val sprite: Sprite? = null,
     val drops: List<BestiaryDrop> = emptyList(),
+    val spawnRecords: List<MonsterSpawnRecord> = emptyList(),
 )
 
 /** skills-dialog.tsx's per-class skill list. */
@@ -405,6 +424,43 @@ data class PartyStateDynamic(
     val threshold: Long = 0,
     val itemCollectionThreshold: Int = 1,
     val bankSortMode: String? = null,
+    // Farming/Hunting (farming-mode-control.tsx). `farmingPolicy` is the
+    // account-wide CURRENT mode - unlike almost everything else here,
+    // /farming-mode takes no `character` field, so this is one shared
+    // value, not per-character (confirmed against the real route source,
+    // runtime/coordinator/http/hunt-mode.ts). Monster focus IS per-
+    // character, keyed by character name.
+    val farmingPolicy: String = "auto",
+    val monsterFocusByCharacter: Map<String, List<String>> = emptyMap(),
+    val monsterSearchRadiusByCharacter: Map<String, Int> = emptyMap(),
+    val huntBlacklist: Map<String, HuntBlacklistEntry> = emptyMap(),
+    val huntSettings: HuntSettings? = null,
+)
+
+/** hunt-blacklist-label.ts's source entry - a monster currently skipped
+ *  by Hunt mode, either automatically (deaths/expirations threshold) or
+ *  manually. */
+@Serializable
+data class HuntBlacklistEntry(
+    val monsterId: String,
+    val at: Long,
+    val deaths: Int = 0,
+    val reason: String = "",
+    val expirations: Int? = null,
+    val characters: List<String> = emptyList(),
+    val lastDeathAt: Long? = null,
+)
+
+/** hunt-settings-control.tsx's config - when Hunt mode should relocate to
+ *  avoid a competing party, and when a monster should get auto-
+ *  blacklisted (too many character deaths or quest expirations to it). */
+@Serializable
+data class HuntSettings(
+    val relocateIfCompeting: Boolean = true,
+    val blacklistDeaths: Boolean = true,
+    val deathThreshold: Int = 3,
+    val blacklistExpirations: Boolean = false,
+    val expirationThreshold: Int = 1,
 )
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

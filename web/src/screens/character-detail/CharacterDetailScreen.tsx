@@ -8,6 +8,7 @@ import { LeaderFollowerSection } from './sections/LeaderFollowerSection'
 import { TravelSection } from './sections/TravelSection'
 import { MerchantQueueSection } from './sections/MerchantQueueSection'
 import { MerchantControlsSection } from './sections/MerchantControlsSection'
+import { FarmingSection } from './sections/FarmingSection'
 import { EquipmentSection } from './sections/EquipmentSection'
 import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
@@ -81,6 +82,15 @@ export function CharacterDetailScreen() {
               isLeader={dynamicState.leader === name}
               travelPlaces={dynamicState.travelPlaces}
             />
+            {vitals.ctype !== 'merchant' && (
+              <FarmingSection
+                characterName={name}
+                farmingPolicy={dynamicState.farmingPolicy}
+                monsterFocus={dynamicState.monsterFocusByCharacter[name] ?? []}
+                monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
+                bestiaryCatalog={dynamicState.bestiaryCatalog}
+              />
+            )}
             {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
             {vitals.ctype === 'merchant' && (
               <MerchantControlsSection
