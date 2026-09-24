@@ -111,9 +111,10 @@ your own authentication in front of it (e.g. your reverse proxy requiring
 a client certificate or HTTP auth) - a real domain with just TLS and no
 auth is still an open API to anyone who finds the address.
 
-See [`DEPLOYMENT.md`](DEPLOYMENT.md) for a full walkthrough of getting
-party-console itself running somewhere this app can reach it (domain,
-Tailscale, or a bare IP), including the trade-offs of each.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for a walkthrough of the Tailscale
+path specifically - the only one actually set up and tested for this
+project so far (see "Why not a domain or a public IP?" in that doc for
+why the others aren't documented step-by-step here).
 
 ## Before you install: your phone needs a path to your server
 
@@ -123,29 +124,20 @@ network. Your phone, when you're out of the house, is **not** on that
 network - so before this app can do anything, you need *some* way for
 your phone to reach that machine from anywhere.
 
-The three practical options, easiest first:
+**[Tailscale](https://tailscale.com) is the recommended, tested path** -
+install it on both your PC and your phone (both free), sign into the
+same account on each, and your phone can reach your PC by its Tailscale
+address from anywhere, as if it were on your home network. No router
+configuration, no public exposure. **[`DEPLOYMENT.md`](DEPLOYMENT.md)
+walks through this exact setup end to end** - start there.
 
-1. **[Tailscale](https://tailscale.com)** (recommended for personal use) -
-   install it on both your PC and your phone (both free), sign into the
-   same account on each, and your phone can reach your PC by its Tailscale
-   address from anywhere, as if it were on your home network. No router
-   configuration, no public exposure. This is what the app's connection
-   screen's "Plain HTTP" trust mode is built around.
-2. **A domain + reverse proxy fronting party-console with real HTTPS** -
-   more setup (DNS, a reverse proxy, a TLS cert), but works from any
-   device without installing anything extra, and is the right choice if
-   you want to share access with people not on your Tailscale network.
-3. **Port-forwarding your router directly to party-console** - the
-   simplest to explain and the one you should **not** actually use
-   long-term: party-console's API has no login of its own, so this
-   exposes an open, unauthenticated control surface to the entire
-   internet. Fine for a five-minute test on your own network; never leave
-   it running this way.
-
-**[`DEPLOYMENT.md`](DEPLOYMENT.md) walks through all three end to end** -
-start there if you haven't set party-console up somewhere reachable yet.
-If you're unsure which to pick: Tailscale is the answer for "just let me
-check on my characters from my phone."
+A domain with a reverse proxy, or a raw port-forward, are also possible
+in principle (the connection screen supports both - see "Connection
+security model" above) but aren't documented here step-by-step, because
+doing either *correctly* - the right reverse-proxy config, firewall
+rules, and an actual authentication layer in front of an API that has
+none of its own - is real work that hasn't been set up and verified for
+this project yet. Tailscale sidesteps needing any of that.
 
 ## Installing
 
