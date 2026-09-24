@@ -14,6 +14,7 @@ import com.partyconsole.companion.network.LiveRecordWire
 import com.partyconsole.companion.network.PartyApiClient
 import com.partyconsole.companion.network.ServerSettings
 import com.partyconsole.companion.network.buildHttpClient
+import com.partyconsole.companion.network.buildSseHttpClient
 import com.partyconsole.companion.network.intField
 import com.partyconsole.companion.network.liveEvents
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +37,7 @@ import kotlinx.serialization.json.JsonObject
 class PartyRepository(private val settings: ServerSettings, scope: CoroutineScope) {
     private val json = Json { ignoreUnknownKeys = true }
     private val httpClient = buildHttpClient(settings)
+    private val sseClient = buildSseHttpClient(settings)
     val api = PartyApiClient(httpClient, settings)
 
     private val _characters = MutableStateFlow<Map<String, CharacterState>>(emptyMap())
@@ -69,7 +71,7 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
 
     init {
         scope.launch {
-            liveEvents(httpClient, settings).collect { event ->
+            liveEvents(sseClient, settings).collect { event ->
                 when (event) {
                     is LiveEvent.ConnectionHealth -> _connected.value = event.healthy
                     is LiveEvent.CharacterUpdated -> applyUpdate(event.name, event.record)
