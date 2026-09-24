@@ -46,6 +46,13 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
 
+    // The actual reason behind the last "not connected" state - previously
+    // discarded entirely, which meant a real connection problem (wrong
+    // port, a TLS mismatch, a VPN/firewall blocking it) showed up as just
+    // an indefinite "Connecting..." with nothing to diagnose it by.
+    private val _lastConnectionError = MutableStateFlow<String?>(null)
+    val lastConnectionError: StateFlow<String?> = _lastConnectionError.asStateFlow()
+
     // Roster (name/ctype/level) is relatively static - fetched once with a
     // short retry, not polled - see recordToState's roster override below.
     private val _roster = MutableStateFlow<Map<String, RosterMember>>(emptyMap())
@@ -73,7 +80,11 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
         scope.launch {
             liveEvents(sseClient, settings).collect { event ->
                 when (event) {
-                    is LiveEvent.ConnectionHealth -> _connected.value = event.healthy
+                    is LiveEvent.ConnectionHealth -> {
+                        _connected.value = event.healthy
+                        if (!event.healthy && event.error != null) _lastConnectionError.value = event.error
+                        if (event.healthy) _lastConnectionError.value = null
+                    }
                     is LiveEvent.CharacterUpdated -> applyUpdate(event.name, event.record)
                 }
             }

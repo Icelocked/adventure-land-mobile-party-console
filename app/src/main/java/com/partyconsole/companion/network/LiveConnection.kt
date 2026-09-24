@@ -27,7 +27,12 @@ import kotlin.coroutines.coroutineContext
  *  there for its own reasons. */
 sealed interface LiveEvent {
     data class CharacterUpdated(val name: String, val record: LiveRecordWire?) : LiveEvent
-    data class ConnectionHealth(val healthy: Boolean) : LiveEvent
+    /** [error] is the actual failure reason (exception type/message, or an
+     *  HTTP status) when [healthy] is false - previously discarded
+     *  entirely, which meant a real connection problem (wrong port, TLS
+     *  mismatch, a proxy/VPN blocking it) showed up in the UI as just an
+     *  indefinite "Connecting..." with nothing to go on. */
+    data class ConnectionHealth(val healthy: Boolean, val error: String? = null) : LiveEvent
 }
 
 private const val HEARTBEAT_TIMEOUT_MS = 15_000L
@@ -62,8 +67,8 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
     var stopped = false
     val scope = CoroutineScope(coroutineContext)
 
-    fun reportHealth(healthy: Boolean) {
-        trySend(LiveEvent.ConnectionHealth(healthy))
+    fun reportHealth(healthy: Boolean, error: String? = null) {
+        trySend(LiveEvent.ConnectionHealth(healthy, error))
     }
 
     // startConnection and scheduleReconnect call each other (a failed
@@ -104,7 +109,7 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
                         // sequence state can no longer be trusted to be in
                         // sync with the server.
                         eventSource.cancel()
-                        reportHealth(false)
+                        reportHealth(false, "Received a malformed message from the server")
                         scheduleReconnect()
                         return
                     }
@@ -122,7 +127,12 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
 
                 override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                     if (stopped) return
-                    reportHealth(false)
+                    val message = when {
+                        response != null -> "Server responded ${response.code} ${response.message}".trim()
+                        t != null -> "${t::class.simpleName}: ${t.message ?: "no details"}"
+                        else -> "Connection failed for an unknown reason"
+                    }
+                    reportHealth(false, message)
                     scheduleReconnect()
                 }
             },
@@ -147,7 +157,7 @@ fun liveEvents(client: OkHttpClient, settings: ServerSettings): Flow<LiveEvent> 
             val silentFor = System.currentTimeMillis() - lastHeartbeat.get()
             if (silentFor > HEARTBEAT_TIMEOUT_MS) {
                 currentSource?.cancel()
-                reportHealth(false)
+                reportHealth(false, "No response from the server for over ${HEARTBEAT_TIMEOUT_MS / 1000}s")
                 scheduleReconnect()
             }
         }
