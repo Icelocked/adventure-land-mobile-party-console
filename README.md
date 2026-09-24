@@ -115,12 +115,45 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for a full walkthrough of getting
 party-console itself running somewhere this app can reach it (domain,
 Tailscale, or a bare IP), including the trade-offs of each.
 
+## Before you install: your phone needs a path to your server
+
+This is the part that trips people up, so it's worth saying plainly:
+party-console runs on your gaming PC (or a server), reachable on your home
+network. Your phone, when you're out of the house, is **not** on that
+network - so before this app can do anything, you need *some* way for
+your phone to reach that machine from anywhere.
+
+The three practical options, easiest first:
+
+1. **[Tailscale](https://tailscale.com)** (recommended for personal use) -
+   install it on both your PC and your phone (both free), sign into the
+   same account on each, and your phone can reach your PC by its Tailscale
+   address from anywhere, as if it were on your home network. No router
+   configuration, no public exposure. This is what the app's connection
+   screen's "Plain HTTP" trust mode is built around.
+2. **A domain + reverse proxy fronting party-console with real HTTPS** -
+   more setup (DNS, a reverse proxy, a TLS cert), but works from any
+   device without installing anything extra, and is the right choice if
+   you want to share access with people not on your Tailscale network.
+3. **Port-forwarding your router directly to party-console** - the
+   simplest to explain and the one you should **not** actually use
+   long-term: party-console's API has no login of its own, so this
+   exposes an open, unauthenticated control surface to the entire
+   internet. Fine for a five-minute test on your own network; never leave
+   it running this way.
+
+**[`DEPLOYMENT.md`](DEPLOYMENT.md) walks through all three end to end** -
+start there if you haven't set party-console up somewhere reachable yet.
+If you're unsure which to pick: Tailscale is the answer for "just let me
+check on my characters from my phone."
+
 ## Installing
 
-Grab the latest APK from this repo's
-[Releases](../../releases) page and install it - you'll need to allow
-"install unknown apps" for whatever app you download it with (Chrome,
-Files, etc.), since this isn't distributed through the Play Store.
+Once your phone has a way to reach your server (see above), grab the
+latest APK from this repo's [Releases](../../releases) page and install
+it - you'll need to allow "install unknown apps" for whatever app you
+download it with (Chrome, Files, etc.), since this isn't distributed
+through the Play Store.
 
 It's a debug-signed build, not signed with a dedicated release key -
 perfectly fine for sideloading, but if you ever uninstall and reinstall
