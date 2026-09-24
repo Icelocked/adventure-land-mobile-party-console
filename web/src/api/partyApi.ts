@@ -294,6 +294,21 @@ export class PartyApiClient {
     return this.sendCommand(character, { type: 'return-leader' })
   }
 
+  /** POST /party-api/town-party (party-actions.ts's town()) - sends EVERY
+   *  active character to town at once, distinct from sendCharacterTo's
+   *  per-character travel. */
+  async sendPartyToTown(): Promise<ApiResult<CommandResult>> {
+    return this.post('town-party', {})
+  }
+
+  /** POST /party-api/escape (party-actions.ts's escape()) - the party-wide
+   *  emergency-recovery command: needs one online warrior/mage/priest, the
+   *  server owns the whole staged rendezvous/convoy-fallback sequence.
+   *  Poll GET /party-api/escape (useEscapeStatus) for `stage`/`error`. */
+  async triggerEscape(): Promise<ApiResult<CommandResult>> {
+    return this.post('escape', {})
+  }
+
   /** `/party-api/command` type "remove-auto-item-mark" - removes one
    *  standing auto-bank/auto-merchant rule by its rule key. Deliberately
    *  no `item` field: the server-side handler for this type never

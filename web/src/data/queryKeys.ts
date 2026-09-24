@@ -11,4 +11,5 @@ export const QK = {
   dynamicState: ['dynamicState'] as const,
   mail: ['mail'] as const,
   gameLogs: ['gameLogs'] as const,
+  escape: ['escape'] as const,
 }

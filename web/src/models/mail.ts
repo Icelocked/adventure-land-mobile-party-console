@@ -21,3 +21,14 @@ export interface ReceivedMail {
   // never fails the whole message's parse.
   taken?: unknown
 }
+
+/** escape-status.tsx's shape for GET/POST /party-api/escape - the party-wide
+ *  emergency-recovery command (needs one online warrior/mage/priest; the server
+ *  owns the whole staged rendezvous/convoy-fallback sequence, this app only
+ *  triggers it and shows `stage`/`error`). */
+export interface EscapeStatus {
+  id: string
+  stage: string
+  error: string | null
+  progress: Record<string, { error?: string | null }>
+}

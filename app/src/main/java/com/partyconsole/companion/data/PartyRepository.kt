@@ -3,6 +3,8 @@ package com.partyconsole.companion.data
 import com.partyconsole.companion.model.CharacterInventory
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.CharacterVitals
+import com.partyconsole.companion.model.EscapeResponse
+import com.partyconsole.companion.model.EscapeStatus
 import com.partyconsole.companion.model.MailSnapshot
 import com.partyconsole.companion.model.PartyStateDynamic
 import com.partyconsole.companion.model.PartyStateGameLogs
@@ -76,6 +78,11 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
     private val _gameLogs = MutableStateFlow<Map<String, List<com.partyconsole.companion.model.GameLogEntry>>>(emptyMap())
     val gameLogs: StateFlow<Map<String, List<com.partyconsole.companion.model.GameLogEntry>>> = _gameLogs.asStateFlow()
 
+    // The party-wide Escape command's status (party-actions.ts's escapeState()) -
+    // its own route, polled on the same cadence.
+    private val _escape = MutableStateFlow<EscapeStatus?>(null)
+    val escape: StateFlow<EscapeStatus?> = _escape.asStateFlow()
+
     init {
         scope.launch {
             liveEvents(sseClient, settings).collect { event ->
@@ -108,6 +115,10 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
         (api.get("state?catalog=0&dashboard=1&section=logs") as? ApiResult.Success)?.let { result ->
             runCatching { json.decodeFromString(PartyStateGameLogs.serializer(), result.value) }
                 .getOrNull()?.let { _gameLogs.value = it.gameLogs }
+        }
+        (api.get("escape") as? ApiResult.Success)?.let { result ->
+            runCatching { json.decodeFromString(EscapeResponse.serializer(), result.value) }
+                .getOrNull()?.let { _escape.value = it.escape }
         }
     }
 
