@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { PartyDataProvider } from '@/data/PartyDataProvider'
 import { loadServerSettings, saveServerSettings, clearServerSettings, SAME_ORIGIN_SETTINGS, type ServerSettings } from '@/config/serverConfig'
 import { ServerSettingsDialogContext } from '@/lib/ServerSettingsDialogContext'
+import { PairingGate } from '@/screens/PairingGate'
 import { CharacterListScreen } from '@/screens/CharacterListScreen'
 import { CharacterDetailScreen } from '@/screens/character-detail/CharacterDetailScreen'
 import { MailScreen } from '@/screens/account/MailScreen'
@@ -29,30 +30,32 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <PartyDataProvider settings={settings} key={settings.baseUrl}>
-        <ServerSettingsDialogContext.Provider value={() => setShowOverride(true)}>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<CharacterListScreen />} />
-              <Route path="/characters/:name" element={<CharacterDetailScreen />} />
-              <Route path="/mail" element={<MailScreen />} />
-              <Route path="/catalog" element={<CatalogScreen />} />
-              <Route path="/bestiary" element={<BestiaryScreen />} />
-              <Route path="/skills" element={<SkillsScreen />} />
-              <Route path="/stand" element={<StandScreen />} />
-              <Route path="/market" element={<MarketScreen />} />
-              <Route path="/bank" element={<BankScreen />} />
-              <Route path="/merchant/:mode" element={<MerchantCommerceScreen />} />
-              <Route path="/routines" element={<RoutinesScreen />} />
-              <Route path="/hunt-settings" element={<HuntSettingsScreen />} />
-              <Route path="/wtb" element={<WtbScreen />} />
-              <Route path="/offerings" element={<OfferingsScreen />} />
-              <Route path="/logs" element={<LogsScreen />} />
-              <Route path="/settings" element={<SettingsScreen />} />
-            </Routes>
-          </BrowserRouter>
-        </ServerSettingsDialogContext.Provider>
-      </PartyDataProvider>
+      <PairingGate>
+        <PartyDataProvider settings={settings} key={settings.baseUrl}>
+          <ServerSettingsDialogContext.Provider value={() => setShowOverride(true)}>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<CharacterListScreen />} />
+                <Route path="/characters/:name" element={<CharacterDetailScreen />} />
+                <Route path="/mail" element={<MailScreen />} />
+                <Route path="/catalog" element={<CatalogScreen />} />
+                <Route path="/bestiary" element={<BestiaryScreen />} />
+                <Route path="/skills" element={<SkillsScreen />} />
+                <Route path="/stand" element={<StandScreen />} />
+                <Route path="/market" element={<MarketScreen />} />
+                <Route path="/bank" element={<BankScreen />} />
+                <Route path="/merchant/:mode" element={<MerchantCommerceScreen />} />
+                <Route path="/routines" element={<RoutinesScreen />} />
+                <Route path="/hunt-settings" element={<HuntSettingsScreen />} />
+                <Route path="/wtb" element={<WtbScreen />} />
+                <Route path="/offerings" element={<OfferingsScreen />} />
+                <Route path="/logs" element={<LogsScreen />} />
+                <Route path="/settings" element={<SettingsScreen />} />
+              </Routes>
+            </BrowserRouter>
+          </ServerSettingsDialogContext.Provider>
+        </PartyDataProvider>
+      </PairingGate>
       {showOverride && (
         <OverrideDialog
           current={settings}
