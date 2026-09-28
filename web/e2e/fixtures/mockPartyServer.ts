@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { createServer, type Server, type ServerResponse } from 'node:http'
 
 /**
  * A stateful in-memory stand-in for party-console's own HTTP surface,
@@ -137,7 +138,7 @@ export class MockPartyServer {
     }
   }
 
-  private snapshotFrame(): string {
+  private snapshotPayload(sequence: number): Record<string, unknown> {
     const characters: Record<string, unknown> = {}
     for (const c of this.characters) {
       const items: Record<string, unknown> = {}
@@ -166,7 +167,63 @@ export class MockPartyServer {
         slots: {},
       }
     }
-    return `data: ${JSON.stringify({ type: 'snapshot', epoch: 'e1', sequence: 1, characters })}\n\n`
+    return { type: 'snapshot', epoch: 'e1', sequence, characters }
+  }
+
+  private sseServer: Server | null = null
+  private sseClients = new Set<ServerResponse>()
+  private sseSequence = 1
+
+  /** A REAL persistent text/event-stream server - not a Playwright
+   *  `route.fulfill()`, which sends one complete response and closes the
+   *  connection. That one-shot close is exactly the failure mode
+   *  liveConnection.ts's reconnect logic exists to recover from: the app
+   *  would genuinely see a disconnect/reconnect cycle every ~1s, cycling
+   *  the "connected" indicator, instead of the stable always-open
+   *  connection a real server holds open. Started lazily; the app's
+   *  EventSource is redirected here via `route.continue({url})` in
+   *  install(), which lets the browser's own networking connect to it
+   *  directly (Playwright's fulfill API has no incremental-write mode). */
+  private startSseServer(): Promise<string> {
+    if (this.sseServer) {
+      const address = this.sseServer.address()
+      return Promise.resolve(`http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}/dashboard-stream`)
+    }
+    return new Promise((resolve) => {
+      const server = createServer((req, res) => {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        })
+        res.write(`data: ${JSON.stringify(this.snapshotPayload(this.sseSequence++))}\n\n`)
+        this.sseClients.add(res)
+        req.on('close', () => this.sseClients.delete(res))
+      })
+      this.sseServer = server
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address()
+        const port = typeof address === 'object' && address ? address.port : 0
+        // A heartbeat keeps every open connection well within
+        // liveConnection.ts's 15s watchdog timeout indefinitely, matching
+        // the real coordinator's own heartbeat cadence.
+        setInterval(() => this.broadcastHeartbeat(), 2000).unref()
+        resolve(`http://127.0.0.1:${port}/dashboard-stream`)
+      })
+    })
+  }
+
+  private broadcastHeartbeat() {
+    const frame = `data: ${JSON.stringify({ type: 'heartbeat', epoch: 'e1', sequence: this.sseSequence++ })}\n\n`
+    for (const client of this.sseClients) client.write(frame)
+  }
+
+  private stopSseServer() {
+    for (const client of this.sseClients) client.end()
+    this.sseClients.clear()
+    this.sseServer?.close()
+    this.sseServer = null
   }
 
   /** Applies one POST body against the given logical /party-api/<path>,
@@ -328,8 +385,11 @@ export class MockPartyServer {
       return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length } })
     })
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
-    await page.route('**/party-api/dashboard-stream', (route) =>
-      route.fulfill({ contentType: 'text/event-stream', body: this.snapshotFrame() }),
-    )
+    await page.route('**/party-api/dashboard-stream', async (route) => {
+      const url = await this.startSseServer()
+      return route.continue({ url })
+    })
+
+    page.once('close', () => this.stopSseServer())
   }
 }
