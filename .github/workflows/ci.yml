@@ -29,3 +29,67 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
+
+  instrumented-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Enable KVM (required for the emulator to actually run, not just boot-check)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Real Compose UI tests on a real (emulated) Android device - the
+      # thing this project had zero of before. AVD state (the emulator
+      # snapshot) is cached across runs since cold-booting one is the
+      # slowest part of this job by far.
+      - name: Cache AVD
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-34
+
+      - name: Create AVD snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumented test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-report
+          path: app/build/reports/androidTests/
+          retention-days: 14

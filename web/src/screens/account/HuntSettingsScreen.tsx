@@ -29,6 +29,7 @@ export function HuntSettingsScreen() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [blacklistBusy, setBlacklistBusy] = useState(false)
+  const [confirmingClearAll, setConfirmingClearAll] = useState(false)
 
   useEffect(() => {
     if (!seeded && settings) {
@@ -102,9 +103,29 @@ export function HuntSettingsScreen() {
 
       <div className="flex items-center justify-between px-3 pb-1 pt-2">
         <h2 className="text-sm font-semibold">Hunt blacklist</h2>
-        <Button size="sm" variant="destructive" disabled={blacklistBusy || blacklist.length === 0} onClick={() => void clearBlacklist()}>
-          Clear all
-        </Button>
+        {confirmingClearAll ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-destructive">Really clear all?</span>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={blacklistBusy}
+              onClick={() => {
+                setConfirmingClearAll(false)
+                void clearBlacklist()
+              }}
+            >
+              Clear all
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setConfirmingClearAll(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button size="sm" variant="destructive" disabled={blacklistBusy || blacklist.length === 0} onClick={() => setConfirmingClearAll(true)}>
+            Clear all
+          </Button>
+        )}
       </div>
       {blacklist.length === 0 ? (
         <EmptyState message="No monsters blacklisted." />

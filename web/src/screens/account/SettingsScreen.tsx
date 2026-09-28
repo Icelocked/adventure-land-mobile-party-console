@@ -128,6 +128,7 @@ export function SettingsScreen() {
                         else {
                           setRealmError(null)
                           setShowRealms(false)
+                          await refreshNow()
                         }
                       }}
                     >

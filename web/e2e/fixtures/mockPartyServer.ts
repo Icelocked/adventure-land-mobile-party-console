@@ -55,9 +55,33 @@ export class MockPartyServer {
   bankGold = 0
   mailMessages: Record<string, unknown>[] = []
   standListings: Record<string, unknown>[] = []
+  bestiaryCatalog: Record<string, unknown>[] = []
+  skillCatalog: Record<string, unknown>[] = []
+  combatLogs: Record<string, unknown[]> = {}
+  merchantActivity: Record<string, unknown>[] = []
+  merchantRoutinePriorities: Record<string, number> = {}
+  merchantAutomations: Record<string, boolean> = {}
+  standBids: Record<string, Record<string, unknown>> = {}
+  aldataListings: Record<string, unknown>[] = []
+  pontyListings: Record<string, unknown>[] = []
+  realmControl: Record<string, unknown> | null = null
+  upgradeOfferingRules: Record<string, unknown>[] = []
+  huntBlacklist: Record<string, Record<string, unknown>> = {}
+  huntSettings: Record<string, unknown> | null = null
+  requirePairing = false
 
   // Auto-mark state, mutated by POSTed commands - mirrors PartyStateDynamic's shape.
   autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
+
+  /** One-shot error injection for error-path tests: set
+   *  `failOnce['merchant/bid'] = 'Stand is full'` before triggering the
+   *  action - the NEXT matching POST fails with that message (via a real
+   *  non-2xx CommandResult body, exactly like the coordinator), then
+   *  reverts to normal success handling. */
+  failOnce: Record<string, string> = {}
+
+  lastOrder: Record<string, unknown> | null = null
+  lastRoutineSave: Record<string, unknown> | null = null
 
   paired = false
 
@@ -83,12 +107,33 @@ export class MockPartyServer {
       bank: { gold: this.bankGold, packs: this.bankPacks },
       standListings: this.standListings,
       merchantCatalog: {
-        allItems: Object.values(this.catalogEntries).map((entry) => ({ ...entry, sprite: testSprite() })),
+        // `meta.upgradeable`/`meta.compoundable` (read by itemFormulas'
+        // itemMaximumLevel) are a separate nested field from the
+        // top-level convenience flags WtbScreen/etc. read directly -
+        // synthesize both from the one flag addCatalogEntry takes.
+        allItems: Object.values(this.catalogEntries).map((entry) => ({
+          ...entry,
+          sprite: testSprite(),
+          meta: { definition: {}, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.upgradeable ? 13 : entry.compoundable ? 7 : 0 },
+        })),
         buyable: [],
         craftable: this.craftable,
         exchangeable: this.exchangeable,
       },
       autoNpcSales: this.autoNpcSales,
+      bestiaryCatalog: this.bestiaryCatalog,
+      skillCatalog: this.skillCatalog,
+      combatLogs: this.combatLogs,
+      merchantActivity: this.merchantActivity,
+      merchantRoutinePriorities: this.merchantRoutinePriorities,
+      merchantAutomations: this.merchantAutomations,
+      standBids: this.standBids,
+      realmControl: this.realmControl,
+      upgradeOfferingRules: this.upgradeOfferingRules,
+      huntBlacklist: this.huntBlacklist,
+      huntSettings: this.huntSettings,
+      aldata: { listings: this.aldataListings },
+      ponty: { listings: this.pontyListings },
     }
   }
 
@@ -124,13 +169,18 @@ export class MockPartyServer {
     return `data: ${JSON.stringify({ type: 'snapshot', epoch: 'e1', sequence: 1, characters })}\n\n`
   }
 
-  /** Applies one /party-api/command or /party-api/merchant/* POST body,
+  /** Applies one POST body against the given logical /party-api/<path>,
    *  mutating this mock's state where the real coordinator would. Only
    *  the command types these tests actually exercise are handled -
    *  anything else is accepted as a no-op success, matching how a real
    *  POST /party-api/command with an unhandled `type` still returns
    *  `{ok:true}` for fields the server simply ignores. */
-  private applyCommand(path: string, body: Record<string, unknown>): Record<string, unknown> {
+  private applyCommand(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
+    if (this.failOnce[path] !== undefined) {
+      const error = this.failOnce[path]
+      delete this.failOnce[path]
+      return { status: 409, json: { ok: false, error } }
+    }
     if (path === 'merchant/auto-npc-sale') {
       // A rule on the configured merchant's OWN inventory is the
       // merchant's account-wide rule (character omitted); a rule on
@@ -150,48 +200,119 @@ export class MockPartyServer {
       } else {
         this.autoNpcSales[key] = { item: body.item as MockItem, character }
       }
-      return { ok: true }
+      return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.source === 'bank') {
       this.removeBankItem(String(body.pack), Number(body.slot))
-      return { ok: true }
+      return { status: 200, json: { ok: true } }
     }
     if (path === 'deconstruction/mark' && body.pack) {
       this.removeBankItem(String(body.pack), Number(body.slot))
-      return { ok: true }
+      return { status: 200, json: { ok: true } }
     }
     if (path === 'mail/collect') {
       const message = this.mailMessages.find((m) => m.id === body.id)
       if (message) message.taken = true
-      return { ok: true }
+      return { status: 200, json: { ok: true } }
     }
-    if (path === 'merchant/order' || path === 'merchant/exchange-order') {
-      this.lastOrder = body
-      return { ok: true }
+    if (
+      path === 'merchant/order' ||
+      path === 'merchant/exchange-order' ||
+      path === 'merchant/aldata-order' ||
+      path === 'merchant/ponty-order' ||
+      path === 'merchant/stand-order' ||
+      path === 'merchant/send-mail'
+    ) {
+      this.lastOrder = { path, ...body }
+      return { status: 200, json: { ok: true } }
     }
-    return { ok: true }
+    if (path === 'hunt-settings') {
+      this.huntSettings = { ...(this.huntSettings ?? {}), ...body }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'hunt-blacklist') {
+      if (body.action === 'clear') this.huntBlacklist = {}
+      else if (body.action === 'remove') delete this.huntBlacklist[String(body.monsterId)]
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'merchant/routine-priorities') {
+      this.lastRoutineSave = body
+      this.merchantRoutinePriorities = { ...this.merchantRoutinePriorities, ...(body.priorities as Record<string, number>) }
+      this.merchantAutomations = { ...this.merchantAutomations, ...(body.enabled as Record<string, boolean>) }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'merchant/bid') {
+      const itemId = String(body.itemId)
+      if (body.clear) delete this.standBids[itemId]
+      else {
+        const { itemId: _itemId, clear: _clear, ...rest } = body
+        this.standBids[itemId] = rest
+      }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'realm/switch') {
+      this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, ...(body.setHome ? { homeRealm: body.realm } : {}) }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'command' && body.type === 'upgrade-offering-rule') {
+      const rule = body.rule as Record<string, unknown>
+      if (body.remove) {
+        this.upgradeOfferingRules = this.upgradeOfferingRules.filter((r) => r.id !== rule.id)
+      } else if (rule.id) {
+        this.upgradeOfferingRules = this.upgradeOfferingRules.map((r) => (r.id === rule.id ? { ...r, ...rule } : r))
+      } else {
+        this.upgradeOfferingRules.push({ ...rule, id: `rule-${this.upgradeOfferingRules.length + 1}` })
+      }
+      return { status: 200, json: { ok: true } }
+    }
+    return { status: 200, json: { ok: true } }
   }
-
-  lastOrder: Record<string, unknown> | null = null
 
   private removeBankItem(pack: string, slot: number) {
     const entries = this.bankPacks[pack]
     if (entries) entries[slot] = null
   }
 
-  /** Installs every route handler on [page]. Call before navigating. */
+  /** Installs every route handler on [page]. Call before navigating.
+   *  Registration order matters: Playwright checks the MOST recently
+   *  registered route first, so the broad party-api fallback is
+   *  registered first (lowest priority) and specific handlers after it
+   *  (highest priority) - matching how a test's own late `page.route()`
+   *  override (e.g. account-screens.spec.ts's Stand removal) still wins
+   *  over anything installed here. */
   async install(page: Page): Promise<void> {
     await page.route('**/e2e-sprite.png', (route) =>
       route.fulfill({ contentType: 'image/png', body: Buffer.from(TINY_PNG_BASE64, 'base64') }),
     )
 
+    // Broad fallback for every /party-api/* POST not given a specific
+    // handler below (hunt-settings, hunt-blacklist, realm/switch,
+    // merchant/bid, merchant/routine-priorities, command, merchant/**,
+    // deconstruction/**, mail/**, ...). GETs not otherwise handled get an
+    // empty object rather than a 404, since several settings-only reads
+    // (ALData's key/auth checks) aren't modeled by this mock.
+    await page.route('**/party-api/**', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const path = url.pathname.replace(/^.*\/party-api\//, '')
+      if (request.method() !== 'POST') return route.fulfill({ json: {} })
+      const body = (request.postDataJSON() as Record<string, unknown>) ?? {}
+      const result = this.applyCommand(path, body)
+      return route.fulfill({ status: result.status, json: result.json })
+    })
+
     await page.route('**/setup/state', (route) => {
-      if (this.paired) return route.fulfill({ status: 200, json: { ok: true } })
+      if (this.paired) return route.fulfill({ status: 200, json: { ok: true, requirePairing: this.requirePairing } })
       return route.fulfill({ status: 401, json: { error: 'not paired' } })
     })
     await page.route('**/setup/pair', (route) => {
       this.paired = true
       return route.fulfill({ status: 200, json: { ok: true } })
+    })
+    await page.route('**/setup/pairing', async (route) => {
+      const body = (route.request().postDataJSON() as { requirePairing?: boolean }) ?? {}
+      if (typeof body.requirePairing === 'boolean') this.requirePairing = body.requirePairing
+      return route.fulfill({ json: { ok: true } })
     })
 
     await page.route('**/party-api/state**', (route) => {
@@ -199,29 +320,16 @@ export class MockPartyServer {
       if (url.searchParams.get('section') === 'logs') return route.fulfill({ json: { gameLogs: {} } })
       return route.fulfill({ json: { roster: this.roster(), ...this.dynamicState() } })
     })
-    await page.route('**/party-api/mail**', (route) => route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length } }))
+    await page.route('**/party-api/mail**', (route) => {
+      // This pattern also matches POST /party-api/mail/collect - defer
+      // that to the broad command fallback registered above (lower
+      // priority) instead of wrongly answering it with the inbox snapshot.
+      if (route.request().method() !== 'GET') return route.fallback()
+      return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length } })
+    })
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
     await page.route('**/party-api/dashboard-stream', (route) =>
       route.fulfill({ contentType: 'text/event-stream', body: this.snapshotFrame() }),
     )
-
-    await page.route('**/party-api/command', async (route) => {
-      const body = route.request().postDataJSON() as Record<string, unknown>
-      route.fulfill({ json: this.applyCommand('command', body) })
-    })
-    await page.route('**/party-api/merchant/**', async (route) => {
-      const url = new URL(route.request().url())
-      const path = url.pathname.replace(/^.*\/party-api\//, '')
-      const body = (route.request().postDataJSON() as Record<string, unknown>) ?? {}
-      route.fulfill({ json: this.applyCommand(path, body) })
-    })
-    await page.route('**/party-api/deconstruction/**', async (route) => {
-      const body = route.request().postDataJSON() as Record<string, unknown>
-      route.fulfill({ json: this.applyCommand('deconstruction/mark', body) })
-    })
-    await page.route('**/party-api/mail/**', async (route) => {
-      const body = route.request().postDataJSON() as Record<string, unknown>
-      route.fulfill({ json: this.applyCommand('mail/collect', body) })
-    })
   }
 }
