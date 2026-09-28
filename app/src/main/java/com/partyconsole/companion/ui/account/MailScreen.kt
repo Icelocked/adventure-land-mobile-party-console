@@ -104,7 +104,7 @@ private fun MailRow(mail: ReceivedMail, catalogFor: (String) -> CatalogItem?, vi
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Attached: ${displayName(item.name, catalogFor)}", style = MaterialTheme.typography.labelSmall)
                     if (!taken && mail.id != null) {
-                        TextButton(onClick = { scope.launch { viewModel.api.collectMail(mail.id) } }) {
+                        TextButton(onClick = { scope.launch { viewModel.api.collectMail(mail.id); viewModel.refreshDynamicStateNow() } }) {
                             Text("Collect")
                         }
                     } else if (taken) {

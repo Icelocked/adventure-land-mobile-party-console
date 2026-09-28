@@ -133,7 +133,7 @@ private fun BankSortToggle(pending: BankSortRequest?, viewModel: PartyViewModel)
     }
     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Button(onClick = { scope.launch { viewModel.api.requestBankSort(pending == null) } }) {
+            Button(onClick = { scope.launch { viewModel.api.requestBankSort(pending == null); viewModel.refreshDynamicStateNow() } }) {
                 Text("Sort on next visit · " + if (pending != null) "On" else "Off")
             }
             if (statusLabel.isNotEmpty()) {
@@ -187,7 +187,7 @@ private fun LockedVaultRow(vault: BankVault, viewModel: PartyViewModel) {
         Text(vault.pack, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (confirming) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = {
+                Button(onClick = {
                     confirming = false
                     error = null
                     scope.launch {
@@ -248,6 +248,7 @@ private fun BankRow(
                             scope.launch {
                                 viewModel.api.markForStand(entry.item, entry.slot, bankPack = pack, price = standPrice.toLongOrNull() ?: 0L)
                                 pickingStand = false
+                                viewModel.refreshDynamicStateNow()
                             }
                         }) { Text("List") }
                     }
@@ -256,10 +257,10 @@ private fun BankRow(
                         TextButton(onClick = { pickingWithdraw = true }) { Text("Withdraw to...") }
                         TextButton(onClick = { pickingStand = true }) { Text("Mark for stand") }
                         TextButton(onClick = {
-                            scope.launch { viewModel.api.sellBankItemToNpc(entry.item, pack, entry.slot) }
+                            scope.launch { viewModel.api.sellBankItemToNpc(entry.item, pack, entry.slot); viewModel.refreshDynamicStateNow() }
                         }) { Text("Sell to NPC") }
                         TextButton(onClick = {
-                            scope.launch { viewModel.api.markBankItemForDeconstruction(entry.item, pack, entry.slot) }
+                            scope.launch { viewModel.api.markBankItemForDeconstruction(entry.item, pack, entry.slot); viewModel.refreshDynamicStateNow() }
                         }) { Text("Deconstruct") }
                     }
                 } else {
@@ -269,6 +270,7 @@ private fun BankRow(
                                 scope.launch {
                                     viewModel.api.withdrawFromBank(name, entry.item, pack, entry.slot)
                                     pickingWithdraw = false
+                                    viewModel.refreshDynamicStateNow()
                                 }
                             }) { Text("  → $name") }
                         }

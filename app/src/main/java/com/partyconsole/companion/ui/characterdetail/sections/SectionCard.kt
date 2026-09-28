@@ -23,3 +23,14 @@ fun SectionCard(title: String, content: @Composable () -> Unit) {
         }
     }
 }
+
+/** "No data yet" for inside a [SectionCard] - the account screens' own
+ *  EmptyState (bodyLarge + 24dp padding) is sized for a whole empty screen
+ *  and looks out of place inside one card on an already-dense character
+ *  detail screen; this is the shared, lighter equivalent for that context,
+ *  used by EquipmentSection/InventorySection instead of each rolling its
+ *  own near-identical Text call. */
+@Composable
+fun SectionEmptyState(message: String) {
+    Text(message, style = MaterialTheme.typography.bodySmall)
+}

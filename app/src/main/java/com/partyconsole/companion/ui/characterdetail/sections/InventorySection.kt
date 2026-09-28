@@ -37,7 +37,7 @@ fun InventorySection(
 ) {
     SectionCard(title = "Inventory") {
         if (items.isEmpty()) {
-            Text("No inventory data yet.", style = MaterialTheme.typography.bodySmall)
+            SectionEmptyState("No inventory data yet.")
             return@SectionCard
         }
         LazyVerticalGrid(

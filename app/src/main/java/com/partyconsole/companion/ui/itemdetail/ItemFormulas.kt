@@ -433,13 +433,11 @@ fun exchangeSections(id: String, level: Int, exchanges: List<MerchantExchangeIte
 
 fun rewardPercentage(chance: Double): String = when {
     chance > 0 && chance < 0.00000001 -> "<0.000001%"
-    else -> "${roundTo(chance * 100, 6)}%"
-}
-
-private fun roundTo(value: Double, decimals: Int): String {
-    val factor = Math.pow(10.0, decimals.toDouble())
-    val rounded = Math.round(value * factor) / factor
-    return if (rounded == Math.floor(rounded)) rounded.toLong().toString() else rounded.toString()
+    // toPrecision (6 significant figures, matching itemFormulas.ts and this
+    // file's own formatDropRate below) - NOT decimal-place rounding, which
+    // printed far more digits than intended for anything above ~1% and
+    // disagreed with formatDropRate's percent() for the same input.
+    else -> "${toPrecision(chance * 100, 6)}%"
 }
 
 /** drop-rate.ts's `effectiveDropRate` - a direct monster kill retains its

@@ -93,7 +93,9 @@ fun OfferingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                                     )
                                 }
                                 androidx.compose.material3.OutlinedButton(onClick = { editing = rule }) { Text("Edit") }
-                                Button(onClick = { remove(rule.id) }, modifier = Modifier.padding(start = 4.dp)) { Text("Remove") }
+                                androidx.compose.material3.TextButton(onClick = { remove(rule.id) }, modifier = Modifier.padding(start = 4.dp)) {
+                                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }

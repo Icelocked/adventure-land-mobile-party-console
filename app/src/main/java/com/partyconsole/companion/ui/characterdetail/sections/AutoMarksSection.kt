@@ -9,7 +9,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -66,8 +65,8 @@ fun AutoMarksSection(
     val clearBank: suspend () -> Unit = { viewModel.api.clearAutoItemMarks(characterName, "bank") }
 
     SectionCard(title = "Automatic rules") {
-        AutoRuleGroup("Auto NPC sales", npcEntries, catalogFor, clearNpc)
-        AutoRuleGroup("Auto deconstruction", deconEntries, catalogFor, clearDecon)
+        AutoRuleGroup("Auto NPC sales", npcEntries, catalogFor, viewModel, clearNpc)
+        AutoRuleGroup("Auto deconstruction", deconEntries, catalogFor, viewModel, clearDecon)
 
         if (isMerchant) {
             val standEntries = dynamicState.autoStandMarks.entries
@@ -94,18 +93,18 @@ fun AutoMarksSection(
                 .filter { (_, mode) -> mode == "merchant" }
                 .map { (key, _) -> RuleEntry(key, itemFromRuleKey(key), null) { viewModel.api.removeAutoItemMark(characterName, "merchant", key) } }
 
-            AutoRuleGroup("Auto stand marks", standEntries, catalogFor) { viewModel.api.clearAllAutoStand() }
-            AutoRuleGroup("Auto upgrades", upgradeEntries, catalogFor) { viewModel.api.clearAutoUpgrades(characterName) }
-            AutoRuleGroup("Auto compounds", compoundEntries, catalogFor) { viewModel.api.clearAutoCompounds(characterName) }
-            AutoRuleGroup("Auto merchant marks", merchantMarkEntries, catalogFor) { viewModel.api.clearAutoItemMarks(characterName, "merchant") }
+            AutoRuleGroup("Auto stand marks", standEntries, catalogFor, viewModel) { viewModel.api.clearAllAutoStand() }
+            AutoRuleGroup("Auto upgrades", upgradeEntries, catalogFor, viewModel) { viewModel.api.clearAutoUpgrades(characterName) }
+            AutoRuleGroup("Auto compounds", compoundEntries, catalogFor, viewModel) { viewModel.api.clearAutoCompounds(characterName) }
+            AutoRuleGroup("Auto merchant marks", merchantMarkEntries, catalogFor, viewModel) { viewModel.api.clearAutoItemMarks(characterName, "merchant") }
         }
 
-        AutoRuleGroup("Auto bank marks", bankEntries, catalogFor, clearBank)
+        AutoRuleGroup("Auto bank marks", bankEntries, catalogFor, viewModel, clearBank)
     }
 }
 
 @Composable
-private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (String) -> CatalogItem?, onClearAll: suspend () -> Unit) {
+private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (String) -> CatalogItem?, viewModel: PartyViewModel, onClearAll: suspend () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     var confirmingClear by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -129,7 +128,7 @@ private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (
                         displayName(entry.item.name, catalogFor) + (entry.item.level?.let { " +$it" } ?: "") + (entry.detail?.let { " · $it" } ?: ""),
                         style = MaterialTheme.typography.labelMedium,
                     )
-                    IconButton(onClick = { scope.launch { entry.onRemove() } }) {
+                    IconButton(onClick = { scope.launch { entry.onRemove(); viewModel.refreshDynamicStateNow() } }) {
                         Icon(Icons.Filled.Close, contentDescription = "Remove")
                     }
                 }
@@ -148,9 +147,9 @@ private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (
                         )
                         Button(onClick = {
                             confirmingClear = false
-                            scope.launch { onClearAll() }
+                            scope.launch { onClearAll(); viewModel.refreshDynamicStateNow() }
                         }) { Text("Clear all") }
-                        OutlinedButton(onClick = { confirmingClear = false }) { Text("Cancel") }
+                        androidx.compose.material3.TextButton(onClick = { confirmingClear = false }) { Text("Cancel") }
                     }
                 } else {
                     androidx.compose.material3.TextButton(
