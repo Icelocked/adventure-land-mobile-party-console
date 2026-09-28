@@ -280,7 +280,7 @@ function BuyScreen({
                     />
                   </label>
                 )}
-                <button className="text-xs text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
+                <button className="text-xs text-destructive underline" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
                   Remove
                 </button>
               </CartRow>
@@ -346,6 +346,13 @@ function CraftScreen({
     })
 
   const selected = recipes.filter((item) => (cart[item.id] ?? 0) > 0)
+  // Per-recipe canAddRecipe only guards the incremental +1 tap - typing a
+  // quantity directly into the cart Input bypasses it entirely, so the
+  // submit button needs its own aggregate check across every material's
+  // running total, matching the dashboard's materialsAvailable gate.
+  const materialsAvailable = Object.entries(requirements).every(
+    ([key, requirement]) => requirement.quantity <= (owned[key] ?? 0) || canPurchaseMaterial(requirement.material),
+  )
 
   return (
     <AccountScreenScaffold title="Merchant crafting">
@@ -385,7 +392,7 @@ function CraftScreen({
                 onChange={(e) => setCart((old) => ({ ...old, [item.id]: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) }))}
                 className="h-8 w-14 px-1.5 text-center text-xs"
               />
-              <button className="text-xs text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: 0 }))}>
+              <button className="text-xs text-destructive underline" onClick={() => setCart((old) => ({ ...old, [item.id]: 0 }))}>
                 Remove
               </button>
             </CartRow>
@@ -412,7 +419,7 @@ function CraftScreen({
           </div>
         </div>
       )}
-      <SubmitBar label="Craft" disabled={!selected.length} submitting={submitting} error={error} onSubmit={onSubmit} />
+      <SubmitBar label="Craft" disabled={!selected.length || !materialsAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />
     </AccountScreenScaffold>
   )
 }
@@ -508,6 +515,14 @@ function ExchangeScreen({
     exchangeable.reduce((sum, item) => sum + (item.id === id && item.level === level ? item.required * (cart[item.key] ?? 0) : 0), 0)
 
   const add = (key: string) => setCart((old) => ({ ...old, [key]: (old[key] ?? 0) + 1 }))
+  // Same gap as Craft's materialsAvailable: the per-row `enabled` check only
+  // guards the incremental Add tap, and typing a quantity directly into the
+  // cart Input bypasses it - so the submit button needs its own aggregate
+  // check across every selected item's running total.
+  const exchangesAvailable = selected.every((item) => {
+    const ownedCount = exchangeOwned[`${item.id}@${item.level ?? 0}`] ?? 0
+    return ownedCount >= item.required * (cart[item.key] ?? 0)
+  })
 
   return (
     <AccountScreenScaffold title="Merchant exchanges">
@@ -553,14 +568,14 @@ function ExchangeScreen({
                 onChange={(e) => setCart((old) => ({ ...old, [item.key]: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) }))}
                 className="h-8 w-14 px-1.5 text-center text-xs"
               />
-              <button className="text-xs text-destructive" onClick={() => setCart((old) => ({ ...old, [item.key]: 0 }))}>
+              <button className="text-xs text-destructive underline" onClick={() => setCart((old) => ({ ...old, [item.key]: 0 }))}>
                 Remove
               </button>
             </CartRow>
           ))}
         </div>
       )}
-      <SubmitBar label="Exchange all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={onSubmit} />
+      <SubmitBar label="Exchange all" disabled={!selected.length || !exchangesAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />
 
       {choosing && (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">

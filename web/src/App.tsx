@@ -5,6 +5,8 @@ import { PartyDataProvider } from '@/data/PartyDataProvider'
 import { loadServerSettings, saveServerSettings, clearServerSettings, SAME_ORIGIN_SETTINGS, type ServerSettings } from '@/config/serverConfig'
 import { ServerSettingsDialogContext } from '@/lib/ServerSettingsDialogContext'
 import { PairingGate } from '@/screens/PairingGate'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { CharacterListScreen } from '@/screens/CharacterListScreen'
 import { CharacterDetailScreen } from '@/screens/character-detail/CharacterDetailScreen'
 import { MailScreen } from '@/screens/account/MailScreen'
@@ -96,22 +98,17 @@ function OverrideDialog({
           Leave blank to use this same origin (the default, correct for the self-hosted setup - see DEPLOYMENT.md). Only set this if you know
           the target server sends CORS headers allowing this origin.
         </p>
-        <input
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          placeholder="(same origin)"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-        />
+        <Input placeholder="(same origin)" value={input} onChange={(event) => setInput(event.target.value)} />
         <div className="flex justify-end gap-2">
-          <button className="rounded-md px-3 py-2 text-sm text-muted-foreground" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button className="rounded-md px-3 py-2 text-sm text-muted-foreground underline" onClick={onReset}>
+          </Button>
+          <Button variant="outline" size="sm" onClick={onReset}>
             Reset to same-origin
-          </button>
-          <button className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" onClick={() => onSave({ baseUrl: input.trim() })}>
+          </Button>
+          <Button size="sm" onClick={() => onSave({ baseUrl: input.trim() })}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </div>

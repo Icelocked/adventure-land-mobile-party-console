@@ -124,7 +124,7 @@ function RuleForm({ rule, catalog, merchant, onClose }: { rule: UpgradeOfferingR
                     setFloor(0)
                     setCeiling(Math.min(1, itemMaximumLevel(item.meta ?? undefined)))
                   }}
-                  className={`flex w-full items-center gap-2 p-2 text-left text-sm hover:bg-accent ${itemId === item.id ? 'bg-accent' : ''}`}
+                  className={`flex w-full items-center gap-2 rounded-md border p-2 text-left text-sm ${itemId === item.id ? 'border-primary bg-primary/10' : 'border-transparent hover:border-primary/40 hover:bg-accent'}`}
                 >
                   <SpriteIcon sprite={item.sprite} size={24} />
                   {item.name}
@@ -178,11 +178,11 @@ function RuleForm({ rule, catalog, merchant, onClose }: { rule: UpgradeOfferingR
             </div>
             <div className="mb-3 flex flex-col gap-1.5 text-sm">
               <label className="flex items-center gap-2">
-                <input type="radio" checked={required} onChange={() => setRequired(true)} />
+                <input type="radio" checked={required} onChange={() => setRequired(true)} className="size-4" />
                 Required to attempt upgrade
               </label>
               <label className="flex items-center gap-2">
-                <input type="radio" checked={!required} onChange={() => setRequired(false)} />
+                <input type="radio" checked={!required} onChange={() => setRequired(false)} className="size-4" />
                 Only if item is available
               </label>
             </div>

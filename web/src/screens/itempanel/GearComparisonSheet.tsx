@@ -133,7 +133,7 @@ function ComparisonPanel({
             <button
               key={choice.stat}
               onClick={() => onStatTypeChange(choice.stat)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${statType === choice.stat ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground'}`}
+              className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${statType === choice.stat ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}
             >
               {choice.label}
             </button>

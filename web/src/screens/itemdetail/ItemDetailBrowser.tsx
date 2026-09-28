@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
@@ -111,6 +111,15 @@ function ItemDetailContent({
 }) {
   const catalogItem = useMemo(() => catalog?.allItems.find((item) => item.id === target.id), [catalog, target.id])
   const [previewLevel, setPreviewLevel] = useState(target.level)
+  // This component isn't remounted when navigating to a related item (tapping
+  // a craft material, set-bonus piece, exchange result, etc. - onNavigateItem
+  // just changes `target` in place) - without this reset, previewLevel keeps
+  // whatever value it had for the PREVIOUS item, feeding a wrong stat preview
+  // and NPC sale price into the newly-navigated item. Matches the Kotlin
+  // app's `remember(target.id, target.level)` for the same state.
+  useEffect(() => {
+    setPreviewLevel(target.level)
+  }, [target.id, target.level])
 
   const exchanges = useMemo(() => exchangeSections(target.id, target.level, catalog?.exchangeable ?? []), [catalog, target.id, target.level])
 
