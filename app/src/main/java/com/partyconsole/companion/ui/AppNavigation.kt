@@ -33,12 +33,15 @@ import com.partyconsole.companion.ui.characterdetail.InventoryScreen
 import com.partyconsole.companion.ui.characterdetail.MerchantActivityScreen
 import com.partyconsole.companion.ui.characterlist.CharacterListScreen
 import com.partyconsole.companion.ui.connection.ConnectionScreen
+import com.partyconsole.companion.ui.connection.PairingScreen
+import com.partyconsole.companion.ui.connection.PairingViewModel
 
 /** Every screen shares one PartyViewModel (one live SSE connection) via
  *  getBackStackEntry(CHARACTER_LIST) scoping - see the comment on the
  *  detail route below, which explains why this matters. */
 private object Routes {
     const val CONNECTION = "connection"
+    const val PAIRING = "pairing"
     const val CHARACTER_LIST = "characters"
     const val CHARACTER_DETAIL = "characters/{name}"
     const val CHARACTER_MENU = "characters/{name}/menu"
@@ -74,15 +77,17 @@ fun AppNavigation(store: ServerConfigStore) {
     val settings by store.settings.collectAsState(initial = null)
 
     // A returning user with an already-saved server shouldn't see the
-    // connection screen again - jump straight to the party view the first
-    // time settings resolves to a real (non-null) value while we're still
+    // connection screen again - jump straight to the pairing gate (which
+    // itself passes straight through to the party view once it confirms
+    // this phone is already paired - see PairingViewModel) the first time
+    // settings resolves to a real (non-null) value while we're still
     // sitting on the connection screen. Reading a fresh DataStore Flow
     // always completes quickly (local disk, no network), so the brief
     // connection-screen flash before this fires is not worth a separate
     // splash screen for a v1.
     LaunchedEffect(settings) {
         if (settings != null && navController.currentDestination?.route == Routes.CONNECTION) {
-            navController.navigate(Routes.CHARACTER_LIST) {
+            navController.navigate(Routes.PAIRING) {
                 popUpTo(Routes.CONNECTION) { inclusive = true }
             }
         }
@@ -98,8 +103,24 @@ fun AppNavigation(store: ServerConfigStore) {
             ConnectionScreen(
                 viewModel = viewModel,
                 onConnected = {
-                    navController.navigate(Routes.CHARACTER_LIST) {
+                    navController.navigate(Routes.PAIRING) {
                         popUpTo(Routes.CONNECTION) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(Routes.PAIRING) {
+            val active = settings
+            if (active == null) {
+                navController.navigate(Routes.CONNECTION) { popUpTo(0) }
+                return@composable
+            }
+            val viewModel: PairingViewModel = viewModel(factory = PairingViewModelFactory(active))
+            PairingScreen(
+                viewModel = viewModel,
+                onPaired = {
+                    navController.navigate(Routes.CHARACTER_LIST) {
+                        popUpTo(Routes.PAIRING) { inclusive = true }
                     }
                 },
             )
