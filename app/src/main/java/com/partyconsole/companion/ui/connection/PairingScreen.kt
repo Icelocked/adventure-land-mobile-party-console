@@ -149,7 +149,17 @@ private fun QrScanner(modifier: Modifier = Modifier, onScanned: (String) -> Unit
         BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())
     }
     var scanned = remember { false }
-    DisposableEffect(Unit) { onDispose { scanner.close() } }
+    // bindToLifecycle ties the camera to the Activity's lifecycle, not this
+    // composable's - without explicitly unbinding here, leaving this screen
+    // (Cancel scan, or a successful scan) leaves the back camera bound and
+    // running in the background until the host Activity itself stops.
+    val boundCameraProvider = remember { arrayOfNulls<ProcessCameraProvider>(1) }
+    DisposableEffect(Unit) {
+        onDispose {
+            boundCameraProvider[0]?.unbindAll()
+            scanner.close()
+        }
+    }
 
     AndroidView(
         modifier = modifier,
@@ -158,8 +168,9 @@ private fun QrScanner(modifier: Modifier = Modifier, onScanned: (String) -> Unit
             val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
+                boundCameraProvider[0] = cameraProvider
                 val preview = androidx.camera.core.Preview.Builder().build().also {
-                    it.surfaceProvider = previewView.surfaceProvider
+                    it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
