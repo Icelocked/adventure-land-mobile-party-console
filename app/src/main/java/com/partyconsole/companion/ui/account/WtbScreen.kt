@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -221,7 +222,7 @@ private fun WtbFormOverlay(itemId: String, catalogItem: CatalogItem?, existing: 
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(if (saving) "Saving..." else "Place WTB") }
                 if (existing != null) {
-                    Button(
+                    OutlinedButton(
                         enabled = !saving,
                         onClick = {
                             scope.launch {
@@ -237,7 +238,7 @@ private fun WtbFormOverlay(itemId: String, catalogItem: CatalogItem?, existing: 
                             }
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    ) { Text("Cancel WTB order") }
+                    ) { Text("Cancel WTB order", color = MaterialTheme.colorScheme.error) }
                 }
             }
         }

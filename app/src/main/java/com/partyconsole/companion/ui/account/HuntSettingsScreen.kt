@@ -16,6 +16,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,6 +53,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var blacklistBusy by remember { mutableStateOf(false) }
+    var confirmingClearAll by remember { mutableStateOf(false) }
 
     LaunchedEffect(dynamicState.huntSettings) {
         val settings = dynamicState.huntSettings
@@ -135,7 +137,17 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
 
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Hunt blacklist", style = MaterialTheme.typography.titleSmall)
-                Button(enabled = !blacklistBusy && blacklist.isNotEmpty(), onClick = { clearBlacklist(null) }) { Text("Clear all") }
+                if (confirmingClearAll) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Really clear all?", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                        Button(enabled = !blacklistBusy, onClick = { confirmingClearAll = false; clearBlacklist(null) }) { Text("Clear all") }
+                        TextButton(onClick = { confirmingClearAll = false }) { Text("Cancel") }
+                    }
+                } else {
+                    TextButton(enabled = blacklist.isNotEmpty(), onClick = { confirmingClearAll = true }) {
+                        Text("Clear all", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
             if (blacklist.isEmpty()) {
                 EmptyState("No monsters blacklisted.")

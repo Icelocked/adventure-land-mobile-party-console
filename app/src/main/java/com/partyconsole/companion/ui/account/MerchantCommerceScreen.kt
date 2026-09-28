@@ -107,6 +107,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 val selected = (catalog?.buyable ?: emptyList()).filter { (buyCart[it.id]?.first ?: 0) > 0 }
                 val goldTotal = selected.sumOf { it.cost * (buyCart[it.id]?.first ?: 0) }
                 LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
+                    if (filtered.isEmpty()) item { EmptyState("No buyable items found.") }
                     items(filtered) { item ->
                         ItemRow(item.name, item.sprite, "${"%,d".format(item.cost)}g") {
                             val current = buyCart[item.id] ?: (0 to 0)
@@ -173,6 +174,13 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                     needed <= (owned[key] ?: 0) || canPurchaseMaterial(material)
                 }
                 val selected = recipes.filter { (craftCart[it.id] ?: 0) > 0 }
+                // canAddRecipe only guards the incremental "+1" Add tap - typing a
+                // quantity directly into a cart row's Input bypasses it, so Submit
+                // needs its own aggregate check across every material's running
+                // total (matches the PWA's materialsAvailable gate).
+                val materialsAvailable = requirements.all { (key, pair) ->
+                    pair.second <= (owned[key] ?: 0) || canPurchaseMaterial(pair.first)
+                }
                 LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
                     item {
                         Text(
@@ -180,6 +188,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
+                    if (filtered.isEmpty()) item { EmptyState("No craftable recipes found.") }
                     items(filtered) { recipe ->
                         val enabled = canAddRecipe(recipe)
                         ItemRow(recipe.name, recipe.sprite, "${"%,d".format(recipe.cost)}g + materials", enabled = enabled) {
@@ -220,7 +229,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                         }
                     }
                 }
-                SubmitBar("Craft", selected.isEmpty(), submitting, error) {
+                SubmitBar("Craft", selected.isEmpty() || !materialsAvailable, submitting, error) {
                     scope.launch {
                         submitting = true
                         error = null
@@ -246,6 +255,11 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 val byKey = remember(exchangeable) { exchangeable.associateBy { it.key } }
                 val selected = exchangeCart.keys.mapNotNull { byKey[it] }.filter { (exchangeCart[it.key] ?: 0) > 0 }
                 fun exchangeRequired(id: String, level: Int): Int = exchangeable.sumOf { if (it.id == id && it.level == level) it.required * (exchangeCart[it.key] ?: 0) else 0 }
+                // Same gap as Craft's materialsAvailable - the per-row `enabled`
+                // check only guards the incremental Add tap.
+                val exchangesAvailable = selected.all { item ->
+                    (exchangeOwned["${item.id}@${item.level}"] ?: 0) >= item.required * (exchangeCart[item.key] ?: 0)
+                }
 
                 LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
                     item {
@@ -254,6 +268,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
+                    if (filtered.isEmpty()) item { EmptyState("No exchange operations available.") }
                     items(filtered) { item ->
                         val isChoice = item.choices != null
                         val ownedCount = exchangeOwned["${item.id}@${item.level}"] ?: 0
@@ -278,7 +293,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                         }
                     }
                 }
-                SubmitBar("Exchange all", selected.isEmpty(), submitting, error) {
+                SubmitBar("Exchange all", selected.isEmpty() || !exchangesAvailable, submitting, error) {
                     scope.launch {
                         submitting = true
                         error = null

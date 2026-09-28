@@ -31,7 +31,7 @@ fun EquipmentSection(
 ) {
     SectionCard(title = "Equipment") {
         if (slots.isEmpty()) {
-            Text("No equipment data yet.", style = MaterialTheme.typography.bodySmall)
+            SectionEmptyState("No equipment data yet.")
             return@SectionCard
         }
         LazyVerticalGrid(
