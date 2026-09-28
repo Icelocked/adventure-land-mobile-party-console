@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.CatalogItem
 import com.partyconsole.companion.model.Item
@@ -127,7 +128,7 @@ private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        SpriteIcon(catalogFor(entry.item.name)?.sprite, size = 24.dp)
+                        SpriteIcon(catalogFor(entry.item.name)?.sprite, size = 24.dp, modifier = Modifier.testTag("auto-mark-sprite"))
                         Text(
                             displayName(entry.item.name, catalogFor) + (entry.item.level?.let { " +$it" } ?: "") + (entry.detail?.let { " · $it" } ?: ""),
                             style = MaterialTheme.typography.labelMedium,
