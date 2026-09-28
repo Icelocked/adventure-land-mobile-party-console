@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { displayName } from '@/lib/catalogLookup'
 import { Button } from '@/components/ui/button'
+import { ExpandChevron } from '@/components/ExpandChevron'
 import { SectionCard } from '../SectionCard'
 import type { CatalogItem, Item, PartyStateDynamic } from '@/models'
 import { itemFromRuleKey } from '@/models'
@@ -129,8 +130,9 @@ function AutoRuleGroup({
 
   return (
     <div className="py-1">
-      <button className="text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setExpanded((v) => !v)}>
-        {title} ({entries.length})
+      <button className="flex w-full items-center gap-1.5 text-left text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setExpanded((v) => !v)}>
+        <span className="min-w-0 flex-1">{title} ({entries.length})</span>
+        <ExpandChevron expanded={expanded} />
       </button>
       {expanded && (
         <div className="mt-1 flex flex-col gap-0.5 pl-4">
