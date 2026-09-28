@@ -29,6 +29,7 @@ export function InventorySection({
           return (
             <button
               key={index}
+              data-testid={`inventory-slot-${index}`}
               onClick={() => onItemTap(index, entry)}
               className="relative overflow-hidden rounded-md border border-border bg-background transition hover:border-primary/40"
               style={{ width: 60, height: 60 }}
