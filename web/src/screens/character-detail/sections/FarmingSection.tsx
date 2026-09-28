@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -42,6 +42,22 @@ export function FarmingSection({
   const [showFocus, setShowFocus] = useState(false)
   const [pickingBackup, setPickingBackup] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // CharacterDetailScreen's route has no per-character `key`, so switching
+  // characters via the switcher row re-renders this same component instance
+  // rather than remounting it (App.tsx routes /characters/:name to one
+  // element). Without this, MonsterFocusForm's own `selected` state - seeded
+  // once from `monsterFocus` at mount - keeps showing the PREVIOUS
+  // character's focus selection while `characterName` has already moved on;
+  // hitting Save then overwrites the new character's farming focus with the
+  // old one's edited list. Closing the form on switch (matching
+  // RestockSection/GoldTargetSection's dirty-state reset for the same
+  // underlying non-remount issue) forces a fresh mount, seeded correctly,
+  // next time it's reopened.
+  useEffect(() => {
+    setShowFocus(false)
+    setPickingBackup(false)
+  }, [characterName])
 
   const selectMode = async (mode: (typeof MODES)[number]['id']) => {
     setError(null)

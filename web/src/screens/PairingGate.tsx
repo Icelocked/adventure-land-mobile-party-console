@@ -92,19 +92,30 @@ export function PairingGate({ children }: { children: ReactNode }) {
       }
       const detector = new Detector({ formats: ['qr_code'] })
       setScanning(true)
+      let detecting = false
+      let submitted = false
       scanTimerRef.current = window.setInterval(() => {
-        if (!videoRef.current) return
+        // Guards against overlapping detect() calls (a slow frame taking
+        // longer than the 350ms tick) each independently finding a code and
+        // calling submitToken - without this, a slow decode could fire the
+        // pairing request more than once for the same scan.
+        if (!videoRef.current || detecting) return
+        detecting = true
         detector
           .detect(videoRef.current)
           .then((codes) => {
             const value = codes[0]?.rawValue
-            if (value) {
+            if (value && !submitted) {
+              submitted = true
               stopScan()
               void submitToken(value)
             }
           })
           .catch(() => {
             // Transient decode misses are normal mid-scan - keep polling.
+          })
+          .finally(() => {
+            detecting = false
           })
       }, 350)
     } catch {
