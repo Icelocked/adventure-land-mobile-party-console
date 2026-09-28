@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
+import { ExpandChevron } from '@/components/ExpandChevron'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
@@ -129,8 +130,12 @@ function LockedVaultsSection({ bankVaults, unlockedPacks }: { bankVaults: BankVa
       <span className="text-sm font-medium">Locked bank vaults ({locked.length})</span>
       {[...byFloor.entries()].map(([floor, vaults]) => (
         <div key={floor}>
-          <button className="text-xs text-primary underline" onClick={() => setExpandedFloor(expandedFloor === floor ? null : floor)}>
-            {floor} ({vaults.length})
+          <button
+            className="flex w-full items-center gap-1.5 text-left text-sm font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => setExpandedFloor(expandedFloor === floor ? null : floor)}
+          >
+            <span className="min-w-0 flex-1">{floor} ({vaults.length})</span>
+            <ExpandChevron expanded={expandedFloor === floor} />
           </button>
           {expandedFloor === floor && (
             <div className="mt-1 flex flex-col gap-1 pl-1">

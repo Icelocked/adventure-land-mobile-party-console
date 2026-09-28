@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { SpriteIcon } from '@/components/SpriteIcon'
+import { ExpandChevron } from '@/components/ExpandChevron'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { BestiaryDrop, BestiaryMonster } from '@/models'
 
@@ -37,6 +38,7 @@ function MonsterRow({ monster, expanded, onToggle }: { monster: BestiaryMonster;
         <span className="shrink-0 text-xs text-muted-foreground">
           HP {monster.hp.toLocaleString()} · ATK {monster.attack.toLocaleString()} · XP {monster.xp.toLocaleString()}
         </span>
+        <ExpandChevron expanded={expanded} />
       </button>
       {expanded &&
         (monster.drops.length === 0 ? (

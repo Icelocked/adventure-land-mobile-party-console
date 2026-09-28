@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { ExpandChevron } from '@/components/ExpandChevron'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { SkillClass, SkillEntry } from '@/models'
 
@@ -30,7 +31,10 @@ function ClassSkillsCard({ classSkills, expanded, onToggle }: { classSkills: Ski
   return (
     <div className="rounded-md border border-border bg-card p-3">
       <button className="w-full text-left" onClick={onToggle}>
-        <div className="text-sm font-medium">{classSkills.name}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="min-w-0 flex-1 text-sm font-medium">{classSkills.name}</span>
+          <ExpandChevron expanded={expanded} />
+        </div>
         {!expanded && <div className="text-xs text-muted-foreground">{classSkills.skills.map((s) => s.name).join(', ')}</div>}
       </button>
       {expanded && (

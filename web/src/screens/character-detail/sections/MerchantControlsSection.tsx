@@ -71,17 +71,27 @@ export function MerchantControlsSection({
         </Chip>
       </div>
 
-      <div className="mt-3 flex flex-col gap-1">
-        <TapButton label="Routines" onClick={() => navigate('/routines')} />
-        <TapButton label="Send to party" onClick={() => void run(() => api.sendMerchantToParty())} />
+      <div className="mt-3 flex flex-col gap-1.5">
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => navigate('/routines')}>
+          Routines
+        </Button>
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => void run(() => api.sendMerchantToParty())}>
+          Send to party
+        </Button>
 
-        <TapButton label="Donate gold" onClick={() => toggle('donate')} />
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('donate')}>
+          Donate gold
+        </Button>
         {expanded === 'donate' && <DonateForm onDonate={(amount) => run(() => api.donateGold(amount))} />}
 
-        <TapButton label="Join giveaway" onClick={() => toggle('giveaway')} />
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('giveaway')}>
+          Join giveaway
+        </Button>
         {expanded === 'giveaway' && <GiveawayForm onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))} />}
 
-        <TapButton label="Collection settings" onClick={() => toggle('settings')} />
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('settings')}>
+          Collection settings
+        </Button>
         {expanded === 'settings' && (
           <CollectionSettingsForm
             threshold={threshold}
@@ -92,8 +102,12 @@ export function MerchantControlsSection({
           />
         )}
 
-        <TapButton label="Clear stale orders" onClick={() => void run(() => api.clearStaleOrders())} />
-        <TapButton label="Clear activity history" onClick={() => void run(() => api.clearMerchantActivity())} />
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => void run(() => api.clearStaleOrders())}>
+          Clear stale orders
+        </Button>
+        <Button variant="outline" size="sm" className="justify-start" onClick={() => void run(() => api.clearMerchantActivity())}>
+          Clear activity history
+        </Button>
 
         {confirmingClear ? (
           <div className="flex items-center gap-2 py-1">
@@ -113,19 +127,13 @@ export function MerchantControlsSection({
             </Button>
           </div>
         ) : (
-          <TapButton label="Clear job queue" destructive onClick={() => setConfirmingClear(true)} />
+          <Button variant="outline" size="sm" className="justify-start text-destructive" onClick={() => setConfirmingClear(true)}>
+            Clear job queue
+          </Button>
         )}
       </div>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
     </SectionCard>
-  )
-}
-
-function TapButton({ label, onClick, destructive }: { label: string; onClick: () => void; destructive?: boolean }) {
-  return (
-    <button onClick={onClick} className={`w-full rounded-md py-1.5 text-left text-sm hover:bg-accent ${destructive ? 'text-destructive' : ''}`}>
-      {label}
-    </button>
   )
 }
 
