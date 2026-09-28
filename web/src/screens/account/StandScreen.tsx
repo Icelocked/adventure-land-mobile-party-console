@@ -53,7 +53,7 @@ function StandRow({ listing, catalogFor }: { listing: StandListing; catalogFor: 
             {editing ? 'Cancel' : 'Edit price'}
           </button>
           <button
-            className="text-xs text-primary underline"
+            className="text-xs text-destructive underline"
             onClick={async () => {
               await api.markForStand(listing.item, listing.slot!, listing.price, { remove: true })
               await refreshNow()

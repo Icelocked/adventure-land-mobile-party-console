@@ -102,14 +102,30 @@ export class PartyApiClient {
   }
 
   async post(path: string, body: unknown): Promise<ApiResult<CommandResult>> {
-    const result = await postJson(this.url(path), body)
-    if (result.kind === 'failure') {
-      // A failed POST's body might still carry a CommandResult with a
-      // real server-side error message - fall back to the raw HTTP
-      // status only when the body isn't parseable as one.
-      return result
+    // Reads the body itself rather than going through postJson/getText,
+    // which discard the response body on any non-2xx status - the server
+    // sends a real CommandResult (with a real .error message) on plenty of
+    // failures too (409 "backup_required", "stand is full", validation
+    // errors, ...), and postJson's HTTP-status-only failure was silently
+    // replacing all of that with a bare "HTTP 409". Matches the Kotlin
+    // app's PartyApiClient.post() exactly: parse the body as a
+    // CommandResult on both success AND failure, falling back to the raw
+    // HTTP status only when the body isn't parseable as one.
+    try {
+      const response = await timedFetch(this.url(path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const text = await response.text()
+      if (!response.ok) {
+        const parsed = parseCommandResult(text)
+        return fail(parsed.error ?? `HTTP ${response.status}`)
+      }
+      return ok(parseCommandResult(text))
+    } catch (error) {
+      return fail(errorMessage(error))
     }
-    return ok(parseCommandResult(result.value))
   }
 
   /** `/party-api/command` - the general-purpose command endpoint:
