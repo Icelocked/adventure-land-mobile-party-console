@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PartyApiClient } from '@/api/partyApi'
 import { loadServerSettings } from '@/config/serverConfig'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 /** Gates the whole app behind party-console's own browser-pairing check
  *  (GET /setup/state - 200 once paired, 401 otherwise; confirmed against
@@ -126,19 +128,14 @@ export function PairingGate({ children }: { children: ReactNode }) {
         browser". Scan the code it shows, or paste the link it gives you below.
       </p>
       {!scanning && (
-        <button
-          className="rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground"
-          onClick={() => void startScan()}
-        >
-          Scan QR code
-        </button>
+        <Button className="w-full" onClick={() => void startScan()}>Scan QR code</Button>
       )}
       {scanning && (
         <div className="space-y-2">
           <video ref={videoRef} className="w-full rounded-md" muted playsInline />
-          <button className="w-full rounded-md border border-border px-4 py-2 text-sm" onClick={stopScan}>
+          <Button variant="outline" className="w-full" onClick={stopScan}>
             Cancel scan
-          </button>
+          </Button>
         </div>
       )}
       {scanUnsupported && !scanning && (
@@ -148,20 +145,15 @@ export function PairingGate({ children }: { children: ReactNode }) {
         <label className="text-sm font-medium" htmlFor="pairing-link">
           Or paste the invite link
         </label>
-        <input
+        <Input
           id="pairing-link"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           placeholder="http://.../setup#..."
           value={manualInput}
           onChange={(event) => setManualInput(event.target.value)}
         />
-        <button
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          disabled={submitting || !manualInput.trim()}
-          onClick={() => void submitToken(manualInput)}
-        >
+        <Button className="w-full" disabled={submitting || !manualInput.trim()} onClick={() => void submitToken(manualInput)}>
           {submitting ? 'Pairing…' : 'Pair this device'}
-        </button>
+        </Button>
       </div>
       {error && (
         <p role="alert" className="text-xs text-destructive">

@@ -59,7 +59,7 @@ export function SettingsScreen() {
               const result = await api.postRoot('setup/pairing', { requirePairing: checked })
               if (result.kind === 'success') setRequirePairing(checked)
             }}
-            className="size-5"
+            className="size-4"
           />
         </div>
 
@@ -80,7 +80,7 @@ export function SettingsScreen() {
             type="checkbox"
             checked={dynamicState.anniversaryAutoChat}
             onChange={(e) => void api.setAnniversaryAutoChat(e.target.checked).then(() => refreshNow())}
-            className="size-5"
+            className="size-4"
           />
         </div>
 
