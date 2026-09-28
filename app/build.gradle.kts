@@ -75,6 +75,18 @@ dependencies {
     // re-fetched per item) - see ui/itemicon/SpriteIcon.kt.
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Pairing-QR scanning (ui/connection/PairingScreen.kt) - CameraX for the
+    // live preview + frame supply, ML Kit for fully on-device barcode
+    // decoding (no network call, matching this app's self-hosted-first
+    // posture). The manual paste-link field covers any device where the
+    // camera permission is declined or unavailable.
+    val cameraxVersion = "1.4.1"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
