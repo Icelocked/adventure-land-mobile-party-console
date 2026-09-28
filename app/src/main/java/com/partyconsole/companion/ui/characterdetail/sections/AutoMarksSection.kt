@@ -25,6 +25,7 @@ import com.partyconsole.companion.model.Item
 import com.partyconsole.companion.model.PartyStateDynamic
 import com.partyconsole.companion.model.itemFromRuleKey
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import com.partyconsole.companion.ui.itemicon.displayName
 import kotlinx.coroutines.launch
 
@@ -123,11 +124,16 @@ private fun AutoRuleGroup(title: String, entries: List<RuleEntry>, catalogFor: (
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp, bottom = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
-                    Text(
-                        displayName(entry.item.name, catalogFor) + (entry.item.level?.let { " +$it" } ?: "") + (entry.detail?.let { " · $it" } ?: ""),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        SpriteIcon(catalogFor(entry.item.name)?.sprite, size = 24.dp)
+                        Text(
+                            displayName(entry.item.name, catalogFor) + (entry.item.level?.let { " +$it" } ?: "") + (entry.detail?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
                     IconButton(onClick = { scope.launch { entry.onRemove(); viewModel.refreshDynamicStateNow() } }) {
                         Icon(Icons.Filled.Close, contentDescription = "Remove")
                     }

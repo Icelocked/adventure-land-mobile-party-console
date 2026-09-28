@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { displayName } from '@/lib/catalogLookup'
+import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
 import { ExpandChevron } from '@/components/ExpandChevron'
 import { SectionCard } from '../SectionCard'
@@ -137,8 +138,9 @@ function AutoRuleGroup({
       {expanded && (
         <div className="mt-1 flex flex-col gap-0.5 pl-4">
           {entries.map((entry) => (
-            <div key={entry.key} className="flex items-center justify-between gap-2">
-              <span className="text-sm">
+            <div key={entry.key} className="flex items-center gap-2">
+              <SpriteIcon sprite={catalogFor(entry.item.name)?.sprite} size={24} />
+              <span className="min-w-0 flex-1 text-sm">
                 {displayName(entry.item.name, catalogFor)}
                 {entry.item.level != null ? ` +${entry.item.level}` : ''}
                 {entry.detail ? ` · ${entry.detail}` : ''}
