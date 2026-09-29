@@ -26,7 +26,7 @@ export function EquipmentSection({
     <SectionCard title="Equipment">
       <div className="grid grid-cols-2 gap-2">
         {entries.map(([slotName, entry]) => {
-          const badge = markBadgeFor(slotName, [], [], [], upgradeMarks, [])
+          const badge = markBadgeFor(slotName, entry?.item, [], [], [], upgradeMarks, [])
           return (
             <button
               key={slotName}

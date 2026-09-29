@@ -36,7 +36,7 @@ export function InventorySection({
     <SectionCard title="Inventory">
       <div className="grid grid-cols-5 gap-1.5">
         {items.map((entry, index) => {
-          const badge = markBadgeFor(index, merchantMarks, bankMarks, statScrollMarks, upgradeMarks, compoundGroups, npcSaleMarks, deconstructionMarks)
+          const badge = markBadgeFor(index, entry?.item, merchantMarks, bankMarks, statScrollMarks, upgradeMarks, compoundGroups, npcSaleMarks, deconstructionMarks)
           return (
             <button
               key={index}

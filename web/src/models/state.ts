@@ -278,7 +278,10 @@ export interface NpcSaleMark {
 
 /** One pending deconstruction mark (state.deconstructionMarks, also a
  *  flat account-wide list) - `state: 'complete'` means it's done and no
- *  longer worth badging, matching the dashboard's own filter. */
+ *  longer worth badging, matching the dashboard's own filter. A bank-
+ *  sourced mark (BankScreen's "Mark for deconstruction", not withdrawn
+ *  first) has no meaningful top-level `slot` (-1) and identifies the
+ *  item by `storage` instead - see bank-deconstruction.ts. */
 export interface DeconstructionMark {
   id: string
   owner: string
@@ -287,6 +290,7 @@ export interface DeconstructionMark {
   quantity: number
   state: 'collecting' | 'withdrawing' | 'ready' | 'running' | 'blocked' | 'complete'
   auto?: boolean
+  storage?: { pack: string; slot: number }
 }
 
 /** One pending, one-time upgrade-pass mark (state.upgrades[character]) -
@@ -352,6 +356,18 @@ export function canDeconstruct(item: Item, catalog: DeconstructionCatalog): bool
 /** The rule-key format both autoItemMarks and autoUpgradeMarks use:
  *  "{item.name}@+{level or 0}" - see automatic-commerce-rule-key.ts. */
 export const autoMarkRuleKey = (item: Item): string => `${item.name}@+${item.level ?? 0}`
+
+/** Whether a mark's own carried `item` still matches what's actually in
+ *  that slot right now - ported from item-identity.ts's sameMarkedItem
+ *  (name+level are the two fields that matter here; a quantity change on
+ *  an otherwise-unchanged stack shouldn't invalidate a mark). A mark is
+ *  only as fresh as the last state poll, and slot numbers get reused once
+ *  the originally-marked item moves, gets consumed, or gets replaced -
+ *  matching by slot number alone can badge a completely unrelated item
+ *  (or an empty slot) as "marked". */
+export function sameMarkedItem(markItem: Item, liveItem: Item): boolean {
+  return markItem.name === liveItem.name && (markItem.level ?? 0) === (liveItem.level ?? 0)
+}
 
 /** Parses a rule key (see autoMarkRuleKey) back into a displayable Item -
  *  used when a collection is keyed by rule string rather than holding a

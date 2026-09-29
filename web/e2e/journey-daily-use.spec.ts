@@ -65,8 +65,11 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await expect(page.getByText('Wolf Coat')).toBeVisible()
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Mark for deconstruction' }).click()
-  await expect(page.getByText('No bank data yet.')).not.toBeVisible() // pack stays, just empties
-  await expect(page.getByText('Wolf Coat')).not.toBeVisible()
+  await expect(page.getByText('No bank data yet.')).not.toBeVisible()
+  // Bank-sourced deconstruction queues for the merchant to collect - the
+  // item stays put (now marked), it doesn't vanish the instant it's marked.
+  await expect(page.getByText('Wolf Coat')).toBeVisible()
+  await expect(page.getByText('Deconstruction', { exact: true })).toBeVisible()
 
   await page.goBack()
   await expect(page).toHaveURL(/\/characters\/Priestname/)

@@ -25,7 +25,11 @@ test('Bank: deconstruction options are hidden unless the item is actually decons
 
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Mark for deconstruction' }).click()
-  await expect(page.getByText('Wolf Coat')).not.toBeVisible()
+  // Bank-sourced deconstruction queues for the merchant to actually
+  // collect - the item stays in the pack (with a marked indicator) until
+  // then, it doesn't vanish the instant it's marked.
+  await expect(page.getByText('Wolf Coat')).toBeVisible()
+  await expect(page.getByText('Deconstruction', { exact: true })).toBeVisible()
 })
 
 test('Bank: pack header shows occupied/total and free slot count', async ({ page }) => {
@@ -78,10 +82,33 @@ test('Bank: marking for withdrawal is a real toggle, and matches the dashboard b
   await page.getByRole('button', { name: 'Mark for withdrawal' }).click()
   await expect.poll(() => server.withdrawals.Merchantina?.length).toBe(1)
   await expect(page.getByRole('button', { name: 'Unmark withdrawal' })).toBeVisible()
+  // Regression: a marked bank row used to show no indicator at all once
+  // collapsed back down - the dashboard shows this as a yellow/amber
+  // border on the item itself.
+  await expect(page.getByText('Withdrawal', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Unmark withdrawal' }).click()
   await expect.poll(() => server.withdrawals.Merchantina?.length ?? 0).toBe(0)
   await expect(page.getByRole('button', { name: 'Mark for withdrawal' })).toBeVisible()
+  await expect(page.getByText('Withdrawal', { exact: true })).not.toBeVisible()
+})
+
+test('Bank: marking an item for NPC sale shows a marked indicator', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'ironore', level: 0, q: 5 } }] }
+  await server.install(page)
+
+  await page.goto('/bank')
+  await page.getByText('Iron Ore').click()
+  await page.getByRole('button', { name: 'Sell to NPC', exact: true }).click()
+
+  // Bank-sourced NPC sales queue for the merchant to collect (they don't
+  // vanish instantly) - the row should still be there, now marked.
+  await expect(page.getByText('Iron Ore')).toBeVisible()
+  await expect(page.getByText('NPC sale')).toBeVisible()
 })
 
 test('Bank: marking for stand shows as already-marked and can be unmarked', async ({ page }) => {
@@ -100,10 +127,12 @@ test('Bank: marking for stand shows as already-marked and can be unmarked', asyn
 
   await expect(page.getByRole('button', { name: 'Unmark for stand' })).toBeVisible()
   await expect.poll(() => server.standListings.length).toBe(1)
+  await expect(page.getByText('Stand', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Unmark for stand' }).click()
   await expect.poll(() => server.standListings.length).toBe(0)
   await expect(page.getByRole('button', { name: 'Mark for stand', exact: true })).toBeVisible()
+  await expect(page.getByText('Stand', { exact: true })).not.toBeVisible()
 })
 
 test('Mail: Collect marks the attachment as taken', async ({ page }) => {

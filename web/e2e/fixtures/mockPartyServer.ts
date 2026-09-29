@@ -85,8 +85,8 @@ export class MockPartyServer {
   compounds: Record<string, { id: string; name: string; items: { slot?: number | string; item: MockItem }[] }[]> = {}
   statScrolls: Record<string, { slot?: number | string; item: MockItem; statType: string }[]> = {}
   // Flat, account-wide - mirrors state.npcSaleMarks/deconstructionMarks.
-  npcSaleMarks: { id: string; source?: string; character?: string; slot: number; item: MockItem; quantity: number }[] = []
-  deconstructionMarks: { id: string; owner: string; slot: number; item: MockItem; quantity: number; state: string }[] = []
+  npcSaleMarks: { id: string; source?: string; pack?: string; character?: string; slot: number; item: MockItem; quantity: number }[] = []
+  deconstructionMarks: { id: string; owner: string; slot: number; item: MockItem; quantity: number; state: string; storage?: { pack: string; slot: number } }[] = []
 
   /** One-shot error injection for error-path tests: set
    *  `failOnce['merchant/bid'] = 'Stand is full'` before triggering the
@@ -281,7 +281,23 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.source === 'bank') {
-      this.removeBankItem(String(body.pack), Number(body.slot))
+      // Bank-sourced NPC sales queue for the merchant to actually collect
+      // and sell, same as the real server (npc-sale.ts sets state:
+      // "queued", not an instant removal) - the item stays put until then.
+      const pack = String(body.pack)
+      const slot = Number(body.slot)
+      if (body.remove) {
+        this.npcSaleMarks = this.npcSaleMarks.filter((mark) => !(mark.source === 'bank' && mark.pack === pack && mark.slot === slot))
+      } else {
+        this.npcSaleMarks.push({
+          id: `npc-sale-${this.npcSaleMarks.length + 1}`,
+          source: 'bank',
+          pack,
+          slot,
+          item: body.item as MockItem,
+          quantity: Number(body.quantity) || 1,
+        })
+      }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.source === 'character') {
@@ -301,8 +317,22 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'deconstruction/mark' && body.pack) {
-      if (body.all) this.forEachMatchingBankItem((body.item as MockItem).name, (pack, slot) => this.removeBankItem(pack, slot))
-      else this.removeBankItem(String(body.pack), Number(body.slot))
+      // Bank-sourced deconstruction also queues (bank-deconstruction.ts
+      // pushes a mark with `storage:{pack,slot}` and a real `slot` of -1,
+      // matching the real server) - the item stays in the pack until the
+      // merchant actually collects and deconstructs it.
+      const push = (pack: string, slot: number, item: MockItem) =>
+        this.deconstructionMarks.push({
+          id: `deconstruction-${this.deconstructionMarks.length + 1}`,
+          owner: String(this.characters.find((c) => c.ctype === 'merchant')?.name ?? ''),
+          slot: -1,
+          item,
+          quantity: Number(item.q) || 1,
+          state: 'collecting',
+          storage: { pack, slot },
+        })
+      if (body.all) this.forEachMatchingBankItem((body.item as MockItem).name, (pack, slot, item) => push(pack, slot, item))
+      else push(String(body.pack), Number(body.slot), body.item as MockItem)
       return { status: 200, json: { ok: true } }
     }
     if (path === 'deconstruction/mark' && body.character) {

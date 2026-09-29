@@ -6,8 +6,8 @@ import { ExpandChevron } from '@/components/ExpandChevron'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import { canDeconstruct } from '@/models'
-import type { BankVault, CatalogItem, CharacterState, DeconstructionCatalog, InventoryEntry, StandListing, WithdrawalRequest } from '@/models'
+import { canDeconstruct, sameMarkedItem } from '@/models'
+import type { BankVault, CatalogItem, CharacterState, DeconstructionCatalog, DeconstructionMark, InventoryEntry, NpcSaleMark, StandListing, WithdrawalRequest } from '@/models'
 
 /** Shared bank vault browse - ported from ui/account/BankScreen.kt and
  *  matched against the dashboard's own bank-sheet.tsx action set
@@ -83,6 +83,8 @@ export function BankScreen() {
                             withdrawals={merchant ? (dynamicState.withdrawals[merchant] ?? []) : []}
                             standListings={dynamicState.standListings}
                             deconstructionCatalog={dynamicState.deconstructionCatalog}
+                            npcSaleMarks={dynamicState.npcSaleMarks}
+                            deconstructionMarks={dynamicState.deconstructionMarks}
                           />
                         )
                       })}
@@ -227,6 +229,28 @@ function LockedVaultRow({ vault }: { vault: BankVault }) {
   )
 }
 
+/** What (if anything) to show on one bank row for a pending bank-side
+ *  mark - a border color plus a small label, not a sprite overlay (bank
+ *  rows are a plain list, not the icon grid InventorySection/
+ *  EquipmentSection use, so an overlaid badge would just collide with
+ *  the row's own sprite/text). Priority mirrors markBadge.ts: whichever
+ *  mark is most "in flight" wins when a slot somehow has more than one.
+ *  Withdrawal gets the dashboard's own amber border (bank-sheet.tsx's
+ *  `marked()` check); the dashboard doesn't visually flag stand/NPC-
+ *  sale/deconstruction bank marks at all, so those colors are new here. */
+function bankRowMark(
+  deconstructionMarked: boolean,
+  npcSaleMarked: boolean,
+  withdrawMarked: boolean,
+  standListed: boolean,
+): { label: string; border: string; text: string } | null {
+  if (deconstructionMarked) return { label: 'Deconstruction', border: 'border-orange-400', text: 'text-orange-400' }
+  if (npcSaleMarked) return { label: 'NPC sale', border: 'border-rose-400', text: 'text-rose-400' }
+  if (withdrawMarked) return { label: 'Withdrawal', border: 'border-amber-400', text: 'text-amber-400' }
+  if (standListed) return { label: 'Stand', border: 'border-violet-400', text: 'text-violet-400' }
+  return null
+}
+
 function BankRow({
   entry,
   pack,
@@ -237,6 +261,8 @@ function BankRow({
   withdrawals,
   standListings,
   deconstructionCatalog,
+  npcSaleMarks,
+  deconstructionMarks,
 }: {
   entry: InventoryEntry
   pack: string
@@ -247,6 +273,8 @@ function BankRow({
   withdrawals: WithdrawalRequest[]
   standListings: StandListing[]
   deconstructionCatalog: DeconstructionCatalog
+  npcSaleMarks: NpcSaleMark[]
+  deconstructionMarks: DeconstructionMark[]
 }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -257,10 +285,22 @@ function BankRow({
   // A request matching the SAME {pack, slot} toggles the pending
   // withdrawal off server-side (transfer-commands.ts's removingWithdrawal) -
   // this check is purely for the button's own label/visibility, not for
-  // deciding which request to send; the server does that itself.
-  const withdrawMarked = withdrawals.some((w) => w.pack === pack && w.slot === entry.slot)
-  const standListing = standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot)
+  // deciding which request to send; the server does that itself. Every
+  // check here also verifies the mark's own item still matches what's in
+  // this slot right now - a slot number alone can get reused once the
+  // originally-marked item is gone (withdrawn, sold, restacked), and
+  // without the identity check a stale mark would badge whatever item
+  // happens to sit there now instead.
+  const withdrawMarked = withdrawals.some((w) => w.pack === pack && w.slot === entry.slot && sameMarkedItem(w.item, entry.item))
+  const standListing = standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, entry.item))
   const deconstructible = canDeconstruct(entry.item, deconstructionCatalog)
+  const npcSaleMarked = npcSaleMarks.some(
+    (mark) => mark.source === 'bank' && mark.pack === pack && mark.slot === entry.slot && sameMarkedItem(mark.item, entry.item),
+  )
+  const deconstructionMarked = deconstructionMarks.some(
+    (mark) => mark.state !== 'complete' && mark.storage?.pack === pack && mark.storage?.slot === entry.slot && sameMarkedItem(mark.item, entry.item),
+  )
+  const mark = bankRowMark(deconstructionMarked, npcSaleMarked, withdrawMarked, !!standListing)
 
   const run = async (action: () => Promise<{ kind: string; message?: string }>) => {
     const result = await action()
@@ -270,14 +310,15 @@ function BankRow({
   }
 
   return (
-    <div className="rounded-md border border-border bg-card p-2">
+    <div className={`rounded-md border bg-card p-2 ${mark ? mark.border : 'border-border'}`}>
       <button className="flex w-full items-center gap-2" onClick={onToggle}>
         <SpriteIcon sprite={catalogFor(entry.item.name)?.sprite} size={36} />
-        <span className="text-sm">
+        <span className="min-w-0 flex-1 text-sm">
           {displayName(entry.item.name, catalogFor)}
           {entry.item.level != null ? ` +${entry.item.level}` : ''}
           {entry.item.q != null && entry.item.q > 1 ? ` x${entry.item.q}` : ''}
         </span>
+        {mark && <span className={`shrink-0 text-[10px] font-medium uppercase ${mark.text}`}>{mark.label}</span>}
       </button>
       {expanded && (
         <>
