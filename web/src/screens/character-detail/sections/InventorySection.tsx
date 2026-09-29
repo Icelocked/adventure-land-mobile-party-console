@@ -1,12 +1,12 @@
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { markBadgeFor } from '@/lib/markBadge'
 import { SectionCard } from '../SectionCard'
-import type { BankMark, CatalogItem, CompoundGroup, DeconstructionMark, InventoryEntry, NpcSaleMark, StatScrollMark, UpgradeMark } from '@/models'
+import type { BankMark, CatalogItem, CompoundGroup, DeconstructionMark, InventoryEntry, Item, NpcSaleMark, StatScrollMark, UpgradeMark } from '@/models'
 
 /** Inventory grid - real sprite icons (cross-referenced from the
  *  merchant catalog by item id) with bank/merchant/upgrade/compound/
- *  stat-scroll/NPC-sale/deconstruction mark badges overlaid, ported from
- *  ui/characterdetail/sections/InventorySection.kt. */
+ *  stat-scroll/NPC-sale/deconstruction/delivery mark badges overlaid,
+ *  ported from ui/characterdetail/sections/InventorySection.kt. */
 export function InventorySection({
   items,
   merchantMarks = [],
@@ -16,6 +16,7 @@ export function InventorySection({
   compoundGroups = [],
   npcSaleMarks = [],
   deconstructionMarks = [],
+  deliveries = [],
   catalogFor,
   onItemTap,
 }: {
@@ -27,6 +28,7 @@ export function InventorySection({
   compoundGroups?: CompoundGroup[]
   npcSaleMarks?: NpcSaleMark[]
   deconstructionMarks?: DeconstructionMark[]
+  deliveries?: { target: string; slot: number; item: Item }[]
   catalogFor: (id: string) => CatalogItem | undefined
   onItemTap: (index: number, entry: InventoryEntry | null) => void
 }) {
@@ -36,7 +38,7 @@ export function InventorySection({
     <SectionCard title="Inventory">
       <div className="grid grid-cols-5 gap-1.5">
         {items.map((entry, index) => {
-          const badge = markBadgeFor(index, entry?.item, merchantMarks, bankMarks, statScrollMarks, upgradeMarks, compoundGroups, npcSaleMarks, deconstructionMarks)
+          const badge = markBadgeFor(index, entry?.item, merchantMarks, bankMarks, statScrollMarks, upgradeMarks, compoundGroups, npcSaleMarks, deconstructionMarks, deliveries)
           return (
             <button
               key={index}

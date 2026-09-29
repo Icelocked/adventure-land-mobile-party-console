@@ -192,17 +192,41 @@ export class PartyApiClient {
     return this.post('merchant/stand', { id, item, slot, bankPack, price, quantity, remove })
   }
 
-  /** POST /party-api/merchant/npc-sale - source is always "character"
-   *  from the item-action panel (bank-side NPC sales are the bank
-   *  screen's own concern). */
-  async markForNpcSale(character: string, item: Item, slot: number, quantity = 1, remove = false): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/npc-sale', { source: 'character', character, slot, item, quantity, remove })
+  /** POST /party-api/merchant/npc-sale from the item-action panel - source
+   *  is "character" for anyone else, but the server rejects that source
+   *  for the merchant's OWN items ("Unknown player character": npc-sale.ts's
+   *  validate() specifically refuses `character === merchantCharacter`) -
+   *  the merchant's own inventory has to use source "merchant" instead,
+   *  same as the auto-NPC-sale reconciliation does (bank-side NPC sales
+   *  are the bank screen's own source "bank" concern). `acknowledged`
+   *  confirms the modified-item warning (isModifiedItem) - the server
+   *  otherwise refuses to sell an upgraded/stat-scrolled/shiny item at all. */
+  async markForNpcSale(
+    character: string,
+    item: Item,
+    slot: number,
+    options: { isMerchant?: boolean; quantity?: number; remove?: boolean; acknowledged?: boolean } = {},
+  ): Promise<ApiResult<CommandResult>> {
+    const { isMerchant = false, quantity = 1, remove = false, acknowledged = false } = options
+    const body: Record<string, unknown> = { source: isMerchant ? 'merchant' : 'character', slot, item, quantity, remove }
+    if (!isMerchant) body.character = character
+    if (acknowledged) body.acknowledged = true
+    return this.post('merchant/npc-sale', body)
   }
 
   /** POST /party-api/merchant/npc-sale with source "bank" - sells a bank
-   *  item directly without withdrawing it to a character first. */
-  async sellBankItemToNpc(item: Item, pack: string, slot: number, quantity = 1, remove = false): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/npc-sale', { source: 'bank', pack, slot, item, quantity, remove })
+   *  item directly without withdrawing it to a character first.
+   *  `acknowledged` confirms the modified-item warning, same as above. */
+  async sellBankItemToNpc(
+    item: Item,
+    pack: string,
+    slot: number,
+    options: { quantity?: number; remove?: boolean; acknowledged?: boolean } = {},
+  ): Promise<ApiResult<CommandResult>> {
+    const { quantity = 1, remove = false, acknowledged = false } = options
+    const body: Record<string, unknown> = { source: 'bank', pack, slot, item, quantity, remove }
+    if (acknowledged) body.acknowledged = true
+    return this.post('merchant/npc-sale', body)
   }
 
   /** POST /party-api/bank/unlock (http/bank-unlock.ts) - queues a merchant

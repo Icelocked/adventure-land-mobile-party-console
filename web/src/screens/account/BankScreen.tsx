@@ -3,10 +3,11 @@ import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow 
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ExpandChevron } from '@/components/ExpandChevron'
+import { ModifiedItemWarning } from '@/components/ModifiedItemWarning'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import { canDeconstruct, sameMarkedItem } from '@/models'
+import { canDeconstruct, isModifiedItem, sameMarkedItem } from '@/models'
 import type { BankVault, CatalogItem, CharacterState, DeconstructionCatalog, DeconstructionMark, InventoryEntry, NpcSaleMark, StandListing, WithdrawalRequest } from '@/models'
 
 /** Shared bank vault browse - ported from ui/account/BankScreen.kt and
@@ -280,6 +281,7 @@ function BankRow({
   const refreshNow = useRefreshDynamicStateNow()
   const [standForm, setStandForm] = useState<'single' | 'all' | null>(null)
   const [standPrice, setStandPrice] = useState('')
+  const [confirmingNpcSale, setConfirmingNpcSale] = useState<'single' | 'all' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // A request matching the SAME {pack, slot} toggles the pending
@@ -421,18 +423,44 @@ function BankRow({
                 </>
               )}
 
-              <Button variant="link" size="xs" className="text-destructive" onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot))}>
+              <Button
+                variant="link"
+                size="xs"
+                className="text-destructive"
+                onClick={() =>
+                  isModifiedItem(entry.item)
+                    ? setConfirmingNpcSale('single')
+                    : void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot))
+                }
+              >
                 Sell to NPC
               </Button>
               <Button
                 variant="link"
                 size="xs"
                 className="text-destructive"
-                onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot, entry.item.q ?? 1))}
+                onClick={() =>
+                  isModifiedItem(entry.item)
+                    ? setConfirmingNpcSale('all')
+                    : void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot, { quantity: entry.item.q ?? 1 }))
+                }
               >
                 Sell all to NPC
               </Button>
             </div>
+          )}
+          {confirmingNpcSale && (
+            <ModifiedItemWarning
+              onConfirm={() =>
+                void run(() =>
+                  api.sellBankItemToNpc(entry.item, pack, entry.slot, {
+                    quantity: confirmingNpcSale === 'all' ? (entry.item.q ?? 1) : 1,
+                    acknowledged: true,
+                  }),
+                ).then(() => setConfirmingNpcSale(null))
+              }
+              onCancel={() => setConfirmingNpcSale(null)}
+            />
           )}
           {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
         </>

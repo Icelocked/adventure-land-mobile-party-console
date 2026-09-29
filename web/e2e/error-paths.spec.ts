@@ -91,6 +91,55 @@ test('ItemActionPanel: an auto NPC sale rule shows a badge on the merchant\'s ow
   await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
 })
 
+test('ItemActionPanel: marking a modified item for NPC sale from the merchant works and requires confirming the warning', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  // Level +3 makes this a "modified" item - the real server (npc-sale.ts's
+  // validate()) refuses to sell it without an explicit acknowledgement,
+  // AND separately refuses source "character" for the merchant's own
+  // items outright ("Unknown player character") - the client must send
+  // source "merchant" here, not "character".
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 3 }] })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+
+  // The warning must appear instead of an instant sale, and Confirm must
+  // stay disabled until the checkbox is actually checked.
+  await expect(page.getByText('permanently destroy it')).toBeVisible()
+  const confirmButton = page.getByRole('button', { name: 'Confirm sale' })
+  await expect(confirmButton).toBeDisabled()
+
+  await page.getByRole('checkbox').check()
+  await expect(confirmButton).toBeEnabled()
+  await confirmButton.click()
+
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
+})
+
+test('Bank: selling a modified item to NPC requires confirming the warning first', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'wcoat', level: 2 } }] }
+  await server.install(page)
+
+  await page.goto('/bank')
+  await page.getByText('Wolf Coat').click()
+  await page.getByRole('button', { name: 'Sell to NPC', exact: true }).click()
+
+  await expect(page.getByText('permanently destroy it')).toBeVisible()
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Confirm sale' }).click()
+
+  await expect(page.getByText('Wolf Coat')).toBeVisible()
+  await expect(page.getByText('NPC sale', { exact: true })).toBeVisible()
+})
+
 test('ItemActionPanel: marking an item for NPC sale shows a badge on its inventory slot', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
@@ -117,6 +166,25 @@ test('ItemActionPanel: marking an item for deconstruction shows a badge on its i
   await page.getByRole('button', { name: 'Mark for Deconstruction' }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('Deconstruction')
+})
+
+test('ItemActionPanel: delivering an item to another character shows it queued on the merchant\'s inventory', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 0 }] })
+  server.addCharacter({ name: 'Warriorname', ctype: 'warrior', level: 20 })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await page.getByTestId('inventory-slot-0').click()
+  // Renamed from "Give to..." to match the dashboard's own "Deliver to…"
+  // wording - and marking a delivery used to leave no trace anywhere
+  // once the panel closed.
+  await page.getByRole('button', { name: 'Deliver to...' }).click()
+  await page.getByRole('button', { name: /Warriorname/ }).click()
+
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('To Warriorname')
 })
 
 test('Hunt settings: Clear all requires confirmation before it actually clears the blacklist', async ({ page }) => {

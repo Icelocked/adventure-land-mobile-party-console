@@ -5,9 +5,10 @@ import type { BankMark, CompoundGroup, DeconstructionMark, Item, NpcSaleMark, St
  *  from ui/itemicon/MarkBadge.kt: an "Auto X" pill for a rule-generated
  *  mark, "Mark for X" for a manual one-off mark. Priority order mirrors
  *  item-action-banner.ts's real priority table: deconstruction, NPC sale,
- *  stat scroll, upgrade, and compound marks all outrank a bank/merchant
- *  hold there - merchant still beats bank when both are somehow set, an
- *  existing decision this doesn't change. */
+ *  stat scroll, upgrade, and compound marks all outrank delivery, which
+ *  in turn outranks a bank/merchant hold there - merchant still beats
+ *  bank when both are somehow set, an existing decision this doesn't
+ *  change. */
 export interface MarkBadgeInfo {
   label: string
   color: string
@@ -20,6 +21,7 @@ const UPGRADE_COLOR = '#A78BFA'
 const COMPOUND_COLOR = '#E879F9'
 const NPC_COLOR = '#FB7185'
 const DECONSTRUCTION_COLOR = '#FB923C'
+const DELIVERY_COLOR = '#60A5FA'
 
 function upgradeLabel(mark: UpgradeMark): string {
   const start = Number(mark.item.level ?? 0)
@@ -42,6 +44,7 @@ export function markBadgeFor(
   compoundGroups: CompoundGroup[] = [],
   npcSaleMarks: NpcSaleMark[] = [],
   deconstructionMarks: DeconstructionMark[] = [],
+  deliveries: { target: string; slot: number; item: Item }[] = [],
 ): MarkBadgeInfo | null {
   if (!item) return null
   const at = (markSlot: number | string | undefined, markItem: Item) => markSlot === slot && sameMarkedItem(markItem, item)
@@ -59,6 +62,8 @@ export function markBadgeFor(
     const level = Number(compound.item.level ?? 0)
     return { label: `+${level} → +${level + 1}`, color: COMPOUND_COLOR }
   }
+  const delivery = deliveries.find((entry) => at(entry.slot, entry.item))
+  if (delivery) return { label: `To ${delivery.target}`, color: DELIVERY_COLOR }
   const merchant = merchantMarks.find((mark) => at(mark.slot, mark.item))
   if (merchant) return { label: merchant.auto ? 'Auto merchant' : 'Mark for merchant', color: MERCHANT_COLOR }
   const bank = bankMarks.find((mark) => at(mark.slot, mark.item))
