@@ -71,3 +71,19 @@ body {
   font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Global tap-feedback fallback: most of this app's buttons are plain
+   <button className="text-xs text-primary underline"> elements scattered
+   across every screen, not the shared <Button> component (which gets its
+   own matching active: utilities directly) - there's no practical way to
+   touch every one of them individually. This gives every button in the
+   app SOME visible press feedback (a brief dim + shrink) without needing
+   per-component changes, so tapping something no longer looks identical
+   to a menu/sheet just dismissing from an outside tap. Values match
+   Button's own active:scale-[0.97] active:opacity-70 exactly, so a
+   component using both this fallback and its own utility doesn't double up
+   into a different result. */
+button:active:not(:disabled) {
+  opacity: 0.7;
+  transform: scale(0.97);
+}
