@@ -84,6 +84,9 @@ export class MockPartyServer {
   upgrades: Record<string, { slot?: number | string; item: MockItem; tiers?: number; equipped?: boolean }[]> = {}
   compounds: Record<string, { id: string; name: string; items: { slot?: number | string; item: MockItem }[] }[]> = {}
   statScrolls: Record<string, { slot?: number | string; item: MockItem; statType: string }[]> = {}
+  // Flat, account-wide - mirrors state.npcSaleMarks/deconstructionMarks.
+  npcSaleMarks: { id: string; source?: string; character?: string; slot: number; item: MockItem; quantity: number }[] = []
+  deconstructionMarks: { id: string; owner: string; slot: number; item: MockItem; quantity: number; state: string }[] = []
 
   /** One-shot error injection for error-path tests: set
    *  `failOnce['merchant/bid'] = 'Stand is full'` before triggering the
@@ -136,6 +139,8 @@ export class MockPartyServer {
       upgrades: this.upgrades,
       compounds: this.compounds,
       statScrolls: this.statScrolls,
+      npcSaleMarks: this.npcSaleMarks,
+      deconstructionMarks: this.deconstructionMarks,
       withdrawals: this.withdrawals,
       deconstructionCatalog: this.deconstructionCatalog,
       bestiaryCatalog: this.bestiaryCatalog,
@@ -279,9 +284,41 @@ export class MockPartyServer {
       this.removeBankItem(String(body.pack), Number(body.slot))
       return { status: 200, json: { ok: true } }
     }
+    if (path === 'merchant/npc-sale' && body.source === 'character') {
+      const character = String(body.character)
+      if (body.remove) {
+        this.npcSaleMarks = this.npcSaleMarks.filter((mark) => !(mark.character === character && mark.slot === Number(body.slot)))
+      } else {
+        this.npcSaleMarks.push({
+          id: `npc-sale-${this.npcSaleMarks.length + 1}`,
+          source: 'character',
+          character,
+          slot: Number(body.slot),
+          item: body.item as MockItem,
+          quantity: Number(body.quantity) || 1,
+        })
+      }
+      return { status: 200, json: { ok: true } }
+    }
     if (path === 'deconstruction/mark' && body.pack) {
       if (body.all) this.forEachMatchingBankItem((body.item as MockItem).name, (pack, slot) => this.removeBankItem(pack, slot))
       else this.removeBankItem(String(body.pack), Number(body.slot))
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'deconstruction/mark' && body.character) {
+      const owner = String(body.character)
+      if (body.remove) {
+        this.deconstructionMarks = this.deconstructionMarks.filter((mark) => !(mark.owner === owner && mark.slot === Number(body.slot)))
+      } else {
+        this.deconstructionMarks.push({
+          id: `deconstruction-${this.deconstructionMarks.length + 1}`,
+          owner,
+          slot: Number(body.slot),
+          item: body.item as MockItem,
+          quantity: Number((body.item as MockItem).q) || 1,
+          state: 'collecting',
+        })
+      }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'command' && body.type === 'withdraw') {

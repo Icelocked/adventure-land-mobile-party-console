@@ -52,6 +52,34 @@ test('ItemActionPanel: marking an item for compounding shows a badge on its inve
   await expect(page.getByTestId('inventory-slot-0')).toContainText('+0 → +1')
 })
 
+test('ItemActionPanel: marking an item for NPC sale shows a badge on its inventory slot', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 0 }] })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
+})
+
+test('ItemActionPanel: marking an item for deconstruction shows a badge on its inventory slot', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 0 }] })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Mark for Deconstruction' }).click()
+
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('Deconstruction')
+})
+
 test('Hunt settings: Clear all requires confirmation before it actually clears the blacklist', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
