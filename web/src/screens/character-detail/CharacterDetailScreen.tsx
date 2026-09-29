@@ -115,11 +115,19 @@ export function CharacterDetailScreen() {
               statScrollMarks={dynamicState.statScrolls[name] ?? []}
               upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => !mark.equipped)}
               compoundGroups={dynamicState.compounds[name] ?? []}
-              // Both flat/account-wide lists - the item-action panel always
-              // marks NPC sales with source "character" (bank-side sales are
-              // BankScreen's own source "bank" concern), and a completed
-              // deconstruction is no longer worth badging.
-              npcSaleMarks={dynamicState.npcSaleMarks.filter((mark) => mark.source === 'character' && mark.character === name)}
+              // Both flat/account-wide lists. The item-action panel's
+              // manual "Mark for NPC Sale" always sends source "character"
+              // (bank-side sales are BankScreen's own source "bank"
+              // concern) - but the STANDING auto-NPC-sale rule reconciles
+              // server-side into its own source "merchant" marks with no
+              // `character` field at all (automatic-sales.ts's
+              // markNpcSale), since that rule only ever applies to the
+              // merchant's own inventory. Missing that source entirely was
+              // why an auto-marked item on the merchant showed no badge.
+              // A completed deconstruction is no longer worth badging.
+              npcSaleMarks={dynamicState.npcSaleMarks.filter(
+                (mark) => (mark.source === 'character' && mark.character === name) || (mark.source === 'merchant' && vitals.ctype === 'merchant'),
+              )}
               deconstructionMarks={dynamicState.deconstructionMarks.filter((mark) => mark.owner === name && mark.state !== 'complete')}
               catalogFor={catalogFor}
               onItemTap={(index, entry) => entry && setActionTarget({ kind: 'inventory', slot: index, item: entry.item })}
