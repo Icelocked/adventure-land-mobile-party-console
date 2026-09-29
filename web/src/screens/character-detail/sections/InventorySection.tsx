@@ -1,21 +1,28 @@
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { markBadgeFor } from '@/lib/markBadge'
 import { SectionCard } from '../SectionCard'
-import type { BankMark, CatalogItem, InventoryEntry } from '@/models'
+import type { BankMark, CatalogItem, CompoundGroup, InventoryEntry, StatScrollMark, UpgradeMark } from '@/models'
 
 /** Inventory grid - real sprite icons (cross-referenced from the
- *  merchant catalog by item id) with bank/merchant mark badges overlaid,
- *  ported from ui/characterdetail/sections/InventorySection.kt. */
+ *  merchant catalog by item id) with bank/merchant/upgrade/compound/
+ *  stat-scroll mark badges overlaid, ported from ui/characterdetail/
+ *  sections/InventorySection.kt. */
 export function InventorySection({
   items,
   merchantMarks = [],
   bankMarks = [],
+  statScrollMarks = [],
+  upgradeMarks = [],
+  compoundGroups = [],
   catalogFor,
   onItemTap,
 }: {
   items: (InventoryEntry | null)[]
   merchantMarks?: BankMark[]
   bankMarks?: BankMark[]
+  statScrollMarks?: StatScrollMark[]
+  upgradeMarks?: UpgradeMark[]
+  compoundGroups?: CompoundGroup[]
   catalogFor: (id: string) => CatalogItem | undefined
   onItemTap: (index: number, entry: InventoryEntry | null) => void
 }) {
@@ -25,7 +32,7 @@ export function InventorySection({
     <SectionCard title="Inventory">
       <div className="grid grid-cols-5 gap-1.5">
         {items.map((entry, index) => {
-          const badge = markBadgeFor(index, merchantMarks, bankMarks)
+          const badge = markBadgeFor(index, merchantMarks, bankMarks, statScrollMarks, upgradeMarks, compoundGroups)
           return (
             <button
               key={index}

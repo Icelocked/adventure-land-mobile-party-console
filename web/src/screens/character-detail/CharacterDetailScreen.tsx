@@ -104,6 +104,7 @@ export function CharacterDetailScreen() {
             )}
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}
+              upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => mark.equipped)}
               catalogFor={catalogFor}
               onSlotTap={(slotName, entry) => entry && setActionTarget({ kind: 'equipment', slotName, item: entry.item })}
             />
@@ -111,6 +112,9 @@ export function CharacterDetailScreen() {
               items={state?.inventory?.items ?? []}
               merchantMarks={dynamicState.merchantMarked[name] ?? []}
               bankMarks={dynamicState.marked[name] ?? []}
+              statScrollMarks={dynamicState.statScrolls[name] ?? []}
+              upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => !mark.equipped)}
+              compoundGroups={dynamicState.compounds[name] ?? []}
               catalogFor={catalogFor}
               onItemTap={(index, entry) => entry && setActionTarget({ kind: 'inventory', slot: index, item: entry.item })}
             />
