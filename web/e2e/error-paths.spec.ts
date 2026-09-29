@@ -74,6 +74,23 @@ test('ItemActionPanel: a stale mark for an emptied/replaced slot does not badge 
   await expect(page.getByTestId('inventory-slot-1')).not.toContainText('Deconstruction')
 })
 
+test('ItemActionPanel: an auto NPC sale rule shows a badge on the merchant\'s own inventory', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'ironore', level: 0, q: 5 }] })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  // The standing auto-NPC-sale rule reconciles server-side into its OWN
+  // source "merchant" npcSaleMarks entries with no `character` field at
+  // all (automatic-sales.ts's markNpcSale) - distinct from the manual
+  // "Mark for NPC Sale" action's source "character". Only checking for
+  // "character" meant an auto-marked item on the merchant never badged.
+  server.npcSaleMarks = [{ id: 'auto-1', source: 'merchant', slot: 0, item: { name: 'ironore', level: 0 }, quantity: 5 }]
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
+})
+
 test('ItemActionPanel: marking an item for NPC sale shows a badge on its inventory slot', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
