@@ -70,6 +70,12 @@ export class MockPartyServer {
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   huntSettings: Record<string, unknown> | null = null
   requirePairing = false
+  // Pending bank withdrawals, keyed by the collecting character (usually
+  // the merchant) - mirrors the coordinator's own `state.withdrawals`.
+  withdrawals: Record<string, { pack: string; slot: number; item: MockItem }[]> = {}
+  // Keyed by item id (matches item.name) - {} means nothing is
+  // deconstructible unless a test explicitly opts an item in.
+  deconstructionCatalog: Record<string, { compound: boolean; cost?: number; rewards?: unknown[] }> = {}
 
   // Auto-mark state, mutated by POSTed commands - mirrors PartyStateDynamic's shape.
   autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
@@ -122,6 +128,8 @@ export class MockPartyServer {
         exchangeable: this.exchangeable,
       },
       autoNpcSales: this.autoNpcSales,
+      withdrawals: this.withdrawals,
+      deconstructionCatalog: this.deconstructionCatalog,
       bestiaryCatalog: this.bestiaryCatalog,
       skillCatalog: this.skillCatalog,
       combatLogs: this.combatLogs,
@@ -264,7 +272,42 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'deconstruction/mark' && body.pack) {
-      this.removeBankItem(String(body.pack), Number(body.slot))
+      if (body.all) this.forEachMatchingBankItem((body.item as MockItem).name, (pack, slot) => this.removeBankItem(pack, slot))
+      else this.removeBankItem(String(body.pack), Number(body.slot))
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'command' && body.type === 'withdraw') {
+      const character = String(body.character)
+      const item = body.item as MockItem
+      const pending = (this.withdrawals[character] ??= [])
+      if (body.markAll === true) {
+        this.forEachMatchingBankItem(item.name, (pack, slot, matchedItem) => {
+          if (!pending.some((w) => w.pack === pack && w.slot === slot)) pending.push({ pack, slot, item: matchedItem })
+        })
+      } else {
+        const index = pending.findIndex((w) => w.pack === body.pack && w.slot === Number(body.slot))
+        if (index >= 0) pending.splice(index, 1)
+        else pending.push({ pack: String(body.pack), slot: Number(body.slot), item })
+      }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'merchant/stand') {
+      if (body.remove) {
+        // A bank-originated listing is removed by id (BankScreen passes
+        // it back); a carried-inventory listing (StandScreen) has none
+        // and is removed by slot instead - matches markForStand's two
+        // real call sites.
+        this.standListings = this.standListings.filter((l) => (body.id ? l.id !== body.id : l.slot !== body.slot))
+      } else {
+        this.standListings.push({
+          id: `stand-${this.standListings.length + 1}`,
+          item: body.item,
+          price: Number(body.price) || 0,
+          quantity: Number(body.quantity) || 1,
+          bankPack: body.bankPack,
+          bankSlot: body.slot,
+        })
+      }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'mail/collect') {
@@ -328,6 +371,15 @@ export class MockPartyServer {
   private removeBankItem(pack: string, slot: number) {
     const entries = this.bankPacks[pack]
     if (entries) entries[slot] = null
+  }
+
+  private forEachMatchingBankItem(itemName: string, fn: (pack: string, slot: number, item: MockItem) => void) {
+    for (const [pack, entries] of Object.entries(this.bankPacks)) {
+      entries.forEach((entry, index) => {
+        const candidate = entry as { slot?: number; item?: MockItem } | null
+        if (candidate?.item?.name === itemName) fn(pack, candidate.slot ?? index, candidate.item!)
+      })
+    }
   }
 
   /** Installs every route handler on [page]. Call before navigating.

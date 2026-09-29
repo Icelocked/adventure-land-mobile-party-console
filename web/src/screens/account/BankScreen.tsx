@@ -1,25 +1,31 @@
 import { useState } from 'react'
-import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ExpandChevron } from '@/components/ExpandChevron'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import type { BankVault, CatalogItem, CharacterState, InventoryEntry } from '@/models'
+import { canDeconstruct } from '@/models'
+import type { BankVault, CatalogItem, CharacterState, DeconstructionCatalog, InventoryEntry, StandListing, WithdrawalRequest } from '@/models'
 
-/** Shared bank vault browse - ported from ui/account/BankScreen.kt,
- *  grouped by pack: withdraw to a character, or sell/deconstruct
- *  directly without withdrawing first. Tap a row to expand its action
- *  strip. */
+/** Shared bank vault browse - ported from ui/account/BankScreen.kt and
+ *  matched against the dashboard's own bank-sheet.tsx action set
+ *  (confirmed field-by-field against party-console v1.1.0's source):
+ *  mark/unmark for withdrawal (always to the configured merchant, same
+ *  as the dashboard - an earlier version let you pick any character,
+ *  which the dashboard has no UI for and can't show back to you), mark
+ *  for stand with an all-stack variant, deconstruction gated by whether
+ *  the item is actually deconstructible, and NPC sale with an all-stack
+ *  variant. Tap a row to expand its action strip. */
 export function BankScreen() {
   const dynamicState = useDynamicState()
-  const roster = useRoster()
   const characters = useCharacters()
   const refreshNow = useRefreshDynamicStateNow()
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const bank = dynamicState.bank
+  const merchant = Object.entries(characters).find(([, c]) => c.vitals?.ctype === 'merchant')?.[0] ?? null
 
   return (
     <AccountScreenScaffold title={`Bank${bank ? ` · ${bank.gold.toLocaleString()}g` : ''}`} onRefresh={() => void refreshNow()}>
@@ -47,7 +53,10 @@ export function BankScreen() {
                         catalogFor={catalogFor}
                         expanded={expandedKey === key}
                         onToggle={() => setExpandedKey(expandedKey === key ? null : key)}
-                        roster={roster}
+                        merchant={merchant}
+                        withdrawals={merchant ? (dynamicState.withdrawals[merchant] ?? []) : []}
+                        standListings={dynamicState.standListings}
+                        deconstructionCatalog={dynamicState.deconstructionCatalog}
                       />
                     )
                   })}
@@ -196,20 +205,41 @@ function BankRow({
   catalogFor,
   expanded,
   onToggle,
-  roster,
+  merchant,
+  withdrawals,
+  standListings,
+  deconstructionCatalog,
 }: {
   entry: InventoryEntry
   pack: string
   catalogFor: (id: string) => CatalogItem | undefined
   expanded: boolean
   onToggle: () => void
-  roster: Record<string, unknown>
+  merchant: string | null
+  withdrawals: WithdrawalRequest[]
+  standListings: StandListing[]
+  deconstructionCatalog: DeconstructionCatalog
 }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
-  const [pickingWithdraw, setPickingWithdraw] = useState(false)
-  const [pickingStand, setPickingStand] = useState(false)
+  const [standForm, setStandForm] = useState<'single' | 'all' | null>(null)
   const [standPrice, setStandPrice] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  // A request matching the SAME {pack, slot} toggles the pending
+  // withdrawal off server-side (transfer-commands.ts's removingWithdrawal) -
+  // this check is purely for the button's own label/visibility, not for
+  // deciding which request to send; the server does that itself.
+  const withdrawMarked = withdrawals.some((w) => w.pack === pack && w.slot === entry.slot)
+  const standListing = standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot)
+  const deconstructible = canDeconstruct(entry.item, deconstructionCatalog)
+
+  const run = async (action: () => Promise<{ kind: string; message?: string }>) => {
+    const result = await action()
+    if (result.kind === 'failure') setError(result.message ?? 'Request failed')
+    else setError(null)
+    await refreshNow()
+  }
 
   return (
     <div className="rounded-md border border-border bg-card p-2">
@@ -221,68 +251,114 @@ function BankRow({
           {entry.item.q != null && entry.item.q > 1 ? ` x${entry.item.q}` : ''}
         </span>
       </button>
-      {expanded &&
-        (pickingStand ? (
-          <div className="mt-1.5 flex items-end gap-2 pl-1">
-            <label className="flex-1 text-xs text-muted-foreground">
-              Price
-              <Input value={standPrice} onChange={(e) => /^\d*$/.test(e.target.value) && setStandPrice(e.target.value)} className="mt-1" />
-            </label>
-            <Button
-              size="sm"
-              onClick={async () => {
-                await api.markForStand(entry.item, entry.slot, Number(standPrice) || 0, { bankPack: pack })
-                setPickingStand(false)
-                await refreshNow()
-              }}
-            >
-              List
-            </Button>
-          </div>
-        ) : !pickingWithdraw ? (
-          <div className="mt-1.5 flex flex-wrap gap-3 pl-1">
-            <button className="text-xs text-primary underline" onClick={() => setPickingWithdraw(true)}>
-              Withdraw to...
-            </button>
-            <button className="text-xs text-primary underline" onClick={() => setPickingStand(true)}>
-              Mark for stand
-            </button>
-            <button
-              className="text-xs text-primary underline"
-              onClick={async () => {
-                await api.sellBankItemToNpc(entry.item, pack, entry.slot)
-                await refreshNow()
-              }}
-            >
-              Sell to NPC
-            </button>
-            <button
-              className="text-xs text-primary underline"
-              onClick={async () => {
-                await api.markBankItemForDeconstruction(entry.item, pack, entry.slot)
-                await refreshNow()
-              }}
-            >
-              Deconstruct
-            </button>
-          </div>
-        ) : (
-          <div className="mt-1.5 flex flex-col gap-1 pl-1">
-            {Object.keys(roster).map((name) => (
-              <button
-                key={name}
-                className="text-left text-xs text-primary underline"
+      {expanded && (
+        <>
+          {standForm ? (
+            <div className="mt-1.5 flex items-end gap-2 pl-1">
+              <label className="flex-1 text-xs text-muted-foreground">
+                Price
+                <Input value={standPrice} onChange={(e) => /^\d*$/.test(e.target.value) && setStandPrice(e.target.value)} className="mt-1" />
+              </label>
+              <Button
+                size="sm"
                 onClick={async () => {
-                  await api.withdrawFromBank(name, entry.item, pack, entry.slot)
-                  setPickingWithdraw(false)
-                  await refreshNow()
+                  await run(() =>
+                    api.markForStand(entry.item, entry.slot, Number(standPrice) || 0, {
+                      bankPack: pack,
+                      quantity: standForm === 'all' ? (entry.item.q ?? 1) : 1,
+                    }),
+                  )
+                  setStandForm(null)
                 }}
               >
-                → {name}
+                List
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setStandForm(null)}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap gap-3 pl-1">
+              <button
+                className="text-xs text-primary underline disabled:opacity-50"
+                disabled={!merchant}
+                onClick={() => void run(() => api.withdrawFromBank(merchant!, entry.item, pack, entry.slot))}
+              >
+                {withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'}
               </button>
-            ))}
-          </div>
-        ))}
+              <button
+                className="text-xs text-primary underline disabled:opacity-50"
+                disabled={!merchant}
+                onClick={() => void run(() => api.withdrawFromBank(merchant!, entry.item, pack, entry.slot, true))}
+              >
+                Mark all for withdrawal
+              </button>
+
+              {standListing ? (
+                <button
+                  className="text-xs text-primary underline"
+                  onClick={() =>
+                    void run(() =>
+                      api.markForStand(entry.item, entry.slot, standListing.price, { bankPack: pack, remove: true, id: standListing.id }),
+                    )
+                  }
+                >
+                  Unmark for stand
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="text-xs text-primary underline"
+                    onClick={() => {
+                      setStandForm('single')
+                      setStandPrice(entry.item.price != null ? String(entry.item.price) : '')
+                    }}
+                  >
+                    Mark for stand
+                  </button>
+                  <button
+                    className="text-xs text-primary underline"
+                    onClick={() => {
+                      setStandForm('all')
+                      setStandPrice(entry.item.price != null ? String(entry.item.price) : '')
+                    }}
+                  >
+                    Mark all for stand
+                  </button>
+                </>
+              )}
+
+              {deconstructible && (
+                <>
+                  <button
+                    className="text-xs text-primary underline"
+                    onClick={() => void run(() => api.markBankItemForDeconstruction(entry.item, pack, entry.slot))}
+                  >
+                    Mark for deconstruction
+                  </button>
+                  <button
+                    className="text-xs text-primary underline"
+                    onClick={() => void run(() => api.markBankItemForDeconstruction(entry.item, pack, entry.slot, true))}
+                  >
+                    Mark all for deconstruction
+                  </button>
+                </>
+              )}
+
+              <button className="text-xs text-destructive underline" onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot))}>
+                Sell to NPC
+              </button>
+              <button
+                className="text-xs text-destructive underline"
+                onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot, entry.item.q ?? 1))}
+              >
+                Sell all to NPC
+              </button>
+            </div>
+          )}
+          {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
+        </>
+      )}
     </div>
   )
 }
