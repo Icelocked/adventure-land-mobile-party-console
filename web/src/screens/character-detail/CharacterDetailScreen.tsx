@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { VitalsHeader } from './VitalsHeader'
@@ -40,17 +41,17 @@ export function CharacterDetailScreen() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
-        <button onClick={() => navigate('/')} aria-label="Back">
+        <Button variant="ghost" size="icon-sm" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="size-5" />
-        </button>
+        </Button>
         <span className="font-medium">{name}</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => void refreshNow()} aria-label="Refresh">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
-          </button>
-          <button aria-label="Menu" onClick={() => setMenuOpen(true)}>
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Menu" onClick={() => setMenuOpen(true)}>
             <Menu className="size-5" />
-          </button>
+          </Button>
         </div>
       </header>
 

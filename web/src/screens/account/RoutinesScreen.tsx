@@ -80,22 +80,24 @@ export function RoutinesScreen() {
               }}
               className="h-8 w-16 text-right font-mono"
             />
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               aria-label={`Move ${ROUTINE_LABELS[key]} up`}
               disabled={index === 0}
               onClick={() => move(key, sortedKeys[index - 1], false)}
-              className="disabled:opacity-30"
             >
               <ArrowUp className="size-4" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
               aria-label={`Move ${ROUTINE_LABELS[key]} down`}
               disabled={index === sortedKeys.length - 1}
               onClick={() => move(key, sortedKeys[index + 1], true)}
-              className="disabled:opacity-30"
             >
               <ArrowDown className="size-4" />
-            </button>
+            </Button>
           </div>
         ))}
       </div>

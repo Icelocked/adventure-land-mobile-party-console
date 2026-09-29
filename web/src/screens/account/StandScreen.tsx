@@ -49,18 +49,20 @@ function StandRow({ listing, catalogFor }: { listing: StandListing; catalogFor: 
       </div>
       {listing.slot != null && (
         <div className="flex items-center gap-3">
-          <button className="text-xs text-primary underline" onClick={() => setEditing((v) => !v)}>
+          <Button variant="link" size="xs" onClick={() => setEditing((v) => !v)}>
             {editing ? 'Cancel' : 'Edit price'}
-          </button>
-          <button
-            className="text-xs text-destructive underline"
+          </Button>
+          <Button
+            variant="link"
+            size="xs"
+            className="text-destructive"
             onClick={async () => {
               await api.markForStand(listing.item, listing.slot!, listing.price, { remove: true })
               await refreshNow()
             }}
           >
             Remove
-          </button>
+          </Button>
         </div>
       )}
       {editing && listing.slot != null && (

@@ -82,15 +82,16 @@ function MailRow({ mail, catalogFor }: { mail: ReceivedMail; catalogFor: (id: st
         <div className="mt-1 flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Attached: {displayName(mail.item.name, catalogFor)}</span>
           {!taken && mail.id ? (
-            <button
-              className="text-xs text-primary underline"
+            <Button
+              variant="link"
+              size="xs"
               onClick={async () => {
                 await api.collectMail(mail.id!)
                 await refreshNow()
               }}
             >
               Collect
-            </button>
+            </Button>
           ) : taken ? (
             <span className="text-xs text-muted-foreground">(collected)</span>
           ) : null}

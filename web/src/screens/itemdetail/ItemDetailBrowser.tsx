@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
+import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import {
   buildStatRows,
@@ -65,9 +66,9 @@ export function ItemDetailBrowser({
   return (
     <div className={className}>
       {trail.length > 1 && (
-        <button className="mb-1 flex items-center gap-1 text-sm text-muted-foreground" onClick={() => setTrail((t) => t.slice(0, -1))}>
+        <Button variant="link" size="xs" className="mb-1 gap-1 px-0 text-muted-foreground" onClick={() => setTrail((t) => t.slice(0, -1))}>
           <ArrowLeft className="size-4" /> Back
-        </button>
+        </Button>
       )}
       {current.kind === 'item' ? (
         <ItemDetailContent
