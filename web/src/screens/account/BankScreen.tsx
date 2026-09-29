@@ -24,8 +24,17 @@ export function BankScreen() {
   const refreshNow = useRefreshDynamicStateNow()
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [collapsedPacks, setCollapsedPacks] = useState<Set<string>>(new Set())
   const bank = dynamicState.bank
   const merchant = Object.entries(characters).find(([, c]) => c.vitals?.ctype === 'merchant')?.[0] ?? null
+
+  const togglePack = (packName: string) =>
+    setCollapsedPacks((old) => {
+      const next = new Set(old)
+      if (next.has(packName)) next.delete(packName)
+      else next.add(packName)
+      return next
+    })
 
   return (
     <AccountScreenScaffold title={`Bank${bank ? ` · ${bank.gold.toLocaleString()}g` : ''}`} onRefresh={() => void refreshNow()}>
@@ -38,29 +47,47 @@ export function BankScreen() {
         <div className="flex flex-col gap-3 px-3">
           {Object.entries(bank.packs).map(([packName, entries]) => {
             const filled = entries.filter((e): e is InventoryEntry => e != null)
-            if (filled.length === 0) return null
+            // items1's last 7 slots are reserved and never usable, even
+            // though the pack still reports a full 42-length array -
+            // matches bank-sheet.tsx's own `usableItems` split, so "free"
+            // here doesn't overstate real deposit room on that one pack.
+            const usableEntries = packName === 'items1' ? entries.slice(0, 35) : entries
+            const free = usableEntries.length - usableEntries.filter((e) => e != null).length
+            const freeColor = free < 5 ? 'text-destructive' : free <= 10 ? 'text-amber-500' : 'text-muted-foreground'
+            const expanded = !collapsedPacks.has(packName)
             return (
               <div key={packName}>
-                <div className="mb-1 text-sm font-medium">{packName}</div>
-                <div className="flex flex-col gap-1">
-                  {filled.map((entry) => {
-                    const key = `${packName}:${entry.slot}`
-                    return (
-                      <BankRow
-                        key={key}
-                        entry={entry}
-                        pack={packName}
-                        catalogFor={catalogFor}
-                        expanded={expandedKey === key}
-                        onToggle={() => setExpandedKey(expandedKey === key ? null : key)}
-                        merchant={merchant}
-                        withdrawals={merchant ? (dynamicState.withdrawals[merchant] ?? []) : []}
-                        standListings={dynamicState.standListings}
-                        deconstructionCatalog={dynamicState.deconstructionCatalog}
-                      />
-                    )
-                  })}
-                </div>
+                <button className="flex w-full items-center gap-1.5 text-left" onClick={() => togglePack(packName)}>
+                  <span className="min-w-0 flex-1 text-sm font-medium">{packName}</span>
+                  <span className={`font-mono text-xs ${freeColor}`} title={`${free} slots free`}>
+                    {filled.length}/{entries.length} · {free} free
+                  </span>
+                  <ExpandChevron expanded={expanded} />
+                </button>
+                {expanded &&
+                  (filled.length === 0 ? (
+                    <p className="mt-1 pl-1 text-xs text-muted-foreground">Empty.</p>
+                  ) : (
+                    <div className="mt-1 flex flex-col gap-1">
+                      {filled.map((entry) => {
+                        const key = `${packName}:${entry.slot}`
+                        return (
+                          <BankRow
+                            key={key}
+                            entry={entry}
+                            pack={packName}
+                            catalogFor={catalogFor}
+                            expanded={expandedKey === key}
+                            onToggle={() => setExpandedKey(expandedKey === key ? null : key)}
+                            merchant={merchant}
+                            withdrawals={merchant ? (dynamicState.withdrawals[merchant] ?? []) : []}
+                            standListings={dynamicState.standListings}
+                            deconstructionCatalog={dynamicState.deconstructionCatalog}
+                          />
+                        )
+                      })}
+                    </div>
+                  ))}
               </div>
             )
           })}

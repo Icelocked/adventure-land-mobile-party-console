@@ -28,6 +28,41 @@ test('Bank: deconstruction options are hidden unless the item is actually decons
   await expect(page.getByText('Wolf Coat')).not.toBeVisible()
 })
 
+test('Bank: pack header shows occupied/total and free slot count', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  // A 10-slot pack with 2 filled, 8 empty (padded with null, the same
+  // fixed-length shape the real bank snapshot sends) - the list view
+  // alone gave no way to tell open slots existed at all.
+  server.bankPacks = {
+    items1: [{ slot: 0, item: { name: 'ironore', level: 0, q: 5 } }, null, null, { slot: 3, item: { name: 'ironore', level: 0 } }, null, null, null, null, null, null],
+  }
+  await server.install(page)
+
+  await page.goto('/bank')
+  await expect(page.getByText('2/10 · 8 free')).toBeVisible()
+})
+
+test('Bank: a pack can be collapsed and expanded, hiding and restoring its item rows', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'ironore', level: 0, q: 5 } }] }
+  await server.install(page)
+
+  await page.goto('/bank')
+  await expect(page.getByText('Iron Ore')).toBeVisible()
+
+  await page.getByText('items1').click()
+  await expect(page.getByText('Iron Ore')).not.toBeVisible()
+
+  await page.getByText('items1').click()
+  await expect(page.getByText('Iron Ore')).toBeVisible()
+})
+
 test('Bank: marking for withdrawal is a real toggle, and matches the dashboard by always targeting the merchant', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
