@@ -145,7 +145,9 @@ function AutoRuleGroup({
                 {entry.item.level != null ? ` +${entry.item.level}` : ''}
                 {entry.detail ? ` · ${entry.detail}` : ''}
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 aria-label="Remove"
                 onClick={async () => {
                   await entry.onRemove()
@@ -153,7 +155,7 @@ function AutoRuleGroup({
                 }}
               >
                 <X className="size-4 text-muted-foreground" />
-              </button>
+              </Button>
             </div>
           ))}
           {entries.length > 0 &&
@@ -176,9 +178,9 @@ function AutoRuleGroup({
                 </Button>
               </div>
             ) : (
-              <button className="mt-1 text-left text-xs text-destructive underline" onClick={() => setConfirmingClear(true)}>
+              <Button variant="link" size="xs" className="mt-1 justify-start text-destructive" onClick={() => setConfirmingClear(true)}>
                 Clear all
-              </button>
+              </Button>
             ))}
         </div>
       )}

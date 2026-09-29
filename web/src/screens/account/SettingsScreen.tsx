@@ -107,9 +107,9 @@ export function SettingsScreen() {
             <div className="text-sm font-medium">Realm: {dynamicState.realmControl.activeRealm ?? 'unknown'}</div>
             <div className="text-xs text-muted-foreground">Home: {dynamicState.realmControl.homeRealm ?? 'unknown'}</div>
             {realmError && <p className="text-xs text-destructive">{realmError}</p>}
-            <button className="mt-1 text-xs text-primary underline" onClick={() => setShowRealms((v) => !v)}>
+            <Button variant="link" size="xs" className="mt-1" onClick={() => setShowRealms((v) => !v)}>
               {showRealms ? 'Cancel' : 'Switch realm...'}
-            </button>
+            </Button>
             {showRealms && (
               <div className="mt-1 flex flex-col gap-1">
                 <label className="flex items-center gap-2 text-xs">
@@ -119,9 +119,11 @@ export function SettingsScreen() {
                 {dynamicState.realmControl.realms
                   .filter((option) => !option.pvp)
                   .map((option) => (
-                    <button
+                    <Button
                       key={option.key}
-                      className="text-left text-xs text-primary underline"
+                      variant="link"
+                      size="xs"
+                      className="justify-start"
                       onClick={async () => {
                         const result = await api.switchRealm(option.key, setHome)
                         if (result.kind === 'failure') setRealmError(result.message)
@@ -133,7 +135,7 @@ export function SettingsScreen() {
                       }}
                     >
                       {option.label} ({option.players} online)
-                    </button>
+                    </Button>
                   ))}
               </div>
             )}

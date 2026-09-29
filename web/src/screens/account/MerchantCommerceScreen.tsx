@@ -280,9 +280,9 @@ function BuyScreen({
                     />
                   </label>
                 )}
-                <button className="text-xs text-destructive underline" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
+                <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
                   Remove
-                </button>
+                </Button>
               </CartRow>
             )
           })}
@@ -392,9 +392,9 @@ function CraftScreen({
                 onChange={(e) => setCart((old) => ({ ...old, [item.id]: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) }))}
                 className="h-8 w-14 px-1.5 text-center text-xs"
               />
-              <button className="text-xs text-destructive underline" onClick={() => setCart((old) => ({ ...old, [item.id]: 0 }))}>
+              <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: 0 }))}>
                 Remove
-              </button>
+              </Button>
             </CartRow>
           ))}
           <div className="mt-2 border-t border-border pt-2">
@@ -568,9 +568,9 @@ function ExchangeScreen({
                 onChange={(e) => setCart((old) => ({ ...old, [item.key]: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) }))}
                 className="h-8 w-14 px-1.5 text-center text-xs"
               />
-              <button className="text-xs text-destructive underline" onClick={() => setCart((old) => ({ ...old, [item.key]: 0 }))}>
+              <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.key]: 0 }))}>
                 Remove
-              </button>
+              </Button>
             </CartRow>
           ))}
         </div>
@@ -584,9 +584,9 @@ function ExchangeScreen({
               <SpriteIcon sprite={choosing.sprite} size={32} />
               <span className="text-sm font-medium">{choosing.name}</span>
             </div>
-            <button className="text-sm text-muted-foreground" onClick={() => setChoosing(null)}>
+            <Button variant="link" size="xs" className="text-muted-foreground" onClick={() => setChoosing(null)}>
               Close
-            </button>
+            </Button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             <p className="mb-2 font-mono text-xs uppercase text-muted-foreground">Available rewards</p>

@@ -173,8 +173,9 @@ function LockedVaultRow({ vault }: { vault: BankVault }) {
       {confirming ? (
         <div className="flex items-center gap-2">
           <span className="text-destructive">Really {label.toLowerCase()}?</span>
-          <button
-            className="text-primary underline"
+          <Button
+            variant="link"
+            size="xs"
             onClick={async () => {
               setConfirming(false)
               setError(null)
@@ -184,15 +185,15 @@ function LockedVaultRow({ vault }: { vault: BankVault }) {
             }}
           >
             Confirm
-          </button>
-          <button className="text-muted-foreground underline" onClick={() => setConfirming(false)}>
+          </Button>
+          <Button variant="link" size="xs" className="text-muted-foreground" onClick={() => setConfirming(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
       ) : (
-        <button className="text-primary underline" onClick={() => setConfirming(true)}>
+        <Button variant="link" size="xs" onClick={() => setConfirming(true)}>
           {label}
-        </button>
+        </Button>
       )}
       {error && <span className="text-destructive">{error}</span>}
     </div>
@@ -278,25 +279,28 @@ function BankRow({
               </Button>
             </div>
           ) : (
-            <div className="mt-1.5 flex flex-wrap gap-3 pl-1">
-              <button
-                className="text-xs text-primary underline disabled:opacity-50"
+            <div className="mt-1.5 flex flex-wrap gap-2 pl-1">
+              <Button
+                variant="link"
+                size="xs"
                 disabled={!merchant}
                 onClick={() => void run(() => api.withdrawFromBank(merchant!, entry.item, pack, entry.slot))}
               >
                 {withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'}
-              </button>
-              <button
-                className="text-xs text-primary underline disabled:opacity-50"
+              </Button>
+              <Button
+                variant="link"
+                size="xs"
                 disabled={!merchant}
                 onClick={() => void run(() => api.withdrawFromBank(merchant!, entry.item, pack, entry.slot, true))}
               >
                 Mark all for withdrawal
-              </button>
+              </Button>
 
               {standListing ? (
-                <button
-                  className="text-xs text-primary underline"
+                <Button
+                  variant="link"
+                  size="xs"
                   onClick={() =>
                     void run(() =>
                       api.markForStand(entry.item, entry.slot, standListing.price, { bankPack: pack, remove: true, id: standListing.id }),
@@ -304,56 +308,62 @@ function BankRow({
                   }
                 >
                   Unmark for stand
-                </button>
+                </Button>
               ) : (
                 <>
-                  <button
-                    className="text-xs text-primary underline"
+                  <Button
+                    variant="link"
+                    size="xs"
                     onClick={() => {
                       setStandForm('single')
                       setStandPrice(entry.item.price != null ? String(entry.item.price) : '')
                     }}
                   >
                     Mark for stand
-                  </button>
-                  <button
-                    className="text-xs text-primary underline"
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="xs"
                     onClick={() => {
                       setStandForm('all')
                       setStandPrice(entry.item.price != null ? String(entry.item.price) : '')
                     }}
                   >
                     Mark all for stand
-                  </button>
+                  </Button>
                 </>
               )}
 
               {deconstructible && (
                 <>
-                  <button
-                    className="text-xs text-primary underline"
+                  <Button
+                    variant="link"
+                    size="xs"
                     onClick={() => void run(() => api.markBankItemForDeconstruction(entry.item, pack, entry.slot))}
                   >
                     Mark for deconstruction
-                  </button>
-                  <button
-                    className="text-xs text-primary underline"
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="xs"
                     onClick={() => void run(() => api.markBankItemForDeconstruction(entry.item, pack, entry.slot, true))}
                   >
                     Mark all for deconstruction
-                  </button>
+                  </Button>
                 </>
               )}
 
-              <button className="text-xs text-destructive underline" onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot))}>
+              <Button variant="link" size="xs" className="text-destructive" onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot))}>
                 Sell to NPC
-              </button>
-              <button
-                className="text-xs text-destructive underline"
+              </Button>
+              <Button
+                variant="link"
+                size="xs"
+                className="text-destructive"
                 onClick={() => void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot, entry.item.q ?? 1))}
               >
                 Sell all to NPC
-              </button>
+              </Button>
             </div>
           )}
           {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}

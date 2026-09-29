@@ -1,5 +1,6 @@
 import { RotateCw, X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
 import type { MerchantJob } from '@/models'
 
@@ -29,7 +30,9 @@ export function MerchantQueueSection({ current, queue }: { current?: MerchantJob
             </span>
             <div className="flex shrink-0 items-center gap-2">
               {job.realmBlockedReason && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label="Retry job"
                   onClick={async () => {
                     if (job.id) await api.retryMerchantJob(job.id)
@@ -37,9 +40,11 @@ export function MerchantQueueSection({ current, queue }: { current?: MerchantJob
                   }}
                 >
                   <RotateCw className="size-4 text-muted-foreground" />
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 aria-label="Cancel job"
                 onClick={async () => {
                   await api.post('merchant/job/cancel', { id: job.id ?? '' })
@@ -47,7 +52,7 @@ export function MerchantQueueSection({ current, queue }: { current?: MerchantJob
                 }}
               >
                 <X className="size-4 text-muted-foreground" />
-              </button>
+              </Button>
             </div>
           </div>
         ))}

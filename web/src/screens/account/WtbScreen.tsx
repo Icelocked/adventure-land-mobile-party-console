@@ -81,9 +81,9 @@ function ItemPicker({ catalog, onCancel, onPick }: { catalog: CatalogItem[]; onC
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       <div className="flex items-center justify-between border-b border-border p-3">
         <span className="text-sm font-medium">Choose an item</span>
-        <button className="text-sm text-muted-foreground" onClick={onCancel}>
+        <Button variant="link" size="xs" className="text-muted-foreground" onClick={onCancel}>
           Close
-        </button>
+        </Button>
       </div>
       <div className="p-3">
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items..." />
@@ -125,9 +125,9 @@ function WtbForm({ itemId, catalogItem, existing, onClose }: { itemId: string; c
             {canLevel ? ` +${level || 0}` : ''}
           </span>
         </div>
-        <button className="text-sm text-muted-foreground" onClick={onClose}>
+        <Button variant="link" size="xs" className="text-muted-foreground" onClick={onClose}>
           Close
-        </button>
+        </Button>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         <div className="grid grid-cols-2 gap-2">

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 /** Shared shell for every account-wide screen (mail/bestiary/skills/
  *  stand/market/bank/logs/settings/catalog) - ported from ui/account/
@@ -11,14 +12,14 @@ export function AccountScreenScaffold({ title, onRefresh, children }: { title: s
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
-        <button onClick={() => navigate(-1)} aria-label="Back">
+        <Button variant="ghost" size="icon-sm" onClick={() => navigate(-1)} aria-label="Back">
           <ArrowLeft className="size-5" />
-        </button>
+        </Button>
         <span className="font-medium">{title}</span>
         {onRefresh ? (
-          <button onClick={onRefresh} aria-label="Refresh">
+          <Button variant="ghost" size="icon-sm" onClick={onRefresh} aria-label="Refresh">
             <RefreshCw className="size-4" />
-          </button>
+          </Button>
         ) : (
           <span className="size-5" />
         )}

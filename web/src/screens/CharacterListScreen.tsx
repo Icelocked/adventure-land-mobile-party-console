@@ -29,12 +29,12 @@ export function CharacterListScreen() {
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span>{accountGold.toLocaleString()}g</span>
           {!connected && <CloudOff className="size-4" aria-label="Disconnected" />}
-          <button onClick={() => void refreshNow()} aria-label="Refresh">
+          <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
-          </button>
-          <button onClick={openServerSettings} aria-label="Server settings">
+          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={openServerSettings} aria-label="Server settings">
             <Settings className="size-4" />
-          </button>
+          </Button>
         </div>
       </header>
 
