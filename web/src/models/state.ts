@@ -258,6 +258,37 @@ export interface BankMark {
   auto?: boolean
 }
 
+/** One pending NPC-sale mark (state.npcSaleMarks, a FLAT account-wide
+ *  list, not keyed by character - filter by `source`/`character` to find
+ *  the marks relevant to one). The item-action panel always sends
+ *  `source: 'character'` (bank-side NPC sales are BankScreen's own
+ *  `source: 'bank'` concern instead). */
+export interface NpcSaleMark {
+  id: string
+  auto?: boolean
+  pack?: string
+  source?: 'bank' | 'merchant' | 'character'
+  character?: string
+  slot: number
+  item: Item
+  quantity: number
+  state?: string
+  error?: string | null
+}
+
+/** One pending deconstruction mark (state.deconstructionMarks, also a
+ *  flat account-wide list) - `state: 'complete'` means it's done and no
+ *  longer worth badging, matching the dashboard's own filter. */
+export interface DeconstructionMark {
+  id: string
+  owner: string
+  slot: number
+  item: Item
+  quantity: number
+  state: 'collecting' | 'withdrawing' | 'ready' | 'running' | 'blocked' | 'complete'
+  auto?: boolean
+}
+
 /** One pending, one-time upgrade-pass mark (state.upgrades[character]) -
  *  distinct from autoUpgradeMarks' standing per-level-range rules: this is
  *  a live in-flight upgrade attempt on one specific item instance. `slot`
@@ -422,6 +453,9 @@ export interface PartyStateDynamic {
   upgrades: Record<string, UpgradeMark[]>
   compounds: Record<string, CompoundGroup[]>
   statScrolls: Record<string, StatScrollMark[]>
+  // Flat, account-wide (not keyed by character) - see NpcSaleMark/DeconstructionMark above.
+  npcSaleMarks: NpcSaleMark[]
+  deconstructionMarks: DeconstructionMark[]
   bankboiPrefix: string
   // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
   anniversaryAutoChat: boolean
@@ -550,6 +584,8 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   upgrades: {},
   compounds: {},
   statScrolls: {},
+  npcSaleMarks: [],
+  deconstructionMarks: [],
   bankboiPrefix: '',
   anniversaryAutoChat: false,
   goldTargets: {},

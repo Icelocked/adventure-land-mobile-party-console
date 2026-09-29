@@ -1,12 +1,12 @@
-import type { BankMark, CompoundGroup, StatScrollMark, UpgradeMark } from '@/models'
+import type { BankMark, CompoundGroup, DeconstructionMark, NpcSaleMark, StatScrollMark, UpgradeMark } from '@/models'
 
 /** What (if anything) to overlay on one inventory slot's icon, ported
  *  from ui/itemicon/MarkBadge.kt: an "Auto X" pill for a rule-generated
- *  mark, "Mark for X" for a manual one-off mark. Stat scroll/upgrade/
- *  compound marks take visual priority over bank/merchant holds, matching
- *  item-action-banner.ts's real priority table (those always outrank a
- *  bank/merchant hold there too) - merchant still beats bank when both
- *  are somehow set, an existing decision this doesn't change. */
+ *  mark, "Mark for X" for a manual one-off mark. Priority order mirrors
+ *  item-action-banner.ts's real priority table: deconstruction, NPC sale,
+ *  stat scroll, upgrade, and compound marks all outrank a bank/merchant
+ *  hold there - merchant still beats bank when both are somehow set, an
+ *  existing decision this doesn't change. */
 export interface MarkBadgeInfo {
   label: string
   color: string
@@ -17,6 +17,8 @@ const MERCHANT_COLOR = '#9E7BFF'
 const STAT_COLOR = '#38BDF8'
 const UPGRADE_COLOR = '#A78BFA'
 const COMPOUND_COLOR = '#E879F9'
+const NPC_COLOR = '#FB7185'
+const DECONSTRUCTION_COLOR = '#FB923C'
 
 function upgradeLabel(mark: UpgradeMark): string {
   const start = Number(mark.item.level ?? 0)
@@ -31,7 +33,13 @@ export function markBadgeFor(
   statScrollMarks: StatScrollMark[] = [],
   upgradeMarks: UpgradeMark[] = [],
   compoundGroups: CompoundGroup[] = [],
+  npcSaleMarks: NpcSaleMark[] = [],
+  deconstructionMarks: DeconstructionMark[] = [],
 ): MarkBadgeInfo | null {
+  const deconstruction = deconstructionMarks.find((mark) => mark.slot === slot && mark.state !== 'complete')
+  if (deconstruction) return { label: deconstruction.auto ? 'Auto deconstruction' : 'Deconstruction', color: DECONSTRUCTION_COLOR }
+  const npcSale = npcSaleMarks.find((mark) => mark.slot === slot)
+  if (npcSale) return { label: npcSale.auto ? 'Auto NPC sale' : 'NPC sale', color: NPC_COLOR }
   const stat = statScrollMarks.find((mark) => mark.slot === slot)
   if (stat) return { label: `Stat scroll → ${stat.statType.toUpperCase()}`, color: STAT_COLOR }
   const upgrade = upgradeMarks.find((mark) => mark.slot === slot)
