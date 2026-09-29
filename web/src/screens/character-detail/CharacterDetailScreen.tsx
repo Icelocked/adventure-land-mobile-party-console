@@ -129,6 +129,15 @@ export function CharacterDetailScreen() {
                 (mark) => (mark.source === 'character' && mark.character === name) || (mark.source === 'merchant' && vitals.ctype === 'merchant'),
               )}
               deconstructionMarks={dynamicState.deconstructionMarks.filter((mark) => mark.owner === name && mark.state !== 'complete')}
+              // A delivery's `slot` refers to the SENDER's inventory (the
+              // item physically stays there until actually delivered), so
+              // this only ever applies to the merchant's own screen -
+              // flatten every recipient's list and match by slot+item.
+              deliveries={
+                vitals.ctype === 'merchant'
+                  ? Object.entries(dynamicState.merchantDeliveries).flatMap(([target, marks]) => marks.map((mark) => ({ target, slot: mark.slot, item: mark.item })))
+                  : []
+              }
               catalogFor={catalogFor}
               onItemTap={(index, entry) => entry && setActionTarget({ kind: 'inventory', slot: index, item: entry.item })}
             />

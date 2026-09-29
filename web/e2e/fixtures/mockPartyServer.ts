@@ -87,6 +87,8 @@ export class MockPartyServer {
   // Flat, account-wide - mirrors state.npcSaleMarks/deconstructionMarks.
   npcSaleMarks: { id: string; source?: string; pack?: string; character?: string; slot: number; item: MockItem; quantity: number }[] = []
   deconstructionMarks: { id: string; owner: string; slot: number; item: MockItem; quantity: number; state: string; storage?: { pack: string; slot: number } }[] = []
+  // Keyed by the RECIPIENT's name - mirrors state.merchantDeliveries.
+  merchantDeliveries: Record<string, { id: string; slot: number; item: MockItem; equipOnDelivery?: boolean }[]> = {}
 
   /** One-shot error injection for error-path tests: set
    *  `failOnce['merchant/bid'] = 'Stand is full'` before triggering the
@@ -141,6 +143,7 @@ export class MockPartyServer {
       statScrolls: this.statScrolls,
       npcSaleMarks: this.npcSaleMarks,
       deconstructionMarks: this.deconstructionMarks,
+      merchantDeliveries: this.merchantDeliveries,
       withdrawals: this.withdrawals,
       deconstructionCatalog: this.deconstructionCatalog,
       bestiaryCatalog: this.bestiaryCatalog,
@@ -277,6 +280,36 @@ export class MockPartyServer {
         delete this.autoNpcSales[key]
       } else {
         this.autoNpcSales[key] = { item: body.item as MockItem, character }
+      }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'merchant/npc-sale' && !body.remove) {
+      // Mirrors npc-sale.ts's validate(): the merchant's own items can
+      // never use source "character" (that's rejected server-side with
+      // this exact error), and any modified item (level>0/stat_type/p)
+      // needs an explicit acknowledgement or the sale is refused outright.
+      const merchantName = this.characters.find((c) => c.ctype === 'merchant')?.name
+      if (body.source === 'character' && body.character === merchantName) {
+        return { status: 400, json: { ok: false, error: 'Unknown player character' } }
+      }
+      const item = body.item as MockItem
+      const modified = Number(item.level) > 0 || !!item.stat_type || !!item.p
+      if (modified && body.acknowledged !== true) {
+        return { status: 400, json: { ok: false, error: 'confirm the modified-item warning before selling' } }
+      }
+    }
+    if (path === 'merchant/npc-sale' && body.source === 'merchant') {
+      const slot = Number(body.slot)
+      if (body.remove) {
+        this.npcSaleMarks = this.npcSaleMarks.filter((mark) => !(mark.source === 'merchant' && mark.slot === slot))
+      } else {
+        this.npcSaleMarks.push({
+          id: `npc-sale-${this.npcSaleMarks.length + 1}`,
+          source: 'merchant',
+          slot,
+          item: body.item as MockItem,
+          quantity: Number(body.quantity) || 1,
+        })
       }
       return { status: 200, json: { ok: true } }
     }
@@ -427,6 +460,24 @@ export class MockPartyServer {
     }
     if (path === 'realm/switch') {
       this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, ...(body.setHome ? { homeRealm: body.realm } : {}) }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'command' && body.type === 'give') {
+      const target = String(body.target)
+      const slot = Number(body.slot)
+      const item = body.item as MockItem
+      // Mirrors transfer-commands.ts's delivery(): drop any existing
+      // delivery for this exact slot+item from every recipient first, then
+      // queue it for the new target - a delivery is never split/duplicated.
+      for (const name of Object.keys(this.merchantDeliveries)) {
+        this.merchantDeliveries[name] = this.merchantDeliveries[name].filter((mark) => !(mark.slot === slot && mark.item.name === item.name && mark.item.level === item.level))
+      }
+      ;(this.merchantDeliveries[target] ??= []).push({
+        id: `delivery-${target}-${slot}`,
+        slot,
+        item,
+        equipOnDelivery: body.equipOnDelivery === true,
+      })
       return { status: 200, json: { ok: true } }
     }
     if (path === 'command' && body.type === 'upgrade-mark') {

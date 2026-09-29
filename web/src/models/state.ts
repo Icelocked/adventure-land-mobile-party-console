@@ -405,6 +405,18 @@ export interface AutoCompoundRule {
   quantity: number
 }
 
+/** One item queued to be hand-delivered to another character (state.
+ *  merchantDeliveries[target], keyed by the RECIPIENT's name) - `slot` is
+ *  the SENDER's inventory slot (always the merchant in practice; the
+ *  item physically stays there, still visible/actionable, until the
+ *  delivery actually happens), see transfer-commands.ts's `delivery()`. */
+export interface MerchantDelivery {
+  id: string
+  slot: number
+  item: Item
+  equipOnDelivery?: boolean
+}
+
 /** One preset map location the "Send to..." picker offers (travelPlaces) -
  *  `id` is the map name POST /party-api/command's character-travel
  *  command expects. */
@@ -472,6 +484,8 @@ export interface PartyStateDynamic {
   // Flat, account-wide (not keyed by character) - see NpcSaleMark/DeconstructionMark above.
   npcSaleMarks: NpcSaleMark[]
   deconstructionMarks: DeconstructionMark[]
+  // Keyed by the RECIPIENT's name - see MerchantDelivery above.
+  merchantDeliveries: Record<string, MerchantDelivery[]>
   bankboiPrefix: string
   // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
   anniversaryAutoChat: boolean
@@ -602,6 +616,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   statScrolls: {},
   npcSaleMarks: [],
   deconstructionMarks: [],
+  merchantDeliveries: {},
   bankboiPrefix: '',
   anniversaryAutoChat: false,
   goldTargets: {},

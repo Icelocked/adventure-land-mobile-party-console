@@ -6,8 +6,10 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
+import { ModifiedItemWarning } from '@/components/ModifiedItemWarning'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
+import { isModifiedItem, sameMarkedItem } from '@/models'
 import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog, RosterMember } from '@/models'
 
 export type ItemActionTarget = { kind: 'inventory'; slot: number; item: Item } | { kind: 'equipment'; slotName: string; item: Item }
@@ -189,6 +191,14 @@ function InventoryActions({
   const exchangeable = isMerchant && Number((meta?.definition.e as number | undefined) ?? 0) > 0
   const autoExchangeMarked = isMerchant && !!dynamicState.autoExchanges[`${item.name}@${level}`]
   const canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
+  // A delivery's `slot` refers to the SENDER's own inventory (the item
+  // stays right where it is, still visible/actionable, until the
+  // merchant actually travels there and hands it off) - only meaningful
+  // for the merchant's own items, matching inventory-panel.tsx's
+  // deliveryTarget, which is the only place the dashboard tracks this.
+  const deliveryTarget = isMerchant
+    ? Object.entries(dynamicState.merchantDeliveries).find(([, marks]) => marks.some((mark) => mark.slot === slot && sameMarkedItem(mark.item, item)))?.[0]
+    : undefined
 
   return (
     <div>
@@ -209,7 +219,20 @@ function InventoryActions({
         </>
       )}
 
-      <TapRow label="Mark for NPC Sale" onClick={() => run(() => api.markForNpcSale(characterName, item, slot))} />
+      <TapRow
+        label="Mark for NPC Sale"
+        onClick={() =>
+          isModifiedItem(item)
+            ? toggle('npcsale')
+            : run(() => api.markForNpcSale(characterName, item, slot, { isMerchant }))
+        }
+      />
+      {expanded === 'npcsale' && (
+        <ModifiedItemWarning
+          onConfirm={() => run(() => api.markForNpcSale(characterName, item, slot, { isMerchant, acknowledged: true }))}
+          onCancel={() => onExpand(null)}
+        />
+      )}
       <TapRow label="Auto-sell to NPC" onClick={() => run(() => api.autoNpcSale(characterName, item))} />
       <TapRow label="Mark for Deconstruction" onClick={() => run(() => api.markForDeconstruction(characterName, item, slot))} />
       <TapRow label="Auto-deconstruct" onClick={() => run(() => api.autoDeconstruct(characterName, item))} />
@@ -264,12 +287,15 @@ function InventoryActions({
 
       {others.length > 0 && (
         <>
-          <TapRow label="Give to..." onClick={() => toggle('give')} />
+          <TapRow label={deliveryTarget ? `Deliver to... · queued for ${deliveryTarget}` : 'Deliver to...'} onClick={() => toggle('give')} />
           {expanded === 'give' &&
             (canEquipOnDelivery
               ? others.map((other) => (
                   <div key={other} className="py-1 pl-4">
-                    <div className="py-1 text-xs text-muted-foreground">→ {other}</div>
+                    <div className="py-1 text-xs text-muted-foreground">
+                      → {other}
+                      {other === deliveryTarget ? ' ✓' : ''}
+                    </div>
                     <TapRow
                       label="  Don't equip"
                       onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other, equipOnDelivery: false }))}
@@ -281,7 +307,11 @@ function InventoryActions({
                   </div>
                 ))
               : others.map((other) => (
-                  <TapRow key={other} label={`  → ${other}`} onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other }))} />
+                  <TapRow
+                    key={other}
+                    label={`  → ${other}${other === deliveryTarget ? ' ✓' : ''}`}
+                    onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other }))}
+                  />
                 )))}
         </>
       )}

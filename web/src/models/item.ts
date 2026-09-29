@@ -18,6 +18,13 @@ export interface Item {
   m?: unknown // boolean | string | number
 }
 
+/** npc-sale.ts's `modified()`, ported verbatim - an NPC sale destroys an
+ *  upgrade/stat-scroll/shiny-variant investment permanently, so the
+ *  server refuses to sell one of these without `acknowledged: true`. */
+export function isModifiedItem(item: Item): boolean {
+  return Number(item.level ?? 0) > 0 || !!item.stat_type || !!item.p
+}
+
 export interface InventoryEntry {
   slot: number
   item: Item
