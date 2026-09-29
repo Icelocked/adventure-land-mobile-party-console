@@ -79,7 +79,7 @@ services:
   party-console-pwa:
     build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
-      - "100.125.193.9:8080:80"   # replace with YOUR Tailscale IP
+      - "100.64.1.5:8080:80"   # replace with YOUR Tailscale IP
     restart: unless-stopped
 ```
 
@@ -159,8 +159,8 @@ existing service from section 3b:
   party-console-pwa:
     build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
-      - "100.125.193.9:8080:80"    # replace with YOUR Tailscale IP
-      - "100.125.193.9:8443:443"   # same IP, HTTPS port
+      - "100.64.1.5:8080:80"    # replace with YOUR Tailscale IP
+      - "100.64.1.5:8443:443"   # same IP, HTTPS port
     volumes:
       - "C:/tailscale-certs:/etc/nginx/tailscale-certs:ro"   # replace with wherever you put the cert files (forward slashes even on Windows - YAML treats backslash as an escape character)
     restart: unless-stopped

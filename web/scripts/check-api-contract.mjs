@@ -29,7 +29,7 @@ const baseUrl = process.argv[2]
 const cookie = process.argv[3]
 if (!baseUrl) {
   console.error('Usage: node scripts/check-api-contract.mjs <server base URL> <party cookie value>')
-  console.error('Example: node scripts/check-api-contract.mjs http://100.125.193.9:3010 abc123...')
+  console.error('Example: node scripts/check-api-contract.mjs http://100.64.1.5:3010 abc123...')
   console.error('(get the cookie value from your browser devtools after pairing once normally)')
   process.exit(2)
 }
