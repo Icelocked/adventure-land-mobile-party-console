@@ -20,6 +20,38 @@ test('ItemActionPanel: a failed action shows its error and keeps the panel open'
   await expect(page.getByRole('button', { name: 'Mark for NPC Sale' })).toBeVisible()
 })
 
+test('ItemActionPanel: marking an item for upgrade shows a badge on its inventory slot', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 0 }] })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat', upgradeable: true })
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await page.getByTestId('inventory-slot-0').click()
+  // Regression: marking for upgrade used to produce zero visible feedback
+  // anywhere in the app (the wire fields for pending one-time marks were
+  // never modeled) - the panel just closed and nothing changed on screen.
+  await page.getByRole('button', { name: 'Mark for Upgrade', exact: true }).click()
+  await page.getByRole('button', { name: /^\+0 → \+1 /, exact: false }).click()
+
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('+0 → +1')
+})
+
+test('ItemActionPanel: marking an item for compounding shows a badge on its inventory slot', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'ringo', level: 0 }] })
+  server.addCatalogEntry({ id: 'ringo', name: 'Ring of Luck', compoundable: true })
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Mark for Compound', exact: true }).click()
+
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('+0 → +1')
+})
+
 test('Hunt settings: Clear all requires confirmation before it actually clears the blacklist', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

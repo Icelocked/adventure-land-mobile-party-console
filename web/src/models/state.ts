@@ -258,6 +258,37 @@ export interface BankMark {
   auto?: boolean
 }
 
+/** One pending, one-time upgrade-pass mark (state.upgrades[character]) -
+ *  distinct from autoUpgradeMarks' standing per-level-range rules: this is
+ *  a live in-flight upgrade attempt on one specific item instance. `slot`
+ *  is a number for an inventory item, the equipment slot name (string)
+ *  when `equipped` is true. */
+export interface UpgradeMark {
+  slot?: number | string
+  item: Item
+  tiers?: number
+  auto?: boolean
+  equipped?: boolean
+}
+
+/** One pending compound-pass mark (state.compounds[character][].items) -
+ *  compounding always advances exactly one tier per pass. */
+export type CompoundMark = UpgradeMark
+
+/** state.compounds[character] groups the copies being compounded together
+ *  under one id - see compound-group.tsx. */
+export interface CompoundGroup {
+  id: string
+  name: string
+  items: CompoundMark[]
+}
+
+/** One pending stat-scroll mark (state.statScrolls[character]). */
+export interface StatScrollMark extends UpgradeMark {
+  statType: string
+  scroll: string
+}
+
 /** One pending bank-withdrawal request, queued for a specific character
  *  (usually the merchant) to collect on their next bank visit - the wire
  *  source of truth `state.withdrawals` in the coordinator, distinct from
@@ -386,6 +417,11 @@ export interface PartyStateDynamic {
   // Both keyed by character, then by autoMarkRuleKey(item).
   autoItemMarks: Record<string, Record<string, string>>
   autoUpgradeMarks: Record<string, Record<string, unknown>>
+  // Pending one-time inventory marks (not standing rules) - see UpgradeMark/
+  // CompoundGroup/StatScrollMark above.
+  upgrades: Record<string, UpgradeMark[]>
+  compounds: Record<string, CompoundGroup[]>
+  statScrolls: Record<string, StatScrollMark[]>
   bankboiPrefix: string
   // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
   anniversaryAutoChat: boolean
@@ -511,6 +547,9 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   deconstructionCatalog: {},
   autoItemMarks: {},
   autoUpgradeMarks: {},
+  upgrades: {},
+  compounds: {},
+  statScrolls: {},
   bankboiPrefix: '',
   anniversaryAutoChat: false,
   goldTargets: {},

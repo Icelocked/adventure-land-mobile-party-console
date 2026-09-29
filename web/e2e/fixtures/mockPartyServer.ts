@@ -79,6 +79,11 @@ export class MockPartyServer {
 
   // Auto-mark state, mutated by POSTed commands - mirrors PartyStateDynamic's shape.
   autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
+  // Pending one-time inventory marks (not standing rules), keyed by
+  // character - mirrors state.upgrades/compounds/statScrolls.
+  upgrades: Record<string, { slot?: number | string; item: MockItem; tiers?: number; equipped?: boolean }[]> = {}
+  compounds: Record<string, { id: string; name: string; items: { slot?: number | string; item: MockItem }[] }[]> = {}
+  statScrolls: Record<string, { slot?: number | string; item: MockItem; statType: string }[]> = {}
 
   /** One-shot error injection for error-path tests: set
    *  `failOnce['merchant/bid'] = 'Stand is full'` before triggering the
@@ -128,6 +133,9 @@ export class MockPartyServer {
         exchangeable: this.exchangeable,
       },
       autoNpcSales: this.autoNpcSales,
+      upgrades: this.upgrades,
+      compounds: this.compounds,
+      statScrolls: this.statScrolls,
       withdrawals: this.withdrawals,
       deconstructionCatalog: this.deconstructionCatalog,
       bestiaryCatalog: this.bestiaryCatalog,
@@ -352,6 +360,24 @@ export class MockPartyServer {
     }
     if (path === 'realm/switch') {
       this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, ...(body.setHome ? { homeRealm: body.realm } : {}) }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'command' && body.type === 'upgrade-mark') {
+      const character = String(body.character)
+      const pending = (this.upgrades[character] ??= [])
+      pending.push({ slot: body.slot as number | string | undefined, item: body.item as MockItem, tiers: Number(body.tiers) || 1, equipped: body.equipped === true })
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'command' && body.type === 'compound-mark') {
+      const character = String(body.character)
+      const group = (this.compounds[character] ??= [])
+      group.push({ id: `compound-${group.length + 1}`, name: (body.item as MockItem).name, items: [{ slot: body.slot as number | string | undefined, item: body.item as MockItem }] })
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'command' && body.type === 'stat-scroll-mark') {
+      const character = String(body.character)
+      const pending = (this.statScrolls[character] ??= [])
+      pending.push({ slot: body.slot as number | string | undefined, item: body.item as MockItem, statType: String(body.statType) })
       return { status: 200, json: { ok: true } }
     }
     if (path === 'command' && body.type === 'upgrade-offering-rule') {

@@ -1,9 +1,12 @@
-import type { BankMark } from '@/models'
+import type { BankMark, CompoundGroup, StatScrollMark, UpgradeMark } from '@/models'
 
 /** What (if anything) to overlay on one inventory slot's icon, ported
  *  from ui/itemicon/MarkBadge.kt: an "Auto X" pill for a rule-generated
- *  mark, "Mark for X" for a manual one-off mark. Merchant marks take
- *  visual priority when a slot somehow has both. */
+ *  mark, "Mark for X" for a manual one-off mark. Stat scroll/upgrade/
+ *  compound marks take visual priority over bank/merchant holds, matching
+ *  item-action-banner.ts's real priority table (those always outrank a
+ *  bank/merchant hold there too) - merchant still beats bank when both
+ *  are somehow set, an existing decision this doesn't change. */
 export interface MarkBadgeInfo {
   label: string
   color: string
@@ -11,8 +14,33 @@ export interface MarkBadgeInfo {
 
 const BANK_COLOR = '#D9A441'
 const MERCHANT_COLOR = '#9E7BFF'
+const STAT_COLOR = '#38BDF8'
+const UPGRADE_COLOR = '#A78BFA'
+const COMPOUND_COLOR = '#E879F9'
 
-export function markBadgeFor(slot: number, merchantMarks: BankMark[], bankMarks: BankMark[]): MarkBadgeInfo | null {
+function upgradeLabel(mark: UpgradeMark): string {
+  const start = Number(mark.item.level ?? 0)
+  const target = start + Number(mark.tiers || 1)
+  return mark.auto ? `Auto → +${target}` : `+${start} → +${target}`
+}
+
+export function markBadgeFor(
+  slot: number | string,
+  merchantMarks: BankMark[],
+  bankMarks: BankMark[],
+  statScrollMarks: StatScrollMark[] = [],
+  upgradeMarks: UpgradeMark[] = [],
+  compoundGroups: CompoundGroup[] = [],
+): MarkBadgeInfo | null {
+  const stat = statScrollMarks.find((mark) => mark.slot === slot)
+  if (stat) return { label: `Stat scroll → ${stat.statType.toUpperCase()}`, color: STAT_COLOR }
+  const upgrade = upgradeMarks.find((mark) => mark.slot === slot)
+  if (upgrade) return { label: upgradeLabel(upgrade), color: UPGRADE_COLOR }
+  const compound = compoundGroups.flatMap((group) => group.items).find((mark) => mark.slot === slot)
+  if (compound) {
+    const level = Number(compound.item.level ?? 0)
+    return { label: `+${level} → +${level + 1}`, color: COMPOUND_COLOR }
+  }
   const merchant = merchantMarks.find((mark) => mark.slot === slot)
   if (merchant) return { label: merchant.auto ? 'Auto merchant' : 'Mark for merchant', color: MERCHANT_COLOR }
   const bank = bankMarks.find((mark) => mark.slot === slot)
