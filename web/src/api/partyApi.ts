@@ -215,9 +215,11 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/deconstruction/mark, triggered by `pack` being
-   *  present - marks a bank item for scrap without withdrawing it first. */
-  async markBankItemForDeconstruction(item: Item, pack: string, slot: number): Promise<ApiResult<CommandResult>> {
-    return this.post('deconstruction/mark', { item, pack, slot })
+   *  present - marks a bank item for scrap without withdrawing it first.
+   *  `all` marks every matching item across every bank pack/BankBoi, not
+   *  just this one slot (bank-deconstruction.ts's matchingTargets). */
+  async markBankItemForDeconstruction(item: Item, pack: string, slot: number, all = false): Promise<ApiResult<CommandResult>> {
+    return this.post('deconstruction/mark', { item, pack, slot, all })
   }
 
   async markForDeconstruction(character: string, item: Item, slot: number, remove = false): Promise<ApiResult<CommandResult>> {

@@ -28,6 +28,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
   server.bankGold = 100
   server.bankPacks = { items1: [{ slot: 0, item: { name: 'wcoat', level: 0 } }] }
+  server.deconstructionCatalog = { wcoat: { compound: false } }
   server.craftable = [{ id: 'ironsword', name: 'Iron Sword', cost: 100, materials: [{ id: 'ironore', name: 'Iron Ore', quantity: 3, level: 0 }] }]
   server.mailMessages = [{ id: 'mail-1', from: 'Warriorname', subject: 'Loot', item: { name: 'wcoat' }, taken: false }]
   await server.install(page)
@@ -63,7 +64,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByRole('button', { name: 'Inspect Bank' }).click()
   await expect(page.getByText('Wolf Coat')).toBeVisible()
   await page.getByText('Wolf Coat').click()
-  await page.getByRole('button', { name: 'Deconstruct' }).click()
+  await page.getByRole('button', { name: 'Mark for deconstruction' }).click()
   await expect(page.getByText('No bank data yet.')).not.toBeVisible() // pack stays, just empties
   await expect(page.getByText('Wolf Coat')).not.toBeVisible()
 

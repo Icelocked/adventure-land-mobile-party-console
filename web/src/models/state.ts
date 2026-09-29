@@ -130,10 +130,15 @@ export interface ActivityEntry {
 
 /** One of the merchant's own 16 stand listing slots (stand-sheet.tsx).
  *  `slot` is the merchant's own INVENTORY slot the item occupies while
- *  listed - distinct from `tradeSlot` (the stand UI position, unused). */
+ *  listed - distinct from `tradeSlot` (the stand UI position, unused).
+ *  `bankPack`/`bankSlot` are set instead of `slot` when the listing was
+ *  marked directly from a bank item rather than a carried one - this is
+ *  how BankScreen tells whether a given bank slot is already listed. */
 export interface StandListing {
   id?: string
   slot?: number
+  bankPack?: string
+  bankSlot?: number
   item: Item
   price: number
   quantity: number
@@ -253,6 +258,35 @@ export interface BankMark {
   auto?: boolean
 }
 
+/** One pending bank-withdrawal request, queued for a specific character
+ *  (usually the merchant) to collect on their next bank visit - the wire
+ *  source of truth `state.withdrawals` in the coordinator, distinct from
+ *  BankMark. Requesting the SAME {pack,slot,item} again toggles it back
+ *  off server-side (see transfer-commands.ts's removingWithdrawal) -
+ *  there is no separate "unmark" request shape. */
+export interface WithdrawalRequest {
+  pack: string
+  slot: number
+  item: Item
+}
+
+/** deconstruction.ts's DeconstructionCatalog, keyed by internal item id -
+ *  whether an item CAN be deconstructed at all (and, for compoundable
+ *  items, that its level is > 0) is a real server-side rule, not
+ *  something safe to assume for every item shown in the bank. */
+export interface DeconstructionCatalogEntry {
+  compound: boolean
+  cost?: number
+  rewards?: { name: string; quantity: number; chance: number }[]
+}
+export type DeconstructionCatalog = Record<string, DeconstructionCatalogEntry>
+
+/** deconstruction.ts's canDeconstruct, ported verbatim. */
+export function canDeconstruct(item: Item, catalog: DeconstructionCatalog): boolean {
+  const entry = catalog[item.name]
+  return !!entry && !item.l && !item.b && (!entry.compound || Number(item.level) > 0)
+}
+
 /** The rule-key format both autoItemMarks and autoUpgradeMarks use:
  *  "{item.name}@+{level or 0}" - see automatic-commerce-rule-key.ts. */
 export const autoMarkRuleKey = (item: Item): string => `${item.name}@+${item.level ?? 0}`
@@ -345,6 +379,10 @@ export interface PartyStateDynamic {
   standSearch: StandSearchState
   marked: Record<string, BankMark[]>
   merchantMarked: Record<string, BankMark[]>
+  // Pending bank-withdrawal requests, keyed by the character who will
+  // collect them (usually the merchant) - see WithdrawalRequest.
+  withdrawals: Record<string, WithdrawalRequest[]>
+  deconstructionCatalog: DeconstructionCatalog
   // Both keyed by character, then by autoMarkRuleKey(item).
   autoItemMarks: Record<string, Record<string, string>>
   autoUpgradeMarks: Record<string, Record<string, unknown>>
@@ -469,6 +507,8 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   standSearch: emptyStandSearchState(),
   marked: {},
   merchantMarked: {},
+  withdrawals: {},
+  deconstructionCatalog: {},
   autoItemMarks: {},
   autoUpgradeMarks: {},
   bankboiPrefix: '',
