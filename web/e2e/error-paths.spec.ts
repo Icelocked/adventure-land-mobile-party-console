@@ -52,6 +52,28 @@ test('ItemActionPanel: marking an item for compounding shows a badge on its inve
   await expect(page.getByTestId('inventory-slot-0')).toContainText('+0 → +1')
 })
 
+test('ItemActionPanel: a stale mark for an emptied/replaced slot does not badge the wrong item', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [null, { name: 'wcoat', level: 0 }] })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  server.addCatalogEntry({ id: 'ringo', name: 'Ring of Luck' })
+  // Simulate marks left over from BEFORE the inventory changed - slot 0
+  // is empty now, slot 1 holds a totally different item than when it was
+  // marked. A slot-number-only match would badge the empty slot AND the
+  // wrong item as "Deconstruction" - matching by item identity too must
+  // rule both out.
+  server.deconstructionMarks = [
+    { id: 'stale-1', owner: 'Merchantina', slot: 0, item: { name: 'ringo', level: 0 }, quantity: 1, state: 'collecting' },
+    { id: 'stale-2', owner: 'Merchantina', slot: 1, item: { name: 'ringo', level: 3 }, quantity: 1, state: 'collecting' },
+  ]
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await expect(page.getByTestId('inventory-slot-0')).not.toContainText('Deconstruction')
+  await expect(page.getByTestId('inventory-slot-1')).not.toContainText('Deconstruction')
+})
+
 test('ItemActionPanel: marking an item for NPC sale shows a badge on its inventory slot', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
