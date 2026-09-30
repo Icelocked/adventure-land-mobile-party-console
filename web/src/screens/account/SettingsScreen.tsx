@@ -5,6 +5,7 @@ import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
+import { applyPendingUpdate, checkForUpdate, subscribeUpdateStatus, type UpdateStatus } from '@/lib/serviceWorkerUpdate'
 import type { RosterMember } from '@/models'
 
 /** Ports hosting-settings.tsx (pairing toggle), account-settings.tsx
@@ -101,6 +102,8 @@ export function SettingsScreen() {
             Change server address
           </Button>
         </div>
+
+        <AppUpdateSection />
 
         {dynamicState.realmControl && (
           <div className="rounded-md border border-border bg-card p-4">
@@ -285,6 +288,42 @@ function ALDataSection() {
         plaintext - never reuse a password. Allow about a minute, then check status.
       </p>
       {(error ?? aldata?.error) && <p className="mt-2 text-xs text-destructive">{error ?? aldata?.error}</p>}
+    </div>
+  )
+}
+
+/** Installed as a home-screen app, there's no browser chrome at all - no
+ *  URL bar, no hard-refresh, no way to clear site data. This is the only
+ *  way to force a stuck service worker to check for a newer build without
+ *  uninstalling and reinstalling the app. */
+function AppUpdateSection() {
+  const [status, setStatus] = useState<UpdateStatus>('idle')
+  useEffect(() => subscribeUpdateStatus(setStatus), [])
+
+  const label =
+    status === 'checking'
+      ? 'Checking…'
+      : status === 'available'
+        ? 'Update found'
+        : status === 'upToDate'
+          ? 'Up to date'
+          : status === 'unsupported'
+            ? 'Not supported in this browser'
+            : 'Check for updates'
+
+  return (
+    <div className="rounded-md border border-border bg-card p-4">
+      <div className="mb-1 text-sm font-medium">App updates</div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        An installed home-screen app has no browser address bar to force-refresh from - use this instead if something looks stale.
+      </p>
+      {status === 'available' ? (
+        <Button onClick={applyPendingUpdate}>Reload to update</Button>
+      ) : (
+        <Button variant="outline" disabled={status === 'checking'} onClick={() => void checkForUpdate()}>
+          {label}
+        </Button>
+      )}
     </div>
   )
 }
