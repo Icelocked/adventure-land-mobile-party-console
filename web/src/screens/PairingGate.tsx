@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
  *  depends on live data sits on an unexplained "connecting" spinner with
  *  no indication that pairing - not the network - is what's blocking it. */
 
-type Status = 'checking' | 'paired' | 'unpaired'
+type Status = 'checking' | 'paired' | 'unpaired' | 'unreachable'
 
 function extractToken(input: string): string {
   const trimmed = input.trim()
@@ -35,7 +35,14 @@ export function PairingGate({ children }: { children: ReactNode }) {
     setStatus('checking')
     const api = new PartyApiClient(loadServerSettings())
     const result = await api.getRoot('setup/state')
-    setStatus(result.kind === 'success' ? 'paired' : 'unpaired')
+    // A real response (even a 401) means the server itself said "you're
+    // not paired" - show the re-pair flow. No response at all (network
+    // error, timeout, the request getting blocked before it ever reaches
+    // the server) is a DIFFERENT problem that re-pairing can't fix, and
+    // showing the same screen for both was actively misleading - see the
+    // corporate-network incident this screen was built to stop repeating.
+    if (result.kind === 'success') setStatus('paired')
+    else setStatus(result.status !== undefined ? 'unpaired' : 'unreachable')
   }
 
   useEffect(() => {
@@ -129,6 +136,20 @@ export function PairingGate({ children }: { children: ReactNode }) {
   }
   if (status === 'paired') {
     return <>{children}</>
+  }
+  if (status === 'unreachable') {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-4 p-6 text-center">
+        <h1 className="text-xl font-semibold">Can't reach the server</h1>
+        <p className="text-sm text-muted-foreground">
+          This device is still paired - the app just couldn't get a response from the server on this network. Check your connection (some
+          networks block this kind of traffic) and try again.
+        </p>
+        <Button className="w-full" onClick={() => void checkPaired()}>
+          Retry
+        </Button>
+      </div>
+    )
   }
 
   return (
