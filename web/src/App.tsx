@@ -6,6 +6,7 @@ import { loadServerSettings, saveServerSettings, clearServerSettings, SAME_ORIGI
 import { ServerSettingsDialogContext } from '@/lib/ServerSettingsDialogContext'
 import { PairingGate } from '@/screens/PairingGate'
 import { ActionToastHost } from '@/components/ActionToastHost'
+import { UpdateBanner } from '@/components/UpdateBanner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CharacterListScreen } from '@/screens/CharacterListScreen'
@@ -34,6 +35,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ActionToastHost />
+      <UpdateBanner />
       <PairingGate>
         <PartyDataProvider settings={settings} key={settings.baseUrl}>
           <ServerSettingsDialogContext.Provider value={() => setShowOverride(true)}>

@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
+test('Settings: App updates section can check for an update without erroring', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  await server.install(page)
+
+  await page.goto('/settings')
+  // Installed as a home-screen app, there's no browser chrome to force-
+  // refresh from at all - this button is the only in-app escape hatch
+  // for a stuck service worker.
+  await page.getByRole('button', { name: 'Check for updates' }).click()
+  await expect(page.getByRole('button', { name: /Checking…|Up to date/ })).toBeVisible()
+})
+
 test('Market: buying an ALData listing submits the order', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
