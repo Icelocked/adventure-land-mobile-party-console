@@ -73,7 +73,11 @@ export function PairingGate({ children }: { children: ReactNode }) {
     const result = await api.postRoot('setup/pair', { token })
     setSubmitting(false)
     if (result.kind === 'failure') {
-      setError("That pairing link didn't work - generate a new one from an already-paired browser and try again")
+      setError(
+        result.status !== undefined
+          ? result.message
+          : "Couldn't reach the server to pair - check your connection and try again",
+      )
       return
     }
     stopScan()
