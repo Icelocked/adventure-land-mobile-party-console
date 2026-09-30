@@ -324,6 +324,30 @@ export interface StatScrollMark extends UpgradeMark {
   scroll: string
 }
 
+/** One inventory slot's accumulated upgrade-roll evidence, mirrored from
+ *  runtime/lucky-slot-tracking.ts's SlotRollStatistics - the server rotates
+ *  automatic upgrades through the merchant's 42 slots and records where the
+ *  underlying roll landed, since a handful of AL private-server slots carry
+ *  a hidden bonus to upgrade success chance ("lucky slots"). Never a
+ *  verified private-server fact by itself, just evidence for comparison. */
+export interface SlotRollStatistics {
+  totalRolls: number
+  sumRolls: number
+  rollsAbove96_3: number
+  perfectRolls: number
+}
+
+/** One evidence stream's full slot table (state.luckySlotTracking[character]
+ *  is a Record of these, keyed by an opaque stream id - each client/session
+ *  keeps its own durable stream so restarts and multiple clients never
+ *  double-count or drop rolls; aggregateSlotTracking sums them for display). */
+export interface LuckySlotTracking {
+  version: 1
+  streamId?: string
+  slots: Record<string, SlotRollStatistics>
+}
+export type LuckySlotStreams = Record<string, LuckySlotTracking>
+
 /** One pending bank-withdrawal request, queued for a specific character
  *  (usually the merchant) to collect on their next bank visit - the wire
  *  source of truth `state.withdrawals` in the coordinator, distinct from
@@ -486,6 +510,11 @@ export interface PartyStateDynamic {
   deconstructionMarks: DeconstructionMark[]
   // Keyed by the RECIPIENT's name - see MerchantDelivery above.
   merchantDeliveries: Record<string, MerchantDelivery[]>
+  // Lucky-upgrade-slot evidence, both keyed by character - see
+  // SlotRollStatistics/LuckySlotTracking above. luckyUpgradeSlots holds
+  // the inferred/verified slot number once confidence is high enough.
+  luckyUpgradeSlots: Record<string, number>
+  luckySlotTracking: Record<string, LuckySlotStreams>
   bankboiPrefix: string
   // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
   anniversaryAutoChat: boolean
@@ -617,6 +646,8 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   npcSaleMarks: [],
   deconstructionMarks: [],
   merchantDeliveries: {},
+  luckyUpgradeSlots: {},
+  luckySlotTracking: {},
   bankboiPrefix: '',
   anniversaryAutoChat: false,
   goldTargets: {},

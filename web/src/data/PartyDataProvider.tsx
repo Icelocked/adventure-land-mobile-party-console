@@ -27,6 +27,12 @@ import { QK } from './queryKeys'
 const DYNAMIC_STATE_POLL_MS = 6_000
 const ROSTER_RETRY_DELAY_MS = 2_000
 const ROSTER_RETRY_ATTEMPTS = 3
+// The item/monster/skill catalog barely ever changes mid-session (it's
+// the account's own static game data) but used to be re-sent in full on
+// every 6s poll alongside everything else - by far the biggest single
+// contributor to a slow-network poll's size. Fetched once at startup,
+// then just re-checked on this much slower cadence instead.
+const CATALOG_REFRESH_MS = 10 * 60_000
 
 const REQUIRED_VITALS_FIELDS = ['hp', 'max_hp', 'mp', 'max_mp', 'gold', 'map', 'x', 'y', 'rip'] as const
 
@@ -80,30 +86,90 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   const api = useMemo(() => new PartyApiClient(settings), [settings])
   const rosterRef = useRef<Record<string, RosterMember>>({})
 
+  // Whether the catalog has been fetched at all yet this session - the
+  // first dynamic-state poll triggers an immediate catalog fetch if not;
+  // after that it only refreshes on the slow CATALOG_REFRESH_MS timer.
+  const catalogFetchedRef = useRef(false)
+
+  const refreshCatalogNow = useMemo(
+    () => async () => {
+      const result = await api.get('state?section=catalog')
+      if (result.kind === 'success') {
+        const parsed = JSON.parse(result.value) as Partial<PartyStateDynamic>
+        catalogFetchedRef.current = true
+        queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({
+          ...emptyPartyStateDynamic(),
+          ...(current ?? {}),
+          ...parsed,
+        }))
+      }
+    },
+    [api, queryClient],
+  )
+
   const refreshDynamicStateNow = useMemo(
     () => async () => {
-      const stateResult = await api.get('state')
-      if (stateResult.kind === 'success') {
-        const parsed = JSON.parse(stateResult.value) as Partial<PartyStateDynamic>
-        queryClient.setQueryData(QK.dynamicState, { ...emptyPartyStateDynamic(), ...parsed })
+      // Split into several small section-scoped requests run in PARALLEL
+      // instead of one large payload fetched sequentially with everything
+      // else - on a slow/high-latency connection, four sequential round
+      // trips compound badly (each one waits for the last to finish
+      // before it even starts), while parallel requests overlap. The big
+      // item/monster/skill catalog is deliberately excluded from this
+      // cycle entirely - see refreshCatalogNow.
+      const escapeStart = performance.now()
+      const [coreResult, bankResult, marketResult, logsResult, mailResult, escapeResult] = await Promise.all([
+        api.get('state?section=core'),
+        api.get('state?section=bank'),
+        api.get('state?section=market'),
+        api.get('state?catalog=0&dashboard=1&section=logs'),
+        api.get('mail'),
+        api.get('escape'),
+      ])
+      // `escape` is the smallest of these (usually just `{escape:null}`),
+      // so its round trip is dominated by real network latency rather
+      // than payload transfer time - a reasonable, zero-extra-request
+      // proxy for "how slow does this connection feel right now".
+      if (escapeResult.kind === 'success') queryClient.setQueryData(QK.latencyMs, Math.round(performance.now() - escapeStart))
+
+      if (coreResult.kind === 'success' || bankResult.kind === 'success' || marketResult.kind === 'success' || logsResult.kind === 'success') {
+        const core = coreResult.kind === 'success' ? (JSON.parse(coreResult.value) as Partial<PartyStateDynamic>) : {}
+        const bank = bankResult.kind === 'success' ? (JSON.parse(bankResult.value) as Partial<PartyStateDynamic>) : {}
+        const market = marketResult.kind === 'success' ? (JSON.parse(marketResult.value) as Partial<PartyStateDynamic>) : {}
+        const logs =
+          logsResult.kind === 'success'
+            ? (JSON.parse(logsResult.value) as { combatLogs?: PartyStateDynamic['combatLogs']; merchantActivity?: PartyStateDynamic['merchantActivity'] })
+            : {}
+        // Merge onto whatever's already cached rather than resetting to
+        // empty each time - now that the response is assembled from
+        // several independent requests, one of them failing (a dropped
+        // packet, a timeout) shouldn't wipe out the others' still-valid
+        // data for this cycle.
+        queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({
+          ...emptyPartyStateDynamic(),
+          ...(current ?? {}),
+          ...core,
+          ...bank,
+          ...market,
+          ...(logs.combatLogs ? { combatLogs: logs.combatLogs } : {}),
+          ...(logs.merchantActivity ? { merchantActivity: logs.merchantActivity } : {}),
+        }))
       }
-      const mailResult = await api.get('mail')
+      if (!catalogFetchedRef.current) void refreshCatalogNow()
+
       if (mailResult.kind === 'success') {
         const parsed = JSON.parse(mailResult.value) as Partial<MailSnapshot>
         queryClient.setQueryData(QK.mail, { messages: [], count: 0, ...parsed })
       }
-      const logsResult = await api.get('state?catalog=0&dashboard=1&section=logs')
       if (logsResult.kind === 'success') {
         const parsed = JSON.parse(logsResult.value) as { gameLogs?: Record<string, GameLogEntry[]> }
         queryClient.setQueryData(QK.gameLogs, parsed.gameLogs ?? {})
       }
-      const escapeResult = await api.get('escape')
       if (escapeResult.kind === 'success') {
         const parsed = JSON.parse(escapeResult.value) as { escape?: EscapeStatus | null }
         queryClient.setQueryData(QK.escape, parsed.escape ?? null)
       }
     },
-    [api, queryClient],
+    [api, queryClient, refreshCatalogNow],
   )
 
   // Roster fetch (name/ctype/level) - relatively static, fetched once
@@ -164,6 +230,22 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     }
   }, [refreshDynamicStateNow])
 
+  // Catalog - see CATALOG_REFRESH_MS. Runs on its own much slower timer,
+  // independent of the main poll above.
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      while (!cancelled) {
+        await new Promise((resolve) => setTimeout(resolve, CATALOG_REFRESH_MS))
+        if (!cancelled) await refreshCatalogNow()
+      }
+    }
+    void poll()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshCatalogNow])
+
   // Live SSE connection - character vitals/inventory + connection health.
   useEffect(() => {
     const handleEvent = (event: LiveEvent) => {
@@ -219,3 +301,6 @@ export const useDynamicState = (): PartyStateDynamic => useCachedValue(QK.dynami
 export const useMail = (): MailSnapshot => useCachedValue(QK.mail, { messages: [], count: 0 })
 export const useGameLogs = (): Record<string, GameLogEntry[]> => useCachedValue(QK.gameLogs, {})
 export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.escape, null)
+/** Round-trip time of the smallest request in the last dynamic-state poll
+ *  cycle (see refreshDynamicStateNow) - null until the first poll lands. */
+export const useLatencyMs = (): number | null => useCachedValue(QK.latencyMs, null)

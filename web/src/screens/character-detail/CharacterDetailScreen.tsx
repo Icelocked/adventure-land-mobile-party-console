@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { LatencyBadge } from '@/components/LatencyBadge'
 import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { VitalsHeader } from './VitalsHeader'
@@ -15,6 +16,7 @@ import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
 import { GoldTargetSection } from './sections/GoldTargetSection'
 import { AutoMarksSection } from './sections/AutoMarksSection'
+import { LuckySlotSection } from './sections/LuckySlotSection'
 import { AccountMenu } from './AccountMenu'
 import { ItemActionPanel, type ItemActionTarget } from '@/screens/itempanel/ItemActionPanel'
 
@@ -46,6 +48,7 @@ export function CharacterDetailScreen() {
         </Button>
         <span className="font-medium">{name}</span>
         <div className="flex items-center gap-2">
+          <LatencyBadge />
           <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
           </Button>
@@ -101,6 +104,9 @@ export function CharacterDetailScreen() {
                 itemCollectionThreshold={dynamicState.itemCollectionThreshold}
                 bankSortMode={dynamicState.bankSortMode}
               />
+            )}
+            {vitals.ctype === 'merchant' && (
+              <LuckySlotSection characterName={name} streams={dynamicState.luckySlotTracking[name] ?? {}} verified={dynamicState.luckyUpgradeSlots[name]} />
             )}
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}

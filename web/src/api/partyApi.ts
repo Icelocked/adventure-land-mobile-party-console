@@ -1,5 +1,6 @@
 import type { Item, StandSearchListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
+import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 
 export interface CommandResult {
   ok: boolean
@@ -98,10 +99,22 @@ export class PartyApiClient {
   }
 
   async postRoot(path: string, body: unknown): Promise<ApiResult<string>> {
-    return postJson(this.rootUrl(path), body)
+    const toastId = beginActionToast()
+    const result = await postJson(this.rootUrl(path), body)
+    resolveActionToast(toastId, result.kind === 'success' ? 'sent' : 'failed', result.kind === 'failure' ? result.message : undefined)
+    return result
   }
 
+  /** Every mutating action in the app funnels through this one method, so
+   *  it's the single instrumentation point for "did my tap register" -
+   *  see lib/actionToast.ts. On a slow/lossy connection a tap could take
+   *  10-15 seconds to actually reach the server with zero visible change
+   *  in between, which reads as "the app is broken" rather than "the
+   *  network is slow" - this gives an immediate, guaranteed acknowledgment
+   *  the moment the request is actually dispatched, independent of how
+   *  long the round trip itself ends up taking. */
   async post(path: string, body: unknown): Promise<ApiResult<CommandResult>> {
+    const toastId = beginActionToast()
     // Reads the body itself rather than going through postJson/getText,
     // which discard the response body on any non-2xx status - the server
     // sends a real CommandResult (with a real .error message) on plenty of
@@ -120,11 +133,17 @@ export class PartyApiClient {
       const text = await response.text()
       if (!response.ok) {
         const parsed = parseCommandResult(text)
-        return fail(parsed.error ?? `HTTP ${response.status}`)
+        const message = parsed.error ?? `HTTP ${response.status}`
+        resolveActionToast(toastId, 'failed', message)
+        return fail(message)
       }
-      return ok(parseCommandResult(text))
+      const parsed = parseCommandResult(text)
+      resolveActionToast(toastId, parsed.ok === false ? 'failed' : 'sent', parsed.error)
+      return ok(parsed)
     } catch (error) {
-      return fail(errorMessage(error))
+      const message = errorMessage(error)
+      resolveActionToast(toastId, 'failed', message)
+      return fail(message)
     }
   }
 

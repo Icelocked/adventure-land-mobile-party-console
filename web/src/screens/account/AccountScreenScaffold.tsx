@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { LatencyBadge } from '@/components/LatencyBadge'
 
 /** Shared shell for every account-wide screen (mail/bestiary/skills/
  *  stand/market/bank/logs/settings/catalog) - ported from ui/account/
@@ -16,13 +17,16 @@ export function AccountScreenScaffold({ title, onRefresh, children }: { title: s
           <ArrowLeft className="size-5" />
         </Button>
         <span className="font-medium">{title}</span>
-        {onRefresh ? (
-          <Button variant="ghost" size="icon-sm" onClick={onRefresh} aria-label="Refresh">
-            <RefreshCw className="size-4" />
-          </Button>
-        ) : (
-          <span className="size-5" />
-        )}
+        <div className="flex items-center gap-2">
+          <LatencyBadge />
+          {onRefresh ? (
+            <Button variant="ghost" size="icon-sm" onClick={onRefresh} aria-label="Refresh">
+              <RefreshCw className="size-4" />
+            </Button>
+          ) : (
+            <span className="size-5" />
+          )}
+        </div>
       </header>
       <div className="flex-1 pb-6">{children}</div>
     </div>

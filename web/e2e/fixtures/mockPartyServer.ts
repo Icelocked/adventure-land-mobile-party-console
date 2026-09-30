@@ -70,6 +70,9 @@ export class MockPartyServer {
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   huntSettings: Record<string, unknown> | null = null
   requirePairing = false
+  // Both keyed by character - mirrors state.luckyUpgradeSlots/luckySlotTracking.
+  luckyUpgradeSlots: Record<string, number> = {}
+  luckySlotTracking: Record<string, Record<string, { version: 1; slots: Record<string, { totalRolls: number; sumRolls: number; rollsAbove96_3: number; perfectRolls: number }> }>> = {}
   // Pending bank withdrawals, keyed by the collecting character (usually
   // the merchant) - mirrors the coordinator's own `state.withdrawals`.
   withdrawals: Record<string, { pack: string; slot: number; item: MockItem }[]> = {}
@@ -155,6 +158,8 @@ export class MockPartyServer {
       standBids: this.standBids,
       realmControl: this.realmControl,
       upgradeOfferingRules: this.upgradeOfferingRules,
+      luckyUpgradeSlots: this.luckyUpgradeSlots,
+      luckySlotTracking: this.luckySlotTracking,
       huntBlacklist: this.huntBlacklist,
       huntSettings: this.huntSettings,
       aldata: { listings: this.aldataListings },
@@ -570,7 +575,8 @@ export class MockPartyServer {
 
     await page.route('**/party-api/state**', (route) => {
       const url = new URL(route.request().url())
-      if (url.searchParams.get('section') === 'logs') return route.fulfill({ json: { gameLogs: {} } })
+      if (url.searchParams.get('section') === 'logs')
+        return route.fulfill({ json: { gameLogs: {}, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity } })
       return route.fulfill({ json: { roster: this.roster(), ...this.dynamicState() } })
     })
     await page.route('**/party-api/mail**', (route) => {

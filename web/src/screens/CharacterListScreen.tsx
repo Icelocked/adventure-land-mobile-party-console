@@ -6,6 +6,7 @@ import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
 import { Button } from '@/components/ui/button'
+import { LatencyBadge } from '@/components/LatencyBadge'
 import type { CharacterState } from '@/models'
 
 /** Party overview - ported from ui/characterlist/CharacterListScreen.kt:
@@ -28,6 +29,7 @@ export function CharacterListScreen() {
         <h1 className="text-lg font-semibold">Party</h1>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span>{accountGold.toLocaleString()}g</span>
+          <LatencyBadge />
           {!connected && <CloudOff className="size-4" aria-label="Disconnected" />}
           <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />

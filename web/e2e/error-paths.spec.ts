@@ -1,6 +1,32 @@
 import { test, expect } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
+test('Character detail: lucky slot section shows real test results, not just that testing is happening', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.luckySlotTracking = {
+    Merchantina: {
+      'stream-1': {
+        version: 1,
+        slots: {
+          '5': { totalRolls: 150, sumRolls: 12, rollsAbove96_3: 130, perfectRolls: 8 },
+          '12': { totalRolls: 20, sumRolls: 5, rollsAbove96_3: 2, perfectRolls: 0 },
+        },
+      },
+    },
+  }
+  server.luckyUpgradeSlots = { Merchantina: 5 }
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await expect(page.getByText('Verified slot: 5.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Show lucky slot data' }).click()
+  await expect(page.getByText('170 recorded upgrade rolls')).toBeVisible()
+  await expect(page.getByText('2/42 slots sampled')).toBeVisible()
+})
+
 test('ItemActionPanel: a failed action shows its error and keeps the panel open', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
