@@ -52,7 +52,19 @@ async function postJson(url: string, body: unknown): Promise<ApiResult<string>> 
       body: JSON.stringify(body),
     })
     const text = await response.text()
-    return response.ok ? ok(text) : fail(`HTTP ${response.status}`)
+    if (response.ok) return ok(text)
+    // The server sends a real {error: "..."} body on plenty of rejections
+    // (see authorize.ts's "Dashboard origin required", setup-routes.ts's
+    // pairing failures) - a bare "HTTP 403" was silently replacing that
+    // with no way for a caller to ever show the actual reason.
+    let message = `HTTP ${response.status}`
+    try {
+      const parsed = JSON.parse(text) as { error?: string }
+      if (parsed.error) message = parsed.error
+    } catch {
+      // body wasn't JSON - keep the bare HTTP status message
+    }
+    return fail(message, response.status)
   } catch (error) {
     return fail(errorMessage(error))
   }
