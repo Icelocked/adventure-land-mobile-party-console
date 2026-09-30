@@ -12,4 +12,5 @@ export const QK = {
   mail: ['mail'] as const,
   gameLogs: ['gameLogs'] as const,
   escape: ['escape'] as const,
+  latencyMs: ['latencyMs'] as const,
 }
