@@ -7,10 +7,15 @@ export interface CommandResult {
   error?: string
 }
 
-export type ApiResult<T> = { kind: 'success'; value: T } | { kind: 'failure'; message: string }
+// `status` is only present when the server actually answered (a real
+// HTTP response, even a 401/403) - absent means the request never got a
+// response at all (network error, timeout, connection blocked). Callers
+// that need to tell "the server said no" apart from "I couldn't reach
+// the server" - see PairingGate's checkPaired - rely on this distinction.
+export type ApiResult<T> = { kind: 'success'; value: T } | { kind: 'failure'; message: string; status?: number }
 
 const ok = <T>(value: T): ApiResult<T> => ({ kind: 'success', value })
-const fail = <T = never>(message: string): ApiResult<T> => ({ kind: 'failure', message })
+const fail = <T = never>(message: string, status?: number): ApiResult<T> => ({ kind: 'failure', message, status })
 
 // Bounded like the Android app's REST client (15s) - a request that
 // stalls after connecting (a network hiccup, a dropped Tailscale route)
@@ -33,7 +38,7 @@ async function getText(url: string): Promise<ApiResult<string>> {
   try {
     const response = await timedFetch(url)
     const text = await response.text()
-    return response.ok ? ok(text) : fail(`HTTP ${response.status}`)
+    return response.ok ? ok(text) : fail(`HTTP ${response.status}`, response.status)
   } catch (error) {
     return fail(errorMessage(error))
   }
