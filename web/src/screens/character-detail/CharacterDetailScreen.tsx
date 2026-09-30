@@ -47,7 +47,8 @@ export function CharacterDetailScreen() {
           <ArrowLeft className="size-5" />
         </Button>
         <span className="font-medium">{name}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>{accountGold.toLocaleString()}g</span>
           <LatencyBadge />
           <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
