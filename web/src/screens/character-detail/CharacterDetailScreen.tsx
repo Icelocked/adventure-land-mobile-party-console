@@ -80,7 +80,7 @@ export function CharacterDetailScreen() {
         <p className="p-6 text-sm text-muted-foreground">This character isn't reporting in right now.</p>
       ) : (
         <>
-          <VitalsHeader name={name} vitals={vitals} accountGold={accountGold} />
+          <VitalsHeader name={name} vitals={vitals} accountGold={accountGold} bestiaryCatalog={dynamicState.bestiaryCatalog} />
           <div className="flex-1 pb-6">
             <LeaderFollowerSection characterName={name} dynamicState={dynamicState} />
             <TravelSection

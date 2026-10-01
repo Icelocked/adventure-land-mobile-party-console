@@ -7,7 +7,7 @@ import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
-import type { CharacterState } from '@/models'
+import type { BestiaryMonster, CharacterState } from '@/models'
 
 /** Party overview - ported from ui/characterlist/CharacterListScreen.kt:
  *  class icon, level/class, HP/MP, one-line activity, gold carried per
@@ -51,7 +51,7 @@ export function CharacterListScreen() {
       ) : (
         <ul className="flex flex-col gap-2 p-3">
           {names.map((name) => (
-            <CharacterRow key={name} name={name} state={characters[name]} />
+            <CharacterRow key={name} name={name} state={characters[name]} bestiaryCatalog={dynamicState.bestiaryCatalog} />
           ))}
         </ul>
       )}
@@ -101,7 +101,7 @@ function PartyControls() {
   )
 }
 
-function CharacterRow({ name, state }: { name: string; state: CharacterState }) {
+function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: CharacterState; bestiaryCatalog: BestiaryMonster[] }) {
   const vitals = state.vitals
   const { Icon, color } = classLook(vitals?.ctype ?? '')
 
@@ -125,7 +125,7 @@ function CharacterRow({ name, state }: { name: string; state: CharacterState }) 
           </div>
           {vitals ? (
             <>
-              <div className={`truncate text-sm ${vitals.rip ? 'text-destructive' : 'text-muted-foreground'}`}>{activityLine(vitals)}</div>
+              <div className={`truncate text-sm ${vitals.rip ? 'text-destructive' : 'text-muted-foreground'}`}>{activityLine(vitals, bestiaryCatalog)}</div>
               <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                 <span>
                   HP {vitals.hp}/{vitals.max_hp}

@@ -207,7 +207,7 @@ function LiveCombatStatus({
       {target && (
         <div className="flex items-center gap-1.5 text-sm">
           <SpriteIcon sprite={targetMonster?.sprite} size={20} />
-          <span>Fighting {targetMonster?.name ?? target}</span>
+          <span>{targetMonster ? `Fighting ${targetMonster.name}` : 'Fighting'}</span>
         </div>
       )}
       {monsterHunt?.target && (

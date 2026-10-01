@@ -17,7 +17,10 @@ test('Character detail: shows the current target, active conditions, and the par
   await server.install(page)
 
   await page.goto('/characters/Ranger1')
-  await expect(page.getByText('Fighting Crabxx')).toBeVisible()
+  // Both the vitals header ("fighting Crabxx") and the Farming section's own
+  // combat-status line ("Fighting Crabxx") now resolve the same target name -
+  // exact+case-sensitive distinguishes the Farming section's capitalized one.
+  await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
   await expect(page.getByText(/Party Hunt: Crabxx.*Chasing the next spawn/)).toBeVisible()
   await expect(page.getByText(/Critical Strike.*1m/)).toBeVisible()
 })
@@ -95,6 +98,24 @@ test('Character detail: monster focus button shows what\'s actually selected, no
 
   await page.goto('/characters/Ranger1')
   await expect(page.getByRole('button', { name: 'Crabxx, Crab' })).toBeVisible()
+})
+
+test('Character list and vitals header never show the raw target id - resolved name when it matches the bestiary, plain "fighting" otherwise', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, target: 'crabx' }) // resolvable
+  server.addCharacter({ name: 'Ranger2', ctype: 'ranger', level: 45, target: '2951603' }) // raw per-instance id, like real game data
+  server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  await server.install(page)
+
+  await page.goto('/')
+  await expect(page.getByText('fighting Crabxx')).toBeVisible()
+  await expect(page.getByText('fighting', { exact: true })).toBeVisible()
+  await expect(page.getByText('2951603')).not.toBeVisible()
+
+  await page.goto('/characters/Ranger2')
+  await expect(page.getByText('fighting', { exact: true })).toBeVisible()
+  await expect(page.getByText('2951603')).not.toBeVisible()
 })
 
 test('Character detail: a merchant never shows combat/hunt status at all', async ({ page }) => {
