@@ -203,6 +203,76 @@ test('Route button opens the general farming-area picker and routes this charact
   })
 })
 
+test('An independent character (not the leader, not following) routes via character-travel, not party-monster-travel', async ({ page }) => {
+  // `canRouteToMonster` allows this (not just the leader), but the travel
+  // command type must still match: party-monster-travel is rejected
+  // server-side unless `name === state.leader` exactly (confirmed against
+  // runtime/coordinator/navigation/manual-commands.ts's partyTravel) - an
+  // independent, non-leader character needs character-travel instead, same
+  // as any other non-leader character.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
+  server.addCharacter({ name: 'Independent1', ctype: 'ranger', level: 50 })
+  server.leader = 'MainLeader'
+  server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  server.monsterChoices = [{ id: 'crabx', locations: [{ map: 'main', x: 50, y: 75 }] }]
+  server.monsterFocusByCharacter = { Independent1: ['crabx'] }
+  await server.install(page)
+
+  let submittedBody: Record<string, unknown> | null = null
+  await page.route('**/party-api/command', async (route) => {
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>
+    return route.fulfill({ json: { ok: true } })
+  })
+
+  await page.goto('/characters/Independent1')
+  await page.getByRole('button', { name: 'Find selected monster' }).click()
+  await page.getByRole('button', { name: /main \(50, 75\)/ }).click()
+  await page.getByRole('button', { name: 'Start farming' }).click()
+  expect(submittedBody).toEqual({
+    character: 'Independent1',
+    type: 'character-travel',
+    location: { map: 'main', x: 50, y: 75 },
+    farmingMonsterIds: ['crabx'],
+  })
+})
+
+test('Phoenix search order pre-fills from a previously saved order, not the computed default', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [{ id: 'phoenix', name: 'Phoenix', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  const locations = [
+    { map: 'main', x: 641, y: 1803 },
+    { map: 'cave', x: -180, y: -1164 },
+    { map: 'main', x: -1184, y: 781 },
+    { map: 'main', x: 1188, y: -193 },
+    { map: 'halloween', x: 8, y: 631 },
+  ]
+  server.monsterChoices = [{ id: 'phoenix', locations }]
+  server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  // The default order (anchors in farmingAreas.ts's defaultPhoenixOrder)
+  // starts with the main(641,1803) region; a saved order reversing that
+  // should show halloween(8,631) as region 1 instead if it's actually used.
+  server.phoenixRouteOrder = [
+    JSON.stringify(['halloween', [8, 631]]),
+    JSON.stringify(['main', [1188, -193]]),
+    JSON.stringify(['main', [-1184, 781]]),
+    JSON.stringify(['cave', [-180, -1164]]),
+    JSON.stringify(['main', [641, 1803]]),
+  ]
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Find selected monster' }).click()
+  await expect(page.getByText('Choose Phoenix search order')).toBeVisible()
+  // Region 1's badge should be on halloween(8,631), not the default order's main(641,1803).
+  const halloweenRegion = page.getByRole('button', { name: /halloween \(8, 631\)/ })
+  await expect(halloweenRegion.getByText('1', { exact: true })).toBeVisible()
+})
+
 test('Route button is disabled for a follower - only the leader can route to a monster', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
