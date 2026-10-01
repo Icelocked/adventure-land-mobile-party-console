@@ -33,6 +33,7 @@ export function FarmingAreaPicker({
   radius,
   busy,
   preparation,
+  savedPhoenixOrder,
   onCancel,
   onStart,
 }: {
@@ -45,16 +46,27 @@ export function FarmingAreaPicker({
   radius: number
   busy: boolean
   preparation?: boolean
+  /** state.phoenixRouteOrder - a previously-saved 5-region search order, reused
+   *  when it's still valid for the current areas rather than always falling
+   *  back to the computed default. */
+  savedPhoenixOrder?: string[]
   onCancel: () => void
   onStart: (area: FarmingArea, phoenixRouteOrder?: string[]) => void | Promise<void>
 }) {
-  const [search, setSearch] = useState('')
-  const [choice, setChoice] = useState<string | null>(null)
-  const [order, setOrder] = useState<string[]>([])
-  const [error, setError] = useState<string | null>(null)
-
   const phoenix = ids.includes('phoenix') && !preparation
   const areas = useMemo(() => farmingAreas(catalog, phoenix ? ['phoenix'] : ids), [catalog, ids, phoenix])
+
+  function startingOrder(candidateAreas: FarmingArea[]): string[] {
+    const saved = (savedPhoenixOrder || []).filter((id) => candidateAreas.some((a) => a.id === id))
+    return saved.length === 5 && new Set(saved).size === 5 ? saved : defaultPhoenixOrder(candidateAreas)
+  }
+
+  const [search, setSearch] = useState('')
+  const [choice, setChoice] = useState<string | null>(null)
+  // Lazy initializer (not a useEffect) so the saved order is seeded correctly
+  // on the very first render, not just when `ids` later changes.
+  const [order, setOrder] = useState<string[]>(() => (phoenix ? startingOrder(areas) : []))
+  const [error, setError] = useState<string | null>(null)
 
   // Reset the chosen area/order whenever the monster selection changes -
   // a previous choice may no longer even be a candidate.
@@ -63,7 +75,7 @@ export function FarmingAreaPicker({
   if (seenIdsKey !== idsKey) {
     setSeenIdsKey(idsKey)
     setChoice(null)
-    setOrder(phoenix ? defaultPhoenixOrder(areas) : [])
+    setOrder(phoenix ? startingOrder(areas) : [])
   }
 
   const highest = areas[0]?.monsterIds.length

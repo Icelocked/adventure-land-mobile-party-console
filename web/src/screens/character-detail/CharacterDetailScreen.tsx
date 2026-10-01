@@ -103,11 +103,13 @@ export function CharacterDetailScreen() {
                 farmingPolicy={farming.savedMode}
                 effectiveMode={farming.effectiveMode}
                 followingLeader={farming.followingLeader}
+                isLeader={dynamicState.leader === name}
                 farmArea={farming.farmArea}
                 monsterFocus={dynamicState.monsterFocusByCharacter[name] ?? []}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
                 monsterChoices={dynamicState.monsterChoices}
+                phoenixRouteOrder={dynamicState.phoenixRouteOrder}
                 position={{ map: vitals.map, x: vitals.x, y: vitals.y }}
                 target={vitals.target}
                 resolvedTargetType={resolvedTargetType}

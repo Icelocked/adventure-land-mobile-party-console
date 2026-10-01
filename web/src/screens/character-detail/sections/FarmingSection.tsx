@@ -49,11 +49,13 @@ export function FarmingSection({
   farmingPolicy,
   effectiveMode,
   followingLeader,
+  isLeader,
   farmArea,
   monsterFocus,
   monsterSearchRadius,
   bestiaryCatalog,
   monsterChoices,
+  phoenixRouteOrder,
   position,
   target,
   resolvedTargetType,
@@ -66,11 +68,20 @@ export function FarmingSection({
   farmingPolicy: string
   effectiveMode: string
   followingLeader?: string
+  /** dynamicState.leader === characterName - distinct from `!followingLeader`,
+   *  which is also true for an independent (not leader, not following)
+   *  character. The server's own party-monster-travel command requires
+   *  the REAL leader specifically (confirmed against use-party-console.tsx's
+   *  startFarmingArea: `state.leader === character ? "party-monster-travel"
+   *  : "character-travel"`) - anyone else, including an independent
+   *  character, needs character-travel instead. */
+  isLeader: boolean
   farmArea?: FarmAreaState | null
   monsterFocus: string[]
   monsterSearchRadius: number
   bestiaryCatalog: BestiaryMonster[]
   monsterChoices: Catalog
+  phoenixRouteOrder: string[]
   /** This character's current position - used only to rank candidate farming areas by proximity. */
   position?: { map: string; x: number; y: number }
   target?: string
@@ -144,7 +155,7 @@ export function FarmingSection({
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {MODES.map((mode) => (
-          <Chip key={mode.id} selected={farmingPolicy === mode.id} onClick={() => void selectMode(mode.id)}>
+          <Chip key={mode.id} selected={farmingPolicy === mode.id} disabled={pickingBackup || pickingArea} onClick={() => void selectMode(mode.id)}>
             {mode.label}
           </Chip>
         ))}
@@ -194,13 +205,14 @@ export function FarmingSection({
           character={position}
           radius={monsterSearchRadius}
           busy={busy}
+          savedPhoenixOrder={phoenixRouteOrder}
           onCancel={() => setPickingArea(false)}
           onStart={async (area, phoenixRouteOrder) => {
             setBusy(true)
             try {
               const result = phoenixRouteOrder
                 ? await api.navigateToMonster('phoenix', { map: area.map, x: area.x, y: area.y }, phoenixRouteOrder)
-                : await api.routeToFarmingArea(characterName, !followingLeader, { map: area.map, x: area.x, y: area.y }, monsterFocus.filter((id) => id !== 'all'))
+                : await api.routeToFarmingArea(characterName, isLeader, { map: area.map, x: area.x, y: area.y }, monsterFocus.filter((id) => id !== 'all'))
               if (result.kind === 'failure') setError(result.message)
               else {
                 setPickingArea(false)
@@ -227,7 +239,7 @@ export function FarmingSection({
           size="icon"
           aria-label={followingLeader ? 'Only the leader can route to a monster' : 'Find selected monster'}
           title={followingLeader ? 'Only the leader can route to a monster' : 'Find selected monster'}
-          disabled={!!followingLeader}
+          disabled={!!followingLeader || pickingBackup || pickingArea}
           onClick={() => setPickingArea(true)}
         >
           <MapPin className="size-4" />
