@@ -4,6 +4,7 @@ import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
 import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
+import { useTargetMonsterType } from '@/data/useTargetMonsterType'
 import { resolveFarmingContext } from '@/models'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { VitalsHeader } from './VitalsHeader'
@@ -38,6 +39,7 @@ export function CharacterDetailScreen() {
 
   const state = characters[name]
   const vitals = state?.vitals
+  const resolvedTargetType = useTargetMonsterType(name, vitals?.target)
   const farming = resolveFarmingContext(dynamicState, name)
   const others = Object.keys(characters).filter((n) => n !== name)
   const accountGold = (dynamicState.bank?.gold ?? 0) + Object.values(characters).reduce((sum, c) => sum + (c.vitals?.gold ?? 0), 0)
@@ -80,7 +82,13 @@ export function CharacterDetailScreen() {
         <p className="p-6 text-sm text-muted-foreground">This character isn't reporting in right now.</p>
       ) : (
         <>
-          <VitalsHeader name={name} vitals={vitals} accountGold={accountGold} bestiaryCatalog={dynamicState.bestiaryCatalog} />
+          <VitalsHeader
+            name={name}
+            vitals={vitals}
+            accountGold={accountGold}
+            bestiaryCatalog={dynamicState.bestiaryCatalog}
+            resolvedTargetType={resolvedTargetType}
+          />
           <div className="flex-1 pb-6">
             <LeaderFollowerSection characterName={name} dynamicState={dynamicState} />
             <TravelSection
@@ -99,7 +107,10 @@ export function CharacterDetailScreen() {
                 monsterFocus={dynamicState.monsterFocusByCharacter[name] ?? []}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
+                monsterChoices={dynamicState.monsterChoices}
+                position={{ map: vitals.map, x: vitals.x, y: vitals.y }}
                 target={vitals.target}
+                resolvedTargetType={resolvedTargetType}
                 conditions={vitals.conditions}
                 monsterHunt={farming.hunt}
                 characterHunt={dynamicState.characterHunt[name] ?? null}

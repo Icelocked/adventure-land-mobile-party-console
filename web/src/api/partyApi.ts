@@ -522,6 +522,40 @@ export class PartyApiClient {
     return this.post('focus', body)
   }
 
+  /** POST /party-api/navigate-to-monster - sends the whole party/convoy to
+   *  go find and farm a specific monster right now (requires an online
+   *  leader; party-wide, not per-character - matches party-console's own
+   *  monster-route-button.tsx flow, triggered from the bestiary/monster
+   *  list, not the per-character Monster focus form). `phoenixRouteOrder`
+   *  is required (and only valid) when `monsterId === "phoenix"`. */
+  async navigateToMonster(
+    monsterId: string,
+    location: { map: string; x: number; y: number },
+    phoenixRouteOrder?: string[],
+  ): Promise<ApiResult<CommandResult>> {
+    return this.post('navigate-to-monster', phoenixRouteOrder ? { monsterId, location, phoenixRouteOrder } : { monsterId, location })
+  }
+
+  /** POST /party-api/command, type "party-monster-travel" (leader) or
+   *  "character-travel" (anyone else) - routes ONE character to a chosen
+   *  farming area for their own current monster focus. Matches
+   *  use-party-console.tsx's startFarmingArea for the farmAreaRequest
+   *  (non-Hunt, per-character "find my monsters" via the route-button)
+   *  case - distinct from navigateToMonster, which moves the whole party
+   *  convoy to one specific monster instead. */
+  async routeToFarmingArea(
+    character: string,
+    isLeader: boolean,
+    location: { map: string; x: number; y: number },
+    farmingMonsterIds: string[],
+  ): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, {
+      type: isLeader ? 'party-monster-travel' : 'character-travel',
+      location,
+      farmingMonsterIds,
+    })
+  }
+
   /** POST /party-api/hunt-blacklist - `action:"clear"` drops everything,
    *  `action:"remove"` drops one monster (needs `monsterId`), `action:
    *  "add"` manually blacklists one (needs `monsterId`). */

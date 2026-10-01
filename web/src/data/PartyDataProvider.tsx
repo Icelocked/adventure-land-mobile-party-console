@@ -78,6 +78,7 @@ function recordToState(name: string, record: LiveRecordWire, roster: Record<stri
 interface PartyDataContextValue {
   api: PartyApiClient
   refreshDynamicStateNow: () => Promise<void>
+  settings: ServerSettings
 }
 
 const PartyDataContext = createContext<PartyDataContextValue | null>(null)
@@ -285,7 +286,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     return close
   }, [settings, queryClient])
 
-  const value = useMemo<PartyDataContextValue>(() => ({ api, refreshDynamicStateNow }), [api, refreshDynamicStateNow])
+  const value = useMemo<PartyDataContextValue>(() => ({ api, refreshDynamicStateNow, settings }), [api, refreshDynamicStateNow, settings])
 
   return <PartyDataContext.Provider value={value}>{children}</PartyDataContext.Provider>
 }
@@ -297,6 +298,7 @@ function usePartyData(): PartyDataContextValue {
 }
 
 export const usePartyApi = (): PartyApiClient => usePartyData().api
+export const useServerSettings = (): ServerSettings => usePartyData().settings
 export const useRefreshDynamicStateNow = (): (() => Promise<void>) => usePartyData().refreshDynamicStateNow
 
 function useCachedValue<T>(key: readonly unknown[], initial: T): T {

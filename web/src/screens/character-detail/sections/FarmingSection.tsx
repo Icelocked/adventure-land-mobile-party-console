@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapPin } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
-import type { BestiaryMonster, Condition, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus, MonsterSpawnRecord } from '@/models'
+import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
+import type { Catalog } from '@/lib/farmingZones'
+import type { BestiaryMonster, Condition, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 import { formatDuration } from '@/lib/itemFormulas'
 
 /** monster-focus-picker.tsx's own trigger-button label, ported verbatim -
@@ -50,7 +53,10 @@ export function FarmingSection({
   monsterFocus,
   monsterSearchRadius,
   bestiaryCatalog,
+  monsterChoices,
+  position,
   target,
+  resolvedTargetType,
   conditions,
   monsterHunt,
   characterHunt,
@@ -64,7 +70,12 @@ export function FarmingSection({
   monsterFocus: string[]
   monsterSearchRadius: number
   bestiaryCatalog: BestiaryMonster[]
+  monsterChoices: Catalog
+  /** This character's current position - used only to rank candidate farming areas by proximity. */
+  position?: { map: string; x: number; y: number }
   target?: string
+  /** See data/useTargetMonsterType.ts - the real monster type resolved live from the map/entities stream. */
+  resolvedTargetType?: string | null
   conditions?: Condition[]
   monsterHunt?: MonsterHuntCycle | null
   characterHunt?: MonsterHuntStatus | null
@@ -75,6 +86,9 @@ export function FarmingSection({
   const refreshNow = useRefreshDynamicStateNow()
   const [showFocus, setShowFocus] = useState(false)
   const [pickingBackup, setPickingBackup] = useState(false)
+  const [backupFocus, setBackupFocus] = useState<string[]>([])
+  const [pickingArea, setPickingArea] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // CharacterDetailScreen's route has no per-character `key`, so switching
@@ -91,23 +105,33 @@ export function FarmingSection({
   useEffect(() => {
     setShowFocus(false)
     setPickingBackup(false)
+    setPickingArea(false)
   }, [characterName])
 
+  // Matches use-party-console.tsx's setFarmingPolicy: try Hunt directly
+  // first (the common case once a backup is already configured - no picker
+  // shown at all), and only open it when the server actually rejects for
+  // missing/invalid backup, not unconditionally on every click.
   const selectMode = async (mode: (typeof MODES)[number]['id']) => {
     setError(null)
-    if (mode === 'hunt') {
+    const result = await api.setFarmingMode(mode)
+    if (result.kind === 'success') {
+      await refreshNow()
+      return
+    }
+    if (mode === 'hunt' && /backup farming/i.test(result.message)) {
+      setBackupFocus(monsterFocus.filter((id) => id !== 'all'))
       setPickingBackup(true)
       return
     }
-    const result = await api.setFarmingMode(mode)
-    if (result.kind === 'failure') setError(result.message)
-    else await refreshNow()
+    setError(result.message)
   }
 
   return (
     <SectionCard title="Farming">
       <LiveCombatStatus
         target={target}
+        resolvedTargetType={resolvedTargetType}
         conditions={conditions}
         monsterHunt={monsterHunt}
         characterHunt={characterHunt}
@@ -137,15 +161,53 @@ export function FarmingSection({
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
 
       {pickingBackup && (
-        <HuntBackupPicker
+        <FarmingAreaPicker
+          catalog={monsterChoices}
           bestiaryCatalog={bestiaryCatalog}
+          ids={backupFocus}
+          onIdsChange={setBackupFocus}
+          character={position}
+          radius={monsterSearchRadius}
+          busy={busy}
+          preparation
           onCancel={() => setPickingBackup(false)}
-          onStart={async (monsterFocusIds, location) => {
-            const result = await api.setFarmingMode('hunt', { monsterFocus: monsterFocusIds, location })
-            if (result.kind === 'failure') setError(result.message)
-            else {
-              setPickingBackup(false)
-              await refreshNow()
+          onStart={async (area) => {
+            setBusy(true)
+            try {
+              const result = await api.setFarmingMode('hunt', { monsterFocus: backupFocus, location: { map: area.map, x: area.x, y: area.y } })
+              if (result.kind === 'failure') setError(result.message)
+              else {
+                setPickingBackup(false)
+                await refreshNow()
+              }
+            } finally {
+              setBusy(false)
+            }
+          }}
+        />
+      )}
+      {pickingArea && (
+        <FarmingAreaPicker
+          catalog={monsterChoices}
+          bestiaryCatalog={bestiaryCatalog}
+          ids={monsterFocus.filter((id) => id !== 'all')}
+          character={position}
+          radius={monsterSearchRadius}
+          busy={busy}
+          onCancel={() => setPickingArea(false)}
+          onStart={async (area, phoenixRouteOrder) => {
+            setBusy(true)
+            try {
+              const result = phoenixRouteOrder
+                ? await api.navigateToMonster('phoenix', { map: area.map, x: area.x, y: area.y }, phoenixRouteOrder)
+                : await api.routeToFarmingArea(characterName, !followingLeader, { map: area.map, x: area.x, y: area.y }, monsterFocus.filter((id) => id !== 'all'))
+              if (result.kind === 'failure') setError(result.message)
+              else {
+                setPickingArea(false)
+                await refreshNow()
+              }
+            } finally {
+              setBusy(false)
             }
           }}
         />
@@ -159,6 +221,16 @@ export function FarmingSection({
           onClick={() => setShowFocus((v) => !v)}
         >
           <span className="truncate">{focusSummary(monsterFocus, bestiaryCatalog)}</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={followingLeader ? 'Only the leader can route to a monster' : 'Find selected monster'}
+          title={followingLeader ? 'Only the leader can route to a monster' : 'Find selected monster'}
+          disabled={!!followingLeader}
+          onClick={() => setPickingArea(true)}
+        >
+          <MapPin className="size-4" />
         </Button>
         <Button variant="outline" size="sm" onClick={() => navigate('/hunt-settings')}>
           Hunt settings...
@@ -184,6 +256,7 @@ export function FarmingSection({
  *  one character's screen. */
 function LiveCombatStatus({
   target,
+  resolvedTargetType,
   conditions,
   monsterHunt,
   characterHunt,
@@ -191,13 +264,14 @@ function LiveCombatStatus({
   bestiaryCatalog,
 }: {
   target?: string
+  resolvedTargetType?: string | null
   conditions?: Condition[]
   monsterHunt?: MonsterHuntCycle | null
   characterHunt?: MonsterHuntStatus | null
   huntBlacklist: Record<string, HuntBlacklistEntry>
   bestiaryCatalog: BestiaryMonster[]
 }) {
-  const targetMonster = target ? bestiaryCatalog.find((m) => m.id === target) : undefined
+  const targetMonster = target ? bestiaryCatalog.find((m) => m.id === (resolvedTargetType ?? target)) : undefined
   const questMonster = monsterHunt?.target ? bestiaryCatalog.find((m) => m.id === monsterHunt.target) : undefined
   const myQuestMonster = characterHunt?.id ? bestiaryCatalog.find((m) => m.id === characterHunt.id) : undefined
   const myQuestBlacklisted = !!characterHunt?.id && !!huntBlacklist[characterHunt.id]
@@ -305,80 +379,6 @@ function MonsterFocusForm({
           }}
         >
           Save
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function HuntBackupPicker({
-  bestiaryCatalog,
-  onCancel,
-  onStart,
-}: {
-  bestiaryCatalog: BestiaryMonster[]
-  onCancel: () => void
-  onStart: (monsterFocus: string[], location: { map: string; x: number; y: number }) => void
-}) {
-  const [search, setSearch] = useState('')
-  const [selectedMonsters, setSelectedMonsters] = useState<string[]>([])
-  const [chosenLocation, setChosenLocation] = useState<MonsterSpawnRecord | null>(null)
-
-  const filtered = bestiaryCatalog.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
-  const toggleMonster = (id: string) => {
-    setSelectedMonsters((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]))
-    setChosenLocation(null)
-  }
-
-  const candidateLocations = useMemo(() => {
-    const records: MonsterSpawnRecord[] = []
-    for (const id of selectedMonsters) {
-      const monster = bestiaryCatalog.find((m) => m.id === id)
-      for (const record of monster?.spawnRecords ?? []) records.push(record)
-    }
-    return records
-  }, [selectedMonsters, bestiaryCatalog])
-
-  return (
-    <div className="mt-2 rounded-md border border-border p-2">
-      <p className="mb-1 text-xs text-muted-foreground">Select backup farming monsters and a spawn location. Hunt returns here between quests.</p>
-      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters..." className="mb-2" />
-      <div className="max-h-40 overflow-y-auto">
-        {filtered.map((monster) => (
-          <label key={monster.id} className="flex items-center gap-2 py-1">
-            <input type="checkbox" checked={selectedMonsters.includes(monster.id)} onChange={() => toggleMonster(monster.id)} className="size-4" />
-            <SpriteIcon sprite={monster.sprite} size={24} />
-            <span className="text-sm">{monster.name}</span>
-          </label>
-        ))}
-      </div>
-      {selectedMonsters.length > 0 && (
-        <div className="mt-2">
-          <p className="mb-1 text-xs text-muted-foreground">Spawn location</p>
-          <div className="max-h-40 overflow-y-auto">
-            {candidateLocations.length === 0 && <p className="text-xs text-muted-foreground">No known spawn locations for the selected monsters.</p>}
-            {candidateLocations.map((record, index) => (
-              <button
-                key={`${record.map}-${record.x}-${record.y}-${index}`}
-                onClick={() => setChosenLocation(record)}
-                className={`block w-full rounded-md border p-1.5 text-left text-sm ${chosenLocation === record ? 'border-primary bg-primary/10' : 'border-border'}`}
-              >
-                {record.mapName ?? record.map} ({Math.round(record.x)}, {Math.round(record.y)})
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="mt-2 flex justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          disabled={!selectedMonsters.length || !chosenLocation}
-          onClick={() => chosenLocation && onStart(selectedMonsters, { map: chosenLocation.map, x: chosenLocation.x, y: chosenLocation.y })}
-        >
-          Save backup and start Hunt
         </Button>
       </div>
     </div>

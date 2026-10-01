@@ -11,11 +11,13 @@ export function VitalsHeader({
   vitals,
   accountGold,
   bestiaryCatalog,
+  resolvedTargetType,
 }: {
   name: string
   vitals: CharacterVitals
   accountGold?: number
   bestiaryCatalog: BestiaryMonster[]
+  resolvedTargetType?: string | null
 }) {
   const { Icon, color } = classLook(vitals.ctype)
   const xpFraction = vitals.max_xp && vitals.max_xp > 0 ? Math.min(1, Math.max(0, (vitals.xp ?? 0) / vitals.max_xp)) : null
@@ -59,7 +61,7 @@ export function VitalsHeader({
         {accountGold != null && <span>Account total {accountGold.toLocaleString()}g</span>}
       </div>
 
-      <div className={`text-sm ${vitals.rip ? 'text-destructive' : ''}`}>{activityLine(vitals, bestiaryCatalog)}</div>
+      <div className={`text-sm ${vitals.rip ? 'text-destructive' : ''}`}>{activityLine(vitals, bestiaryCatalog, resolvedTargetType)}</div>
     </div>
   )
 }

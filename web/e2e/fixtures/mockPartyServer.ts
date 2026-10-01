@@ -74,6 +74,10 @@ export class MockPartyServer {
   upgradeOfferingRules: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   monsterFocusByCharacter: Record<string, string[]> = {}
+  // farmingAreas.ts's Catalog shape - spawn-area GEOMETRY, a separate
+  // catalog from bestiaryCatalog's own simpler spawnRecords.
+  monsterChoices: { id: string; locations?: { map: string; x: number; y: number; mapName?: string; boundary?: number[] }[] }[] = []
+  phoenixRouteOrder: string[] = []
   huntSettings: Record<string, unknown> | null = null
   monsterHunt: Record<string, unknown> | null = null
   // A real account always has a leader once configured - resolveFarmingContext
@@ -177,6 +181,8 @@ export class MockPartyServer {
       luckySlotTracking: this.luckySlotTracking,
       huntBlacklist: this.huntBlacklist,
       monsterFocusByCharacter: this.monsterFocusByCharacter,
+      monsterChoices: this.monsterChoices,
+      phoenixRouteOrder: this.phoenixRouteOrder,
       huntSettings: this.huntSettings,
       monsterHunt: this.monsterHunt,
       leader: this.leader,
