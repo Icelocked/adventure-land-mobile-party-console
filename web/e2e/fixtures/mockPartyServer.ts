@@ -36,7 +36,11 @@ export interface MockCharacter {
   x?: number
   y?: number
   items?: (MockItem | null)[]
-  target?: string
+  // Deliberately string | number, not just string - the real vitals status's
+  // own target field is never coerced server-side (characters/shared.js's
+  // publishMapFrame), unlike the map-frame's entities[].id (explicitly
+  // String()'d) - this models that real, exact asymmetry.
+  target?: string | number
   conditions?: { id: string; name: string; remainingMs?: number }[]
   // This character's own Hunt quest assignment - mirrors state.statuses[name].monsterHunt,
   // exposed via characterDetails in the real state?section=core&dashboard=1 response.
@@ -235,6 +239,22 @@ export class MockPartyServer {
   private sseServer: Server | null = null
   private sseClients = new Set<ServerResponse>()
   private sseSequence = 1
+  // Per-character map/entities frames (telemetry/map-stream.ts) - keyed by
+  // character name. Each entity's `id` is deliberately left as whatever
+  // type the test sets (string OR number) rather than always coercing to
+  // string, since the real bug this exists to catch (useTargetMonsterType.ts)
+  // is an asymmetric id type between the vitals status's own `target` field
+  // (never coerced server-side, characters/shared.js's publishMapFrame) and
+  // mapEntity()'s explicit `String(entity.id)` cast for THIS feed - a mock
+  // that always stringified both sides could never reproduce it.
+  private mapFrameEntities = new Map<string, { id: string | number; mtype?: string }[]>()
+  private mapStreamClients = new Map<string, Set<ServerResponse>>()
+
+  setMapFrameEntities(character: string, entities: { id: string | number; mtype?: string }[]): void {
+    this.mapFrameEntities.set(character, entities)
+    const frame = `data: ${JSON.stringify({ entities })}\n\n`
+    for (const client of this.mapStreamClients.get(character) ?? []) client.write(frame)
+  }
 
   /** A REAL persistent text/event-stream server - not a Playwright
    *  `route.fulfill()`, which sends one complete response and closes the
@@ -245,14 +265,33 @@ export class MockPartyServer {
    *  connection a real server holds open. Started lazily; the app's
    *  EventSource is redirected here via `route.continue({url})` in
    *  install(), which lets the browser's own networking connect to it
-   *  directly (Playwright's fulfill API has no incremental-write mode). */
+   *  directly (Playwright's fulfill API has no incremental-write mode).
+   *  Also serves /map-stream/:character the same way, on the same server. */
   private startSseServer(): Promise<string> {
     if (this.sseServer) {
       const address = this.sseServer.address()
-      return Promise.resolve(`http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}/dashboard-stream`)
+      return Promise.resolve(`http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`)
     }
     return new Promise((resolve) => {
       const server = createServer((req, res) => {
+        const path = (req.url ?? '').split('?')[0]
+        const mapStreamMatch = path.match(/\/map-stream\/([^/]+)/)
+        if (mapStreamMatch) {
+          const character = decodeURIComponent(mapStreamMatch[1])
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+          })
+          const existing = this.mapFrameEntities.get(character)
+          if (existing) res.write(`data: ${JSON.stringify({ entities: existing })}\n\n`)
+          const clients = this.mapStreamClients.get(character) ?? new Set()
+          this.mapStreamClients.set(character, clients)
+          clients.add(res)
+          req.on('close', () => clients.delete(res))
+          return
+        }
         res.writeHead(200, {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
@@ -271,7 +310,7 @@ export class MockPartyServer {
         // liveConnection.ts's 15s watchdog timeout indefinitely, matching
         // the real coordinator's own heartbeat cadence.
         setInterval(() => this.broadcastHeartbeat(), 2000).unref()
-        resolve(`http://127.0.0.1:${port}/dashboard-stream`)
+        resolve(`http://127.0.0.1:${port}`)
       })
     })
   }
@@ -284,6 +323,8 @@ export class MockPartyServer {
   private stopSseServer() {
     for (const client of this.sseClients) client.end()
     this.sseClients.clear()
+    for (const clients of this.mapStreamClients.values()) for (const client of clients) client.end()
+    this.mapStreamClients.clear()
     this.sseServer?.close()
     this.sseServer = null
   }
@@ -621,8 +662,13 @@ export class MockPartyServer {
     })
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
     await page.route('**/party-api/dashboard-stream', async (route) => {
-      const url = await this.startSseServer()
-      return route.continue({ url })
+      const base = await this.startSseServer()
+      return route.continue({ url: `${base}/dashboard-stream` })
+    })
+    await page.route('**/party-api/map-stream/**', async (route) => {
+      const base = await this.startSseServer()
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/map-stream\//, '')
+      return route.continue({ url: `${base}/map-stream/${path}` })
     })
 
     page.once('close', () => this.stopSseServer())

@@ -100,6 +100,44 @@ test('Character detail: monster focus button shows what\'s actually selected, no
   await expect(page.getByRole('button', { name: 'Crabxx, Crab' })).toBeVisible()
 })
 
+test('Character detail: resolves the real monster name via the live map/entities stream', async ({ page }) => {
+  // End-to-end proof the subscription/frame-parsing/resolution pipeline
+  // genuinely works: vitals.target is a per-instance id ("2951603" - a raw
+  // game entity id, confirmed string in production since a real number
+  // would crash activityLine.ts's `.trim()` call, which it doesn't), and
+  // the live map/entities feed carries that same id alongside the actual
+  // monster type (mtype) - useTargetMonsterType looks it up there instead
+  // of ever showing the raw id.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, target: '2951603' })
+  server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  await server.install(page)
+  server.setMapFrameEntities('Ranger1', [{ id: '2951603', mtype: 'crabx' }])
+
+  await page.goto('/characters/Ranger1')
+  await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
+  await expect(page.getByText('fighting Crabxx', { exact: true })).toBeVisible()
+})
+
+test('Character detail: a numeric target does not crash the page (activityLine must never assume target is a string)', async ({ page }) => {
+  // Found while testing the above: vitals.target is never coerced
+  // server-side (characters/shared.js's publishMapFrame just does `target:
+  // character.target || null`), so if the native game field is ever a raw
+  // number instead of a string, `vitals.target?.trim()` throws - a full
+  // page crash, not a cosmetic issue. Defensive fix: String() it first.
+  const pageErrors: string[] = []
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, target: 2951603 })
+  await server.install(page)
+  page.on('pageerror', (err) => pageErrors.push(err.message))
+
+  await page.goto('/characters/Ranger1')
+  await expect(page.getByText('fighting', { exact: true })).toBeVisible()
+  expect(pageErrors).toEqual([])
+})
+
 test('Character list and vitals header never show the raw target id - resolved name when it matches the bestiary, plain "fighting" otherwise', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

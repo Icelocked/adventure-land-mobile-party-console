@@ -22,7 +22,11 @@ export function activityLine(vitals: CharacterVitals, bestiaryCatalog: BestiaryM
   if (vitals.stocking) return 'stocking up'
   if (vitals.upgrading) return 'upgrading'
   if (vitals.farmingMode) return `farming (${vitals.farmingMode})`
-  if (vitals.target?.trim()) {
+  // String() first - vitals.target is never coerced server-side
+  // (characters/shared.js's publishMapFrame just does `target:
+  // character.target || null`), so if the native game field is ever a raw
+  // number rather than a string, `.trim()` on it directly throws.
+  if (vitals.target != null && String(vitals.target).trim()) {
     const monster = bestiaryCatalog.find((m) => m.id === (resolvedTargetType ?? vitals.target))
     return monster ? `fighting ${monster.name}` : 'fighting'
   }
