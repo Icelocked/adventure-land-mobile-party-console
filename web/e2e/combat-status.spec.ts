@@ -32,6 +32,24 @@ test('Character detail: shows nothing extra for a fighter with no current target
   await expect(page.getByText(/^Party Hunt:/)).not.toBeVisible()
 })
 
+test('Character detail: shows this character\'s own Hunt quest, flagged when its target is blacklisted', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({
+    name: 'Ranger1',
+    ctype: 'ranger',
+    level: 50,
+    monsterHunt: { id: 'crabx', count: 3, remainingMs: 125000 },
+  })
+  server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  server.huntBlacklist = { crabx: { monsterId: 'crabx', at: Date.now(), deaths: 3, reason: 'deaths' } }
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  await expect(page.getByText(/My quest: Crabxx.*3 left.*2m/)).toBeVisible()
+  await expect(page.getByText(/Blacklisted — skipped for Hunt/)).toBeVisible()
+})
+
 test('Character detail: a merchant never shows combat/hunt status at all', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

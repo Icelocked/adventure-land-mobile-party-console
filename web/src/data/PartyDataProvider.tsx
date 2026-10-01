@@ -12,6 +12,7 @@ import type {
   GameLogEntry,
   InventoryEntry,
   MailSnapshot,
+  MonsterHuntStatus,
   PartyStateDynamic,
   RosterMember,
 } from '@/models'
@@ -118,7 +119,12 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       // cycle entirely - see refreshCatalogNow.
       const escapeStart = performance.now()
       const [coreResult, bankResult, marketResult, logsResult, mailResult, escapeResult] = await Promise.all([
-        api.get('state?section=core'),
+        // dashboard=1 is just a payload-shape toggle (see runtime/coordinator/
+        // telemetry/public-state.ts) - no extra auth/ACL, and it's what unlocks
+        // characterDetails below (party-console's own dashboard already reads
+        // per-character Hunt quest status from there; this app just wasn't
+        // asking for the same shape before now).
+        api.get('state?section=core&dashboard=1'),
         api.get('state?section=bank'),
         api.get('state?section=market'),
         api.get('state?catalog=0&dashboard=1&section=logs'),
@@ -132,7 +138,16 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       if (escapeResult.kind === 'success') queryClient.setQueryData(QK.latencyMs, Math.round(performance.now() - escapeStart))
 
       if (coreResult.kind === 'success' || bankResult.kind === 'success' || marketResult.kind === 'success' || logsResult.kind === 'success') {
-        const core = coreResult.kind === 'success' ? (JSON.parse(coreResult.value) as Partial<PartyStateDynamic>) : {}
+        const coreRaw =
+          coreResult.kind === 'success'
+            ? (JSON.parse(coreResult.value) as Partial<PartyStateDynamic> & {
+                characterDetails?: Record<string, { monsterHunt?: MonsterHuntStatus | null }>
+              })
+            : undefined
+        const { characterDetails, ...core } = coreRaw ?? {}
+        const characterHunt = characterDetails
+          ? Object.fromEntries(Object.entries(characterDetails).map(([name, detail]) => [name, detail.monsterHunt ?? null]))
+          : undefined
         const bank = bankResult.kind === 'success' ? (JSON.parse(bankResult.value) as Partial<PartyStateDynamic>) : {}
         const market = marketResult.kind === 'success' ? (JSON.parse(marketResult.value) as Partial<PartyStateDynamic>) : {}
         const logs =
@@ -148,6 +163,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
           ...emptyPartyStateDynamic(),
           ...(current ?? {}),
           ...core,
+          ...(characterHunt ? { characterHunt } : {}),
           ...bank,
           ...market,
           ...(logs.combatLogs ? { combatLogs: logs.combatLogs } : {}),

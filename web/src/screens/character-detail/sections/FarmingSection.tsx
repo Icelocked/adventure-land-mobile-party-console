@@ -6,7 +6,7 @@ import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
-import type { BestiaryMonster, Condition, MonsterHuntCycle, MonsterSpawnRecord } from '@/models'
+import type { BestiaryMonster, Condition, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus, MonsterSpawnRecord } from '@/models'
 import { formatDuration } from '@/lib/itemFormulas'
 
 const MODES: { id: 'auto' | 'default' | 'scatter' | 'hunt'; label: string; description: string }[] = [
@@ -33,6 +33,8 @@ export function FarmingSection({
   target,
   conditions,
   monsterHunt,
+  characterHunt,
+  huntBlacklist,
 }: {
   characterName: string
   farmingPolicy: string
@@ -42,6 +44,8 @@ export function FarmingSection({
   target?: string
   conditions?: Condition[]
   monsterHunt?: MonsterHuntCycle | null
+  characterHunt?: MonsterHuntStatus | null
+  huntBlacklist: Record<string, HuntBlacklistEntry>
 }) {
   const api = usePartyApi()
   const navigate = useNavigate()
@@ -79,7 +83,14 @@ export function FarmingSection({
 
   return (
     <SectionCard title="Farming">
-      <LiveCombatStatus target={target} conditions={conditions} monsterHunt={monsterHunt} bestiaryCatalog={bestiaryCatalog} />
+      <LiveCombatStatus
+        target={target}
+        conditions={conditions}
+        monsterHunt={monsterHunt}
+        characterHunt={characterHunt}
+        huntBlacklist={huntBlacklist}
+        bestiaryCatalog={bestiaryCatalog}
+      />
       <p className="mb-1.5 text-xs text-muted-foreground">Account-wide - applies to the whole party.</p>
       <div className="flex flex-wrap gap-1.5">
         {MODES.map((mode) => (
@@ -127,23 +138,30 @@ export function FarmingSection({
 }
 
 /** What this character is actually doing right now - current target, active
- *  buffs/debuffs, and (if Hunt mode) the party's current quest. All of this
- *  already arrives over the live connection / core poll this app already
- *  has open; it was just never surfaced anywhere. */
+ *  buffs/debuffs, the party's current Hunt quest, and (if Hunt mode) this
+ *  character's own quest assignment with a blacklist check. Mirrors
+ *  party-console's farming-mode-control.tsx hunt-status block, scoped to
+ *  one character's screen. */
 function LiveCombatStatus({
   target,
   conditions,
   monsterHunt,
+  characterHunt,
+  huntBlacklist,
   bestiaryCatalog,
 }: {
   target?: string
   conditions?: Condition[]
   monsterHunt?: MonsterHuntCycle | null
+  characterHunt?: MonsterHuntStatus | null
+  huntBlacklist: Record<string, HuntBlacklistEntry>
   bestiaryCatalog: BestiaryMonster[]
 }) {
   const targetMonster = target ? bestiaryCatalog.find((m) => m.id === target) : undefined
   const questMonster = monsterHunt?.target ? bestiaryCatalog.find((m) => m.id === monsterHunt.target) : undefined
-  if (!target && !conditions?.length && !monsterHunt?.target) return null
+  const myQuestMonster = characterHunt?.id ? bestiaryCatalog.find((m) => m.id === characterHunt.id) : undefined
+  const myQuestBlacklisted = !!characterHunt?.id && !!huntBlacklist[characterHunt.id]
+  if (!target && !conditions?.length && !monsterHunt?.target && !characterHunt?.id) return null
   return (
     <div className="mb-2 space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
       {target && (
@@ -155,7 +173,20 @@ function LiveCombatStatus({
       {monsterHunt?.target && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <SpriteIcon sprite={questMonster?.sprite} size={16} />
-          <span>Party Hunt: {questMonster?.name ?? monsterHunt.target}{monsterHunt.message ? ` · ${monsterHunt.message}` : ''}</span>
+          <span>
+            Party Hunt{monsterHunt.stage ? ` · ${monsterHunt.stage}` : ''}: {questMonster?.name ?? monsterHunt.target}
+            {monsterHunt.message ? ` · ${monsterHunt.message}` : ''}
+          </span>
+        </div>
+      )}
+      {characterHunt?.id && (
+        <div className="flex items-center gap-1.5 text-xs">
+          <SpriteIcon sprite={myQuestMonster?.sprite} size={16} />
+          <span className={myQuestBlacklisted ? 'text-destructive' : 'text-muted-foreground'}>
+            My quest: {myQuestMonster?.name ?? characterHunt.id} · {characterHunt.count} left
+            {characterHunt.remainingMs ? ` · ${formatDuration(characterHunt.remainingMs)}` : ''}
+            {myQuestBlacklisted ? ' · Blacklisted — skipped for Hunt' : ''}
+          </span>
         </div>
       )}
       {!!conditions?.length && (

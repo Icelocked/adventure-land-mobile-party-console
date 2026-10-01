@@ -567,6 +567,8 @@ export interface PartyStateDynamic {
   // state?section=core poll this app already fetches (confirmed against the
   // real coordinator source), just never modeled before now.
   monsterHunt?: MonsterHuntCycle | null
+  // Per-character Hunt quest assignment - see MonsterHuntStatus. Keyed by character name.
+  characterHunt: Record<string, MonsterHuntStatus | null>
   farmAreaState?: { paused?: boolean } | null
   // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one standing
   // buy order per item id, automatically filled up to `price`.
@@ -614,8 +616,26 @@ export interface StandBid {
 export interface MonsterHuntCycle {
   target: string | null
   message?: string
+  stage: string
+  owner?: string
   currentIndex: number
   missions: { target: string; owners: string[] }[]
+  backup?: {
+    members: Record<string, { target: string | null; remainingMs: number; ready: boolean; fresh: boolean }>
+  }
+  turnIn?: { owner: string; phase: 'returning' | 'claiming' | 'complete' }
+}
+
+/** One character's own Hunt quest assignment - party-console's
+ *  monster-hunt-status.tsx, ported. Arrives via characterDetails in the
+ *  state?section=core&dashboard=1 poll (diagnosticCharacters already
+ *  allowlists `monsterHunt` there - this app just wasn't requesting the
+ *  dashboard-shaped payload that carries it before now). */
+export interface MonsterHuntStatus {
+  id: string | null
+  count: number
+  remainingMs: number | null
+  server: string | null
 }
 export interface HuntBlacklistEntry {
   monsterId: string
@@ -683,6 +703,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   monsterSearchRadiusByCharacter: {},
   huntBlacklist: {},
   monsterHunt: null,
+  characterHunt: {},
   farmAreaState: null,
   standBids: {},
   upgradeOfferingRules: [],

@@ -38,6 +38,9 @@ export interface MockCharacter {
   items?: (MockItem | null)[]
   target?: string
   conditions?: { id: string; name: string; remainingMs?: number }[]
+  // This character's own Hunt quest assignment - mirrors state.statuses[name].monsterHunt,
+  // exposed via characterDetails in the real state?section=core&dashboard=1 response.
+  monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
 }
 
 export interface MockCatalogEntry {
@@ -168,6 +171,11 @@ export class MockPartyServer {
       monsterHunt: this.monsterHunt,
       aldata: { listings: this.aldataListings },
       ponty: { listings: this.pontyListings },
+      // Real shape of state?section=core&dashboard=1's own extra field -
+      // see diagnosticCharacters() server-side, which allowlists monsterHunt.
+      characterDetails: Object.fromEntries(
+        this.characters.map((c) => [c.name, { monsterHunt: c.monsterHunt ?? null }]),
+      ),
     }
   }
 
