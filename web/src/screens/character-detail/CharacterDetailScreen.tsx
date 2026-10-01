@@ -105,7 +105,16 @@ export function CharacterDetailScreen() {
                 followingLeader={farming.followingLeader}
                 isLeader={dynamicState.leader === name}
                 farmArea={farming.farmArea}
-                monsterFocus={dynamicState.monsterFocusByCharacter[name] ?? []}
+                // connected-character-card.tsx: `monsterFocusByCharacter?.[char.name] || selectedFocus`
+                // (selectedFocus falling back to the flat state.monsterFocus) -
+                // not just a leader-specific case. The SERVER deliberately keeps
+                // monsterFocusByCharacter[leader] empty (navigation/focus.ts's
+                // characterFocus() writes the leader's own focus into the flat
+                // monsterFocus field and deletes their per-character entry, since
+                // that's what followers/others inherit from) - reading only
+                // monsterFocusByCharacter here meant the leader's screen always
+                // showed "No monsters selected" even with a real focus configured.
+                monsterFocus={dynamicState.monsterFocusByCharacter[name]?.length ? dynamicState.monsterFocusByCharacter[name]! : (dynamicState.monsterFocus ?? [])}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
                 monsterChoices={dynamicState.monsterChoices}
