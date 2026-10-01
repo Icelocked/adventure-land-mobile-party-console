@@ -97,6 +97,8 @@ export function CharacterDetailScreen() {
                 target={vitals.target}
                 conditions={vitals.conditions}
                 monsterHunt={dynamicState.monsterHunt}
+                characterHunt={dynamicState.characterHunt[name] ?? null}
+                huntBlacklist={dynamicState.huntBlacklist}
               />
             )}
             {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
