@@ -23,10 +23,25 @@ const fail = <T = never>(message: string, status?: number): ApiResult<T> => ({ k
 // of hanging the UI forever with nothing to time it out. fetch() has no
 // built-in timeout, unlike OkHttp, so this is done via AbortController.
 const REQUEST_TIMEOUT_MS = 15_000
+// state?section=core carries every character's farmingProfiles, and
+// a long-played/heavily-automated account's accumulated hunt-cycle/
+// convoy diagnostic history (routeRecovery attempt logs, eventTrips,
+// combatRecovery revisions - none of it rendered, all of it round-
+// tripped every poll) can push that single response past 1-2MB. On a
+// slow connection (confirmed against a live account: the tiny `escape`
+// endpoint alone took 8+ seconds of pure round-trip latency) the 15s
+// cap was hitting on every single poll for this one request - timing
+// out consistently, silently, before farmingPolicy/leader/monsterFocus
+// ever arrived, while every smaller request (bank/market/mail/escape)
+// kept succeeding fine. That looked exactly like "the UI never updates
+// no matter how long you wait or refresh" because it effectively never
+// did. GETs (state fetches) get a longer allowance than POSTs
+// (mutating commands, which should still fail fast if truly stuck).
+const GET_TIMEOUT_MS = 45_000
 
-async function timedFetch(url: string, init?: RequestInit): Promise<Response> {
+async function timedFetch(url: string, init: RequestInit = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await fetch(url, { ...init, signal: controller.signal })
   } finally {
@@ -36,7 +51,7 @@ async function timedFetch(url: string, init?: RequestInit): Promise<Response> {
 
 async function getText(url: string): Promise<ApiResult<string>> {
   try {
-    const response = await timedFetch(url)
+    const response = await timedFetch(url, {}, GET_TIMEOUT_MS)
     const text = await response.text()
     return response.ok ? ok(text) : fail(`HTTP ${response.status}`, response.status)
   } catch (error) {
