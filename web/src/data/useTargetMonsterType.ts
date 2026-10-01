@@ -50,7 +50,16 @@ export function useTargetMonsterType(characterName: string, target: string | und
       } catch {
         return
       }
-      const entity = frame?.entities?.find((e) => e.id === target)
+      // The game's own native code compares character.target against an
+      // entity's .id with no coercion at all (characters/shared.js:14442),
+      // meaning they're natively the same type - but this codebase's own
+      // serialization is asymmetric: mapEntity() explicitly casts entity
+      // ids to String() for the map-frame feed, while the vitals status's
+      // own `target` field (shared.js line ~387) does not. If the native
+      // type is numeric, comparing them directly (string !== number) would
+      // silently never match, for any target, regardless of timing -
+      // String() both sides to compare by value, not by type.
+      const entity = frame?.entities?.find((e) => String(e.id) === String(target))
       setResolved(entity?.mtype ?? null)
     }
     return () => source.close()
