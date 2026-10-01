@@ -1,12 +1,22 @@
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
-import type { CharacterVitals } from '@/models'
+import type { BestiaryMonster, CharacterVitals } from '@/models'
 
 /** The sticky, always-visible top of the character detail screen -
  *  ported from ui/characterdetail/sections/VitalsHeader.kt. Kept out of
  *  the scrollable body so vitals never scroll out of view while browsing
  *  equipment/inventory below. */
-export function VitalsHeader({ name, vitals, accountGold }: { name: string; vitals: CharacterVitals; accountGold?: number }) {
+export function VitalsHeader({
+  name,
+  vitals,
+  accountGold,
+  bestiaryCatalog,
+}: {
+  name: string
+  vitals: CharacterVitals
+  accountGold?: number
+  bestiaryCatalog: BestiaryMonster[]
+}) {
   const { Icon, color } = classLook(vitals.ctype)
   const xpFraction = vitals.max_xp && vitals.max_xp > 0 ? Math.min(1, Math.max(0, (vitals.xp ?? 0) / vitals.max_xp)) : null
 
@@ -49,7 +59,7 @@ export function VitalsHeader({ name, vitals, accountGold }: { name: string; vita
         {accountGold != null && <span>Account total {accountGold.toLocaleString()}g</span>}
       </div>
 
-      <div className={`text-sm ${vitals.rip ? 'text-destructive' : ''}`}>{activityLine(vitals)}</div>
+      <div className={`text-sm ${vitals.rip ? 'text-destructive' : ''}`}>{activityLine(vitals, bestiaryCatalog)}</div>
     </div>
   )
 }
