@@ -4,6 +4,7 @@ import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
 import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
+import { resolveFarmingContext } from '@/models'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { VitalsHeader } from './VitalsHeader'
 import { LeaderFollowerSection } from './sections/LeaderFollowerSection'
@@ -37,6 +38,7 @@ export function CharacterDetailScreen() {
 
   const state = characters[name]
   const vitals = state?.vitals
+  const farming = resolveFarmingContext(dynamicState, name)
   const others = Object.keys(characters).filter((n) => n !== name)
   const accountGold = (dynamicState.bank?.gold ?? 0) + Object.values(characters).reduce((sum, c) => sum + (c.vitals?.gold ?? 0), 0)
 
@@ -90,15 +92,18 @@ export function CharacterDetailScreen() {
             {vitals.ctype !== 'merchant' && (
               <FarmingSection
                 characterName={name}
-                farmingPolicy={dynamicState.farmingPolicy}
+                farmingPolicy={farming.savedMode}
+                effectiveMode={farming.effectiveMode}
+                followingLeader={farming.followingLeader}
+                farmArea={farming.farmArea}
                 monsterFocus={dynamicState.monsterFocusByCharacter[name] ?? []}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
                 target={vitals.target}
                 conditions={vitals.conditions}
-                monsterHunt={dynamicState.monsterHunt}
+                monsterHunt={farming.hunt}
                 characterHunt={dynamicState.characterHunt[name] ?? null}
-                huntBlacklist={dynamicState.huntBlacklist}
+                huntBlacklist={farming.blacklist}
               />
             )}
             {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
