@@ -501,16 +501,27 @@ export class PartyApiClient {
     return this.post('config', body)
   }
 
-  /** POST /party-api/farming-mode - the account-wide farming strategy
-   *  (Auto/Default/Scatter/Hunt); unlike nearly everything else in this
-   *  client, this command takes no `character` field at all (confirmed
-   *  against runtime/coordinator/http/hunt-mode.ts) - it's one shared
-   *  value for the whole party. Hunt specifically requires a `backup`
-   *  (monster focus + a real spawn location) the first time, or whenever
-   *  changing it - the server 409s with `code:"backup_required"` if
-   *  Hunt is requested without one and none is already set. */
-  async setFarmingMode(mode: 'auto' | 'default' | 'scatter' | 'hunt', backup?: { monsterFocus: string[]; location: { map: string; x: number; y: number } }): Promise<ApiResult<CommandResult>> {
-    return this.post('farming-mode', backup ? { mode, backup } : { mode })
+  /** POST /party-api/farming-mode - sets a character's farming strategy
+   *  (Auto/Default/Scatter/Hunt). `character` matters a lot more than it
+   *  looks: hunt-mode.ts's own handler never reads it, but the ROUTE
+   *  WRAPPER around it does (http/farming-scope.ts's
+   *  createScopedFarmingRoute, reading `body.character` to pick which
+   *  character's scoped state view the handler actually edits) - omit it
+   *  and the server silently defaults to the ACCOUNT LEADER instead of
+   *  the character you think you're changing (confirmed against
+   *  application.ts's `ports.mainOwner` wiring). A character following
+   *  the leader gets redirected server-side to a "saved for later"
+   *  preference instead of a live change (createSavedFarmingModeRoute) -
+   *  matches party-console's own setFarmingPolicy exactly. Hunt
+   *  specifically requires a `backup` (monster focus + a real spawn
+   *  location) the first time, or whenever changing it - the server
+   *  409s if Hunt is requested without one and none is already set. */
+  async setFarmingMode(
+    mode: 'auto' | 'default' | 'scatter' | 'hunt',
+    character: string,
+    backup?: { monsterFocus: string[]; location: { map: string; x: number; y: number } },
+  ): Promise<ApiResult<CommandResult>> {
+    return this.post('farming-mode', backup ? { mode, character, backup } : { mode, character })
   }
 
   /** POST /party-api/focus - which monsters a character farms/hunts,
