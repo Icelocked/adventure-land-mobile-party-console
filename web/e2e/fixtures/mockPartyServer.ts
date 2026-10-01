@@ -36,6 +36,8 @@ export interface MockCharacter {
   x?: number
   y?: number
   items?: (MockItem | null)[]
+  target?: string
+  conditions?: { id: string; name: string; remainingMs?: number }[]
 }
 
 export interface MockCatalogEntry {
@@ -69,6 +71,7 @@ export class MockPartyServer {
   upgradeOfferingRules: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   huntSettings: Record<string, unknown> | null = null
+  monsterHunt: Record<string, unknown> | null = null
   requirePairing = false
   // Both keyed by character - mirrors state.luckyUpgradeSlots/luckySlotTracking.
   luckyUpgradeSlots: Record<string, number> = {}
@@ -162,6 +165,7 @@ export class MockPartyServer {
       luckySlotTracking: this.luckySlotTracking,
       huntBlacklist: this.huntBlacklist,
       huntSettings: this.huntSettings,
+      monsterHunt: this.monsterHunt,
       aldata: { listings: this.aldataListings },
       ponty: { listings: this.pontyListings },
     }
@@ -191,6 +195,8 @@ export class MockPartyServer {
           y: c.y ?? 0,
           rip: false,
           inventorySize: (c.items ?? []).length,
+          ...(c.target ? { target: c.target } : {}),
+          ...(c.conditions ? { conditions: c.conditions } : {}),
         },
         items,
         slots: {},
