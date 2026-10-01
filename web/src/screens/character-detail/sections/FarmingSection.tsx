@@ -125,7 +125,7 @@ export function FarmingSection({
   // missing/invalid backup, not unconditionally on every click.
   const selectMode = async (mode: (typeof MODES)[number]['id']) => {
     setError(null)
-    const result = await api.setFarmingMode(mode)
+    const result = await api.setFarmingMode(mode, characterName)
     if (result.kind === 'success') {
       await refreshNow()
       return
@@ -185,7 +185,7 @@ export function FarmingSection({
           onStart={async (area) => {
             setBusy(true)
             try {
-              const result = await api.setFarmingMode('hunt', { monsterFocus: backupFocus, location: { map: area.map, x: area.x, y: area.y } })
+              const result = await api.setFarmingMode('hunt', characterName, { monsterFocus: backupFocus, location: { map: area.map, x: area.x, y: area.y } })
               if (result.kind === 'failure') setError(result.message)
               else {
                 setPickingBackup(false)

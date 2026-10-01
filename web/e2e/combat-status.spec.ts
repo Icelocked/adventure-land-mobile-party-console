@@ -179,7 +179,11 @@ test('Selecting Hunt with an existing backup already configured activates it dir
   await page.goto('/characters/Ranger1')
   await page.getByRole('button', { name: 'Hunt', exact: true }).click()
   await expect(page.getByText('Getting ready to hunt')).not.toBeVisible()
-  expect(submittedBody).toEqual({ mode: 'hunt' })
+  // `character` matters here beyond just being present in the payload -
+  // omitting it makes the server silently edit the ACCOUNT LEADER's
+  // profile instead of this character's own (http/farming-scope.ts's
+  // createScopedFarmingRoute defaults to ports.mainOwner() when absent).
+  expect(submittedBody).toEqual({ mode: 'hunt', character: 'Ranger1' })
 })
 
 test('Hunt backup picker, when the server actually requires one, starts from the character\'s existing monster focus - not blank', async ({ page }) => {
@@ -208,7 +212,9 @@ test('Hunt backup picker, when the server actually requires one, starts from the
   await page.getByRole('button', { name: /main \(100, 200\)/ }).click()
   await page.getByRole('button', { name: 'Save backup and start Hunt' }).click()
   await expect(page.getByText('Getting ready to hunt')).not.toBeVisible()
-  expect((submittedBody as unknown as { backup?: { monsterFocus?: string[] } } | null)?.backup?.monsterFocus).toEqual(['phoenix'])
+  const body = submittedBody as unknown as { character?: string; backup?: { monsterFocus?: string[] } } | null
+  expect(body?.character).toBe('Ranger1')
+  expect(body?.backup?.monsterFocus).toEqual(['phoenix'])
 })
 
 test('Route button opens the general farming-area picker and routes this character to the chosen area', async ({ page }) => {
@@ -239,6 +245,31 @@ test('Route button opens the general farming-area picker and routes this charact
     location: { map: 'main', x: 50, y: 75 },
     farmingMonsterIds: ['crabx'],
   })
+})
+
+test('Selecting a farming mode sends THIS character, not silently defaulting to the account leader', async ({ page }) => {
+  // The actual bug: http/farming-scope.ts's createScopedFarmingRoute reads
+  // body.character to decide whose profile to edit, defaulting to the
+  // account leader when it's missing. Viewing an independent (non-leader)
+  // character's screen and selecting a mode previously edited the LEADER's
+  // profile instead - the viewed character's own chip never changed,
+  // because nothing had actually been sent for THEM at all.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
+  server.addCharacter({ name: 'Independent1', ctype: 'ranger', level: 50 })
+  server.leader = 'MainLeader'
+  await server.install(page)
+
+  let submittedBody: Record<string, unknown> | null = null
+  await page.route('**/party-api/farming-mode', async (route) => {
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>
+    return route.fulfill({ json: { ok: true, farmingPolicy: 'default' } })
+  })
+
+  await page.goto('/characters/Independent1')
+  await page.getByRole('button', { name: 'Default', exact: true }).click()
+  expect(submittedBody).toEqual({ mode: 'default', character: 'Independent1' })
 })
 
 test('An independent character (not the leader, not following) routes via character-travel, not party-monster-travel', async ({ page }) => {
