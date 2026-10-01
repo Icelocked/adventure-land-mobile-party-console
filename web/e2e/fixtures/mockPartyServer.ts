@@ -73,6 +73,7 @@ export class MockPartyServer {
   realmControl: Record<string, unknown> | null = null
   upgradeOfferingRules: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
+  monsterFocusByCharacter: Record<string, string[]> = {}
   huntSettings: Record<string, unknown> | null = null
   monsterHunt: Record<string, unknown> | null = null
   // A real account always has a leader once configured - resolveFarmingContext
@@ -175,6 +176,7 @@ export class MockPartyServer {
       luckyUpgradeSlots: this.luckyUpgradeSlots,
       luckySlotTracking: this.luckySlotTracking,
       huntBlacklist: this.huntBlacklist,
+      monsterFocusByCharacter: this.monsterFocusByCharacter,
       huntSettings: this.huntSettings,
       monsterHunt: this.monsterHunt,
       leader: this.leader,

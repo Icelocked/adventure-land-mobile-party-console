@@ -9,6 +9,15 @@ import { SectionCard } from '../SectionCard'
 import type { BestiaryMonster, Condition, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus, MonsterSpawnRecord } from '@/models'
 import { formatDuration } from '@/lib/itemFormulas'
 
+/** monster-focus-picker.tsx's own trigger-button label, ported verbatim -
+ *  shows what's actually selected right now (names, or a count for "all"),
+ *  not a static "open this to find out" label. */
+function focusSummary(monsterFocus: string[], bestiaryCatalog: BestiaryMonster[]): string {
+  if (monsterFocus.includes('all')) return 'All monsters'
+  if (!monsterFocus.length) return 'No monsters selected'
+  return monsterFocus.map((id) => bestiaryCatalog.find((m) => m.id === id)?.name ?? id).join(', ')
+}
+
 const MODES: { id: 'auto' | 'default' | 'scatter' | 'hunt'; label: string; description: string }[] = [
   { id: 'auto', label: 'Auto', description: 'Default, switching to scatter when learned conditions allow it' },
   { id: 'default', label: 'Default', description: 'Force the normal party formation' },
@@ -142,9 +151,14 @@ export function FarmingSection({
         />
       )}
 
-      <div className="mt-2 flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={() => setShowFocus((v) => !v)}>
-          {characterName}'s monster focus
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="min-w-0 flex-1 justify-start overflow-hidden"
+          onClick={() => setShowFocus((v) => !v)}
+        >
+          <span className="truncate">{focusSummary(monsterFocus, bestiaryCatalog)}</span>
         </Button>
         <Button variant="outline" size="sm" onClick={() => navigate('/hunt-settings')}>
           Hunt settings...

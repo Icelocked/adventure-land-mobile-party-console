@@ -45,7 +45,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   // the sequence that used to leak Warriorname's open form into Priestname.
   await page.getByText('Warriorname').click()
   await expect(page).toHaveURL(/\/characters\/Warriorname/)
-  await page.getByRole('button', { name: "Warriorname's monster focus" }).click()
+  await page.getByRole('button', { name: 'No monsters selected' }).click()
   await expect(page.getByPlaceholder('Search monsters...')).toBeVisible()
 
   await page.getByRole('button', { name: /^Priestname/ }).click()

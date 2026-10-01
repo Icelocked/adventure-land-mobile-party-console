@@ -81,6 +81,22 @@ test('Character detail: a character running independently (not the leader, not f
   await expect(page.getByText(/Blacklisted — skipped for Hunt/)).toBeVisible()
 })
 
+test('Character detail: monster focus button shows what\'s actually selected, not a static label', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [
+    { id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] },
+    { id: 'crab', name: 'Crab', hp: 80, attack: 8, xp: 3, threat: 1, drops: [] },
+  ]
+  server.monsterFocusByCharacter = { Ranger1: ['crabx', 'crab'] }
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  await expect(page.getByRole('button', { name: 'Crabxx, Crab' })).toBeVisible()
+})
+
 test('Character detail: a merchant never shows combat/hunt status at all', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
