@@ -118,6 +118,134 @@ test('Character list and vitals header never show the raw target id - resolved n
   await expect(page.getByText('2951603')).not.toBeVisible()
 })
 
+test('Selecting Hunt with an existing backup already configured activates it directly - no picker shown', async ({ page }) => {
+  // use-party-console.tsx's setFarmingPolicy tries Hunt directly first and
+  // only opens the picker if the server actually rejects it - showing the
+  // picker unconditionally would force re-selecting an already-configured
+  // focus every time, and (per hunt/mode.ts's setBackup) submitting a
+  // DIFFERENT selection than what's already there silently overwrites
+  // every participant's own monsterFocusByCharacter.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  await server.install(page)
+
+  let submittedBody: Record<string, unknown> | null = null
+  await page.route('**/party-api/farming-mode', async (route) => {
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>
+    return route.fulfill({ json: { ok: true, farmingPolicy: 'hunt', monsterHunt: null } })
+  })
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Hunt', exact: true }).click()
+  await expect(page.getByText('Getting ready to hunt')).not.toBeVisible()
+  expect(submittedBody).toEqual({ mode: 'hunt' })
+})
+
+test('Hunt backup picker, when the server actually requires one, starts from the character\'s existing monster focus - not blank', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [{ id: 'phoenix', name: 'Phoenix', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  server.monsterChoices = [{ id: 'phoenix', locations: [{ map: 'main', x: 100, y: 200 }] }]
+  server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  await server.install(page)
+
+  let callCount = 0
+  let submittedBody: Record<string, unknown> | null = null
+  await page.route('**/party-api/farming-mode', async (route) => {
+    callCount += 1
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>
+    if (callCount === 1) return route.fulfill({ status: 409, json: { error: 'Choose a backup farming location before starting Hunt' } })
+    return route.fulfill({ json: { ok: true, farmingPolicy: 'hunt', monsterHunt: null } })
+  })
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Hunt', exact: true }).click()
+  await expect(page.locator('label', { hasText: 'Phoenix' }).getByRole('checkbox')).toBeChecked()
+
+  await page.getByRole('button', { name: /main \(100, 200\)/ }).click()
+  await page.getByRole('button', { name: 'Save backup and start Hunt' }).click()
+  await expect(page.getByText('Getting ready to hunt')).not.toBeVisible()
+  expect((submittedBody as unknown as { backup?: { monsterFocus?: string[] } } | null)?.backup?.monsterFocus).toEqual(['phoenix'])
+})
+
+test('Route button opens the general farming-area picker and routes this character to the chosen area', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  server.monsterChoices = [{ id: 'crabx', locations: [{ map: 'main', x: 50, y: 75 }] }]
+  server.monsterFocusByCharacter = { Ranger1: ['crabx'] }
+  await server.install(page)
+
+  let submittedBody: Record<string, unknown> | null = null
+  await page.route('**/party-api/command', async (route) => {
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>
+    return route.fulfill({ json: { ok: true } })
+  })
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Find selected monster' }).click()
+  await expect(page.getByText('Choose a farming area')).toBeVisible()
+  await page.getByRole('button', { name: /main \(50, 75\)/ }).click()
+  await page.getByRole('button', { name: 'Start farming' }).click()
+  await expect(page.getByText('Choose a farming area')).not.toBeVisible()
+  expect(submittedBody).toEqual({
+    character: 'Ranger1',
+    type: 'party-monster-travel',
+    location: { map: 'main', x: 50, y: 75 },
+    farmingMonsterIds: ['crabx'],
+  })
+})
+
+test('Route button is disabled for a follower - only the leader can route to a monster', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
+  server.addCharacter({ name: 'Follower1', ctype: 'ranger', level: 50 })
+  server.leader = 'MainLeader'
+  server.followers = { Follower1: true }
+  await server.install(page)
+
+  await page.goto('/characters/Follower1')
+  await expect(page.getByRole('button', { name: 'Only the leader can route to a monster' })).toBeDisabled()
+})
+
+test('Phoenix search order requires exactly 5 regions before starting the patrol', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [{ id: 'phoenix', name: 'Phoenix', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  server.monsterChoices = [
+    {
+      id: 'phoenix',
+      locations: [
+        { map: 'main', x: 641, y: 1803 },
+        { map: 'cave', x: -180, y: -1164 },
+        { map: 'main', x: -1184, y: 781 },
+      ],
+    },
+  ]
+  server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Find selected monster' }).click()
+  await expect(page.getByText('Choose Phoenix search order')).toBeVisible()
+  const startButton = page.getByRole('button', { name: 'Start Phoenix patrol' })
+  await expect(startButton).toBeDisabled()
+  await page.getByRole('button', { name: /main \(641, 1803\)/ }).click()
+  await page.getByRole('button', { name: /cave \(-180, -1164\)/ }).click()
+  await page.getByRole('button', { name: /main \(-1184, 781\)/ }).click()
+  await expect(startButton).toBeDisabled() // only 3 of 5 regions chosen
+})
+
 test('Character detail: a merchant never shows combat/hunt status at all', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

@@ -1,6 +1,7 @@
 import type { Item, InventoryEntry } from './item'
 import type { Sprite } from './sprite'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
+import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
 
 export type { Sprite }
 
@@ -483,6 +484,13 @@ export interface PartyStateDynamic {
   // aren't in `bank.packs` yet.
   bankVaults: BankVault[]
   bestiaryCatalog: BestiaryMonster[]
+  // Spawn-area geometry for farmingAreas.ts (farming-area-picker.tsx's port) -
+  // a SEPARATE catalog from bestiaryCatalog's own spawnRecords (confirmed
+  // against the real coordinator source, status/catalogs.ts/public-state.ts:
+  // both are sent alongside each other, same `section=catalog` channel).
+  monsterChoices: MonsterLocationCatalog
+  // Saved Phoenix 5-region search order (state.phoenixRouteOrder).
+  phoenixRouteOrder: string[]
   skillCatalog: SkillClass[]
   combatLogs: Record<string, ActivityEntry[]>
   merchantActivity: ActivityEntry[]
@@ -718,6 +726,8 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   followers: {},
   restockPolicies: {},
   bestiaryCatalog: [],
+  monsterChoices: [],
+  phoenixRouteOrder: [],
   skillCatalog: [],
   combatLogs: {},
   merchantActivity: [],

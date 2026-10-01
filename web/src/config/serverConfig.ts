@@ -31,6 +31,11 @@ export const SAME_ORIGIN_SETTINGS: ServerSettings = { baseUrl: '' }
  *  matches that by default (see the doc comment above). */
 export const apiBase = (settings: ServerSettings): string => `${settings.baseUrl.replace(/\/+$/, '')}/party-api`
 export const streamUrl = (settings: ServerSettings): string => `${apiBase(settings)}/dashboard-stream`
+/** Per-character live map/entities feed (runtime/coordinator/telemetry/map-stream.ts) -
+ *  the only channel that carries nearby entities (id -> mtype), needed to resolve
+ *  a character's raw combat target id into an actual monster name. */
+export const mapStreamUrl = (settings: ServerSettings, character: string): string =>
+  `${apiBase(settings)}/map-stream/${encodeURIComponent(character)}`
 
 const STORAGE_KEY = 'party-console-companion:server-settings'
 
