@@ -569,7 +569,14 @@ export interface PartyStateDynamic {
   monsterHunt?: MonsterHuntCycle | null
   // Per-character Hunt quest assignment - see MonsterHuntStatus. Keyed by character name.
   characterHunt: Record<string, MonsterHuntStatus | null>
-  farmAreaState?: { paused?: boolean } | null
+  farmAreaState?: FarmAreaState | null
+  // Keyed by character name - see resolveFarmingContext. There is only one
+  // account `leader`; the leader's OWN effective policy/blacklist/hunt/area
+  // are always the simple top-level fields above, never a profile entry.
+  // A character that follows the leader also uses those same top-level
+  // fields. Every OTHER character (not the leader, not following) runs
+  // independently and has its own entry here instead.
+  farmingProfiles: Record<string, FarmingProfile>
   // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one standing
   // buy order per item id, automatically filled up to `price`.
   standBids: Record<string, StandBid>
@@ -637,6 +644,27 @@ export interface MonsterHuntStatus {
   remainingMs: number | null
   server: string | null
 }
+/** farmAreaState's real shape (party-state.tsx) - was too narrow before (just `paused`). */
+export interface FarmAreaState {
+  message?: string
+  paused?: boolean
+  active?: { map: string; x: number; y: number; monsterIds?: string[] }
+}
+
+/** state.farmingProfiles[name] - one non-leader, non-following character's
+ *  own independent farming policy/blacklist/hunt/area, kept separate from
+ *  the account's simple top-level fields (which only ever reflect the
+ *  leader's own settings) - see resolveFarmingContext below, ported from
+ *  party-console's farming-context.ts. */
+export interface FarmingProfile {
+  farmAreaState?: FarmAreaState
+  farmingPolicy?: string
+  monsterHunt?: MonsterHuntCycle | null
+  huntSettings?: HuntSettings
+  huntBlacklist?: Record<string, HuntBlacklistEntry>
+  monsterFocus?: string[]
+}
+
 export interface HuntBlacklistEntry {
   monsterId: string
   at: number
@@ -656,6 +684,32 @@ export interface HuntSettings {
   deathThreshold: number
   blacklistExpirations: boolean
   expirationThreshold: number
+}
+
+/** What a character's farming setup ACTUALLY is right now - ported verbatim
+ *  from party-console's farming-context.ts. The leader's own effective
+ *  policy/blacklist/hunt/area always live in the simple top-level fields,
+ *  and a character following the leader inherits those same top-level
+ *  fields too. Everyone else (not the leader, not following) runs
+ *  independently, so their effective values come from their own
+ *  farmingProfiles entry instead. `savedMode` is what THIS character
+ *  personally selected (or inherited by simply being the leader);
+ *  `effectiveMode` is what's actually running right now. */
+export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
+  const followingLeader = state.leader && state.leader !== name && state.followers[name] ? state.leader : undefined
+  const owner = followingLeader || name
+  const legacy = owner === state.leader
+  const personal = state.farmingProfiles[name]
+  const effective = state.farmingProfiles[owner]
+  return {
+    owner,
+    followingLeader,
+    farmArea: effective?.farmAreaState || (legacy ? state.farmAreaState : undefined) || null,
+    savedMode: personal?.farmingPolicy || (name === state.leader ? state.farmingPolicy : undefined) || 'auto',
+    effectiveMode: effective?.farmingPolicy || (legacy ? state.farmingPolicy : undefined) || 'auto',
+    blacklist: effective?.huntBlacklist || (legacy ? state.huntBlacklist : undefined) || {},
+    hunt: effective?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
+  }
 }
 
 export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
@@ -705,6 +759,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   monsterHunt: null,
   characterHunt: {},
   farmAreaState: null,
+  farmingProfiles: {},
   standBids: {},
   upgradeOfferingRules: [],
 })

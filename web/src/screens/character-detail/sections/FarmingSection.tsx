@@ -6,7 +6,7 @@ import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
-import type { BestiaryMonster, Condition, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus, MonsterSpawnRecord } from '@/models'
+import type { BestiaryMonster, Condition, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus, MonsterSpawnRecord } from '@/models'
 import { formatDuration } from '@/lib/itemFormulas'
 
 const MODES: { id: 'auto' | 'default' | 'scatter' | 'hunt'; label: string; description: string }[] = [
@@ -17,16 +17,27 @@ const MODES: { id: 'auto' | 'default' | 'scatter' | 'hunt'; label: string; descr
 ]
 
 /** farming-mode-control.tsx ported, scoped down from its full scope:
- *  the mode selector (account-wide - /farming-mode takes no `character`
- *  field at all) and this character's own monster focus. Passive/rare
- *  hunting rules, the visual radius-map preview, and Phoenix's 5-region
- *  patrol ordering are NOT ported - all niche/advanced sub-features on
- *  top of the core "what should this character farm" control that this
- *  section exists for. Hunt settings + the blacklist viewer are their
- *  own screen (RoutinesScreen-sized, not an inline card). */
+ *  the mode selector + effective-mode/follow indicator, hunt status, and
+ *  this character's own monster focus. Passive/rare hunting rules, the
+ *  visual radius-map preview, and Phoenix's 5-region patrol ordering are
+ *  NOT ported - all niche/advanced sub-features on top of the core "what
+ *  should this character farm" control that this section exists for. Hunt
+ *  settings + the blacklist viewer are their own screen (RoutinesScreen-
+ *  sized, not an inline card).
+ *
+ *  `farmingPolicy`/`monsterHunt`/`huntBlacklist` here are already resolved
+ *  (CharacterDetailScreen's resolveFarmingContext call) - /farming-mode
+ *  itself takes no `character` field (selecting a mode is always account-
+ *  wide), but what's actually EFFECTIVE for a given character can differ
+ *  from the raw account-wide fields when they run their own independent
+ *  farming setup (not the leader, not following) - see models/state.ts's
+ *  resolveFarmingContext. */
 export function FarmingSection({
   characterName,
   farmingPolicy,
+  effectiveMode,
+  followingLeader,
+  farmArea,
   monsterFocus,
   monsterSearchRadius,
   bestiaryCatalog,
@@ -38,6 +49,9 @@ export function FarmingSection({
 }: {
   characterName: string
   farmingPolicy: string
+  effectiveMode: string
+  followingLeader?: string
+  farmArea?: FarmAreaState | null
   monsterFocus: string[]
   monsterSearchRadius: number
   bestiaryCatalog: BestiaryMonster[]
@@ -91,14 +105,26 @@ export function FarmingSection({
         huntBlacklist={huntBlacklist}
         bestiaryCatalog={bestiaryCatalog}
       />
-      <p className="mb-1.5 text-xs text-muted-foreground">Account-wide - applies to the whole party.</p>
-      <div className="flex flex-wrap gap-1.5">
+      <p className="mb-1.5 text-xs text-muted-foreground">
+        Account-wide - applies to the whole party.
+        {followingLeader ? ` Following ${followingLeader} - effective settings are theirs.` : ''}
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
         {MODES.map((mode) => (
           <Chip key={mode.id} selected={farmingPolicy === mode.id} onClick={() => void selectMode(mode.id)}>
             {mode.label}
           </Chip>
         ))}
+        {(farmingPolicy === 'auto' || farmingPolicy === 'hunt') && effectiveMode !== farmingPolicy && (
+          <span className="text-xs text-muted-foreground">Currently: {effectiveMode}</span>
+        )}
       </div>
+      {farmArea?.active && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Active farming zone: {farmArea.active.map} ({Math.round(farmArea.active.x)}, {Math.round(farmArea.active.y)})
+          {farmArea.message && !/farming resumed/i.test(farmArea.message) ? ` · ${farmArea.message}` : ''}
+        </p>
+      )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
 
       {pickingBackup && (
@@ -176,6 +202,7 @@ function LiveCombatStatus({
           <span>
             Party Hunt{monsterHunt.stage ? ` · ${monsterHunt.stage}` : ''}: {questMonster?.name ?? monsterHunt.target}
             {monsterHunt.message ? ` · ${monsterHunt.message}` : ''}
+            {monsterHunt.owner ? ` · Quest owner: ${monsterHunt.owner}` : ''}
           </span>
         </div>
       )}

@@ -75,6 +75,14 @@ export class MockPartyServer {
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   huntSettings: Record<string, unknown> | null = null
   monsterHunt: Record<string, unknown> | null = null
+  // A real account always has a leader once configured - resolveFarmingContext
+  // (models/state.ts) falls back to the plain top-level farmingPolicy/
+  // huntBlacklist/monsterHunt fields above ONLY for whichever character IS
+  // the leader (or follows nobody and matches `leader`); every other
+  // character needs its own farmingProfiles entry or it sees nothing.
+  leader: string | null = null
+  followers: Record<string, boolean> = {}
+  farmingProfiles: Record<string, Record<string, unknown>> = {}
   requirePairing = false
   // Both keyed by character - mirrors state.luckyUpgradeSlots/luckySlotTracking.
   luckyUpgradeSlots: Record<string, number> = {}
@@ -169,6 +177,9 @@ export class MockPartyServer {
       huntBlacklist: this.huntBlacklist,
       huntSettings: this.huntSettings,
       monsterHunt: this.monsterHunt,
+      leader: this.leader,
+      followers: this.followers,
+      farmingProfiles: this.farmingProfiles,
       aldata: { listings: this.aldataListings },
       ponty: { listings: this.pontyListings },
       // Real shape of state?section=core&dashboard=1's own extra field -
