@@ -78,6 +78,11 @@ export class MockPartyServer {
   upgradeOfferingRules: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   monsterFocusByCharacter: Record<string, string[]> = {}
+  // The leader's own effective focus (party-state.tsx's flat field) -
+  // the real server deliberately keeps monsterFocusByCharacter[leader]
+  // empty (navigation/focus.ts's characterFocus() deletes it there),
+  // so a leader-focus test needs this set directly, not the by-character map.
+  monsterFocus: string[] = []
   // farmingAreas.ts's Catalog shape - spawn-area GEOMETRY, a separate
   // catalog from bestiaryCatalog's own simpler spawnRecords.
   monsterChoices: { id: string; locations?: { map: string; x: number; y: number; mapName?: string; boundary?: number[] }[] }[] = []
@@ -185,6 +190,7 @@ export class MockPartyServer {
       luckySlotTracking: this.luckySlotTracking,
       huntBlacklist: this.huntBlacklist,
       monsterFocusByCharacter: this.monsterFocusByCharacter,
+      monsterFocus: this.monsterFocus,
       monsterChoices: this.monsterChoices,
       phoenixRouteOrder: this.phoenixRouteOrder,
       huntSettings: this.huntSettings,

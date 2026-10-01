@@ -478,6 +478,13 @@ export interface PartyStateDynamic {
   merchantQueue: MerchantJob[]
   leader?: string | null
   followers: Record<string, boolean>
+  // The leader's own effective monster focus (party-state.tsx's flat
+  // field) - navigation/focus.ts's characterFocus() deliberately keeps
+  // monsterFocusByCharacter[leader] empty (that's what followers/others
+  // inherit from instead), so this is the fallback CharacterDetailScreen
+  // needs for the leader's own screen - see connected-character-card.tsx's
+  // `monsterFocusByCharacter?.[char.name] || selectedFocus`.
+  monsterFocus?: string[]
   restockPolicies: Record<string, RestockPolicy>
   bank?: BankSnapshot | null
   // Every bank pack the account could ever have, locked or not (see BankVault) - locked ones

@@ -88,6 +88,17 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   const api = useMemo(() => new PartyApiClient(settings), [settings])
   const rosterRef = useRef<Record<string, RosterMember>>({})
 
+  // The 6s background poll and a manual refreshDynamicStateNow() (fired
+  // right after a mutating action, e.g. FarmingSection's selectMode) can
+  // overlap with no ordering between their requests - a poll tick that
+  // happened to start just before the action, reading pre-action state,
+  // can still resolve AFTER the manual refresh's post-action read and
+  // silently clobber the fresher data back to stale via setQueryData,
+  // making a just-applied change look like it never took effect. Each
+  // call captures its own generation number; only the latest one is
+  // allowed to write.
+  const dynamicStateGeneration = useRef(0)
+
   // Whether the catalog has been fetched at all yet this session - the
   // first dynamic-state poll triggers an immediate catalog fetch if not;
   // after that it only refreshes on the slow CATALOG_REFRESH_MS timer.
@@ -118,6 +129,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       // before it even starts), while parallel requests overlap. The big
       // item/monster/skill catalog is deliberately excluded from this
       // cycle entirely - see refreshCatalogNow.
+      const generation = ++dynamicStateGeneration.current
       const escapeStart = performance.now()
       const [coreResult, bankResult, marketResult, logsResult, mailResult, escapeResult] = await Promise.all([
         // dashboard=1 is just a payload-shape toggle (see runtime/coordinator/
@@ -136,6 +148,11 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       // so its round trip is dominated by real network latency rather
       // than payload transfer time - a reasonable, zero-extra-request
       // proxy for "how slow does this connection feel right now".
+      // A newer call (the next poll tick, or another manual refresh)
+      // already started while this one was in flight - its results will
+      // supersede ours shortly, so writing this response now would only
+      // risk clobbering fresher data with this call's staler snapshot.
+      if (generation !== dynamicStateGeneration.current) return
       if (escapeResult.kind === 'success') queryClient.setQueryData(QK.latencyMs, Math.round(performance.now() - escapeStart))
 
       if (coreResult.kind === 'success' || bankResult.kind === 'success' || marketResult.kind === 'success' || logsResult.kind === 'success') {

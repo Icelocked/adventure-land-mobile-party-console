@@ -100,6 +100,27 @@ test('Character detail: monster focus button shows what\'s actually selected, no
   await expect(page.getByRole('button', { name: 'Crabxx, Crab' })).toBeVisible()
 })
 
+test('Character detail: the leader\'s own focus button falls back to the flat field, not "No monsters selected"', async ({ page }) => {
+  // navigation/focus.ts's characterFocus() deliberately keeps
+  // monsterFocusByCharacter[leader] EMPTY (the leader's effective focus
+  // lives in the flat monsterFocus field instead, which is what
+  // followers/others inherit from) - a leader's own screen must fall back
+  // to that flat field, matching connected-character-card.tsx's
+  // `monsterFocusByCharacter?.[char.name] || selectedFocus`.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  server.monsterFocusByCharacter = {}
+  server.monsterFocus = ['crabx']
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  await expect(page.getByRole('button', { name: 'Crabxx', exact: true })).toBeVisible()
+  await expect(page.getByText('No monsters selected')).not.toBeVisible()
+})
+
 test('Character detail: resolves the real monster name via the live map/entities stream', async ({ page }) => {
   // End-to-end proof the subscription/frame-parsing/resolution pipeline
   // genuinely works: vitals.target is a per-instance id ("2951603" - a raw
