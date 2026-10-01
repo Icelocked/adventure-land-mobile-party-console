@@ -43,7 +43,19 @@ async function timedFetch(url: string, init: RequestInit = {}, timeoutMs: number
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    return await fetch(url, { ...init, signal: controller.signal })
+    // party-console's own /party-api/* middleware (http/middleware.ts's
+    // partyApiResponseHeaders) sets CORS headers but no Cache-Control at
+    // all - unlike codeResponseHeaders, which explicitly no-stores the
+    // CODE editor endpoint. Every poll hits the exact same URL+querystring
+    // (state?section=core&dashboard=1), and fetch()'s default cache mode
+    // consults the browser's own HTTP cache using heuristics when a
+    // response carries no explicit cache directives - a real risk of
+    // silently serving a stale snapshot forever on a connection/browser
+    // combination that decides to cache it, with no way for this app to
+    // tell from the outside (the request still resolves fast and 200s).
+    // Forcing no-store here is enough on its own; it doesn't depend on
+    // the server ever sending matching headers.
+    return await fetch(url, { ...init, cache: 'no-store', signal: controller.signal })
   } finally {
     clearTimeout(timeout)
   }

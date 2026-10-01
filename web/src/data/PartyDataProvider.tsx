@@ -163,6 +163,13 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
               })
             : undefined
         const { characterDetails, ...core } = coreRaw ?? {}
+        queryClient.setQueryData(QK.coreFetchDebug, {
+          at: Date.now(),
+          success: coreResult.kind === 'success',
+          message: coreResult.kind === 'failure' ? coreResult.message : undefined,
+          leader: core.leader,
+          farmingPolicy: core.farmingPolicy,
+        })
         const characterHunt = characterDetails
           ? Object.fromEntries(Object.entries(characterDetails).map(([name, detail]) => [name, detail.monsterHunt ?? null]))
           : undefined
@@ -339,3 +346,12 @@ export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.esca
 /** Round-trip time of the smallest request in the last dynamic-state poll
  *  cycle (see refreshDynamicStateNow) - null until the first poll lands. */
 export const useLatencyMs = (): number | null => useCachedValue(QK.latencyMs, null)
+/** Temporary diagnostic - see queryKeys.ts's coreFetchDebug. */
+export interface CoreFetchDebug {
+  at: number
+  success: boolean
+  message?: string
+  leader?: string | null
+  farmingPolicy?: string
+}
+export const useCoreFetchDebug = (): CoreFetchDebug | null => useCachedValue(QK.coreFetchDebug, null)
