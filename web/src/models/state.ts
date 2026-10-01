@@ -562,6 +562,12 @@ export interface PartyStateDynamic {
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
   huntSettings?: HuntSettings | null
+  // The party's current Hunt quest (coordinator's HuntCycle) - which monster
+  // it's chasing right now and for which member. Already arrives in the same
+  // state?section=core poll this app already fetches (confirmed against the
+  // real coordinator source), just never modeled before now.
+  monsterHunt?: MonsterHuntCycle | null
+  farmAreaState?: { paused?: boolean } | null
   // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one standing
   // buy order per item id, automatically filled up to `price`.
   standBids: Record<string, StandBid>
@@ -602,6 +608,15 @@ export interface StandBid {
 /** hunt-blacklist-label.ts's source entry - a monster currently skipped
  *  by Hunt mode, either automatically (deaths/expirations threshold) or
  *  manually. */
+/** Minimal slice of the coordinator's HuntCycle worth showing - the full
+ *  type carries a lot of internal travel/recovery bookkeeping no screen
+ *  needs. */
+export interface MonsterHuntCycle {
+  target: string | null
+  message?: string
+  currentIndex: number
+  missions: { target: string; owners: string[] }[]
+}
 export interface HuntBlacklistEntry {
   monsterId: string
   at: number
@@ -667,6 +682,8 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   monsterFocusByCharacter: {},
   monsterSearchRadiusByCharacter: {},
   huntBlacklist: {},
+  monsterHunt: null,
+  farmAreaState: null,
   standBids: {},
   upgradeOfferingRules: [],
 })

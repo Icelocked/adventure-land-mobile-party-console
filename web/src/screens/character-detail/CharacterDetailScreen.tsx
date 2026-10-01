@@ -94,6 +94,9 @@ export function CharacterDetailScreen() {
                 monsterFocus={dynamicState.monsterFocusByCharacter[name] ?? []}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
+                target={vitals.target}
+                conditions={vitals.conditions}
+                monsterHunt={dynamicState.monsterHunt}
               />
             )}
             {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
