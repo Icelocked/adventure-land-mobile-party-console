@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useCharacters } from '@/data/PartyDataProvider'
+import { useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { itemMaximumLevel } from '@/lib/itemFormulas'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
@@ -22,7 +22,6 @@ import type { CatalogItem, UpgradeOffering, UpgradeOfferingRule } from '@/models
  *  screen exists for. */
 export function OfferingsScreen() {
   const dynamicState = useDynamicState()
-  const characters = useCharacters()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [editing, setEditing] = useState<UpgradeOfferingRule | 'new' | null>(null)
@@ -30,7 +29,7 @@ export function OfferingsScreen() {
 
   const catalog = dynamicState.merchantCatalog?.allItems ?? []
   const catalogFor = (id: string): CatalogItem | undefined => catalog.find((c) => c.id === id)
-  const merchant = Object.entries(characters).find(([, c]) => c.vitals?.ctype === 'merchant')?.[0]
+  const merchant = dynamicState.merchantCharacter ?? undefined
   const rules = dynamicState.upgradeOfferingRules
 
   const remove = async (id: string) => {

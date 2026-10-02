@@ -67,7 +67,7 @@ export function ItemActionPanel({
         quantities[entryItem.name] = (quantities[entryItem.name] ?? 0) + Math.max(1, entryItem.q ?? 1)
       }
     }
-    const merchant = Object.values(characters).find((c) => c.vitals?.ctype === 'merchant')
+    const merchant = dynamicState.merchantCharacter ? characters[dynamicState.merchantCharacter] : undefined
     for (const entry of merchant?.inventory?.items ?? []) add(entry?.item)
     for (const pack of Object.values(dynamicState.bank?.packs ?? {})) {
       for (const entry of pack) add(entry?.item)
@@ -174,12 +174,14 @@ function InventoryActions({
   const dynamicState = useDynamicState()
   const { item, slot } = target
   const level = item.level ?? 0
-  const others = Object.keys(roster).filter((name) => name !== characterName)
+  // use-party-console.tsx: bankbois are storage workers, never delivery targets.
+  const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
+  const others = Object.keys(roster).filter((name) => name !== characterName && !bankboiNames.has(name))
   const toggle = (key: string) => onExpand(expanded === key ? null : key)
   // inventory-panel.tsx only offers upgrade/compound actions when the
   // account has a merchant character at all (upgrading always routes
   // through them), independent of which character's item this is.
-  const hasMerchant = Object.values(roster).some((r) => r.ctype === 'merchant')
+  const hasMerchant = !!dynamicState.merchantCharacter
   const canUpgrade = hasMerchant && !!meta?.upgradeable && itemMaximumLevel(meta) > level
   const canCompound = hasMerchant && !!meta?.compoundable
   const canStatScroll = isMerchant && !!meta?.definition.stat

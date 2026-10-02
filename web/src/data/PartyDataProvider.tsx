@@ -429,3 +429,12 @@ export const useCoreFetchDebug = (): CoreFetchDebug | null => useCachedValue(QK.
  *  would save empty defaults over the server's real values. */
 export const useConfigLoadedAt = (): number | null => useCachedValue(QK.configLoadedAt, null)
 export const useConfigLoaded = (): boolean => useConfigLoadedAt() !== null
+/** The configured merchant (config section) - the merchant ROLE. Never infer
+ *  it from character class: bankbois and second merchants share the class. */
+export const useMerchantCharacter = (): string | null => useDynamicState().merchantCharacter ?? null
+/** inventory/shared-rules.ts ruleOwner: with shared merchant rules every
+ *  member's rules live under the merchant; otherwise each owns its own. */
+export function useRuleOwner(name: string): string {
+  const state = useDynamicState()
+  return state.merchantRules ? (state.merchantCharacter ?? name) : name
+}
