@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { aggregateSlotTracking, emptyRolls, luckySlotSearch } from '@/lib/luckySlot'
@@ -12,8 +11,20 @@ import type { LuckySlotStreams } from '@/models'
  *  this was previously entirely invisible in the PWA - you could see that
  *  testing was happening (upgrade marks moving between slots) with no way
  *  to see what it had actually found. */
-export function LuckySlotSection({ characterName, streams, verified }: { characterName: string; streams: LuckySlotStreams; verified?: number | null }) {
-  const [open, setOpen] = useState(false)
+export function LuckySlotSection({
+  characterName,
+  streams,
+  verified,
+  open,
+  onOpenChange: setOpen,
+}: {
+  characterName: string
+  streams: LuckySlotStreams
+  verified?: number | null
+  // Controlled so the inventory's lucky slot can open it too (lucky-slot-menu.tsx "Show lucky slot data").
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const tracking = aggregateSlotTracking(streams)
   const search = luckySlotSearch(tracking)
   const nextSlot = verified != null ? verified : search.nextSlot

@@ -89,6 +89,8 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await expect(craftButton).toBeEnabled()
   await craftButton.click()
   await expect.poll(() => server.lastOrder?.path).toBe('merchant/order')
+  // A placed order navigates back; let that land before the next goto.
+  await expect(page).not.toHaveURL(/\/merchant\/craft/)
 
   await page.goto('/characters/Merchantina')
   await page.getByRole('button', { name: 'Menu' }).click()

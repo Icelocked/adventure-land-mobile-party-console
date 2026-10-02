@@ -129,6 +129,8 @@ export class MockPartyServer {
   bankGold = 0
   mailMessages: Record<string, unknown>[] = []
   mailPostage: number | null = null
+  // inventory-entry.tsx operation, per character then slot (an upgrade/compound in progress).
+  inventoryOperations: Record<string, Record<number, Record<string, unknown>>> = {}
   mailActions: { action: string; id?: unknown }[] = []
   standListings: Record<string, unknown>[] = []
   bestiaryCatalog: Record<string, unknown>[] = []
@@ -358,7 +360,8 @@ export class MockPartyServer {
       ;(c.items ?? []).forEach((item, index) => {
         // The wire shape is InventoryEntry ({slot, item}), not the bare
         // item - recordToState() in the app casts this straight through.
-        if (item) items[String(index)] = { slot: index, item }
+        const operation = this.inventoryOperations[c.name]?.[index]
+        if (item) items[String(index)] = { slot: index, item, ...(operation ? { operation } : {}) }
       })
       characters[c.name] = {
         generation: 'g1',

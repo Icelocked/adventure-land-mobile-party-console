@@ -1,3 +1,6 @@
+import type { ItemMeta } from './itemDetail'
+import type { Sprite } from './sprite'
+
 /** Mirrors the Android app's model/Item.kt, itself a mirror of
  *  party-console's `Item` type (dashboard/features/party/item.tsx) -
  *  field names match the server's JSON exactly. `unknown` is used in
@@ -25,15 +28,27 @@ export function isModifiedItem(item: Item): boolean {
   return Number(item.level ?? 0) > 0 || !!item.stat_type || !!item.p
 }
 
+/** inventory-entry.tsx's operation: an upgrade/compound in progress on
+ *  this slot (item-operation-overlay.tsx). */
+export interface ItemOperation {
+  type: string
+  fromLevel: number
+  toLevel: number
+  chance?: number | null
+  sprite?: Sprite | null
+}
+
 export interface InventoryEntry {
   slot: number
   item: Item
-  // An upgrade/compound in progress on this slot (item-operation-overlay.tsx).
-  operation?: unknown
+  // Live item meta, when the server attaches it (inventory-entry.tsx).
+  meta?: ItemMeta | null
+  operation?: ItemOperation | null
 }
 
 export interface EquippedEntry {
   item: Item
+  meta?: ItemMeta | null
 }
 
 /** Mirrors `Condition` (dashboard/features/party/condition.tsx) - one live

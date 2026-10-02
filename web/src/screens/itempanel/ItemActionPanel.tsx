@@ -25,6 +25,7 @@ export function ItemActionPanel({
   roster,
   catalog,
   monsters,
+  onLuckySlotData,
   onClose,
 }: {
   target: ItemActionTarget
@@ -33,6 +34,8 @@ export function ItemActionPanel({
   roster: Record<string, RosterMember>
   catalog: MerchantCatalog | null | undefined
   monsters: BestiaryMonster[]
+  // lucky-slot-menu.tsx "Show lucky slot data", when this is the merchant's lucky slot.
+  onLuckySlotData?: () => void
   onClose: () => void
 }) {
   const refreshNow = useRefreshDynamicStateNow()
@@ -96,6 +99,15 @@ export function ItemActionPanel({
         <div className="my-2 border-t border-border" />
 
         <TapRow label="Item details" onClick={() => setShowingDetails(true)} />
+        {onLuckySlotData && (
+          <TapRow
+            label="Show lucky slot data"
+            onClick={() => {
+              onClose()
+              onLuckySlotData()
+            }}
+          />
+        )}
 
         {target.kind === 'inventory' ? (
           <InventoryActions
@@ -387,6 +399,11 @@ function EquipmentActions({
   return (
     <div>
       {slotName !== 'elixir' && !slotName.startsWith('trade') && <TapRow label="Unequip" onClick={() => run(() => api.itemCommand('unequip', characterName, item, slotName))} />}
+      {slotName === 'elixir' && (
+        <button disabled className="w-full rounded-md py-2 text-left text-sm text-muted-foreground">
+          Active elixir effect
+        </button>
+      )}
       {canUpgrade && (
         <>
           <TapRow label="Mark for Upgrade" onClick={() => toggle('upgrade')} />

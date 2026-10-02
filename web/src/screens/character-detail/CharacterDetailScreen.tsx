@@ -40,6 +40,8 @@ export function CharacterDetailScreen() {
   const roster = useRoster()
   const [actionTarget, setActionTarget] = useState<ItemActionTarget | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [luckySlotOpen, setLuckySlotOpen] = useState(false)
+  const [actionOnLucky, setActionOnLucky] = useState(false)
 
   const state = characters[name]
   const vitals = state?.vitals
@@ -141,46 +143,36 @@ export function CharacterDetailScreen() {
               <MerchantControlsSection forceStand={dynamicState.merchantForceStand} gatheringModes={dynamicState.gatheringModes} />
             )}
             {isMerchant && (
-              <LuckySlotSection characterName={name} streams={dynamicState.luckySlotTracking[name] ?? {}} verified={dynamicState.luckyUpgradeSlots[name]} />
+              <LuckySlotSection
+                characterName={name}
+                streams={dynamicState.luckySlotTracking[name] ?? {}}
+                verified={dynamicState.luckyUpgradeSlots[name]}
+                open={luckySlotOpen}
+                onOpenChange={setLuckySlotOpen}
+              />
             )}
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}
               upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => mark.equipped)}
+              statScrollMarks={dynamicState.statScrolls[name] ?? []}
+              // equipment.tsx: the class, not the configured merchant role.
+              isMerchant={vitals.ctype === 'merchant'}
               catalogFor={catalogFor}
-              onSlotTap={(slotName, entry) => entry && setActionTarget({ kind: 'equipment', slotName, item: entry.item })}
+              onSlotTap={(slotName, entry) => setActionTarget({ kind: 'equipment', slotName, item: entry.item })}
             />
             <InventorySection
+              characterName={name}
+              isMerchant={isMerchant}
               items={state?.inventory?.items ?? []}
-              merchantMarks={dynamicState.merchantMarked[name] ?? []}
-              bankMarks={dynamicState.marked[name] ?? []}
-              statScrollMarks={dynamicState.statScrolls[name] ?? []}
-              upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => !mark.equipped)}
-              compoundGroups={dynamicState.compounds[name] ?? []}
-              // Both flat/account-wide lists. The item-action panel's
-              // manual "Mark for NPC Sale" always sends source "character"
-              // (bank-side sales are BankScreen's own source "bank"
-              // concern) - but the STANDING auto-NPC-sale rule reconciles
-              // server-side into its own source "merchant" marks with no
-              // `character` field at all (automatic-sales.ts's
-              // markNpcSale), since that rule only ever applies to the
-              // merchant's own inventory. Missing that source entirely was
-              // why an auto-marked item on the merchant showed no badge.
-              // A completed deconstruction is no longer worth badging.
-              npcSaleMarks={dynamicState.npcSaleMarks.filter(
-                (mark) => (mark.source === 'character' && mark.character === name) || (mark.source === 'merchant' && isMerchant),
-              )}
-              deconstructionMarks={dynamicState.deconstructionMarks.filter((mark) => mark.owner === name && mark.state !== 'complete')}
-              // A delivery's `slot` refers to the SENDER's inventory (the
-              // item physically stays there until actually delivered), so
-              // this only ever applies to the merchant's own screen -
-              // flatten every recipient's list and match by slot+item.
-              deliveries={
-                isMerchant
-                  ? Object.entries(dynamicState.merchantDeliveries).flatMap(([target, marks]) => marks.map((mark) => ({ target, slot: mark.slot, item: mark.item })))
-                  : []
-              }
+              inventorySize={vitals.inventorySize}
+              loaded={!!state?.inventory}
+              dynamicState={dynamicState}
               catalogFor={catalogFor}
-              onItemTap={(index, entry) => entry && setActionTarget({ kind: 'inventory', slot: index, item: entry.item })}
+              onItemTap={(entry, lucky) => {
+                setActionTarget({ kind: 'inventory', slot: entry.slot, item: entry.item })
+                setActionOnLucky(lucky)
+              }}
+              onLuckySlotData={() => setLuckySlotOpen(true)}
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
@@ -198,6 +190,7 @@ export function CharacterDetailScreen() {
           roster={roster}
           catalog={dynamicState.merchantCatalog}
           monsters={dynamicState.bestiaryCatalog}
+          onLuckySlotData={actionOnLucky && actionTarget.kind === 'inventory' ? () => setLuckySlotOpen(true) : undefined}
           onClose={() => setActionTarget(null)}
         />
       )}

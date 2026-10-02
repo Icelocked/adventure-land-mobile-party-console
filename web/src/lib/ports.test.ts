@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { itemActionBanner } from './itemActionBanner'
+import { suggestedItemValue, upgradeEstimate, UPGRADE_CHANCES } from './suggestedItemValue'
 import { routineFor } from './routineLabels'
 import { bankSaleCopies, same } from './bankSaleCopies'
 import { recoveryDelay } from './dashboardRecovery'
@@ -131,5 +133,36 @@ describe('itemRuleConflicts / conflictingItems / describeRule (shared-rules.ts, 
     expect(describeRule({ targetTier: 4, quantity: 2 })).toBe('Compound to +4 · 2 remaining')
     expect(describeRule({ price: 12000 })).toBe('12,000g')
     expect(describeRule({})).toBe('Automatic rule')
+  })
+})
+
+describe('item-action-banner.ts', () => {
+  it('ranks manual marks over automatic, delivery over bank, and drops merchant marks on the merchant', () => {
+    expect(itemActionBanner([{ action: 'bank', label: 'Bank' }, { action: 'stand', automatic: true, label: 'Auto stand' }, { action: 'upgrade', label: '+0 → +1' }], false)?.label).toBe('+0 → +1')
+    expect(itemActionBanner([{ action: 'bank', label: 'Bank' }, { action: 'delivery', label: 'To X' }], false)?.label).toBe('To X')
+    expect(itemActionBanner([{ action: 'merchant', label: 'Mark for merchant' }], true)).toBeNull()
+  })
+  it('flags two automatic families as a rule conflict, but not two processing rules', () => {
+    const conflict = itemActionBanner([{ action: 'npc', automatic: true, label: 'NPC sale' }, { action: 'deconstruction', automatic: true, label: 'Auto deconstruction' }], true)
+    expect(conflict).toMatchObject({ label: 'Rule conflict', title: 'npc · deconstruction', border: 'border-red-400' })
+    expect(itemActionBanner([{ action: 'upgrade', automatic: true, label: 'Auto → +3' }, { action: 'compound', automatic: true, label: 'Auto compound → +2' }], true)?.label).toBe('Auto → +3')
+  })
+})
+
+describe('suggested-item-value.tsx / upgrade-estimate.tsx', () => {
+  it('a plain buy is one item at cost; precomputed sources never fall below the item value', () => {
+    expect(upgradeEstimate({ id: 'x', name: 'x', cost: 50, seller: '' }, 3, 0)).toEqual({ attempts: 3, gold: 150, scrolls: [] })
+    const value = suggestedItemValue(
+      { slot: 0, item: { name: 'x' }, meta: { definition: { g: 100 }, world: { suggestedPrices: [{ monsterId: 'goo', monsterName: 'Goo', rate: 0.1, quantity: 1, kills: 10, goldPerKill: 1, suggested: 40 }] } } },
+      [{ id: 'x', name: 'x', cost: 80, seller: '' }],
+    )
+    expect(value.defaultPrice).toBe(100)
+    expect(value.sources.map((source) => [source.monsterName, source.suggested])).toEqual([['buy', 80], ['Goo', 100]])
+    expect(value.suggested).toBe(80)
+  })
+  it('the +N estimate is deterministic (seeded)', () => {
+    const item = { id: 'bow', name: 'Bow', cost: 1000, seller: '', upgradeable: true, upgradeChances: UPGRADE_CHANCES[0], scrollCosts: [1000, 40000, 1600000, 64000000] }
+    expect(upgradeEstimate(item, 1, 7)).toEqual(upgradeEstimate({ ...item }, 1, 7))
+    expect(upgradeEstimate(item, 1, 7).gold).toBeGreaterThan(1000)
   })
 })

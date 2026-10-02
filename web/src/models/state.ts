@@ -1,3 +1,4 @@
+import type { StandPriceHistory } from '@/lib/suggestedItemValue'
 import type { Item, InventoryEntry, EquippedEntry } from './item'
 import type { Sprite } from './sprite'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
@@ -313,6 +314,7 @@ export interface NpcSaleMark {
   quantity: number
   state?: string
   error?: string | null
+  retryAt?: number | null
 }
 
 /** One pending deconstruction mark (state.deconstructionMarks, also a
@@ -712,7 +714,7 @@ export interface PartyStateDynamic {
   autoStandBuys?: boolean
   autoBlacklistMerchants?: boolean
   merchantStandLocation?: { map: string; x: number; y: number; [field: string]: unknown } | null
-  standPriceHistory?: Record<string, unknown>
+  standPriceHistory?: Record<string, StandPriceHistory>
   nativeStand?: {
     offers: Record<string, { itemId: string; auto: boolean; phase: string; slot: string; level?: number; price?: number; quantity?: number; acknowledged?: number; problem?: string }>
     problems: Record<string, string>
