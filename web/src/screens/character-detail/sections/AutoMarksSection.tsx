@@ -34,15 +34,19 @@ export function AutoMarksSection({
 }) {
   const api = usePartyApi()
 
-  // connected-inventory.tsx: the configured merchant's rules are the
-  // account-wide ones (no `character`), everyone else's are per-player.
-  const npcScope = characterName === dynamicState.merchantCharacter ? undefined : characterName
+  // shared-rules.ts ruleOwner: with shared merchant rules, every member's
+  // rules live under the merchant (connected-inventory.tsx reads them there).
+  const owner = dynamicState.merchantRules ? (dynamicState.merchantCharacter ?? characterName) : characterName
+  // connected-inventory.tsx: the configured merchant's NPC rules are the
+  // account-wide ones (no `character`); the server also drops `character`
+  // in shared mode (automatic-sales.ts). Everyone else's are per-player.
+  const npcScope = characterName === dynamicState.merchantCharacter || dynamicState.merchantRules ? undefined : characterName
   const npcEntries: RuleEntry[] = Object.entries(dynamicState.autoNpcSales)
     .filter(([, rule]) => (npcScope === undefined ? rule.character == null : rule.character === characterName))
     .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(npcScope, rule.item, true) }))
   const clearNpc = () => api.clearAllAutoNpcSales(npcScope)
 
-  const deconEntries: RuleEntry[] = Object.entries(dynamicState.autoDeconstruction[characterName] ?? {}).map(([key, rule]) => ({
+  const deconEntries: RuleEntry[] = Object.entries(dynamicState.autoDeconstruction[owner] ?? {}).map(([key, rule]) => ({
     key,
     item: rule.item,
     onRemove: () => api.autoDeconstruct(characterName, rule.item, true),
@@ -52,7 +56,7 @@ export function AutoMarksSection({
   // inventory-panel.tsx's own clearAutomaticSection loops the existing per-rule remove the same way.
   const clearDecon = () => Promise.all(deconEntries.map((entry) => entry.onRemove()))
 
-  const bankEntries: RuleEntry[] = Object.entries(dynamicState.autoItemMarks[characterName] ?? {})
+  const bankEntries: RuleEntry[] = Object.entries(dynamicState.autoItemMarks[owner] ?? {})
     .filter(([, mode]) => mode === 'bank')
     .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, 'bank', key) }))
   const clearBank = () => api.clearAutoItemMarks(characterName, 'bank')
@@ -91,7 +95,7 @@ export function AutoMarksSection({
       })),
     )
 
-    merchantMarkEntries = Object.entries(dynamicState.autoItemMarks[characterName] ?? {})
+    merchantMarkEntries = Object.entries(dynamicState.autoItemMarks[owner] ?? {})
       .filter(([, mode]) => mode === 'merchant')
       .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, 'merchant', key) }))
   }

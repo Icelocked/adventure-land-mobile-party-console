@@ -28,7 +28,9 @@ export function BankScreen() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [collapsedPacks, setCollapsedPacks] = useState<Set<string>>(new Set())
   const bank = dynamicState.bank
-  const merchant = Object.entries(characters).find(([, c]) => c.vitals?.ctype === 'merchant')?.[0] ?? null
+  // party-inventory-panels.tsx: withdrawals go to the configured merchant,
+  // whether or not it's online right now.
+  const merchant = dynamicState.merchantCharacter ?? null
 
   const togglePack = (packName: string) =>
     setCollapsedPacks((old) => {

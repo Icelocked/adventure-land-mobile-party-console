@@ -20,7 +20,9 @@ export function CharacterListScreen() {
   const refreshNow = useRefreshDynamicStateNow()
   const openServerSettings = useOpenServerSettings()
 
-  const names = Object.keys(characters)
+  // use-party-console.tsx chars: bankbois get their own cards, not party ones.
+  const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
+  const names = Object.keys(characters).filter((name) => !bankboiNames.has(name))
   const accountGold = (dynamicState.bank?.gold ?? 0) + Object.values(characters).reduce((sum, c) => sum + (c.vitals?.gold ?? 0), 0)
 
   return (

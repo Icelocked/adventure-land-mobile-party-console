@@ -204,7 +204,7 @@ test('Selecting Hunt with an existing backup already configured activates it dir
   // omitting it makes the server silently edit the ACCOUNT LEADER's
   // profile instead of this character's own (http/farming-scope.ts's
   // createScopedFarmingRoute defaults to ports.mainOwner() when absent).
-  expect(submittedBody).toEqual({ mode: 'hunt', character: 'Ranger1' })
+  await expect.poll(() => submittedBody).toEqual({ mode: 'hunt', character: 'Ranger1' })
 })
 
 test('Hunt backup picker, when the server actually requires one, starts from the character\'s existing monster focus - not blank', async ({ page }) => {
@@ -260,7 +260,7 @@ test('Route button opens the general farming-area picker and routes this charact
   await page.getByRole('button', { name: /main \(50, 75\)/ }).click()
   await page.getByRole('button', { name: 'Start farming' }).click()
   await expect(page.getByText('Choose a farming area')).not.toBeVisible()
-  expect(submittedBody).toEqual({
+  await expect.poll(() => submittedBody).toEqual({
     character: 'Ranger1',
     type: 'party-monster-travel',
     location: { map: 'main', x: 50, y: 75 },
@@ -290,7 +290,7 @@ test('Selecting a farming mode sends THIS character, not silently defaulting to 
 
   await page.goto('/characters/Independent1')
   await page.getByRole('button', { name: 'Default', exact: true }).click()
-  expect(submittedBody).toEqual({ mode: 'default', character: 'Independent1' })
+  await expect.poll(() => submittedBody).toEqual({ mode: 'default', character: 'Independent1' })
 })
 
 test('An independent character (not the leader, not following) routes via character-travel, not party-monster-travel', async ({ page }) => {
@@ -320,7 +320,7 @@ test('An independent character (not the leader, not following) routes via charac
   await page.getByRole('button', { name: 'Find selected monster' }).click()
   await page.getByRole('button', { name: /main \(50, 75\)/ }).click()
   await page.getByRole('button', { name: 'Start farming' }).click()
-  expect(submittedBody).toEqual({
+  await expect.poll(() => submittedBody).toEqual({
     character: 'Independent1',
     type: 'character-travel',
     location: { map: 'main', x: 50, y: 75 },

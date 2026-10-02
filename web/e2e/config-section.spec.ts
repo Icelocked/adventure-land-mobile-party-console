@@ -25,6 +25,7 @@ test('Config section: settings that only the config section carries reach the UI
 })
 
 test('Config section: a slow config response never holds up core, and config-seeded controls wait for it', async ({ page }) => {
+  test.setTimeout(60_000)
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
@@ -34,12 +35,13 @@ test('Config section: a slow config response never holds up core, and config-see
   await server.install(page)
 
   await page.goto('/characters/Patinder')
-  // Core (the merchant job) renders while config is still in flight...
-  await expect(page.getByText(/Now: restock/)).toBeVisible()
+  // Core keeps polling on its own 6s cadence while config is still in flight...
+  await expect.poll(() => server.stateRequests.filter((r) => r.section === 'core').length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
   // ...and the controls that would otherwise save defaults stay disabled.
   await expect(page.getByRole('button', { name: 'Follow', exact: true })).toBeDisabled()
-  await expect(page.getByRole('button', { name: /Force stand/ })).toBeDisabled()
   await expect(page.getByText('Loading settings…').first()).toBeVisible()
+  // Merchant sections wait for the configured merchant (a config field), as on the dashboard.
+  await expect(page.getByText(/Now: restock/)).toBeVisible({ timeout: 25_000 })
 })
 
 test('Config section: polled on its own slower timer, not with every core poll', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useMerchantCharacter } from '@/data/PartyDataProvider'
 import { inventoryCounts } from '@/lib/inventoryCounts'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
@@ -491,17 +491,16 @@ function ExchangeScreen({
   submitting: boolean
   error: string | null
 }) {
+  const merchantCharacter = useMerchantCharacter()
   // Only the merchant's own carried items count toward exchange
   // requirements (exchanges run through the merchant), matching
   // use-party-console.tsx's `exchangeOwned` scoping - distinct from the
   // full-account `owned` totals Buy/Craft use.
   const merchantOnly = useMemo(() => {
     const filtered: typeof characters = {}
-    for (const [name, state] of Object.entries(characters)) {
-      if (state.vitals?.ctype === 'merchant') filtered[name] = state
-    }
+    if (merchantCharacter && characters[merchantCharacter]) filtered[merchantCharacter] = characters[merchantCharacter]
     return filtered
-  }, [characters])
+  }, [characters, merchantCharacter])
   const exchangeOwned = useMemo(() => inventoryCounts(merchantOnly, bank, true), [merchantOnly, bank])
 
   const grouped = useMemo(() => groupExchangeItems(exchangeable), [exchangeable])

@@ -31,6 +31,7 @@ export function CharacterDetailScreen() {
   const navigate = useNavigate()
   const characters = useCharacters()
   const dynamicState = useDynamicState()
+  const isMerchant = name === dynamicState.merchantCharacter
   const refreshNow = useRefreshDynamicStateNow()
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const roster = useRoster()
@@ -108,10 +109,11 @@ export function CharacterDetailScreen() {
             <LeaderFollowerSection characterName={name} dynamicState={dynamicState} />
             <TravelSection
               characterName={name}
-              isMerchant={vitals.ctype === 'merchant'}
+              isMerchant={isMerchant}
               isLeader={dynamicState.leader === name}
               travelPlaces={dynamicState.travelPlaces}
             />
+            {/* Merchant-class characters can't run hunts (farming-scope.ts) - a class capability, not the merchant role. */}
             {vitals.ctype !== 'merchant' && (
               <FarmingSection
                 characterName={name}
@@ -145,8 +147,8 @@ export function CharacterDetailScreen() {
                 huntBlacklist={farming.blacklist}
               />
             )}
-            {vitals.ctype === 'merchant' && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
-            {vitals.ctype === 'merchant' && (
+            {isMerchant && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
+            {isMerchant && (
               <MerchantControlsSection
                 forceStand={dynamicState.merchantForceStand}
                 gatheringModes={dynamicState.gatheringModes}
@@ -155,7 +157,7 @@ export function CharacterDetailScreen() {
                 bankSortMode={dynamicState.bankSortMode}
               />
             )}
-            {vitals.ctype === 'merchant' && (
+            {isMerchant && (
               <LuckySlotSection characterName={name} streams={dynamicState.luckySlotTracking[name] ?? {}} verified={dynamicState.luckyUpgradeSlots[name]} />
             )}
             <EquipmentSection
@@ -182,7 +184,7 @@ export function CharacterDetailScreen() {
               // why an auto-marked item on the merchant showed no badge.
               // A completed deconstruction is no longer worth badging.
               npcSaleMarks={dynamicState.npcSaleMarks.filter(
-                (mark) => (mark.source === 'character' && mark.character === name) || (mark.source === 'merchant' && vitals.ctype === 'merchant'),
+                (mark) => (mark.source === 'character' && mark.character === name) || (mark.source === 'merchant' && isMerchant),
               )}
               deconstructionMarks={dynamicState.deconstructionMarks.filter((mark) => mark.owner === name && mark.state !== 'complete')}
               // A delivery's `slot` refers to the SENDER's inventory (the
@@ -190,7 +192,7 @@ export function CharacterDetailScreen() {
               // this only ever applies to the merchant's own screen -
               // flatten every recipient's list and match by slot+item.
               deliveries={
-                vitals.ctype === 'merchant'
+                isMerchant
                   ? Object.entries(dynamicState.merchantDeliveries).flatMap(([target, marks]) => marks.map((mark) => ({ target, slot: mark.slot, item: mark.item })))
                   : []
               }
@@ -199,7 +201,7 @@ export function CharacterDetailScreen() {
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
-            <AutoMarksSection characterName={name} isMerchant={vitals.ctype === 'merchant'} dynamicState={dynamicState} catalogFor={catalogFor} />
+            <AutoMarksSection characterName={name} isMerchant={isMerchant} dynamicState={dynamicState} catalogFor={catalogFor} />
           </div>
         </>
       )}
@@ -208,7 +210,7 @@ export function CharacterDetailScreen() {
         <ItemActionPanel
           target={actionTarget}
           characterName={name}
-          isMerchant={vitals?.ctype === 'merchant'}
+          isMerchant={isMerchant}
           roster={roster}
           catalog={dynamicState.merchantCatalog}
           monsters={dynamicState.bestiaryCatalog}
