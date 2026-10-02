@@ -222,6 +222,15 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
         <Sheet open onOpenChange={(open) => !open && setShowingDetails(false)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
             <ItemDetailBrowser
+              context={{ character: `Bank · ${pack}`, slot: entry.slot }}
+              onAddStand={
+                merchant
+                  ? () => {
+                      setShowingDetails(false)
+                      setExpanded('stand')
+                    }
+                  : undefined
+              }
               rootItemId={item.name}
               rootLevel={level}
               rootStatType={item.stat_type}

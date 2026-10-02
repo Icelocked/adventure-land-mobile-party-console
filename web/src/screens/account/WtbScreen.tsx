@@ -103,12 +103,25 @@ function ItemPicker({ catalog, onCancel, onPick }: { catalog: CatalogItem[]; onC
   )
 }
 
-function WtbForm({ itemId, catalogItem, existing, onClose }: { itemId: string; catalogItem: CatalogItem | undefined; existing: StandBid | undefined; onClose: () => void }) {
+/** Also opened from item details' "Add to WTB" at the previewed level. */
+export function WtbForm({
+  itemId,
+  catalogItem,
+  existing,
+  initialLevel,
+  onClose,
+}: {
+  itemId: string
+  catalogItem: CatalogItem | undefined
+  existing: StandBid | undefined
+  initialLevel?: number
+  onClose: () => void
+}) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [price, setPrice] = useState(existing ? String(existing.price) : '')
   const [quantity, setQuantity] = useState(existing ? String(existing.quantity) : '1')
-  const [level, setLevel] = useState(String(existing?.minimumQuality ?? 0))
+  const [level, setLevel] = useState(String(initialLevel ?? existing?.minimumQuality ?? 0))
   const [priority, setPriority] = useState(existing?.priorityOverride != null ? String(existing.priorityOverride) : '')
   const [useStandSlot, setUseStandSlot] = useState(existing?.useStandSlot === true)
   const [acceptHigherLevels, setAcceptHigherLevels] = useState(existing?.acceptHigherLevels !== false)

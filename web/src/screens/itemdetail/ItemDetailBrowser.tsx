@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, DollarSign, HandCoins, SlidersHorizontal } from 'lucide-react'
+import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/data/PartyDataProvider'
+import { WtbForm } from '@/screens/account/WtbScreen'
+import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import {
   buildStatRows,
+  comparisonSlotLabel,
+  comparisonSlotsFor,
   definitionNumber,
+  detailMeta,
+  isEquipment,
   definitionString,
   effectiveDropRate,
   exchangeSections,
@@ -46,6 +53,9 @@ export function ItemDetailBrowser({
   rootStatType,
   rootGift = false,
   rootExpires,
+  rootMeta,
+  context,
+  onAddStand,
   className,
 }: {
   rootItemId: string
@@ -55,6 +65,12 @@ export function ItemDetailBrowser({
   rootStatType?: string
   rootGift?: boolean
   rootExpires?: unknown
+  // The live instance's meta, merged over the catalog's (use-party-console.tsx detailMeta).
+  rootMeta?: ItemMeta | null
+  // item-details.tsx header: whose item and where ("Ranger1 · slot 3").
+  context?: { character: string; slot: number }
+  // item-details.tsx "Add to stand": only for the merchant's inventory or the bank.
+  onAddStand?: () => void
   className?: string
 }) {
   const [trail, setTrail] = useState<DetailTarget[]>([{ kind: 'item', id: rootItemId, level: rootLevel }])
@@ -78,6 +94,9 @@ export function ItemDetailBrowser({
           rootStatType={rootStatType}
           rootGift={rootGift}
           rootExpires={rootExpires}
+          rootMeta={rootMeta}
+          context={trail.length === 1 ? context : undefined}
+          onAddStand={trail.length === 1 ? onAddStand : undefined}
           onNavigateItem={pushItem}
           onNavigateMonster={pushMonster}
         />
@@ -98,9 +117,15 @@ function ItemDetailContent({
   rootStatType,
   rootGift,
   rootExpires,
+  rootMeta,
+  context,
+  onAddStand,
   onNavigateItem,
   onNavigateMonster,
 }: {
+  rootMeta?: ItemMeta | null
+  context?: { character: string; slot: number }
+  onAddStand?: () => void
   target: { id: string; level: number }
   catalog: MerchantCatalog | null | undefined
   isRoot: boolean
@@ -124,8 +149,19 @@ function ItemDetailContent({
 
   const exchanges = useMemo(() => exchangeSections(target.id, target.level, catalog?.exchangeable ?? []), [catalog, target.id, target.level])
 
-  const meta = catalogItem?.meta ?? undefined
+  const meta = isRoot ? detailMeta(catalogItem?.meta, rootMeta) : (catalogItem?.meta ?? undefined)
   const world = meta?.world
+  const state = useDynamicState()
+  const characters = useCharacters()
+  const diagnostics = useCharacterDiagnosticsMap()
+  const [addingWtb, setAddingWtb] = useState(false)
+  const [comparePicker, setComparePicker] = useState<string | null | false>(false)
+  const [comparing, setComparing] = useState<{ character: string; slot?: string } | null>(null)
+  // stand-capacity.tsx standIsFull.
+  const standFull = state.standListings.length >= 16
+  const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
+  const comparable = isEquipment(meta?.definition)
+  const tracktrix = context && ['tracker', 'supercomputer'].includes(target.id) ? (diagnostics[context.character]?.tracktrix as { active?: boolean; bonuses?: Record<string, number> | null } | undefined) : undefined
   const explanation = typeof meta?.definition.explanation === 'string' ? meta.definition.explanation : undefined
 
   const tabs = useMemo(() => {
@@ -154,6 +190,22 @@ function ItemDetailContent({
           {target.level > 0 ? ` +${target.level}` : ''}
         </span>
       </div>
+      {context && (
+        <p className="-mt-1 mb-2 text-xs text-muted-foreground">
+          {context.character} · slot {context.slot}
+        </p>
+      )}
+      <div className="mb-2 flex flex-wrap gap-2">
+        {onAddStand && context && context.slot >= 0 && (
+          <Button size="sm" variant="outline" disabled={standFull} onClick={onAddStand}>
+            <DollarSign className="size-4" /> Add to stand
+          </Button>
+        )}
+        <Button size="sm" variant="outline" onClick={() => setAddingWtb(true)}>
+          <HandCoins className="size-4" /> Add to WTB
+        </Button>
+      </div>
+      {context && ['tracker', 'supercomputer'].includes(target.id) && characters[context.character] && <TracktrixBonusList data={tracktrix} />}
       {explanation && <p className="mb-2 text-sm text-muted-foreground">{explanation}</p>}
 
       {tabs.length > 1 && (
@@ -166,6 +218,61 @@ function ItemDetailContent({
         </div>
       )}
 
+      {activeTab === 'Overview' && comparable && (meta?.upgradeable || meta?.compoundable) && (
+        <div className="mb-2">
+          <Button size="sm" variant="outline" onClick={() => setComparePicker(comparePicker === false ? null : false)}>
+            <SlidersHorizontal className="size-4" /> Compare
+          </Button>
+          {comparePicker !== false && (
+            <div role="group" aria-label="Compare for" className="mt-1.5 flex flex-col gap-1 rounded-md border border-cyan-800 p-2">
+              {comparePicker === null ? (
+                <>
+                  <p className="font-mono text-[10px] uppercase text-cyan-400">Compare +{previewLevel} for</p>
+                  {partyNames.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        const slots = comparisonSlotsFor(meta, characters[name]?.vitals?.ctype ?? '')
+                        if (slots.length > 1) return setComparePicker(name)
+                        setComparePicker(false)
+                        setComparing({ character: name, slot: slots[0] })
+                      }}
+                      className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs"
+                    >
+                      <span>{name}</span>
+                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{characters[name]?.vitals?.ctype}</span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => setComparePicker(null)} className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <ArrowLeft className="size-3.5" /> {comparePicker} · Choose equipment slot
+                  </button>
+                  {comparisonSlotsFor(meta, characters[comparePicker]?.vitals?.ctype ?? '').map((slot) => {
+                    const equipped = characters[comparePicker]?.inventory?.slots?.[slot]
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => {
+                          setComparing({ character: comparePicker, slot })
+                          setComparePicker(false)
+                        }}
+                        className="flex items-center justify-between gap-3 rounded border border-border px-3 py-2 text-left text-xs"
+                      >
+                        <span>{comparisonSlotLabel(slot)}</span>
+                        <span className="truncate font-mono text-[10px] text-muted-foreground">{equipped ? String(equipped.meta?.definition.name || catalog?.allItems.find((entry) => entry.id === equipped.item.name)?.name || equipped.item.name) : 'Empty'}</span>
+                      </button>
+                    )
+                  })}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === 'Overview' && (
         <OverviewSection
           meta={meta}
@@ -182,7 +289,48 @@ function ItemDetailContent({
       {activeTab === 'Ingredient in' && world?.usedIn && <IngredientInSection usedIn={world.usedIn} onNavigateItem={onNavigateItem} />}
       {activeTab === 'Exchange' && <ExchangeSection exchanges={exchanges} onNavigateItem={onNavigateItem} />}
       {activeTab === 'Drops' && world?.drops && <DropsSection drops={world.drops} onNavigateMonster={onNavigateMonster} />}
+      {addingWtb && (
+        <WtbForm itemId={target.id} catalogItem={catalogItem} existing={state.standBids[target.id]} initialLevel={previewLevel} onClose={() => setAddingWtb(false)} />
+      )}
+      {comparing && (
+        <GearComparisonSheet
+          item={{ name: target.id, level: previewLevel, ...(isRoot && rootStatType ? { stat_type: rootStatType } : {}) }}
+          meta={meta}
+          characterName={comparing.character}
+          slot={comparing.slot}
+          onClose={() => setComparing(null)}
+        />
+      )}
     </div>
+  )
+}
+
+/** tracktrix-bonuses.tsx TracktrixBonusList. */
+function TracktrixBonusList({ data }: { data?: { active?: boolean; bonuses?: Record<string, number> | null } }) {
+  const bonuses = Object.entries(data?.bonuses || {}).filter(([, value]) => Number.isFinite(value) && value !== 0)
+  return (
+    <section aria-label="Current Tracktrix bonuses" className="mb-2 rounded border border-violet-700 p-3 text-sm">
+      <h4 className="mb-2 font-semibold">Current Tracktrix bonuses</h4>
+      {!data || (data.active && data.bonuses === null) ? (
+        <p>Waiting for Tracktrix data.</p>
+      ) : !data.active ? (
+        <p>Inactive — this character is not receiving Tracktrix bonuses.</p>
+      ) : !bonuses.length ? (
+        <p>No stat bonuses unlocked yet.</p>
+      ) : (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+          {bonuses.map(([stat, value]) => (
+            <div key={stat} className="flex justify-between gap-3">
+              <dt>{stat.replaceAll('_', ' ').toUpperCase()}</dt>
+              <dd className="font-mono text-emerald-400">
+                {value > 0 ? '+' : ''}
+                {value.toLocaleString()}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </section>
   )
 }
 
@@ -240,6 +388,12 @@ function OverviewSection({
               </span>
             ))}
           </div>
+          {!!meta?.usage?.hands.length && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Hands required: <span className="font-mono">{meta.usage.hands.join(' or ')}</span>
+              {meta.usage.hands.length > 1 ? ' depending on class' : ''}
+            </p>
+          )}
         </>
       )}
 
@@ -454,10 +608,24 @@ function ExchangeSection({ exchanges, onNavigateItem }: { exchanges: ExchangeSec
 }
 
 function DropsSection({ drops, onNavigateMonster }: { drops: ItemDropSource[]; onNavigateMonster: (id: string) => void }) {
-  const sorted = useMemo(() => [...drops].sort((a, b) => effectiveDropRate(b) - effectiveDropRate(a)), [drops])
+  // item-details.tsx: sort by percentage (default) or name; ties by name.
+  const [dropSort, setDropSort] = useState<'name' | 'percentage'>('percentage')
+  const sorted = useMemo(
+    () => [...drops].sort((a, b) => (dropSort === 'percentage' ? effectiveDropRate(b) - effectiveDropRate(a) : 0) || a.monsterName.localeCompare(b.monsterName)),
+    [drops, dropSort],
+  )
   return (
     <div>
-      <div className="mb-1.5 text-sm font-semibold">Monster drops</div>
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-sm font-semibold">Monster drops</span>
+        <label className="flex items-center gap-2 text-xs">
+          Sort
+          <select aria-label="Sort monster drops" value={dropSort} onChange={(event) => setDropSort(event.target.value as 'name' | 'percentage')} className="rounded border border-border bg-background px-2 py-1">
+            <option value="name">Name</option>
+            <option value="percentage">Percentage</option>
+          </select>
+        </label>
+      </div>
       <div className="flex flex-col gap-1">
         {sorted.map((drop, index) => (
           <RelatedItemRow key={`${drop.monsterId}-${index}`} name={drop.monsterName} sprite={drop.sprite} detail={formatDropRate(drop)} onClick={() => onNavigateMonster(drop.monsterId)} />

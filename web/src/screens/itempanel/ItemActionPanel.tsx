@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useCharacters, useCharacterDiagnosticsMap, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
-import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment, isUsable, comparisonSlotsFor, upgradeRuleTiers } from '@/lib/itemFormulas'
+import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment, isUsable, comparisonSlotsFor, comparisonSlotLabel, upgradeRuleTiers } from '@/lib/itemFormulas'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
@@ -136,6 +136,16 @@ export function ItemActionPanel({
             rootStatType={item.stat_type}
             rootGift={item.gift === true}
             rootExpires={item.expires}
+            context={{ character: characterName, slot: target.kind === 'inventory' ? target.slot : -1 }}
+            // connected-inventory.tsx: only the merchant's own inventory is a stand source.
+            onAddStand={
+              isMerchant && target.kind === 'inventory'
+                ? () => {
+                    setShowingDetails(false)
+                    setExpanded('stand')
+                  }
+                : undefined
+            }
             catalog={catalog}
             monsters={monsters}
           />
@@ -164,8 +174,6 @@ export function TapRow({ label, onClick, disabled, title, className = '' }: { la
   )
 }
 
-// inventory-panel.tsx comparison submenu labels.
-const COMPARISON_SLOT_LABELS: Record<string, string> = { mainhand: 'Main hand', offhand: 'Off hand', ring1: 'Ring 1', ring2: 'Ring 2', earring1: 'Earring 1', earring2: 'Earring 2' }
 const CLEAR_MARKS_TITLE = 'Clear this item’s manual marks and matching shared automatic rules'
 
 /** inventory-panel.tsx's item context menu, in its order and with its
@@ -289,7 +297,7 @@ function InventoryActions({
               <div className="py-1 pl-4">
                 {comparisonSlots.map((comparisonSlot) => (
                   <button key={comparisonSlot} onClick={() => onCompare(comparisonSlot)} className="flex w-full items-center justify-between rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent">
-                    <span>{COMPARISON_SLOT_LABELS[comparisonSlot] ?? comparisonSlot}</span>
+                    <span>{comparisonSlotLabel(comparisonSlot)}</span>
                     <span className="text-xs text-muted-foreground">{equippedName(comparisonSlot)}</span>
                   </button>
                 ))}
