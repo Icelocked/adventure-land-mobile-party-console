@@ -106,3 +106,22 @@ test('Send to party: with more than one group, choose the group', async ({ page 
   await page.getByRole('button', { name: 'Solo', exact: true }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'bank-party')?.body).toEqual({ group: 'Solo' })
 })
+
+test('Shared rule conflicts: a paused choice can be resolved by owner', async ({ page }) => {
+  const server = merchantServer()
+  server.extraState = {
+    merchantRules: {
+      version: 1,
+      owner: 'Patinder',
+      members: ['Patinder', 'Ranger1'],
+      conflicts: [{ id: 'upgrade:bow@+0', family: 'upgrade', key: 'bow@+0', choices: [{ owner: 'Ranger1', value: { tiers: 3, quantity: -1 } }] }],
+    },
+  }
+  await server.install(page)
+  const bodies = posts(page)
+
+  await page.goto('/characters/Patinder')
+  await expect(page.getByText('upgrade · bow@+0 · Paused')).toBeVisible()
+  await page.getByRole('button', { name: 'Use Ranger1: 3 upgrade levels · Unlimited' }).click()
+  await expect.poll(() => bodies.find((b) => b.path === 'merchant/rule-conflict')?.body).toEqual({ id: 'upgrade:bow@+0', owner: 'Ranger1' })
+})

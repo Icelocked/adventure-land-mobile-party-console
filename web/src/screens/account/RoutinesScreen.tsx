@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { ROUTINE_LABELS, hasEnableToggle } from '@/lib/routineLabels'
@@ -18,6 +19,7 @@ export function RoutinesScreen() {
   const dynamicState = useDynamicState()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const navigate = useNavigate()
   const configLoaded = useConfigLoaded()
 
   // party-management-panels.tsx: fishing/mining aren't automations - their
@@ -148,6 +150,10 @@ export function RoutinesScreen() {
           }}
         >
           {saving ? 'Saving...' : 'Save routines'}
+        </Button>
+        {/* routine-priorities-dialog.tsx Cancel: discard the draft. */}
+        <Button className="mt-2 w-full" variant="outline" disabled={saving} onClick={() => navigate(-1)}>
+          Cancel
         </Button>
         <ConfigLoadingNote />
       </div>
