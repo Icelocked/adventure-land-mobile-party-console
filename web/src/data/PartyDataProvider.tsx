@@ -134,14 +134,6 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     const core = async () => {
       const sentAt = Date.now()
       const result = await section<CoreWire>('core')
-      const configState = queryClient.getQueryData<PartyStateDynamic>(QK.dynamicState)
-      queryClient.setQueryData(QK.coreFetchDebug, {
-        at: Date.now(),
-        success: result.kind === 'success',
-        message: result.kind === 'failure' ? result.message : undefined,
-        leader: configState?.leader,
-        farmingPolicy: configState?.farmingPolicy,
-      })
       if (result.kind !== 'success') return
       // bankbois: core only has item-less summaries; the bank section has the full entries.
       const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, serverNow, ...patch } = result.value
@@ -178,9 +170,6 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       const { roster: rosterList, ...patch } = result.value
       mergeState(patch)
       queryClient.setQueryData(QK.configLoadedAt, Date.now())
-      queryClient.setQueryData<CoreFetchDebug | null>(QK.coreFetchDebug, (current) =>
-        current ? { ...current, leader: patch.leader, farmingPolicy: patch.farmingPolicy } : current,
-      )
       if (Array.isArray(rosterList)) {
         const roster: Record<string, RosterMember> = {}
         for (const member of rosterList) roster[member.name] = member
@@ -457,15 +446,6 @@ export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.esca
 /** Round-trip time of the smallest request in the last dynamic-state poll
  *  cycle (see refreshDynamicStateNow) - null until the first poll lands. */
 export const useLatencyMs = (): number | null => useCachedValue(QK.latencyMs, null)
-/** Temporary diagnostic - see queryKeys.ts's coreFetchDebug. */
-export interface CoreFetchDebug {
-  at: number
-  success: boolean
-  message?: string
-  leader?: string | null
-  farmingPolicy?: string
-}
-export const useCoreFetchDebug = (): CoreFetchDebug | null => useCachedValue(QK.coreFetchDebug, null)
 /** When the config section (rules, marks, settings, leader/followers, ...)
  *  last arrived - null until the first one lands. Any control seeded from a
  *  config field must stay disabled until then (useConfigLoaded), or it

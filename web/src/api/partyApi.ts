@@ -516,23 +516,6 @@ export class PartyApiClient {
     return this.itemCommand('auto-compound-mark', owner, { name }, null, { targetTier, remove: true })
   }
 
-  /** POST /party-api/merchant/production with action "complete" -
-   *  inventory/production.ts's beginProduction() refuses EVERY future
-   *  production job (any item, upgrade or compound) while any attempt in
-   *  state.production.attempts is left `completed: false` - the only way
-   *  to clear one is this exact call, matching what the character's own
-   *  script sends on a normal finish (characters/shared.js's
-   *  finishProductionJournal). Clearing the character's own localStorage
-   *  journal does NOT do this - that's a client-side-only record,
-   *  completely separate from this server-side one, confirmed against a
-   *  live account where clearing localStorage left this permanently
-   *  blocking all production work. `success` is best-effort since the
-   *  whole reason this needed manual recovery is that the real outcome
-   *  couldn't be determined automatically. */
-  async completeProductionAttempt(character: string, id: string, success: boolean): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/production', { character, action: 'complete', id, success })
-  }
-
   /** POST /party-api/merchant/force-stand - pauses ALL merchant work and
    *  returns them home to run the stand exclusively; disabling lets
    *  queued work resume. */

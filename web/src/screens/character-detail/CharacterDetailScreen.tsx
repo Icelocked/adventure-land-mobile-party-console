@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
-import { useCharacters, useCoreFetchDebug, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useTargetMonsterType } from '@/data/useTargetMonsterType'
 import { defaultRestockPolicy, resolveFarmingContext } from '@/models'
 import { useCatalogLookup } from '@/lib/catalogLookup'
@@ -35,7 +35,6 @@ export function CharacterDetailScreen() {
   const refreshNow = useRefreshDynamicStateNow()
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const roster = useRoster()
-  const coreFetchDebug = useCoreFetchDebug()
   const [actionTarget, setActionTarget] = useState<ItemActionTarget | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -64,20 +63,6 @@ export function CharacterDetailScreen() {
           </Button>
         </div>
       </header>
-
-      {/* TEMPORARY diagnostic - see data/PartyDataProvider.tsx's
-       *  coreFetchDebug. Shows exactly what the last state?section=core
-       *  fetch actually reported (success/failure, leader, farmingPolicy)
-       *  independent of anything resolveFarmingContext or the farming UI
-       *  derives from it, so a screenshot can tell us whether the fetch
-       *  itself is the problem or something downstream is. Remove once
-       *  the "farmingPolicy/leader never updates" investigation is done. */}
-      {coreFetchDebug && (
-        <p className="border-b border-border bg-amber-950/40 px-3 py-1 text-[10px] text-amber-200">
-          core: {coreFetchDebug.success ? 'ok' : `FAILED (${coreFetchDebug.message})`} · {Math.round((Date.now() - coreFetchDebug.at) / 1000)}s ago · leader=
-          {JSON.stringify(coreFetchDebug.leader)} · farmingPolicy={JSON.stringify(coreFetchDebug.farmingPolicy)}
-        </p>
-      )}
 
       {others.length > 0 && (
         <div className="flex gap-2 overflow-x-auto border-b border-border px-3 py-2">

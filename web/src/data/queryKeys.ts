@@ -18,10 +18,4 @@ export const QK = {
   // server clock offset - see PartyDataProvider's pollDynamicState.
   characterDiagnostics: ['characterDiagnostics'] as const,
   serverOffset: ['serverOffset'] as const,
-  // Temporary diagnostic (see PartyDataProvider's refreshDynamicStateNow) -
-  // tracks whether the big state?section=core fetch is actually landing
-  // and what it reported, independent of whatever resolveFarmingContext/
-  // the UI derives from it. Remove once the "farmingPolicy/leader never
-  // updates" investigation is resolved.
-  coreFetchDebug: ['coreFetchDebug'] as const,
 }
