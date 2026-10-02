@@ -157,7 +157,7 @@ test('Bank: selling a modified item to NPC requires confirming the warning first
 
   await page.goto('/bank')
   await page.getByText('Wolf Coat').click()
-  await page.getByRole('button', { name: 'Sell to NPC', exact: true }).click()
+  await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
 
   const sheet = page.getByRole('group', { name: 'Sell to NPC' })
   await expect(sheet.getByText('permanently destroy it')).toBeVisible()
@@ -165,7 +165,7 @@ test('Bank: selling a modified item to NPC requires confirming the warning first
   await sheet.getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByText('Wolf Coat')).toBeVisible()
-  await expect(page.getByText('NPC sale', { exact: true })).toBeVisible()
+  await expect(page.getByText('NPC', { exact: true })).toBeVisible()
 })
 
 test('ItemActionPanel: marking an item for NPC sale shows a badge on its inventory slot', async ({ page }) => {
