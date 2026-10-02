@@ -32,6 +32,14 @@ export interface MerchantJob {
   bidItemId?: string
   order?: unknown
   autoExchangeKeys?: string[]
+  // merchant-job.tsx fields shown by the queue/job label (M1).
+  operationStage?: string
+  listings?: unknown[]
+  seller?: string
+  expectedItem?: Item
+  retryAt?: number
+  pauseReason?: string
+  commandReport?: unknown
 }
 
 /** One HP or MP auto-potion threshold - see restock-policy.tsx. */
@@ -162,6 +170,9 @@ export interface StandListing {
   slot?: number
   bankPack?: string
   bankSlot?: number
+  // configured | live | paused ..., and the stand slot a live listing sits in.
+  state?: string
+  tradeSlot?: string
   item: Item
   price: number
   quantity: number
@@ -651,6 +662,55 @@ export interface PartyStateDynamic {
   bankbois: Bankboi[]
   bankboiQueue?: { id: string; item: Item; state: string; bootstrap?: boolean }[]
   buyUpgradeBatchSize?: number
+
+  // ---- F6: the rest of party-state.tsx's PartyState, typed as the
+  // dashboard does where the shape is simple; `unknown` where it imports a
+  // deep runtime type - the package that renders a field ports its shape.
+  // Roster, slots, session
+  activeSlots?: { index: number; kind?: string; character?: string | null; primary?: boolean; [field: string]: unknown }[]
+  characterConnections?: unknown[]
+  steamSwitch?: unknown
+  bankboiTransaction?: { bankboi: string; phase: string; mode: string } | null
+  gameVersion?: number
+  classChoices?: string[]
+  appearanceChoices?: Record<string, unknown[]>
+  characterAppearances?: Record<string, { skin?: string; characterSprite?: unknown; characterDollHtml?: string; updatedAt: number }>
+  accountId?: string | null
+  referenceRevision?: string
+  // Giveaways
+  giveawayRealms?: { key: string; label: string }[]
+  giveawayPlayers?: Record<string, string[]>
+  // Merchant and stand
+  merchantWeapon?: { item: Item } | null
+  merchantBlacklist?: Record<string, { reason?: string; at?: number; [field: string]: unknown }>
+  autoStandBuys?: boolean
+  autoBlacklistMerchants?: boolean
+  merchantStandLocation?: { map: string; x: number; y: number; [field: string]: unknown } | null
+  standPriceHistory?: Record<string, unknown>
+  nativeStand?: {
+    offers: Record<string, { itemId: string; auto: boolean; phase: string; slot: string; level?: number; price?: number; quantity?: number; acknowledged?: number; problem?: string }>
+    problems: Record<string, string>
+  }
+  mluckSchedule?: { target: string; remainingMs: number; leadMs: number; dispatchInMs: number; marginMs: number; status: string } | null
+  gatheringCooldowns?: { fishing?: number; mining?: number }
+  gatheringNoTool?: Record<string, boolean>
+  purchases?: Record<string, { name: string }[]>
+  // Events, hunting, location
+  eventSchedules?: unknown[]
+  eventSelectionsByCharacter?: Record<string, string[]>
+  eventsByCharacter?: Record<string, boolean>
+  monsterPrioritiesByCharacter?: Record<string, Record<string, number>>
+  passiveHunting?: unknown
+  passiveRareHunts?: { tinyp: boolean; phoenix: boolean; goldenbat?: boolean; cutebee?: boolean; hen?: boolean; rooster?: boolean }
+  scatterMonsterTypes?: string[]
+  huntFailures?: Record<string, { deaths: number; expirations: number }>
+  anniversary?: unknown
+  characterLocations?: Record<string, { map: string; x: number; y: number; [field: string]: unknown }>
+  partyLocation?: { map: string; x: number; y: number; [field: string]: unknown } | null
+  combatRecovery?: { phase: string; reason?: string; names: string[] } | null
+  activeConvoy?: unknown
+  // Upgrades
+  upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
 }
 
 /** inventory/shared-rules.ts's SharedRules (conflicts kept opaque until the
@@ -769,6 +829,8 @@ export interface HuntBlacklistEntry {
  *  avoid a competing party, and when a monster should get auto-
  *  blacklisted (too many character deaths or quest expirations to it). */
 export interface HuntSettings {
+  // hunt/spawn-preferences.ts - preferred spawn per monster (C2).
+  preferredSpawns?: Record<string, unknown>
   relocateIfCompeting: boolean
   blacklistDeaths: boolean
   deathThreshold: number

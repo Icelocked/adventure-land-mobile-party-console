@@ -7,6 +7,8 @@ import type { Item } from './item'
 export interface MailSnapshot {
   messages: ReceivedMail[]
   count: number
+  error?: string
+  updatedAt?: number
 }
 
 export interface ReceivedMail {
@@ -20,6 +22,9 @@ export interface ReceivedMail {
   // boolean | "pending" on the wire - kept untyped so a non-boolean value
   // never fails the whole message's parse.
   taken?: unknown
+  // mail-inbox: a queued collection and why it failed, if it did.
+  collection?: unknown
+  collectionError?: string
 }
 
 /** escape-status.tsx's shape for GET/POST /party-api/escape - the party-wide
