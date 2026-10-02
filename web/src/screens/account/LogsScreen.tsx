@@ -1,4 +1,4 @@
-import { useDynamicState, useGameLogs, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useDynamicState, useGameLogs, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { ActivityEntry, GameLogEntry } from '@/models'
 
@@ -6,6 +6,7 @@ import type { ActivityEntry, GameLogEntry } from '@/models'
  *  merchant errand history, per-character combat log lines, and raw
  *  in-game chat/system messages. */
 export function LogsScreen() {
+  useDomainInterest('logs')
   const dynamicState = useDynamicState()
   const gameLogs = useGameLogs()
   const refreshNow = useRefreshDynamicStateNow()

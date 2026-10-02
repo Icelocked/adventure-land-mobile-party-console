@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usePartyApi, useDynamicState, useMail, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useDynamicState, useMail, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import type { CatalogItem, ReceivedMail } from '@/models'
  *  needs a "which character's inventory" picker this screen has no
  *  natural context for, called out as its own remaining gap. */
 export function MailScreen() {
+  useDomainInterest('mail')
   const mail = useMail()
   const dynamicState = useDynamicState()
   const api = usePartyApi()

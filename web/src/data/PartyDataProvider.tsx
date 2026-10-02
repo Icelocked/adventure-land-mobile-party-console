@@ -18,6 +18,7 @@ import type {
 } from '@/models'
 import { emptyPartyStateDynamic } from '@/models'
 import { QK } from './queryKeys'
+import { affectedDomains, PARTY_ACTION_EVENT, type Domain, type PartyActionDetail } from './queryActions'
 
 /** Owns one live connection to one configured server and pushes every
  *  known character's state into the shared TanStack Query cache - a
@@ -25,18 +26,6 @@ import { QK } from './queryKeys'
  *  server connection (recreated whenever [settings] changes - see the
  *  key on <PartyDataProvider> in App.tsx). */
 
-const DYNAMIC_STATE_POLL_MS = 6_000
-// query-cache.tsx's `config` policy: configuration/rules/marks, split out of
-// `core` by the server (public-state.ts omitConfigFields) and polled on its
-// own slower cadence. Carries farmingProfiles, so it can be large - it never
-// rides in the 6s batch, where a slow config response would hold up core.
-const CONFIG_POLL_MS = 15_000
-// The item/monster/skill catalog barely ever changes mid-session (it's
-// the account's own static game data) but used to be re-sent in full on
-// every 6s poll alongside everything else - by far the biggest single
-// contributor to a slow-network poll's size. Fetched once at startup,
-// then just re-checked on this much slower cadence instead.
-const CATALOG_REFRESH_MS = 10 * 60_000
 
 const REQUIRED_VITALS_FIELDS = ['hp', 'max_hp', 'mp', 'max_mp', 'gold', 'map', 'x', 'y', 'rip'] as const
 
@@ -81,6 +70,7 @@ function recordToState(name: string, record: LiveRecordWire, roster: Record<stri
 interface PartyDataContextValue {
   api: PartyApiClient
   refreshDynamicStateNow: () => Promise<void>
+  registerInterest: (domain: Domain) => () => void
   settings: ServerSettings
 }
 
@@ -90,37 +80,6 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   const queryClient = useQueryClient()
   const api = useMemo(() => new PartyApiClient(settings), [settings])
   const rosterRef = useRef<Record<string, RosterMember>>({})
-
-  // The 6s background poll and a manual refreshDynamicStateNow() (fired
-  // right after a mutating action, e.g. FarmingSection's selectMode) can
-  // overlap with no ordering between their requests - a poll tick that
-  // happened to start just before the action, reading pre-action state,
-  // can still resolve AFTER the manual refresh's post-action read and
-  // silently clobber the fresher data back to stale via setQueryData,
-  // making a just-applied change look like it never took effect. Each
-  // call captures its own generation number; only the latest one is
-  // allowed to write.
-  const dynamicStateGeneration = useRef(0)
-
-  // Whether the catalog has been fetched at all yet this session - the
-  // first dynamic-state poll triggers an immediate catalog fetch if not;
-  // after that it only refreshes on the slow CATALOG_REFRESH_MS timer.
-  const catalogFetchedRef = useRef(false)
-
-  const refreshCatalogNow = useMemo(
-    () => async () => {
-      const result = await api.getJson<Partial<PartyStateDynamic>>('state?section=catalog')
-      if (result.kind === 'success') {
-        catalogFetchedRef.current = true
-        queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({
-          ...emptyPartyStateDynamic(),
-          ...(current ?? {}),
-          ...result.value,
-        }))
-      }
-    },
-    [api, queryClient],
-  )
 
   // Roster (name/class/level/server) - the full list arrives with config;
   // core's `characters` summary refreshes the active ones every poll, so a
@@ -145,27 +104,82 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     [queryClient],
   )
 
-  // One config request at a time: a refresh asked for while one is in
-  // flight runs once more right after it, so requests never overlap and an
-  // older response can never land after a newer one.
-  const configInFlight = useRef<Promise<void> | null>(null)
-  const configAgain = useRef(false)
+  // Per-domain polling, mirroring query-cache.tsx's domain policies: every
+  // section is its own single-flight request on its own cadence, so a slow
+  // section never holds up another, and a refresh asked for while one is in
+  // flight runs once more right after it (never two at once, never an older
+  // response landing after a newer one).
+  const interest = useRef<Record<string, number>>({})
+  const lastAccountId = useRef<string | null>(null)
+  const lastReferenceRevision = useRef<string | null>(null)
+  const catalogLoaded = useRef(false)
 
-  const refreshConfigNow = useMemo(() => {
-    const fetchConfig = async () => {
-      const result = await api.getJson<Partial<PartyStateDynamic> & { roster?: RosterMember[] }>(
-        'state?catalog=0&dashboard=1&section=config',
-      )
+  const fetchers = useMemo(() => {
+    type CoreWire = Partial<PartyStateDynamic> & {
+      characterDetails?: Record<string, CharacterDiagnostics>
+      serverNow?: number
+      characters?: Record<string, Pick<RosterMember, 'name' | 'ctype' | 'level' | 'server'>>
+    }
+    type LogsWire = {
+      combatLogs?: PartyStateDynamic['combatLogs']
+      merchantActivity?: PartyStateDynamic['merchantActivity']
+      gameLogs?: Record<string, GameLogEntry[]>
+    }
+    const mergeState = (patch: Partial<PartyStateDynamic>) =>
+      queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({ ...emptyPartyStateDynamic(), ...(current ?? {}), ...patch }))
+    // dashboard=1 is the dashboard's own request shape (query-cache.tsx reads
+    // every domain as state?catalog=0&dashboard=1&section=X).
+    const section = <T,>(name: string) => api.getJson<T>(`state?catalog=0&dashboard=1&section=${name}`)
+
+    const core = async () => {
+      const sentAt = Date.now()
+      const result = await section<CoreWire>('core')
+      const configState = queryClient.getQueryData<PartyStateDynamic>(QK.dynamicState)
+      queryClient.setQueryData(QK.coreFetchDebug, {
+        at: Date.now(),
+        success: result.kind === 'success',
+        message: result.kind === 'failure' ? result.message : undefined,
+        leader: configState?.leader,
+        farmingPolicy: configState?.farmingPolicy,
+      })
       if (result.kind !== 'success') return
-      const { roster: rosterList, ...config } = result.value
-      queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({
-        ...emptyPartyStateDynamic(),
-        ...(current ?? {}),
-        ...config,
-      }))
+      // bankbois: core only has item-less summaries; the bank section has the full entries.
+      const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, serverNow, ...patch } = result.value
+      // query-cache.tsx: a different account on the same server replaces
+      // everything - the dashboard remounts, the PWA reloads.
+      const accountId = patch.accountId ?? null
+      if (accountId && lastAccountId.current && accountId !== lastAccountId.current) {
+        window.location.reload()
+        return
+      }
+      if (accountId) lastAccountId.current = accountId
+      // live-metrics.ts synchronizeDashboardClock: offset from the midpoint of the round trip.
+      if (serverNow) queryClient.setQueryData(QK.serverOffset, serverNow - (sentAt + Date.now()) / 2)
+      if (characterDetails) queryClient.setQueryData(QK.characterDiagnostics, characterDetails)
+      if (summaries) {
+        const roster = { ...rosterRef.current }
+        for (const [name, summary] of Object.entries(summaries)) roster[name] = { ...roster[name], ...summary, name }
+        applyRoster(roster)
+      }
+      const characterHunt = characterDetails
+        ? Object.fromEntries(Object.entries(characterDetails).map(([name, detail]) => [name, detail.monsterHunt ?? null]))
+        : undefined
+      mergeState({ ...patch, ...(characterHunt ? { characterHunt } : {}) })
+      // query-cache.tsx keys the catalog by core's referenceRevision.
+      if (patch.referenceRevision && patch.referenceRevision !== lastReferenceRevision.current) {
+        lastReferenceRevision.current = patch.referenceRevision
+        void triggers.catalog()
+      }
+    }
+
+    const config = async () => {
+      const result = await section<Partial<PartyStateDynamic> & { roster?: RosterMember[] }>('config')
+      if (result.kind !== 'success') return
+      const { roster: rosterList, ...patch } = result.value
+      mergeState(patch)
       queryClient.setQueryData(QK.configLoadedAt, Date.now())
       queryClient.setQueryData<CoreFetchDebug | null>(QK.coreFetchDebug, (current) =>
-        current ? { ...current, leader: config.leader, farmingPolicy: config.farmingPolicy } : current,
+        current ? { ...current, leader: patch.leader, farmingPolicy: patch.farmingPolicy } : current,
       )
       if (Array.isArray(rosterList)) {
         const roster: Record<string, RosterMember> = {}
@@ -173,192 +187,207 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
         applyRoster(roster)
       }
     }
-    return async () => {
-      if (configInFlight.current) {
-        configAgain.current = true
-        return configInFlight.current
-      }
-      const run = (async () => {
-        try {
-          do {
-            configAgain.current = false
-            await fetchConfig()
-          } while (configAgain.current)
-        } finally {
-          configInFlight.current = null
-        }
-      })()
-      configInFlight.current = run
-      return run
+
+    const simple = (name: string) => async () => {
+      const result = await section<Partial<PartyStateDynamic>>(name)
+      if (result.kind === 'success') mergeState(result.value)
     }
+
+    const logs = async () => {
+      const result = await section<LogsWire>('logs')
+      if (result.kind !== 'success') return
+      const { combatLogs, merchantActivity, gameLogs } = result.value
+      mergeState({ ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}) })
+      queryClient.setQueryData(QK.gameLogs, gameLogs ?? {})
+    }
+
+    const mail = async () => {
+      const result = await api.getJson<Partial<MailSnapshot>>('mail')
+      if (result.kind === 'success') queryClient.setQueryData(QK.mail, { messages: [], count: 0, ...result.value })
+    }
+
+    // `escape` is the smallest request (usually `{escape:null}`), so its
+    // round trip is mostly network latency - the latency badge's source.
+    const escape = async () => {
+      const started = performance.now()
+      const result = await api.getJson<{ escape?: EscapeStatus | null }>('escape')
+      if (result.kind !== 'success') return
+      queryClient.setQueryData(QK.latencyMs, Math.round(performance.now() - started))
+      queryClient.setQueryData(QK.escape, result.value.escape ?? null)
+    }
+
+    const catalog = async () => {
+      const result = await api.getJson<Partial<PartyStateDynamic>>('state?section=catalog')
+      if (result.kind !== 'success') return
+      catalogLoaded.current = true
+      mergeState(result.value)
+    }
+
+    // dashboard-live.tsx: while the live stream is down, `fast` (vitals) and
+    // `inventory` (items/slots) stand in for it.
+    const fallbackRecords = new Map<string, LiveRecordWire>()
+    const applyFallback = (name: string, patch: Partial<LiveRecordWire>) => {
+      // A response that lands after the stream recovered is stale.
+      if (queryClient.getQueryData<boolean>(QK.connected) !== false) return
+      const previous = fallbackRecords.get(name) ?? { generation: 'poll', sample: 0, sampledAt: Date.now(), vitals: {}, items: {}, slots: {} }
+      const record = { ...previous, ...patch }
+      fallbackRecords.set(name, record)
+      queryClient.setQueryData<Record<string, CharacterState>>(QK.characters, (current) => ({
+        ...(current ?? {}),
+        [name]: recordToState(name, record, rosterRef.current),
+      }))
+    }
+    const fast = async () => {
+      const result = await section<{ characters?: Record<string, Record<string, unknown>> }>('fast')
+      if (result.kind !== 'success') return
+      for (const [name, vitals] of Object.entries(result.value.characters ?? {})) {
+        const size = fallbackRecords.get(name)?.vitals.inventorySize
+        applyFallback(name, { vitals: { ...vitals, ...(size !== undefined ? { inventorySize: size } : {}) } })
+      }
+    }
+    const inventory = async () => {
+      type InventoryWire = { items?: (InventoryEntry | null)[]; slots?: Record<string, EquippedEntry | null> }
+      const result = await section<{ characters?: Record<string, InventoryWire> }>('inventory')
+      if (result.kind !== 'success') return
+      for (const [name, entry] of Object.entries(result.value.characters ?? {})) {
+        const items: Record<string, unknown> = {}
+        ;(entry.items ?? []).forEach((value, index) => {
+          if (value) items[String(index)] = value
+        })
+        const vitals = fallbackRecords.get(name)?.vitals ?? {}
+        applyFallback(name, { items, slots: entry.slots ?? {}, vitals: { ...vitals, inventorySize: (entry.items ?? []).length } })
+      }
+    }
+
+    const singleFlight = (fetch: () => Promise<void>) => {
+      let inFlight: Promise<void> | null = null
+      let again = false
+      return (): Promise<void> => {
+        if (inFlight) {
+          again = true
+          return inFlight
+        }
+        inFlight = (async () => {
+          try {
+            do {
+              again = false
+              await fetch().catch((error) => console.error('poll failed', error))
+            } while (again)
+          } finally {
+            inFlight = null
+          }
+        })()
+        return inFlight
+      }
+    }
+    const triggers = {
+      core: singleFlight(core),
+      config: singleFlight(config),
+      bank: singleFlight(simple('bank')),
+      market: singleFlight(simple('market')),
+      logs: singleFlight(logs),
+      mail: singleFlight(mail),
+      escape: singleFlight(escape),
+      catalog: singleFlight(catalog),
+      fast: singleFlight(fast),
+      inventory: singleFlight(inventory),
+    }
+    return triggers
   }, [api, queryClient, applyRoster])
 
-  const pollDynamicState = useMemo(
-    () => async () => {
-      // Split into several small section-scoped requests run in PARALLEL
-      // instead of one large payload fetched sequentially with everything
-      // else - on a slow/high-latency connection, four sequential round
-      // trips compound badly (each one waits for the last to finish
-      // before it even starts), while parallel requests overlap. The big
-      // item/monster/skill catalog is deliberately excluded from this
-      // cycle entirely - see refreshCatalogNow.
-      const generation = ++dynamicStateGeneration.current
-      const escapeStart = performance.now()
-      const escapeWallStart = Date.now()
-      type CoreWire = Partial<PartyStateDynamic> & {
-        characterDetails?: Record<string, CharacterDiagnostics>
-        serverNow?: number
-        characters?: Record<string, Pick<RosterMember, 'name' | 'ctype' | 'level' | 'server'>>
-      }
-      type LogsWire = {
-        combatLogs?: PartyStateDynamic['combatLogs']
-        merchantActivity?: PartyStateDynamic['merchantActivity']
-        gameLogs?: Record<string, GameLogEntry[]>
-      }
-      const [coreResult, bankResult, marketResult, logsResult, mailResult, escapeResult] = await Promise.all([
-        // dashboard=1 is the dashboard's own payload shape (query-cache.tsx
-        // reads every domain as state?catalog=0&dashboard=1&section=X): it
-        // unlocks characterDetails, and on core the server strips every
-        // config field (public-state.ts omitConfigFields) - those arrive
-        // via refreshConfigNow instead.
-        api.getJson<CoreWire>('state?catalog=0&dashboard=1&section=core'),
-        // bankbois carry their items only with dashboard=1 (public-state.ts).
-        api.getJson<Partial<PartyStateDynamic>>('state?catalog=0&dashboard=1&section=bank'),
-        api.getJson<Partial<PartyStateDynamic>>('state?catalog=0&dashboard=1&section=market'),
-        api.getJson<LogsWire>('state?catalog=0&dashboard=1&section=logs'),
-        api.getJson<Partial<MailSnapshot>>('mail'),
-        api.getJson<{ escape?: EscapeStatus | null }>('escape'),
-      ])
-      // `escape` is the smallest of these (usually just `{escape:null}`),
-      // so its round trip is dominated by real network latency rather
-      // than payload transfer time - a reasonable, zero-extra-request
-      // proxy for "how slow does this connection feel right now".
-      // A newer call (the next poll tick, or another manual refresh)
-      // already started while this one was in flight - its results will
-      // supersede ours shortly, so writing this response now would only
-      // risk clobbering fresher data with this call's staler snapshot.
-      if (generation !== dynamicStateGeneration.current) return
-      if (escapeResult.kind === 'success') queryClient.setQueryData(QK.latencyMs, Math.round(performance.now() - escapeStart))
+  // query-cache.tsx policies (core is 2s here rather than 1s - mobile data).
+  // A domain a visible screen depends on (useDomainInterest) polls faster.
+  const cadences = useMemo(() => {
+    const interested = (domain: string) => (interest.current[domain] ?? 0) > 0
+    // Only once the stream has reported unhealthy - not during the first
+    // connect, when a fallback write could overwrite the first snapshot.
+    const liveDown = () => queryClient.getQueryData<boolean>(QK.connected) === false
+    const policies: Record<keyof typeof fetchers, () => number | null> = {
+      core: () => 2_000,
+      config: () => 15_000,
+      bank: () => (interested('bank') ? 2_000 : 15_000),
+      market: () => 10_000,
+      logs: () => (interested('logs') ? 1_000 : 6_000),
+      mail: () => (interested('mail') ? 2_000 : 10_000),
+      escape: () => (queryClient.getQueryData(QK.escape) ? 1_000 : 6_000),
+      // Refetched when core's referenceRevision changes, not on a timer -
+      // but retried until the first one lands.
+      catalog: () => (catalogLoaded.current ? null : 5_000),
+      fast: () => (liveDown() ? 250 : null),
+      inventory: () => (liveDown() ? 2_000 : null),
+    }
+    return policies
+  }, [queryClient, fetchers])
 
-      if (coreResult.kind === 'success' || bankResult.kind === 'success' || marketResult.kind === 'success' || logsResult.kind === 'success') {
-        const coreRaw: CoreWire = coreResult.kind === 'success' ? coreResult.value : {}
-        // bankbois: core only has item-less summaries; the bank section has the full entries.
-        const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, serverNow, ...core } = coreRaw
-        // live-metrics.ts synchronizeDashboardClock: offset from the midpoint of the round trip.
-        if (serverNow) queryClient.setQueryData(QK.serverOffset, serverNow - (escapeWallStart + Date.now()) / 2)
-        if (characterDetails) queryClient.setQueryData(QK.characterDiagnostics, characterDetails)
-        if (summaries) {
-          const roster = { ...rosterRef.current }
-          for (const [name, summary] of Object.entries(summaries)) roster[name] = { ...roster[name], ...summary, name }
-          applyRoster(roster)
+  useEffect(() => {
+    let cancelled = false
+    const sleeps = new Set<() => void>()
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const wake = () => {
+          clearTimeout(timer)
+          sleeps.delete(wake)
+          resolve()
         }
-        const configState = queryClient.getQueryData<PartyStateDynamic>(QK.dynamicState)
-        queryClient.setQueryData(QK.coreFetchDebug, {
-          at: Date.now(),
-          success: coreResult.kind === 'success',
-          message: coreResult.kind === 'failure' ? coreResult.message : undefined,
-          leader: configState?.leader,
-          farmingPolicy: configState?.farmingPolicy,
-        })
-        const characterHunt = characterDetails
-          ? Object.fromEntries(Object.entries(characterDetails).map(([name, detail]) => [name, detail.monsterHunt ?? null]))
-          : undefined
-        const bank = bankResult.kind === 'success' ? bankResult.value : {}
-        const market = marketResult.kind === 'success' ? marketResult.value : {}
-        const logs: LogsWire = logsResult.kind === 'success' ? logsResult.value : {}
-        // Merge onto whatever's already cached rather than resetting to
-        // empty each time - now that the response is assembled from
-        // several independent requests, one of them failing (a dropped
-        // packet, a timeout) shouldn't wipe out the others' still-valid
-        // data for this cycle.
-        queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({
-          ...emptyPartyStateDynamic(),
-          ...(current ?? {}),
-          ...core,
-          ...(characterHunt ? { characterHunt } : {}),
-          ...bank,
-          ...market,
-          ...(logs.combatLogs ? { combatLogs: logs.combatLogs } : {}),
-          ...(logs.merchantActivity ? { merchantActivity: logs.merchantActivity } : {}),
-        }))
+        const timer = setTimeout(wake, ms)
+        sleeps.add(wake)
+      })
+    for (const domain of Object.keys(fetchers) as (keyof typeof fetchers)[]) {
+      void (async () => {
+        while (!cancelled) {
+          const interval = cadences[domain]()
+          // Polling pauses while the app is in the background, like the dashboard's queries.
+          if (interval !== null && !document.hidden) await fetchers[domain]()
+          if (cancelled) return
+          await sleep(interval ?? 1_000)
+        }
+      })()
+    }
+    // Coming back to the foreground: refresh right away.
+    const onVisible = () => {
+      if (document.hidden) return
+      for (const wake of [...sleeps]) wake()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+      for (const wake of [...sleeps]) wake()
+    }
+  }, [fetchers, cadences])
+
+  // query-actions.ts: after an action, refresh the domains it touched.
+  useEffect(() => {
+    const onAction = (event: Event) => {
+      const { path, body } = (event as CustomEvent<PartyActionDetail>).detail
+      for (const domain of affectedDomains(path, body)) {
+        if (cadences[domain]() === null && (domain === 'fast' || domain === 'inventory')) continue
+        void fetchers[domain]()
       }
-      if (!catalogFetchedRef.current) void refreshCatalogNow()
+    }
+    window.addEventListener(PARTY_ACTION_EVENT, onAction)
+    return () => window.removeEventListener(PARTY_ACTION_EVENT, onAction)
+  }, [fetchers, cadences])
 
-      if (mailResult.kind === 'success') queryClient.setQueryData(QK.mail, { messages: [], count: 0, ...mailResult.value })
-      if (logsResult.kind === 'success') queryClient.setQueryData(QK.gameLogs, logsResult.value.gameLogs ?? {})
-      if (escapeResult.kind === 'success') queryClient.setQueryData(QK.escape, escapeResult.value.escape ?? null)
-    },
-    [api, queryClient, refreshCatalogNow, applyRoster],
-  )
-
-  // After a mutation: refresh core and config together, like
-  // query-actions.ts invalidating ['core', 'config'].
+  // After a mutation: refresh core and config together, like query-actions.ts's
+  // ['core', 'config'] group. Resolves once both have landed.
   const refreshDynamicStateNow = useMemo(
     () => async () => {
-      await Promise.all([pollDynamicState(), refreshConfigNow()])
+      await Promise.all([fetchers.core(), fetchers.config(), fetchers.escape()])
     },
-    [pollDynamicState, refreshConfigNow],
+    [fetchers],
   )
 
-  // Dynamic state / mail / game logs - polled on the same ~6s cadence
-  // party-console's own account-info refresh uses. A failed or thrown
-  // cycle must never end the loop.
-  useEffect(() => {
-    let cancelled = false
-    const poll = async () => {
-      while (!cancelled) {
-        try {
-          await pollDynamicState()
-        } catch (error) {
-          console.error('state poll failed', error)
-        }
-        await new Promise((resolve) => setTimeout(resolve, DYNAMIC_STATE_POLL_MS))
+  const registerInterest = useMemo(
+    () => (domain: Domain) => {
+      interest.current[domain] = (interest.current[domain] ?? 0) + 1
+      void fetchers[domain]()
+      return () => {
+        interest.current[domain] = Math.max(0, (interest.current[domain] ?? 1) - 1)
       }
-    }
-    void poll()
-    return () => {
-      cancelled = true
-    }
-  }, [pollDynamicState])
-
-  // Config (and the roster it carries) - see CONFIG_POLL_MS.
-  useEffect(() => {
-    let cancelled = false
-    const poll = async () => {
-      while (!cancelled) {
-        try {
-          await refreshConfigNow()
-        } catch (error) {
-          console.error('config poll failed', error)
-        }
-        await new Promise((resolve) => setTimeout(resolve, CONFIG_POLL_MS))
-      }
-    }
-    void poll()
-    return () => {
-      cancelled = true
-    }
-  }, [refreshConfigNow])
-
-  // Catalog - see CATALOG_REFRESH_MS. Runs on its own much slower timer,
-  // independent of the main poll above.
-  useEffect(() => {
-    let cancelled = false
-    const poll = async () => {
-      while (!cancelled) {
-        await new Promise((resolve) => setTimeout(resolve, CATALOG_REFRESH_MS))
-        try {
-          if (!cancelled) await refreshCatalogNow()
-        } catch (error) {
-          console.error('catalog poll failed', error)
-        }
-      }
-    }
-    void poll()
-    return () => {
-      cancelled = true
-    }
-  }, [refreshCatalogNow])
+    },
+    [fetchers],
+  )
 
   // Live SSE connection - character vitals/inventory + connection health.
   useEffect(() => {
@@ -383,7 +412,10 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     return close
   }, [settings, queryClient])
 
-  const value = useMemo<PartyDataContextValue>(() => ({ api, refreshDynamicStateNow, settings }), [api, refreshDynamicStateNow, settings])
+  const value = useMemo<PartyDataContextValue>(
+    () => ({ api, refreshDynamicStateNow, registerInterest, settings }),
+    [api, refreshDynamicStateNow, registerInterest, settings],
+  )
 
   return <PartyDataContext.Provider value={value}>{children}</PartyDataContext.Provider>
 }
@@ -397,6 +429,12 @@ function usePartyData(): PartyDataContextValue {
 export const usePartyApi = (): PartyApiClient => usePartyData().api
 export const useServerSettings = (): ServerSettings => usePartyData().settings
 export const useRefreshDynamicStateNow = (): (() => Promise<void>) => usePartyData().refreshDynamicStateNow
+/** A screen that shows this domain makes it poll at its fast cadence while
+ *  mounted (query-cache.tsx polls bank/mail/logs faster while they're open). */
+export function useDomainInterest(domain: Domain): void {
+  const { registerInterest } = usePartyData()
+  useEffect(() => registerInterest(domain), [registerInterest, domain])
+}
 
 function useCachedValue<T>(key: readonly unknown[], initial: T): T {
   const { data } = useQuery({

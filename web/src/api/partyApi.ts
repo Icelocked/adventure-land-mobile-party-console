@@ -1,6 +1,7 @@
 import type { Item, MarketListing, RestockPolicy, StandListing, StandSearchListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
+import { PARTY_ACTION_EVENT, type PartyActionDetail } from '@/data/queryActions'
 
 export interface CommandResult {
   ok: boolean
@@ -202,6 +203,16 @@ export class PartyApiClient {
    *  the moment the request is actually dispatched, independent of how
    *  long the round trip itself ends up taking. */
   async post(path: string, body: unknown): Promise<ApiResult<CommandResult>> {
+    try {
+      return await this.postOnce(path, body)
+    } finally {
+      // query-actions.ts: refresh whatever the action touched, success or not.
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new CustomEvent<PartyActionDetail>(PARTY_ACTION_EVENT, { detail: { path: `/${path.replace(/^\/+/, '')}`, body } }))
+    }
+  }
+
+  private async postOnce(path: string, body: unknown): Promise<ApiResult<CommandResult>> {
     const toastId = beginActionToast()
     // Reads the body itself rather than going through postJson/getText,
     // which discard the response body on any non-2xx status - the server
