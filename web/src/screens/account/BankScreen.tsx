@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -283,6 +283,10 @@ function BankRow({
   const dynamicState = useDynamicState()
   const [standForm, setStandForm] = useState<'single' | 'all' | null>(null)
   const [confirmingNpcSale, setConfirmingNpcSale] = useState<'single' | 'all' | null>(null)
+  // bank-withdrawal.tsx: withdraw is a server-side toggle, so a second tap
+  // while the first is in flight would remove the mark it just added.
+  const withdrawInFlight = useRef(false)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // A request matching the SAME {pack, slot} toggles the pending
@@ -319,6 +323,18 @@ function BankRow({
     await refreshNow()
   }
 
+  const withdraw = async (markAll: boolean) => {
+    if (withdrawInFlight.current || !merchant) return
+    withdrawInFlight.current = true
+    setWithdrawing(true)
+    try {
+      await run(() => api.withdrawFromBank(merchant, entry.item, pack, entry.slot, markAll))
+    } finally {
+      withdrawInFlight.current = false
+      setWithdrawing(false)
+    }
+  }
+
   return (
     <div className={`rounded-md border bg-card p-2 ${mark ? mark.border : 'border-border'}`}>
       <button className="flex w-full items-center gap-2" onClick={onToggle}>
@@ -351,16 +367,16 @@ function BankRow({
               <Button
                 variant="link"
                 size="xs"
-                disabled={!merchant}
-                onClick={() => void run(() => api.withdrawFromBank(merchant!, entry.item, pack, entry.slot))}
+                disabled={!merchant || withdrawing}
+                onClick={() => void withdraw(false)}
               >
                 {withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'}
               </Button>
               <Button
                 variant="link"
                 size="xs"
-                disabled={!merchant}
-                onClick={() => void run(() => api.withdrawFromBank(merchant!, entry.item, pack, entry.slot, true))}
+                disabled={!merchant || withdrawing}
+                onClick={() => void withdraw(true)}
               >
                 Mark all for withdrawal
               </Button>

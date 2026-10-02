@@ -17,7 +17,10 @@ export function MarketScreen() {
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const listings = [...(dynamicState.aldata?.listings ?? []), ...(dynamicState.ponty?.listings ?? [])]
+  const listings: MarketListing[] = [
+    ...(dynamicState.aldata?.listings ?? []).map((listing) => ({ ...listing, origin: 'aldata' as const })),
+    ...(dynamicState.ponty?.listings ?? []).map((listing) => ({ ...listing, origin: 'ponty' as const })),
+  ]
   const search = dynamicState.standSearch
   const wtbCount = Object.keys(dynamicState.standBids).length
 
@@ -67,6 +70,7 @@ function MarketRow({ listing, catalogFor }: { listing: MarketListing; catalogFor
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [quantity, setQuantity] = useState(String(listing.quantity))
+  const [error, setError] = useState<string | null>(null)
   const suffix = listing.seller ? ` (${listing.seller})` : listing.source ? ` [${listing.source}]` : ''
 
   return (
@@ -81,18 +85,21 @@ function MarketRow({ listing, catalogFor }: { listing: MarketListing; catalogFor
           {listing.unitPrice ?? listing.price}g × {listing.quantity}
         </span>
       </div>
-      {listing.key && (
+      {(listing.key || listing.keys?.length) && (
         <div className="mt-1.5 flex items-end gap-2">
-          <label className="flex-1 text-xs text-muted-foreground">
-            Qty
-            <Input value={quantity} onChange={(e) => /^\d*$/.test(e.target.value) && setQuantity(e.target.value)} className="mt-1" />
-          </label>
+          {/* Ponty sells the whole listing; ALData takes a quantity. */}
+          {listing.origin !== 'ponty' && (
+            <label className="flex-1 text-xs text-muted-foreground">
+              Qty
+              <Input value={quantity} onChange={(e) => /^\d*$/.test(e.target.value) && setQuantity(e.target.value)} className="mt-1" />
+            </label>
+          )}
           <Button
             size="sm"
             onClick={async () => {
-              const qty = Number(quantity) || 1
-              if (listing.source === 'ponty') await api.buyPonty(listing.key!, qty, listing.unitPrice ?? listing.price)
-              else await api.buyAlData(listing.key!, qty)
+              setError(null)
+              const result = listing.origin === 'ponty' ? await api.buyPonty(listing) : await api.buyAlData(listing, Number(quantity) || 1)
+              if (result.kind === 'failure') setError(result.message)
               await refreshNow()
             }}
           >
@@ -100,6 +107,7 @@ function MarketRow({ listing, catalogFor }: { listing: MarketListing; catalogFor
           </Button>
         </div>
       )}
+      {error && <p role="alert" className="mt-1 text-sm text-destructive">{error}</p>}
     </div>
   )
 }

@@ -134,6 +134,8 @@ test('Settings: switching realm updates immediately (no stale data until the nex
   await expect(page.getByText('Realm: US I')).toBeVisible()
   await page.getByText('Switch realm...').click()
   await page.getByText('US II (50 online)').click()
+  // party-inventory-panels.tsx: a confirmation with the Fatigue/Hop Sickness warnings first.
+  await page.getByRole('group', { name: 'Switch realm?' }).getByRole('button', { name: 'Switch all characters' }).click()
 
   await expect(page.getByText('Realm: US II')).toBeVisible()
 })

@@ -793,8 +793,12 @@ export class MockPartyServer {
       const itemId = String(body.itemId)
       if (body.clear) delete this.standBids[itemId]
       else {
-        const { itemId: _itemId, clear: _clear, ...rest } = body
-        this.standBids[itemId] = rest
+        // merchant-bid.ts priority(): absent keeps the previous override,
+        // null/'' clears it.
+        const { itemId: _itemId, clear: _clear, replaceStandEntry: _replace, priorityOverride, ...rest } = body
+        const previous = this.standBids[itemId]?.priorityOverride
+        const nextPriority = priorityOverride === undefined ? previous : priorityOverride === null || priorityOverride === '' ? undefined : Number(priorityOverride)
+        this.standBids[itemId] = { ...rest, ...(nextPriority !== undefined ? { priorityOverride: nextPriority } : {}) }
       }
       return { status: 200, json: { ok: true } }
     }

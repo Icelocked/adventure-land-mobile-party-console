@@ -26,6 +26,8 @@ export function SettingsScreen() {
   const [showRealms, setShowRealms] = useState(false)
   const [realmError, setRealmError] = useState<string | null>(null)
   const [setHome, setSetHome] = useState(false)
+  const [realmDestination, setRealmDestination] = useState<string | null>(null)
+  const [realmBusy, setRealmBusy] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -139,16 +141,12 @@ export function SettingsScreen() {
           <div className="rounded-md border border-border bg-card p-4">
             <div className="text-sm font-medium">Realm: {dynamicState.realmControl.activeRealm ?? 'unknown'}</div>
             <div className="text-xs text-muted-foreground">Home: {dynamicState.realmControl.homeRealm ?? 'unknown'}</div>
-            {realmError && <p className="text-xs text-destructive">{realmError}</p>}
-            <Button variant="link" size="xs" className="mt-1" onClick={() => setShowRealms((v) => !v)}>
+            {realmError && !realmDestination && <p className="text-xs text-destructive">{realmError}</p>}
+            <Button variant="link" size="xs" className="mt-1" onClick={() => (setShowRealms((v) => !v), setRealmDestination(null))}>
               {showRealms ? 'Cancel' : 'Switch realm...'}
             </Button>
-            {showRealms && (
+            {showRealms && !realmDestination && (
               <div className="mt-1 flex flex-col gap-1">
-                <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={setHome} onChange={(e) => setSetHome(e.target.checked)} className="size-4" />
-                  Set as home realm
-                </label>
                 {dynamicState.realmControl.realms
                   .filter((option) => !option.pvp)
                   .map((option) => (
@@ -157,19 +155,76 @@ export function SettingsScreen() {
                       variant="link"
                       size="xs"
                       className="justify-start"
-                      onClick={async () => {
-                        const result = await api.switchRealm(option.key, setHome)
-                        if (result.kind === 'failure') setRealmError(result.message)
-                        else {
-                          setRealmError(null)
-                          setShowRealms(false)
-                          await refreshNow()
-                        }
+                      disabled={!!dynamicState.realmControl?.operation}
+                      onClick={() => {
+                        setRealmError(null)
+                        setSetHome(false)
+                        setRealmDestination(option.key)
                       }}
                     >
                       {option.label} ({option.players} online)
                     </Button>
                   ))}
+              </div>
+            )}
+            {realmDestination && (
+              // party-inventory-panels.tsx's "Switch realm?" confirmation.
+              <div role="group" aria-label="Switch realm?" className="mt-2 flex flex-col gap-2 rounded-md border border-border p-3">
+                <p className="text-sm font-medium">Switch realm?</p>
+                <p className="text-xs text-muted-foreground">
+                  This switches every active party character to{' '}
+                  {dynamicState.realmControl.realms.find((realm) => realm.key === realmDestination)?.label || realmDestination} and gives non-merchant
+                  characters Realm Fatigue.
+                </p>
+                <div className="flex flex-col gap-1 rounded-md bg-amber-500/10 p-2 text-xs">
+                  <p>
+                    <strong>Realm Fatigue:</strong> approximately 30 minutes. Home-realm rewards are paused; ordinary rewards continue.
+                  </p>
+                  {realmDestination !== dynamicState.realmControl.homeRealm ? (
+                    <p>
+                      <strong>Outside your home realm:</strong> Hop Sickness applies −80 Luck, Gold, and XP, plus −20% output, until you return home or change
+                      your home realm through Bean.
+                    </p>
+                  ) : (
+                    <p>This destination is already your home realm, so Hop Sickness should not apply.</p>
+                  )}
+                </div>
+                {realmDestination !== dynamicState.realmControl.homeRealm && (
+                  <label className="flex items-start gap-2 text-xs">
+                    <input type="checkbox" checked={setHome} onChange={(e) => setSetHome(e.target.checked)} className="mt-0.5 size-4" />
+                    <span>
+                      <strong>Set as home realm</strong>
+                      <span className="block text-muted-foreground">
+                        After switching, one non-merchant will visit Bean in Main and request the home change. Current game data exposes no separate home-change
+                        cooldown.
+                      </span>
+                    </span>
+                  </label>
+                )}
+                {realmError && <p role="alert" className="text-xs text-destructive">{realmError}</p>}
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" disabled={realmBusy} onClick={() => setRealmDestination(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={realmBusy}
+                    onClick={async () => {
+                      setRealmError(null)
+                      setRealmBusy(true)
+                      const result = await api.switchRealm(realmDestination, setHome)
+                      setRealmBusy(false)
+                      if (result.kind === 'failure') setRealmError(result.message)
+                      else {
+                        setRealmDestination(null)
+                        setShowRealms(false)
+                        await refreshNow()
+                      }
+                    }}
+                  >
+                    {realmBusy ? 'Starting…' : 'Switch all characters'}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
