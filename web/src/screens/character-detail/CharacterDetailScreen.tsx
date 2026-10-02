@@ -11,6 +11,7 @@ import { VitalsHeader } from './VitalsHeader'
 import { LeaderFollowerSection } from './sections/LeaderFollowerSection'
 import { TravelSection } from './sections/TravelSection'
 import { MerchantQueueSection } from './sections/MerchantQueueSection'
+import { RuleConflictsSection } from './sections/RuleConflictsSection'
 import { MerchantControlsSection } from './sections/MerchantControlsSection'
 import { FarmingSection } from './sections/FarmingSection'
 import { EquipmentSection } from './sections/EquipmentSection'
@@ -137,13 +138,7 @@ export function CharacterDetailScreen() {
             )}
             {isMerchant && <MerchantQueueSection />}
             {isMerchant && (
-              <MerchantControlsSection
-                forceStand={dynamicState.merchantForceStand}
-                gatheringModes={dynamicState.gatheringModes}
-                threshold={dynamicState.threshold}
-                itemCollectionThreshold={dynamicState.itemCollectionThreshold}
-                bankSortMode={dynamicState.bankSortMode}
-              />
+              <MerchantControlsSection forceStand={dynamicState.merchantForceStand} gatheringModes={dynamicState.gatheringModes} />
             )}
             {isMerchant && (
               <LuckySlotSection characterName={name} streams={dynamicState.luckySlotTracking[name] ?? {}} verified={dynamicState.luckyUpgradeSlots[name]} />
@@ -189,6 +184,7 @@ export function CharacterDetailScreen() {
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
+            {isMerchant && <RuleConflictsSection />}
             <AutoMarksSection characterName={name} isMerchant={isMerchant} dynamicState={dynamicState} catalogFor={catalogFor} />
           </div>
         </>
