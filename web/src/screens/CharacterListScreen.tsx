@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CloudOff, Menu, RefreshCw } from 'lucide-react'
-import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded } from '@/data/PartyDataProvider'
+import { CloudOff, Menu, Plus, RefreshCw } from 'lucide-react'
+import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded, useRoster } from '@/data/PartyDataProvider'
 import { AccountMenu } from '@/screens/character-detail/AccountMenu'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
 import { PartyGold } from '@/components/PartyGold'
+import { CharacterPortrait } from '@/components/CharacterPortrait'
+import { orderCharacters } from '@/lib/characterOrder'
+import { pendingCharacters, pendingHelp, pendingLabels, type PendingCharacter } from '@/lib/pendingCharacters'
+import { RosterPickerSheet } from '@/screens/roster/RosterPickerSheet'
+import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import type { BestiaryMonster, CharacterState } from '@/models'
 
@@ -26,7 +31,30 @@ export function CharacterListScreen() {
 
   // use-party-console.tsx chars: bankbois get their own cards, not party ones.
   const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
-  const names = Object.keys(characters).filter((name) => !bankboiNames.has(name))
+  const roster = useRoster()
+  // use-party-console.tsx chars: active slots in slot order (all live
+  // characters on a server that reports no slots), then orderCharacters.
+  const slots = dynamicState.activeSlots
+  const liveNames = (slots
+    ? slots
+        .slice()
+        .sort((x, y) => x.index - y.index)
+        .map((slot) => slot.character)
+        .filter((name): name is string => !!name && !!characters[name])
+    : Object.keys(characters)
+  ).filter((name) => !bankboiNames.has(name))
+  const primary = slots?.find((slot) => slot.primary)?.character ?? slots?.find((slot) => slot.kind === 'native' && slot.index === 0)?.character
+  const steam = (slots ?? []).filter((slot) => slot.kind === 'native' && slot.character).map((slot) => slot.character!)
+  const names = orderCharacters(
+    liveNames.map((name) => ({ name, ctype: characters[name]?.vitals?.ctype })),
+    Object.values(roster),
+    primary,
+    dynamicState.merchantCharacter,
+    steam,
+  ).map((entry) => entry.name)
+  const pending = pendingCharacters(dynamicState, names)
+  const [pickerSlot, setPickerSlot] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
   const updates = useConsoleUpdates().state
   const navigate = useNavigate()
   const settings = useServerSettings()
@@ -74,7 +102,7 @@ export function CharacterListScreen() {
 
       {names.length > 0 && <PartyControls />}
 
-      {names.length === 0 ? (
+      {names.length === 0 && !pending.length ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           {!configLoaded ? (
             <p className="text-muted-foreground">Party Console is loading…</p>
@@ -95,8 +123,33 @@ export function CharacterListScreen() {
           {names.map((name) => (
             <CharacterRow key={name} name={name} state={characters[name]} bestiaryCatalog={dynamicState.bestiaryCatalog} />
           ))}
+          {pending.map((entry) => (
+            <PendingCharacterCard key={entry.name} entry={entry} />
+          ))}
         </ul>
       )}
+      <RosterSlots onChoose={setPickerSlot} />
+      {dynamicState.bankboiTransaction && (
+        // party-workspace.tsx's "Bankboi Active" card.
+        <div className="mx-3 mb-3 rounded-lg border-2 border-dashed border-primary/60 p-4 text-center">
+          <p className="font-mono text-lg font-black uppercase tracking-widest text-primary">Bankboi Active</p>
+          <p className="mt-1 font-mono text-xs uppercase text-muted-foreground">{dynamicState.bankboiTransaction.bankboi}</p>
+          <p className="font-mono text-[10px] uppercase text-muted-foreground">
+            {dynamicState.bankboiTransaction.mode} · {dynamicState.bankboiTransaction.phase}
+          </p>
+        </div>
+      )}
+      {pickerSlot !== null && (
+        <RosterPickerSheet
+          slot={pickerSlot}
+          onClose={() => setPickerSlot(null)}
+          onCreate={() => {
+            setPickerSlot(null)
+            setCreating(true)
+          }}
+        />
+      )}
+      {creating && <CreateCharacterSheet onClose={() => setCreating(false)} />}
       {menuOpen && <AccountMenu onClose={() => setMenuOpen(false)} />}
     </div>
   )
@@ -184,6 +237,54 @@ function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: C
           )}
         </div>
       </Link>
+    </li>
+  )
+}
+
+/** roster-controls.tsx: one "Load character slot N" per empty headless
+ *  slot, disabled while a Steam handoff is running. */
+function RosterSlots({ onChoose }: { onChoose: (slot: number) => void }) {
+  const state = useDynamicState()
+  const operation = state.steamSwitch
+  const busy = !!operation?.phase && operation.phase !== 'complete'
+  const empty = (state.activeSlots ?? []).filter((slot) => slot.kind === 'headless' && !slot.character)
+  if (!empty.length) return null
+  return (
+    <div className="flex flex-col gap-2 px-3 pb-3">
+      {empty.map((slot) => (
+        <button
+          key={slot.index}
+          type="button"
+          disabled={busy}
+          onClick={() => onChoose(slot.index)}
+          className="flex min-h-14 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border text-sm text-muted-foreground disabled:opacity-50"
+        >
+          <Plus className="size-4" /> Load character slot {slot.index + 1}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** pending-character-cards.tsx: a character that's loading, waiting or
+ *  lost, with its portrait, class, hosting and status. */
+function PendingCharacterCard({ entry }: { entry: PendingCharacter }) {
+  const state = useDynamicState()
+  const roster = useRoster()
+  const look = state.characterAppearances?.[entry.name]
+  const headless = state.activeSlots?.some((slot) => slot.character === entry.name && slot.kind === 'headless')
+  return (
+    <li aria-live="polite" className="flex gap-3 rounded-lg border border-border bg-card p-3">
+      <CharacterPortrait html={look?.characterDollHtml} skin={look?.skin} className="h-16 w-12 rounded border border-border" />
+      <div className="min-w-0">
+        <p className="font-medium">{entry.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {roster[entry.name]?.ctype} · {headless ? 'Headless character' : entry.primary ? 'Steam primary' : 'Steam companion'}
+        </p>
+        <p className="mt-1 text-sm text-primary">{entry.status === 'waiting' ? 'Waiting for your character to connect…' : pendingLabels[entry.status]}</p>
+        {entry.error && <p className="mt-1 text-sm text-destructive">{entry.error}</p>}
+        {entry.delayed && <p className="mt-1 text-xs text-amber-500">{pendingHelp(entry)}</p>}
+      </div>
     </li>
   )
 }

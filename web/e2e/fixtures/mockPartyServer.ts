@@ -214,8 +214,11 @@ export class MockPartyServer {
     return this
   }
 
+  /** Roster members that aren't live (offline, not in a slot). */
+  offlineRoster: { name: string; ctype: string; level: number; online?: boolean }[] = []
+
   private roster() {
-    return this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level }))
+    return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level })), ...this.offlineRoster]
   }
 
   private dynamicState(): Record<string, unknown> {

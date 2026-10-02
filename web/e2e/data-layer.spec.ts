@@ -46,7 +46,8 @@ test('While the live stream is down, characters still arrive via the fast/invent
   await page.route('**/party-api/dashboard-stream', (route) => route.abort())
 
   await page.goto('/')
-  await expect(page.getByText('Ranger1')).toBeVisible({ timeout: 10_000 })
-  expect(count(server, 'fast')).toBeGreaterThan(0)
-  expect(count(server, 'inventory')).toBeGreaterThan(0)
+  await expect.poll(() => count(server, 'fast'), { timeout: 15_000 }).toBeGreaterThan(0)
+  await expect.poll(() => count(server, 'inventory'), { timeout: 15_000 }).toBeGreaterThan(0)
+  // A live row (vitals), not just a pending card for the slot.
+  await expect(page.getByText('HP 100/100')).toBeVisible({ timeout: 10_000 })
 })
