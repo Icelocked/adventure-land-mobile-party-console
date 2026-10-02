@@ -8,8 +8,8 @@
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
-- **Phase 5:** I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 (this commit).
-- **Next:** Phase 5 (I6, I7).
+- **Phase 5:** I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 (this commit).
+- **Next:** Phase 5 (I6).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1228,6 +1228,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/gear-comparison-dialog.tsx`.
 - **PWA files:** `P/screens/itempanel/GearComparisonSheet.tsx`. Its comment at lines 9-16 claims the data is unavailable; that is false per 03-ch (e).
 - **Dependencies:** F2, F7 #14/#27.
+- **As built:** a verbatim port of `project()`, the stat rows, the stat-scroll and level previews and set changes. Base stats come from `characterDiagnostics` and HP/MP from vitals. Meta is the catalog meta with live meta merged over it (`detailMeta`). `propertiesAtLevel` and `detailMeta` were added to `itemFormulas.ts`. The exotic stat picker is a native select.
 
 #### I8 — Auto-rule list editing (M)
 - **Rows:** A246–A249, A251–A253, A259.

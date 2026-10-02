@@ -130,6 +130,35 @@ export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: 
   return values
 }
 
+/** properties-at-level.tsx, verbatim: the server-reported stat block for
+ *  the item as it is, moved by the formula's difference between the actual
+ *  item and the preview (level and stat scroll). */
+export function propertiesAtLevel(meta: ItemMeta | undefined, item: { level?: number; stat_type?: string }, level: number, statType?: string | null) {
+  const actualLevel = Math.max(0, Number(item.level) || 0)
+  const actualCalculated = calculatedLevelProperties(meta, item.stat_type, actualLevel)
+  const previewCalculated = calculatedLevelProperties(meta, statType || undefined, level)
+  const reported = (meta?.properties || {}) as Record<string, unknown>
+  return Object.keys({ ...actualCalculated, ...previewCalculated, ...reported }).reduce<Record<string, string | number | boolean>>((out, key) => {
+    const reportedValue = reported[key]
+    if (reportedValue !== undefined && typeof reportedValue !== 'number' && typeof reportedValue !== 'string') {
+      out[key] = reportedValue as boolean
+      return out
+    }
+    const current = Number(reportedValue ?? actualCalculated[key] ?? 0)
+    const value = current + Number(previewCalculated[key] || 0) - Number(actualCalculated[key] || 0)
+    if (value) out[key] = value
+    return out
+  }, {})
+}
+
+/** use-party-console.tsx detailMeta: catalog meta with the live instance's
+ *  meta over it (keeping the catalog's world info when the live one has none). */
+export function detailMeta(known: ItemMeta | null | undefined, live: ItemMeta | null | undefined): ItemMeta | undefined {
+  if (!known) return live ?? undefined
+  if (!live) return known
+  return { ...known, ...live, world: live.world || known.world }
+}
+
 /** The stat block to actually display at [previewLevel]: the server's own
  *  current-level `properties` (authoritative) adjusted by the DELTA
  *  between the formula evaluated at the preview level vs. the actual
