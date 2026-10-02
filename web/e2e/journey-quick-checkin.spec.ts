@@ -28,7 +28,8 @@ test('Quick check-in: party data is immediately correct on open, no lingering lo
   await expect(page.locator('[aria-label="Disconnected"]')).not.toBeVisible()
 
   await expect(page.getByText('HP 850/1000')).toBeVisible()
-  await expect(page.getByText('6,234g')).toBeVisible() // account total, correct on the very first render
+  // party-gold.tsx: bank, then "(X total)" with what the party carries - correct on first render.
+  await expect(page.getByRole('button', { name: 'Party gold' })).toContainText('(6,234 total)')
 
   // Glance at one character, then leave - no mutation, no deep
   // navigation. This should be the fastest, most boring path in the app.
