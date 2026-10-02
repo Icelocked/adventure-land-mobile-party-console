@@ -817,7 +817,8 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'realm/switch') {
-      this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, ...(body.setHome ? { homeRealm: body.realm } : {}) }
+      // Simplified: the real switch runs as an operation; the mock completes it at once.
+      this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, currentRealm: body.realm, split: false, ...(body.setHome ? { homeRealm: body.realm } : {}) }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'command' && body.type === 'give') {

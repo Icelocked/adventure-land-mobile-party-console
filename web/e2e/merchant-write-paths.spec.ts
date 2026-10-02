@@ -111,22 +111,60 @@ test('Realm switch: tapping a realm asks first (with the Hop Sickness warning); 
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
-  server.realmControl = { activeRealm: 'US I', homeRealm: 'US I', realms: [{ key: 'EU I', label: 'EU I', players: 30, pvp: false }] }
+  server.realmControl = {
+    activeRealm: 'US I',
+    currentRealm: 'US I',
+    homeRealm: 'US I',
+    split: false,
+    characters: [],
+    realms: [
+      { key: 'EU I', label: 'EU I', players: 30, pvp: false },
+      { key: 'EU PVP', label: 'EU PVP', players: 9, pvp: true },
+    ],
+  }
   await server.install(page)
   const bodies = postBodies(page, 'realm/switch')
 
   await page.goto('/settings')
-  await page.getByText('Switch realm...').click()
-  await page.getByText('EU I (30 online)').click()
+  await page.getByText('Change realm…').click()
+  await expect(page.getByRole('button', { name: 'EU PVP (9 players) — disabled' })).toBeDisabled()
+  await page.getByText('EU I (30 players)').click()
   const dialog = page.getByRole('group', { name: 'Switch realm?' })
   await expect(dialog.getByText(/Hop Sickness applies/)).toBeVisible()
   await dialog.getByRole('button', { name: 'Cancel' }).click()
   await page.waitForTimeout(300)
   expect(bodies).toHaveLength(0)
 
-  await page.getByText('EU I (30 online)').click()
+  await page.getByText('EU I (30 players)').click()
   await page.getByRole('group', { name: 'Switch realm?' }).getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Switch all characters' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toEqual({ realm: 'EU I', setHome: true })
+})
+
+test('Realm: a split party shows "Mixed realms" with each character, and a running switch shows progress', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.realmControl = {
+    activeRealm: 'US I',
+    currentRealm: null,
+    homeRealm: 'US I',
+    split: true,
+    characters: [
+      { name: 'Patinder', ctype: 'merchant', realm: 'US I', online: true },
+      { name: 'Ranger1', ctype: 'ranger', realm: null, online: false },
+    ],
+    realms: [{ key: 'US I', label: 'US I', players: 80, pvp: false }],
+    operation: { id: 'op-1', phase: 'moving-characters', realm: 'US I', setHome: false, startedAt: Date.now(), characters: [{ name: 'Ranger1', ctype: 'ranger', realm: null, online: false }] },
+  }
+  await server.install(page)
+
+  await page.goto('/settings')
+  await expect(page.getByText('Current: Mixed realms · Home: US I')).toBeVisible()
+  await expect(page.getByText('Patinder: US I')).toBeVisible()
+  await expect(page.getByText('Ranger1: offline')).toBeVisible()
+  await expect(page.getByText('moving characters')).toBeVisible()
+  await expect(page.getByText('Ranger1: waiting')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Change realm…' })).toBeDisabled()
 })

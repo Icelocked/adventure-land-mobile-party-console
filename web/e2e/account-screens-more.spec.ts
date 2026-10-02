@@ -127,17 +127,29 @@ test('Settings: switching realm updates immediately (no stale data until the nex
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
-  server.realmControl = { activeRealm: 'US I', homeRealm: 'US I', realms: [{ key: 'US II', label: 'US II', players: 50, pvp: false }] }
+  server.realmControl = {
+    activeRealm: 'US I',
+    currentRealm: 'US I',
+    homeRealm: 'US I',
+    split: false,
+    characters: [],
+    realms: [
+      { key: 'US I', label: 'US I', players: 80, pvp: false },
+      { key: 'US II', label: 'US II', players: 50, pvp: false },
+    ],
+  }
   await server.install(page)
 
   await page.goto('/settings')
-  await expect(page.getByText('Realm: US I')).toBeVisible()
-  await page.getByText('Switch realm...').click()
-  await page.getByText('US II (50 online)').click()
+  await expect(page.getByText('Current: US I · Home: US I')).toBeVisible()
+  await page.getByText('Change realm…').click()
+  // The realm the party is already in can't be picked.
+  await expect(page.getByRole('button', { name: 'US I (80 players)' })).toBeDisabled()
+  await page.getByText('US II (50 players)').click()
   // party-inventory-panels.tsx: a confirmation with the Fatigue/Hop Sickness warnings first.
   await page.getByRole('group', { name: 'Switch realm?' }).getByRole('button', { name: 'Switch all characters' }).click()
 
-  await expect(page.getByText('Realm: US II')).toBeVisible()
+  await expect(page.getByText('Current: US II · Home: US I')).toBeVisible()
 })
 
 test('Offerings: saving a rule fails once with a server error, then succeeds', async ({ page }) => {

@@ -509,13 +509,37 @@ export interface RealmOption {
   pvp: boolean
 }
 
+/** realm-character.tsx */
+export interface RealmCharacter {
+  name: string
+  ctype: string
+  realm: string | null
+  online: boolean
+}
+
+/** realm-operation.tsx - a realm switch (and optional home change) in progress. */
+export interface RealmOperation {
+  id: string
+  phase: string
+  realm: string
+  setHome: boolean
+  startedAt: number
+  executor?: string | null
+  error?: string | null
+  characters?: RealmCharacter[]
+}
+
+/** realm-control.tsx */
 export interface RealmControl {
   activeRealm?: string
-  homeRealm?: string
+  // Where the party actually is (activeRealm is where the coordinator aims it).
+  currentRealm?: string | null
+  homeRealm?: string | null
+  split: boolean
+  merchantRealm?: string | null
+  characters: RealmCharacter[]
   realms: RealmOption[]
-  // A realm switch/home change in progress - the dashboard disables
-  // switching meanwhile. Opaque until the full realm panel (R2) lands.
-  operation?: unknown
+  operation?: RealmOperation | null
 }
 
 /** The slice of GET /party-api/state that changes often enough to poll
