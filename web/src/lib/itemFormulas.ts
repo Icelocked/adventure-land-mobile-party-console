@@ -360,7 +360,12 @@ export const ITEM_DETAIL_PROPERTY_RANK = new Map(ITEM_DETAIL_PROPERTY_ORDER.map(
  *  internal. `type` is intentionally left visible (unlike the desktop
  *  version, which replaces it with a derived "equip_slot" label this app
  *  doesn't compute) so the equip slot/category is still readable. */
-const IGNORED_STAT_KEYS = new Set(['skin', 'skin_a', 'skin_c', 'skin_r', 'name', 'explanation', 'g', 's', 'grades', 'upgrade', 'compound', 'level', 'set'])
+// item-details.tsx `ignored` (type is shown as the derived equip slot instead).
+const IGNORED_STAT_KEYS = new Set(['skin', 'skin_a', 'skin_c', 'skin_r', 'name', 'explanation', 'type', 'g', 's', 'grades', 'upgrade', 'compound', 'level', 'set'])
+
+/** comparison-slot-label.tsx, verbatim. */
+export const comparisonSlotLabel = (slot: string) =>
+  slot === 'mainhand' ? 'Main hand' : slot === 'offhand' ? 'Off hand' : slot === 'ring1' ? 'Ring 1' : slot === 'ring2' ? 'Ring 2' : slot === 'earring1' ? 'Earring 1' : slot === 'earring2' ? 'Earring 2' : slot
 
 export interface StatRow {
   key: string
@@ -376,6 +381,18 @@ export function buildStatRows(meta: ItemMeta | undefined, actualLevel: number, p
   const preview = previewProperties(meta, actualLevel, previewLevel, statType)
   const display: Record<string, unknown> = { ...definition }
   for (const [key, value] of Object.entries(preview)) display[key] = value
+  // item-details.tsx: equipment shows where it goes instead of its type.
+  const type = String(definition.type)
+  if ((COMPARISON_SLOTS[type] || []).length)
+    display.equip_slot =
+      type === 'weapon'
+        ? 'Main hand' + (meta?.usage?.hands.includes(1) ? ' (off hand depends on class)' : '')
+        : COMPARISON_SLOTS[type]
+            .map((slot) => {
+              const label = comparisonSlotLabel(slot)
+              return label.charAt(0).toUpperCase() + label.slice(1)
+            })
+            .join(' or ')
   const stackSize = asNumber(definition.s) ?? 1
   display.stackable = stackSize > 1
   if (stackSize > 1) display.max_stack_size = stackSize

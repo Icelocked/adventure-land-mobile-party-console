@@ -8,8 +8,8 @@
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
-- **Phase 5:** I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 (this commit).
-- **Next:** Phase 5 (I6).
+- **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
+- **Next:** Phase 6 (M4-M8, M10, M11).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1218,6 +1218,12 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/item-details.tsx`, `party-item-details.tsx`, `properties-at-level.tsx`.
 - **PWA files:** `P/screens/itemdetail/ItemDetailBrowser.tsx`, `P/screens/itempanel/ItemActionPanel.tsx:57`, `P/lib/itemFormulas.ts:134-147, 324-356`.
 - **Dependencies:** F2, F5, M5, M7.
+- **As built (ground rule 2):**
+  - The PWA keeps its tabbed details sheet. The dashboard's header buttons and sections are added into it.
+  - Add to stand opens the options list's stand form; Add to WTB opens the WTB form at the previewed level.
+  - The Compare picker lists party members, then slots, and opens the I7 comparison.
+  - The stats grid now hides `type` and shows the derived equip slot.
+  - Not yet built: "From catalog" comparison (goes with the catalog reference package). Monster detail extras (Navigate, achievement progress, definition grid) go with the bestiary work in C-phase.
 
 #### I7 — Gear comparison projection (M)
 - **Rows:** A278–A280.
