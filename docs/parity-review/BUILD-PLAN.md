@@ -1,5 +1,12 @@
 # BUILD-PLAN: PWA ↔ party-console v1.2.0, 1:1 parity
 
+## Progress (updated 2026-10-02)
+- **Phase 0:** PR-0a `166727f`, PR-0b `df8d619`, PR-0c `b7238d4`, PR-0d `08dda78`, PR-0e `bf012c2` shipped. **PR-0f (P0-21) is waiting** on a live check that the debug banner shows `leader="<name>"`.
+- **Phase 1:**
+  - **Shipped:** F1 `f3a0d7e`, F2 + F3 `f080eb1`, F4 `9a232b4`, the item-options redesign `bcfcd1f`, F6 + F7 test setup `7cdcbbf`, F8 `873f4e9`.
+  - **Built with their consumer packages:** the remaining F5 primitives and F7 ports.
+- **Next:** Phase 2 (R1, R2, S1).
+
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
 2. **Keep the PWA's existing framework and layout.** The one sanctioned redesign: tapping an item opens the **options list**, and **"Item details" is one entry in that list**. Today the item details pane hosts all the other options. This applies to F5 `ItemActionPanel` and every package that opens an item.
