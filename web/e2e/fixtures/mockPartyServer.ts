@@ -56,6 +56,43 @@ export interface MockCatalogEntry {
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
 
+// Copied VERBATIM from party-console v1.2.0
+// runtime/coordinator/telemetry/public-state.ts:65-86 (configFields,
+// configExtraKeys). Re-sync on every console release: these decide which
+// keys `section=core&dashboard=1` strips and `section=config` serves.
+const CONFIG_FIELDS = [
+  'characterAppearances', 'merchantRules',
+  'bankboiPrefix', 'anniversaryAutoChat', 'farmingProfiles',
+  'passiveRareHunts', 'passiveHunting', 'phoenixRouteOrder',
+  'threshold', 'itemCollectionThreshold', 'buyUpgradeBatchSize',
+  'marked', 'merchantMarked', 'autoItemMarks', 'merchantDeliveries',
+  'standListings', 'npcSaleMarks', 'deconstructionMarks', 'autoDeconstruction',
+  'deconstructionCatalog', 'autoNpcSales', 'autoStandMarks',
+  'merchantRoutinePriorities', 'merchantAutomations', 'merchantBlacklist',
+  'standBids', 'autoStandBuys', 'autoBlacklistMerchants', 'standSearch',
+  'upgrades', 'statScrolls', 'compounds', 'autoCompounds', 'autoExchanges', 'goldTargets',
+  'leader', 'followers', 'eventsByCharacter', 'eventSelectionsByCharacter',
+  'monsterFocus', 'monsterFocusByCharacter', 'monsterPrioritiesByCharacter',
+  'monsterSearchRadiusByCharacter', 'scatterMonsterTypes',
+  'farmingPolicy',
+  'huntBlacklist', 'huntSettings',
+  'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
+] as const
+const CONFIG_EXTRA_KEYS = ['roster', 'classChoices', 'eventStrategy', 'giveawayRealms', 'autoUpgradeMarks'] as const
+// public-state.ts catalogs() - served only by section=catalog (core omits them).
+const CATALOG_FIELDS = ['travelPlaces', 'monsterChoices', 'bestiaryCatalog', 'skillCatalog', 'appearanceChoices', 'merchantCatalog', 'bankVaults'] as const
+const BANK_FIELDS = ['bank', 'bankVaults', 'bankCurrent', 'bankQueue'] as const
+const MARKET_FIELDS = ['aldata', 'ponty', 'standPriceHistory'] as const
+const LOGS_FIELDS = ['gameLogs', 'combatLogs', 'merchantActivity'] as const
+
+function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]))
+}
+function omit(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  const drop = new Set(keys)
+  return Object.fromEntries(Object.entries(source).filter(([key]) => !drop.has(key)))
+}
+
 export class MockPartyServer {
   characters: MockCharacter[] = []
   catalogEntries: Record<string, MockCatalogEntry> = {}
@@ -204,12 +241,56 @@ export class MockPartyServer {
       farmingProfiles: this.farmingProfiles,
       aldata: { listings: this.aldataListings },
       ponty: { listings: this.pontyListings },
-      // Real shape of state?section=core&dashboard=1's own extra field -
-      // see diagnosticCharacters() server-side, which allowlists monsterHunt.
-      characterDetails: Object.fromEntries(
-        this.characters.map((c) => [c.name, { monsterHunt: c.monsterHunt ?? null }]),
-      ),
+      ...this.extraState,
     }
+  }
+
+  /** Any other state field a test needs (merchantForceStand, threshold,
+   *  goldTargets, merchantCharacter, ...). Routed to its section exactly
+   *  like a built-in field. */
+  extraState: Record<string, unknown> = {}
+
+  /** Redirect every party-api GET to /setup once, like the hosting
+   *  gateway does for a browser whose pairing lapsed (authorize.ts). */
+  redirectNextStateGet = false
+
+  /** Delay (ms) before answering section=config - for proving a slow
+   *  config response never holds up core. */
+  configDelayMs = 0
+
+  /** Every state GET's `section` (or '' for none), in request order. */
+  stateRequests: { section: string; dashboard: boolean }[] = []
+
+  /** GET /party-api/state, split by `section` the way the real
+   *  coordinator does (public-state.ts:236-277). */
+  stateSection(section: string, dashboard: boolean): Record<string, unknown> {
+    const full: Record<string, unknown> = { roster: this.roster(), ...this.dynamicState() }
+    if (section === 'config') return pick(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS])
+    if (section === 'catalog') return { ...pick(full, CATALOG_FIELDS), referenceRevision: 'mock' }
+    if (section === 'bank') return { ...pick(full, BANK_FIELDS), ...(dashboard ? { bankbois: full.bankbois ?? [] } : {}) }
+    if (section === 'market') return pick(full, MARKET_FIELDS)
+    if (section === 'logs') return { gameLogs: {}, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }
+    if (section === 'core') {
+      if (!dashboard) return omit(full, [...CATALOG_FIELDS])
+      const core = omit(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS, ...CATALOG_FIELDS, 'bank', 'ponty', 'combatLogs', 'merchantActivity', 'standPriceHistory'])
+      // fullPayload(omitCatalog) drops aldata's listings/trades/buyOrders.
+      const aldata = { ...((full.aldata as Record<string, unknown>) ?? {}) }
+      delete aldata.listings
+      delete aldata.trades
+      delete aldata.buyOrders
+      return {
+        ...core,
+        aldata,
+        // public-state.ts bankboiSummaries: no items/slots on core.
+        bankbois: ((full.bankbois as Record<string, unknown>[]) ?? []).map((entry) => omit(entry, ['items', 'slots'])),
+        // diagnosticCharacters() allowlists monsterHunt (among others).
+        characterDetails: Object.fromEntries(this.characters.map((c) => [c.name, { monsterHunt: c.monsterHunt ?? null }])),
+        characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
+        serverNow: Date.now(),
+        bankGold: this.bankGold,
+      }
+    }
+    return full
   }
 
   private snapshotPayload(sequence: number): Record<string, unknown> {
@@ -667,11 +748,17 @@ export class MockPartyServer {
       return route.fulfill({ json: { ok: true } })
     })
 
-    await page.route('**/party-api/state**', (route) => {
+    await page.route('**/party-api/state**', async (route) => {
       const url = new URL(route.request().url())
-      if (url.searchParams.get('section') === 'logs')
-        return route.fulfill({ json: { gameLogs: {}, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity } })
-      return route.fulfill({ json: { roster: this.roster(), ...this.dynamicState() } })
+      const section = url.searchParams.get('section') ?? ''
+      const dashboard = url.searchParams.get('dashboard') === '1'
+      this.stateRequests.push({ section, dashboard })
+      if (this.redirectNextStateGet) {
+        this.redirectNextStateGet = false
+        return route.fulfill({ status: 302, headers: { Location: '/setup' } })
+      }
+      if (section === 'config' && this.configDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.configDelayMs))
+      return route.fulfill({ json: this.stateSection(section, dashboard) })
     })
     await page.route('**/party-api/mail**', (route) => {
       // This pattern also matches POST /party-api/mail/collect - defer

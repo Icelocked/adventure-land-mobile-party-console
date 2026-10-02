@@ -1,4 +1,4 @@
-import type { Item, InventoryEntry } from './item'
+import type { Item, InventoryEntry, EquippedEntry } from './item'
 import type { Sprite } from './sprite'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
 import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
@@ -610,6 +610,41 @@ export interface PartyStateDynamic {
   // AUTOMATIC upgrades within a level range, independent of the item's
   // own upgrade-mark tier.
   upgradeOfferingRules: UpgradeOfferingRule[]
+  // The configured merchant (party-state.tsx) - config section only. Never
+  // infer the merchant from character class; bankbois are merchants too.
+  merchantCharacter?: string | null
+  // Shared merchant rules (inventory/shared-rules.ts's SharedRules) - when
+  // present, rules are owned by `owner` for every name in `members`.
+  merchantRules?: SharedRules | null
+  // Full entries (with items) only arrive from section=bank&dashboard=1;
+  // section=core carries item-less summaries (public-state.ts bankboiSummaries).
+  bankbois: Bankboi[]
+  bankboiQueue?: { id: string; item: Item; state: string; bootstrap?: boolean }[]
+  buyUpgradeBatchSize?: number
+}
+
+/** inventory/shared-rules.ts's SharedRules (conflicts kept opaque until the
+ *  rule-conflict panel is ported). */
+export interface SharedRules {
+  version: 1
+  owner: string
+  members: string[]
+  backup?: unknown
+  conflicts: unknown[]
+}
+
+/** bankboi.tsx's Bankboi. `items`/`slots` are absent on core's summaries. */
+export interface Bankboi {
+  name: string
+  ctype?: string
+  level?: number
+  state: string
+  items?: (InventoryEntry | null)[]
+  slots?: Record<string, EquippedEntry>
+  gold?: number
+  seenAt?: number
+  error?: string | null
+  transaction?: { phase: string; mode: string } | null
 }
 
 /** upgrade-offerings.ts's UpgradeOfferingRule, ported verbatim. `name` is
@@ -789,6 +824,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   farmingProfiles: {},
   standBids: {},
   upgradeOfferingRules: [],
+  bankbois: [],
 })
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

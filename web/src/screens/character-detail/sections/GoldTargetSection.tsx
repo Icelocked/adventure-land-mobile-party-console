@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
@@ -12,6 +13,7 @@ import { SectionCard } from '../SectionCard'
 export function GoldTargetSection({ characterName, serverTarget }: { characterName: string; serverTarget: number }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   const [dirty, setDirty] = useState(false)
   const [value, setValue] = useState(String(serverTarget))
   const [saving, setSaving] = useState(false)
@@ -39,7 +41,7 @@ export function GoldTargetSection({ characterName, serverTarget }: { characterNa
           className="flex-1"
         />
         <Button
-          disabled={!dirty || saving}
+          disabled={!configLoaded || !dirty || saving}
           onClick={async () => {
             setSaving(true)
             await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 })
@@ -51,6 +53,7 @@ export function GoldTargetSection({ characterName, serverTarget }: { characterNa
           {saving ? 'Saving...' : 'Save'}
         </Button>
       </div>
+      <ConfigLoadingNote />
     </SectionCard>
   )
 }

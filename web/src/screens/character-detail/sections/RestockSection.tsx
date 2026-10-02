@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
@@ -14,6 +15,7 @@ const digitsOnly = (value: string) => /^\d*$/.test(value)
 export function RestockSection({ characterName, serverPolicy }: { characterName: string; serverPolicy: RestockPolicy }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   const [dirty, setDirty] = useState(false)
   const [hpMin, setHpMin] = useState(String(serverPolicy.hp.min))
   const [hpMax, setHpMax] = useState(String(serverPolicy.hp.max))
@@ -63,7 +65,7 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
       <Button
         className="mt-2"
         size="sm"
-        disabled={!dirty || saving}
+        disabled={!configLoaded || !dirty || saving}
         onClick={async () => {
           setSaving(true)
           await api.saveRestock(characterName, Number(hpMin) || 0, Number(hpMax) || 0, Number(mpMin) || 0, Number(mpMax) || 0)
@@ -74,6 +76,7 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
       >
         {saving ? 'Saving...' : 'Save'}
       </Button>
+      <ConfigLoadingNote />
     </SectionCard>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
-import { useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { AUTOMATIC_ROUTINE_KEYS, ROUTINE_LABELS, hasEnableToggle } from '@/lib/routineLabels'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ export function RoutinesScreen() {
   const dynamicState = useDynamicState()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
 
   const [draft, setDraft] = useState<Record<string, number>>(dynamicState.merchantRoutinePriorities)
   const [enabledDraft, setEnabledDraft] = useState<Record<string, boolean>>(dynamicState.merchantAutomations)
@@ -28,12 +30,12 @@ export function RoutinesScreen() {
   // same as the dashboard's own "never overwrite a draft while open"
   // polling guard - after that, only local edits and Save change it.
   useEffect(() => {
-    if (!seeded && Object.keys(dynamicState.merchantRoutinePriorities).length > 0) {
+    if (!seeded && configLoaded) {
       setDraft(dynamicState.merchantRoutinePriorities)
       setEnabledDraft(dynamicState.merchantAutomations)
       setSeeded(true)
     }
-  }, [seeded, dynamicState.merchantRoutinePriorities, dynamicState.merchantAutomations])
+  }, [seeded, configLoaded, dynamicState.merchantRoutinePriorities, dynamicState.merchantAutomations])
 
   const sortedKeys = Object.keys(ROUTINE_LABELS).sort(
     (a, b) => (draft[b] ?? 50) - (draft[a] ?? 50) || ROUTINE_LABELS[a].localeCompare(ROUTINE_LABELS[b]),
@@ -105,7 +107,7 @@ export function RoutinesScreen() {
         {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
         <Button
           className="w-full"
-          disabled={saving}
+          disabled={!seeded || saving}
           onClick={async () => {
             setSaving(true)
             setError(null)
@@ -119,6 +121,7 @@ export function RoutinesScreen() {
         >
           {saving ? 'Saving...' : 'Save routines'}
         </Button>
+        <ConfigLoadingNote />
       </div>
     </AccountScreenScaffold>
   )

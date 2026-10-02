@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment } from '@/lib/itemFormulas'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -189,6 +189,7 @@ function InventoryActions({
   const canBuyAnother = !isMerchant && !!meta?.buyable
   // exchangeable/autoExchangeMarked (inventory-panel.tsx) - NPC exchange only runs off the merchant's own inventory.
   const exchangeable = isMerchant && Number((meta?.definition.e as number | undefined) ?? 0) > 0
+  const configLoaded = useConfigLoaded()
   const autoExchangeMarked = isMerchant && !!dynamicState.autoExchanges[`${item.name}@${level}`]
   const canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
   // A delivery's `slot` refers to the SENDER's own inventory (the item
@@ -280,8 +281,10 @@ function InventoryActions({
 
       {exchangeable && (
         <TapRow
-          label={autoExchangeMarked ? 'Auto exchange · already marked' : 'Auto exchange'}
-          onClick={() => !autoExchangeMarked && run(() => api.itemCommand('auto-exchange', characterName, item, slot))}
+          // The server toggles this rule (merchant-item-commands.ts), so a tap
+          // before autoExchanges has loaded could silently remove it.
+          label={!configLoaded ? 'Auto exchange · loading settings…' : autoExchangeMarked ? 'Auto exchange · already marked' : 'Auto exchange'}
+          onClick={() => configLoaded && !autoExchangeMarked && run(() => api.itemCommand('auto-exchange', characterName, item, slot))}
         />
       )}
 

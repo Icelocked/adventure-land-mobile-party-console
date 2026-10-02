@@ -217,6 +217,7 @@ Tests are Playwright specs using the fidelity-fixed mock from P0-03 and assertin
   3. SSE frame `{type:'delta', sequence:'x'}` is ignored.
 
 ### P0-03 — e2e mock must mirror the real server
+- **Sequencing (as built):** items 1, 2, 6 and 11 shipped in PR-0b. Each remaining handler rule (3, 4, 5, 7, 8, 9, 10) lands in the same PR as the PWA fix for that endpoint (P0-16, P0-14, P0-07, P0-06, P0-17/P0-20, P0-20, P0-19), so every rule ships with the test that exercises it.
 - **Rows:** A509. This is the precondition for every other P0 test.
 - **Broken today:**
   - `E/fixtures/mockPartyServer.ts:660-664` ignores `section`.
