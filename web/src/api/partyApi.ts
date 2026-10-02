@@ -422,7 +422,8 @@ export class PartyApiClient {
    *  first (0-gold) vault using an owned key item; omitted, it spends
    *  `vault.gold` to open an already-accessible vault. The server enforces
    *  ordering/ownership and returns a specific error otherwise. */
-  async unlockBankVault(pack: string, kind?: 'key'): Promise<ApiResult<CommandResult>> {
+  async unlockBankVault(pack: string, kind: 'key' | 'gold'): Promise<ApiResult<CommandResult>> {
+    // party-inventory-panels.tsx onUnlock: {pack, kind}.
     return this.post('bank/unlock', { pack, kind })
   }
 
