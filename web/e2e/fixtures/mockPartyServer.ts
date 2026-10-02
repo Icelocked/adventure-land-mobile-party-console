@@ -42,6 +42,8 @@ export interface MockCharacter {
   // String()'d) - this models that real, exact asymmetry.
   target?: string | number
   conditions?: { id: string; name: string; remainingMs?: number }[]
+  // Equipped slots as the live stream sends them ({slot: {item}}), incl. a merchant's trade1..N.
+  slots?: Record<string, { item: MockItem; price?: number } | null>
   // This character's own Hunt quest assignment - mirrors state.statuses[name].monsterHunt,
   // exposed via characterDetails in the real state?section=core&dashboard=1 response.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
@@ -52,6 +54,11 @@ export interface MockCatalogEntry {
   name: string
   upgradeable?: boolean
   compoundable?: boolean
+  // G.items[id].g - the item's base gold value (stand price default, NPC sale value).
+  value?: number
+  maxLevel?: number
+  // Extra G.items fields (e.g. `e` for exchangeable).
+  definition?: Record<string, unknown>
 }
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
@@ -225,7 +232,7 @@ export class MockPartyServer {
         allItems: Object.values(this.catalogEntries).map((entry) => ({
           ...entry,
           sprite: testSprite(),
-          meta: { definition: {}, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.upgradeable ? 13 : entry.compoundable ? 7 : 0 },
+          meta: { definition: { ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0) },
         })),
         buyable: [],
         craftable: this.craftable,
@@ -265,6 +272,9 @@ export class MockPartyServer {
       farmingProfiles: this.farmingProfiles,
       aldata: { listings: this.aldataListings },
       ponty: { listings: this.pontyListings },
+      // A configured account always has a merchant (config section);
+      // default to the first merchant-class character unless overridden.
+      merchantCharacter: this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null),
       ...this.extraState,
     }
   }
@@ -273,6 +283,9 @@ export class MockPartyServer {
    *  goldTargets, merchantCharacter, ...). Routed to its section exactly
    *  like a built-in field. */
   extraState: Record<string, unknown> = {}
+
+  /** undefined = the first merchant-class character (see dynamicState). */
+  merchantCharacter: string | null | undefined = undefined
 
   /** Redirect every party-api GET to /setup once, like the hosting
    *  gateway does for a browser whose pairing lapsed (authorize.ts). */
@@ -345,7 +358,7 @@ export class MockPartyServer {
           ...(c.conditions ? { conditions: c.conditions } : {}),
         },
         items,
-        slots: {},
+        slots: c.slots ?? {},
       }
     }
     return { type: 'snapshot', epoch: 'e1', sequence, characters }
@@ -481,24 +494,22 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true, leader: this.leader, followers: this.followers } }
     }
     if (path === 'merchant/auto-npc-sale') {
-      // A rule on the configured merchant's OWN inventory is the
-      // merchant's account-wide rule (character omitted); a rule on
-      // anyone else's inventory is scoped to them - matches
-      // AutoMarksSection's `isMerchant ? rule.character == null : ...`
-      // filter, which never parses the map's own keys.
-      const requestedCharacter = body.character as string | undefined
-      const merchantName = this.characters.find((c) => c.ctype === 'merchant')?.name
-      const character = requestedCharacter === merchantName ? undefined : requestedCharacter
-      const key = `${(body.item as MockItem).name}@+${(body.item as MockItem).level ?? 0}`
+      // Mirrors http/automatic-sales.ts npc(): `character` is kept exactly
+      // as sent (a per-player rule keyed [character, ruleKey] - even for the
+      // merchant, where such a rule never fires); omitted, it's the
+      // account-wide merchant rule.
+      const character = typeof body.character === 'string' ? body.character : undefined
+      if (character && !this.characters.some((c) => c.name === character)) return { status: 400, json: { error: 'Unknown character' } }
       if (body.action === 'clear-all') {
-        for (const k of Object.keys(this.autoNpcSales)) {
-          if ((this.autoNpcSales[k].character ?? undefined) === character) delete this.autoNpcSales[k]
-        }
-      } else if (body.action === 'remove') {
-        delete this.autoNpcSales[key]
-      } else {
-        this.autoNpcSales[key] = { item: body.item as MockItem, character }
+        for (const k of Object.keys(this.autoNpcSales)) if (this.autoNpcSales[k].character === character) delete this.autoNpcSales[k]
+        return { status: 200, json: { ok: true } }
       }
+      const item = body.item as MockItem
+      if (typeof item?.name !== 'string') return { status: 400, json: { error: 'invalid automatic NPC sale item' } }
+      const ruleKey = JSON.stringify({ name: item.name, level: Math.max(0, Number(item.level) || 0), p: (item as { p?: string }).p || null, stat_type: item.stat_type || null })
+      const key = character ? JSON.stringify([character, ruleKey]) : ruleKey
+      if (body.action === 'remove') delete this.autoNpcSales[key]
+      else this.autoNpcSales[key] = { item, ...(character ? { character } : {}) }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && !body.remove) {
@@ -618,22 +629,68 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/stand') {
-      if (body.remove) {
-        // A bank-originated listing is removed by id (BankScreen passes
-        // it back); a carried-inventory listing (StandScreen) has none
-        // and is removed by slot instead - matches markForStand's two
-        // real call sites.
-        this.standListings = this.standListings.filter((l) => (body.id ? l.id !== body.id : l.slot !== body.slot))
-      } else {
-        this.standListings.push({
-          id: `stand-${this.standListings.length + 1}`,
-          item: body.item,
-          price: Number(body.price) || 0,
-          quantity: Number(body.quantity) || 1,
-          bankPack: body.bankPack,
-          bankSlot: body.slot,
-        })
+      // Mirrors http/stand-marks.ts + merchant/stand-marks.ts.
+      const slot = Number(body.slot)
+      const item = (body.item ?? {}) as MockItem
+      if (typeof item.name !== 'string' || !Number.isSafeInteger(slot) || slot < 0) return { status: 400, json: { error: 'invalid stand item' } }
+      const pack = typeof body.bankPack === 'string' && body.bankPack ? body.bankPack : null
+      const id = typeof body.id === 'string' ? body.id : null
+      type Listing = { id: string; slot: number; item: MockItem; price: number; quantity: number; state?: string; tradeSlot?: string; bankPack?: string; bankSlot?: number }
+      const listings = this.standListings as Listing[]
+      const index = id
+        ? listings.findIndex((entry) => entry.id === id)
+        : listings.findIndex(
+            (entry) =>
+              (pack ? entry.bankPack === pack && entry.bankSlot === slot : entry.state !== 'live' && !entry.tradeSlot && entry.slot === slot && !entry.bankPack) &&
+              JSON.stringify(entry.item) === JSON.stringify(item),
+          )
+      if (body.remove === true) {
+        if (index >= 0) listings.splice(index, 1)
+        return { status: 200, json: { ok: true } }
       }
+      const price = Number(body.price)
+      const quantity = Number(body.quantity || 1)
+      if (!Number.isSafeInteger(price) || price < 1 || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 9999)
+        return { status: 400, json: { error: 'invalid stand price or quantity' } }
+      const make = (source: { slot: number; item: MockItem; bankPack?: string }, existingId?: string): Listing => ({
+        id: existingId || `stand-${Date.now()}-${listings.length}`,
+        slot: source.slot,
+        item: source.item,
+        price,
+        quantity: Math.max(1, Math.min(9999, Number(source.item.q) || 1)),
+        state: 'configured',
+        bankPack: source.bankPack,
+        bankSlot: source.bankPack ? source.slot : undefined,
+      })
+      if (body.markAll === true) {
+        const identity = (entry: MockItem) => JSON.stringify({ name: entry.name, level: entry.level ?? 0 })
+        const wanted = identity(item)
+        const covered = new Set<string>()
+        listings.forEach((existing, n) => {
+          if (identity(existing.item) !== wanted) return
+          listings[n] = make({ slot: existing.bankPack ? existing.bankSlot! : existing.slot, item: existing.item, bankPack: existing.bankPack }, existing.id)
+          covered.add(`${existing.bankPack ?? ''}:${existing.bankPack ? existing.bankSlot : existing.slot}`)
+        })
+        const merchant = this.characters.find((c) => c.ctype === 'merchant')
+        const sources: { slot: number; item: MockItem; bankPack?: string }[] = []
+        merchant?.items?.forEach((entry, n) => entry && identity(entry) === wanted && sources.push({ slot: n, item: entry }))
+        for (const [bankPack, entries] of Object.entries(this.bankPacks))
+          entries.forEach((entry, n) => {
+            const candidate = entry as { slot?: number; item?: MockItem } | null
+            if (candidate?.item && identity(candidate.item) === wanted) sources.push({ slot: candidate.slot ?? n, item: candidate.item, bankPack })
+          })
+        for (const source of sources) {
+          const key = `${source.bankPack ?? ''}:${source.slot}`
+          if (listings.length >= 16 || covered.has(key)) continue
+          listings.push(make(source))
+          covered.add(key)
+        }
+        return { status: 200, json: { ok: true } }
+      }
+      if ((index < 0 || listings[index].state === 'paused') && listings.length >= 16) return { status: 409, json: { error: 'merchant stand is full (16/16)' } }
+      const listing = { ...make({ slot, item, bankPack: pack ?? undefined }, id ?? undefined), quantity }
+      if (index >= 0) listings[index] = listing
+      else listings.push(listing)
       return { status: 200, json: { ok: true } }
     }
     if (path === 'mail/collect') {

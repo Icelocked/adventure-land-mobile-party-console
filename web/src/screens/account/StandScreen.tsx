@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { StandListingForm } from '@/components/StandListingForm'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { CatalogItem, StandListing } from '@/models'
 
@@ -34,7 +34,22 @@ function StandRow({ listing, catalogFor }: { listing: StandListing; catalogFor: 
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [editing, setEditing] = useState(false)
-  const [price, setPrice] = useState(String(listing.price))
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const act = async (action: () => Promise<{ kind: string; message?: string }>) => {
+    setBusy(true)
+    setError(null)
+    const result = await action()
+    setBusy(false)
+    if (result.kind === 'failure') setError(result.message ?? 'Request failed')
+    else {
+      setEditing(false)
+      setConfirmingRemove(false)
+      await refreshNow()
+    }
+  }
 
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
@@ -47,42 +62,34 @@ function StandRow({ listing, catalogFor }: { listing: StandListing; catalogFor: 
           {listing.price}g × {listing.quantity}
         </span>
       </div>
-      {listing.slot != null && (
-        <div className="flex items-center gap-3">
-          <Button variant="link" size="xs" onClick={() => setEditing((v) => !v)}>
-            {editing ? 'Cancel' : 'Edit price'}
-          </Button>
-          <Button
-            variant="link"
-            size="xs"
-            className="text-destructive"
-            onClick={async () => {
-              await api.markForStand(listing.item, listing.slot!, listing.price, { remove: true })
-              await refreshNow()
-            }}
-          >
-            Remove
-          </Button>
-        </div>
+      <div className="flex items-center gap-3">
+        <Button variant="link" size="xs" disabled={busy} onClick={() => setEditing((v) => !v)}>
+          {editing ? 'Cancel' : 'Edit price'}
+        </Button>
+        {/* stand-sheet.tsx removeSale: a second tap confirms. */}
+        <Button
+          variant="link"
+          size="xs"
+          className="text-destructive"
+          disabled={busy}
+          onClick={() => (confirmingRemove ? void act(() => api.removeStandListing(listing)) : setConfirmingRemove(true))}
+        >
+          {busy && confirmingRemove ? 'Removing…' : confirmingRemove ? 'Really remove?' : 'Remove'}
+        </Button>
+      </div>
+      {editing && (
+        // party-inventory-panels.tsx onStandEdit: same listing (id, bank
+        // source) with its current price and quantity.
+        <StandListingForm
+          item={listing.item}
+          itemValue={catalogFor(listing.item.name)?.meta?.definition.g as number | undefined}
+          existing={listing}
+          onSubmit={({ price, quantity, markAll }) =>
+            void act(() => api.markForStand(listing.item, listing.slot, price, { id: listing.id, bankPack: listing.bankPack, quantity, markAll }))
+          }
+        />
       )}
-      {editing && listing.slot != null && (
-        <div className="flex items-end gap-2">
-          <label className="flex-1 text-xs text-muted-foreground">
-            Price
-            <Input value={price} onChange={(e) => /^\d*$/.test(e.target.value) && setPrice(e.target.value)} className="mt-1" />
-          </label>
-          <Button
-            size="sm"
-            onClick={async () => {
-              await api.markForStand(listing.item, listing.slot!, Number(price) || 0, { quantity: listing.quantity, id: listing.id })
-              setEditing(false)
-              await refreshNow()
-            }}
-          >
-            Save
-          </Button>
-        </div>
-      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }

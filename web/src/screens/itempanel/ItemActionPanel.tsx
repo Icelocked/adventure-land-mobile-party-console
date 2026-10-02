@@ -3,13 +3,12 @@ import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow,
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment } from '@/lib/itemFormulas'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
-import { ModifiedItemWarning } from '@/components/ModifiedItemWarning'
+import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
-import { isModifiedItem, sameMarkedItem } from '@/models'
+import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
+import { StandListingForm } from '@/components/StandListingForm'
 import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog, RosterMember } from '@/models'
 
 export type ItemActionTarget = { kind: 'inventory'; slot: number; item: Item } | { kind: 'equipment'; slotName: string; item: Item }
@@ -188,10 +187,12 @@ function InventoryActions({
   // directly via the commerce screen instead.
   const canBuyAnother = !isMerchant && !!meta?.buyable
   // exchangeable/autoExchangeMarked (inventory-panel.tsx) - NPC exchange only runs off the merchant's own inventory.
-  const exchangeable = isMerchant && Number((meta?.definition.e as number | undefined) ?? 0) > 0
+  // merchant-item-commands.ts only accepts auto-exchange on the configured merchant.
+  const exchangeable = characterName === dynamicState.merchantCharacter && Number((meta?.definition.e as number | undefined) ?? 0) > 0
   const configLoaded = useConfigLoaded()
-  const autoExchangeMarked = isMerchant && !!dynamicState.autoExchanges[`${item.name}@${level}`]
+  const autoExchangeMarked = exchangeable && !!dynamicState.autoExchanges[`${item.name}@${level}`]
   const canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
+  const standListing = dynamicState.standListings.find((listing) => listing.bankPack == null && listing.slot === slot && sameMarkedItem(listing.item, item))
   // A delivery's `slot` refers to the SENDER's own inventory (the item
   // stays right where it is, still visible/actionable, until the
   // merchant actually travels there and hands it off) - only meaningful
@@ -213,28 +214,55 @@ function InventoryActions({
 
       {isMerchant && (
         <>
-          <TapRow label="Mark for Stand" onClick={() => toggle('stand')} />
-          {expanded === 'stand' && <StandForm item={item} slot={slot} run={run} />}
+          <TapRow
+            label="Mark for Stand"
+            onClick={() => {
+              // connected-inventory.tsx onStand: a new listing needs a free slot.
+              if (!standListing && dynamicState.standListings.length >= 16) return run(async () => ({ kind: 'failure', message: 'Merchant stand is full (16/16)' }))
+              toggle('stand')
+            }}
+          />
+          {expanded === 'stand' && (
+            <StandListingForm
+              item={item}
+              itemValue={meta?.definition.g as number | undefined}
+              existing={standListing}
+              onSubmit={({ price, quantity, markAll }) => run(() => api.markForStand(item, slot, price, { id: standListing?.id, quantity, markAll }))}
+            />
+          )}
           <TapRow label="Auto-stand this item" onClick={() => toggle('autostand')} />
-          {expanded === 'autostand' && <AutoStandForm characterName={characterName} item={item} run={run} />}
+          {expanded === 'autostand' && (
+            <StandListingForm
+              auto
+              item={item}
+              itemValue={meta?.definition.g as number | undefined}
+              existing={dynamicState.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined}
+              onSubmit={({ price }) => run(() => api.autoStand(item, price))}
+            />
+          )}
         </>
       )}
 
-      <TapRow
-        label="Mark for NPC Sale"
-        onClick={() =>
-          isModifiedItem(item)
-            ? toggle('npcsale')
-            : run(() => api.markForNpcSale(characterName, item, slot, { isMerchant }))
-        }
-      />
+      <TapRow label="Mark for NPC Sale" onClick={() => toggle('npcsale')} />
       {expanded === 'npcsale' && (
-        <ModifiedItemWarning
-          onConfirm={() => run(() => api.markForNpcSale(characterName, item, slot, { isMerchant, acknowledged: true }))}
+        <NpcSaleSheet
+          item={item}
+          meta={meta}
+          location={`${isMerchant ? 'Merchant inventory' : `${characterName} inventory - the merchant will collect it`} · slot ${slot}`}
+          available={Number(item.q || 1)}
           onCancel={() => onExpand(null)}
+          onConfirm={async (quantity, acknowledged) => {
+            const result = await api.markForNpcSale(characterName, item, slot, { isMerchant, quantity, acknowledged })
+            if (result.kind === 'failure') return result.message
+            run(async () => result)
+            return null
+          }}
         />
       )}
-      <TapRow label="Auto-sell to NPC" onClick={() => run(() => api.autoNpcSale(characterName, item))} />
+      <TapRow
+        label="Auto-sell to NPC"
+        onClick={() => configLoaded && run(() => api.autoNpcSale(characterName === dynamicState.merchantCharacter ? undefined : characterName, item))}
+      />
       <TapRow label="Mark for Deconstruction" onClick={() => run(() => api.markForDeconstruction(characterName, item, slot))} />
       <TapRow label="Auto-deconstruct" onClick={() => run(() => api.autoDeconstruct(characterName, item))} />
 
@@ -253,7 +281,8 @@ function InventoryActions({
       {canCompound && (
         <>
           <TapRow label="Mark for Compound" onClick={() => run(() => api.itemCommand('compound-mark', characterName, item, slot))} />
-          <TapRow label="Auto-mark for Compound" onClick={() => toggle('autocompound')} />
+          {/* automatic-item-actions.tsx: only while below the +7 auto-compound cap. */}
+          {level < Math.min(7, itemMaximumLevel(meta)) && <TapRow label="Auto-mark for Compound" onClick={() => toggle('autocompound')} />}
           {expanded === 'autocompound' && (
             <CompoundTierPicker
               meta={meta}
@@ -345,7 +374,7 @@ function EquipmentActions({
 
   return (
     <div>
-      {slotName !== 'elixir' && <TapRow label="Unequip" onClick={() => run(() => api.itemCommand('unequip', characterName, item, slotName))} />}
+      {slotName !== 'elixir' && !slotName.startsWith('trade') && <TapRow label="Unequip" onClick={() => run(() => api.itemCommand('unequip', characterName, item, slotName))} />}
       {canUpgrade && (
         <>
           <TapRow label="Mark for Upgrade" onClick={() => toggle('upgrade')} />
@@ -394,7 +423,8 @@ function UpgradeTierPicker({ meta, level, onPick }: { meta: ItemMeta | undefined
  *  compoundables) with the real compound-scroll cost (compoundPassCost),
  *  not a free-form number input the way this used to work. */
 function CompoundTierPicker({ meta, level, buyable, onPick }: { meta: ItemMeta | undefined; level: number; buyable: { id: string; cost: number }[]; onPick: (tier: number) => void }) {
-  const max = Math.max(0, itemMaximumLevel(meta) - level)
+  // The server's validTier caps auto-compound targets at +7 (compound-commands.ts).
+  const max = Math.max(0, Math.min(7, itemMaximumLevel(meta)) - level)
   if (max <= 0) return null
   const grades = meta?.definition.grades as number[] | undefined
   return (
@@ -456,37 +486,3 @@ function StatScrollPicker({
   )
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex-1 text-xs text-muted-foreground">
-      {label}
-      <Input value={value} onChange={(e) => /^\d*$/.test(e.target.value) && onChange(e.target.value)} className="mt-1" />
-    </label>
-  )
-}
-
-function AutoStandForm({ characterName, item, run }: { characterName: string; item: Item; run: (action: () => Promise<ApiResult<CommandResult>>) => void }) {
-  const api = usePartyApi()
-  const [price, setPrice] = useState(item.price != null ? String(item.price) : '')
-  return (
-    <div className="flex items-end gap-2 py-2 pl-4">
-      <NumberField label="Price" value={price} onChange={setPrice} />
-      <Button size="sm" onClick={() => run(() => api.autoStand(characterName, item, Number(price) || 0))}>
-        Set
-      </Button>
-    </div>
-  )
-}
-
-function StandForm({ item, slot, run }: { item: Item; slot: number; run: (action: () => Promise<ApiResult<CommandResult>>) => void }) {
-  const api = usePartyApi()
-  const [price, setPrice] = useState(item.price != null ? String(item.price) : '')
-  return (
-    <div className="flex items-end gap-2 py-2 pl-4">
-      <NumberField label="Price" value={price} onChange={setPrice} />
-      <Button size="sm" onClick={() => run(() => api.markForStand(item, slot, Number(price) || 0))}>
-        List
-      </Button>
-    </div>
-  )
-}

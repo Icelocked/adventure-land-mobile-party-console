@@ -73,7 +73,8 @@ export function RoutinesScreen() {
   return (
     <AccountScreenScaffold title={`Merchant routines · ${enabledCount}/${Object.keys(ROUTINE_LABELS).length} enabled`}>
       <p className="px-3 pb-2 text-xs text-muted-foreground">Higher priorities run first. Equal priorities run oldest first. Enabled controls only automatic scheduling.</p>
-      <div className="flex flex-col gap-1.5 px-3">
+      {/* Edits made before the draft seeds from config would be overwritten. */}
+      <fieldset disabled={!seeded} className="flex flex-col gap-1.5 px-3">
         {sortedKeys.map((key) => {
           const locked = disabledRoutine(key)
           const index = movableKeys.indexOf(key)
@@ -123,7 +124,7 @@ export function RoutinesScreen() {
           </div>
           )
         })}
-      </div>
+      </fieldset>
       <div className="sticky bottom-0 border-t border-border bg-background p-3">
         {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
         <Button

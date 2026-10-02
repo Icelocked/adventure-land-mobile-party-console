@@ -39,6 +39,7 @@ test('ItemActionPanel: a failed action shows its error and keeps the panel open'
 
   server.failOnce['merchant/npc-sale'] = 'Item is currently reserved for crafting'
   await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByText('Item is currently reserved for crafting')).toBeVisible()
   // ItemActionPanel's run() only calls onClose() on success - confirm the
@@ -133,15 +134,15 @@ test('ItemActionPanel: marking a modified item for NPC sale from the merchant wo
   await page.getByTestId('inventory-slot-0').click()
   await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
 
-  // The warning must appear instead of an instant sale, and Confirm must
-  // stay disabled until the checkbox is actually checked.
-  await expect(page.getByText('permanently destroy it')).toBeVisible()
-  const confirmButton = page.getByRole('button', { name: 'Confirm sale' })
-  await expect(confirmButton).toBeDisabled()
+  // The confirmation sheet shows the warning, and selling is refused
+  // until it's acknowledged (use-party-console.tsx confirmNpcSale).
+  const sheet = page.getByRole('group', { name: 'Sell to NPC' })
+  await expect(sheet.getByText('permanently destroy it')).toBeVisible()
+  await sheet.getByRole('button', { name: 'Sell to NPC' }).click()
+  await expect(sheet.getByText('Confirm the modified-item warning')).toBeVisible()
 
-  await page.getByRole('checkbox').check()
-  await expect(confirmButton).toBeEnabled()
-  await confirmButton.click()
+  await sheet.getByRole('checkbox').check()
+  await sheet.getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
 })
@@ -158,9 +159,10 @@ test('Bank: selling a modified item to NPC requires confirming the warning first
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Sell to NPC', exact: true }).click()
 
-  await expect(page.getByText('permanently destroy it')).toBeVisible()
-  await page.getByRole('checkbox').check()
-  await page.getByRole('button', { name: 'Confirm sale' }).click()
+  const sheet = page.getByRole('group', { name: 'Sell to NPC' })
+  await expect(sheet.getByText('permanently destroy it')).toBeVisible()
+  await sheet.getByRole('checkbox').check()
+  await sheet.getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByText('Wolf Coat')).toBeVisible()
   await expect(page.getByText('NPC sale', { exact: true })).toBeVisible()
@@ -176,6 +178,7 @@ test('ItemActionPanel: marking an item for NPC sale shows a badge on its invento
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
   await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
 })

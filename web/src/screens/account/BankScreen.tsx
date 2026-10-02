@@ -3,11 +3,12 @@ import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow 
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ExpandChevron } from '@/components/ExpandChevron'
-import { ModifiedItemWarning } from '@/components/ModifiedItemWarning'
+import { NpcSaleSheet } from '@/components/NpcSaleSheet'
+import { bankSaleCopies } from '@/lib/bankSaleCopies'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { StandListingForm } from '@/components/StandListingForm'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import { canDeconstruct, isModifiedItem, sameMarkedItem } from '@/models'
+import { canDeconstruct, sameMarkedItem } from '@/models'
 import type { BankVault, CatalogItem, CharacterState, DeconstructionCatalog, DeconstructionMark, InventoryEntry, NpcSaleMark, StandListing, WithdrawalRequest } from '@/models'
 
 /** Shared bank vault browse - ported from ui/account/BankScreen.kt and
@@ -279,8 +280,8 @@ function BankRow({
 }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const dynamicState = useDynamicState()
   const [standForm, setStandForm] = useState<'single' | 'all' | null>(null)
-  const [standPrice, setStandPrice] = useState('')
   const [confirmingNpcSale, setConfirmingNpcSale] = useState<'single' | 'all' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -296,6 +297,13 @@ function BankRow({
   const withdrawMarked = withdrawals.some((w) => w.pack === pack && w.slot === entry.slot && sameMarkedItem(w.item, entry.item))
   const standListing = standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, entry.item))
   const deconstructible = canDeconstruct(entry.item, deconstructionCatalog)
+  const saleTargets = bankSaleCopies(dynamicState.bank, dynamicState.bankbois, entry)
+  const openStandForm = (mode: 'single' | 'all') => {
+    // A new listing needs a free stand slot (party-inventory-panels.tsx).
+    if (!standListing && standListings.length >= 16) return setError('Merchant stand is full (16/16)')
+    setError(null)
+    setStandForm(mode)
+  }
   const npcSaleMarked = npcSaleMarks.some(
     (mark) => mark.source === 'bank' && mark.pack === pack && mark.slot === entry.slot && sameMarkedItem(mark.item, entry.item),
   )
@@ -325,29 +333,19 @@ function BankRow({
       {expanded && (
         <>
           {standForm ? (
-            <div className="mt-1.5 flex items-end gap-2 pl-1">
-              <label className="flex-1 text-xs text-muted-foreground">
-                Price
-                <Input value={standPrice} onChange={(e) => /^\d*$/.test(e.target.value) && setStandPrice(e.target.value)} className="mt-1" />
-              </label>
-              <Button
-                size="sm"
-                onClick={async () => {
-                  await run(() =>
-                    api.markForStand(entry.item, entry.slot, Number(standPrice) || 0, {
-                      bankPack: pack,
-                      quantity: standForm === 'all' ? (entry.item.q ?? 1) : 1,
-                    }),
-                  )
-                  setStandForm(null)
-                }}
-              >
-                List
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setStandForm(null)}>
-                Cancel
-              </Button>
-            </div>
+            // party-inventory-panels.tsx onBankStand: same stand dialog, with
+            // "Mark all" preset for the all-copies action.
+            <StandListingForm
+              item={entry.item}
+              itemValue={catalogFor(entry.item.name)?.meta?.definition.g as number | undefined}
+              existing={standListing}
+              markAll={standForm === 'all'}
+              onCancel={() => setStandForm(null)}
+              onSubmit={async ({ price, quantity, markAll }) => {
+                await run(() => api.markForStand(entry.item, entry.slot, price, { id: standListing?.id, bankPack: pack, quantity, markAll }))
+                setStandForm(null)
+              }}
+            />
           ) : (
             <div className="mt-1.5 flex flex-wrap gap-2 pl-1">
               <Button
@@ -372,9 +370,7 @@ function BankRow({
                   variant="link"
                   size="xs"
                   onClick={() =>
-                    void run(() =>
-                      api.markForStand(entry.item, entry.slot, standListing.price, { bankPack: pack, remove: true, id: standListing.id }),
-                    )
+                    void run(() => api.removeStandListing(standListing))
                   }
                 >
                   Unmark for stand
@@ -384,20 +380,14 @@ function BankRow({
                   <Button
                     variant="link"
                     size="xs"
-                    onClick={() => {
-                      setStandForm('single')
-                      setStandPrice(entry.item.price != null ? String(entry.item.price) : '')
-                    }}
+                    onClick={() => openStandForm('single')}
                   >
                     Mark for stand
                   </Button>
                   <Button
                     variant="link"
                     size="xs"
-                    onClick={() => {
-                      setStandForm('all')
-                      setStandPrice(entry.item.price != null ? String(entry.item.price) : '')
-                    }}
+                    onClick={() => openStandForm('all')}
                   >
                     Mark all for stand
                   </Button>
@@ -423,43 +413,44 @@ function BankRow({
                 </>
               )}
 
-              <Button
-                variant="link"
-                size="xs"
-                className="text-destructive"
-                onClick={() =>
-                  isModifiedItem(entry.item)
-                    ? setConfirmingNpcSale('single')
-                    : void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot))
-                }
-              >
+              <Button variant="link" size="xs" className="text-destructive" onClick={() => setConfirmingNpcSale('single')}>
                 Sell to NPC
               </Button>
               <Button
                 variant="link"
                 size="xs"
                 className="text-destructive"
-                onClick={() =>
-                  isModifiedItem(entry.item)
-                    ? setConfirmingNpcSale('all')
-                    : void run(() => api.sellBankItemToNpc(entry.item, pack, entry.slot, { quantity: entry.item.q ?? 1 }))
-                }
+                onClick={() => {
+                  if (!saleTargets.length) return setError('No unlocked matching bank items available')
+                  setConfirmingNpcSale('all')
+                }}
               >
                 Sell all to NPC
               </Button>
             </div>
           )}
           {confirmingNpcSale && (
-            <ModifiedItemWarning
-              onConfirm={() =>
-                void run(() =>
-                  api.sellBankItemToNpc(entry.item, pack, entry.slot, {
-                    quantity: confirmingNpcSale === 'all' ? (entry.item.q ?? 1) : 1,
-                    acknowledged: true,
-                  }),
-                ).then(() => setConfirmingNpcSale(null))
-              }
+            <NpcSaleSheet
+              item={entry.item}
+              meta={catalogFor(entry.item.name)?.meta ?? undefined}
+              location={confirmingNpcSale === 'all' ? `${saleTargets.length} slots across bank panes and bankbois` : `Bank · ${pack} · slot ${entry.slot}`}
+              all={confirmingNpcSale === 'all'}
+              available={confirmingNpcSale === 'all' ? saleTargets.reduce((sum, target) => sum + Number(target.entry.item.q || 1), 0) : Number(entry.item.q || 1)}
               onCancel={() => setConfirmingNpcSale(null)}
+              onConfirm={async (quantity, acknowledged) => {
+                // use-party-console.tsx confirmNpcSale: one sale per copy, each its whole stack.
+                const sales =
+                  confirmingNpcSale === 'all'
+                    ? saleTargets.map((target) => () => api.sellBankItemToNpc(target.entry.item, target.pack, target.entry.slot, { quantity: Number(target.entry.item.q || 1), acknowledged }))
+                    : [() => api.sellBankItemToNpc(entry.item, pack, entry.slot, { quantity, acknowledged })]
+                for (const sale of sales) {
+                  const result = await sale()
+                  if (result.kind === 'failure') return result.message
+                }
+                setConfirmingNpcSale(null)
+                await refreshNow()
+                return null
+              }}
             />
           )}
           {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
