@@ -7,7 +7,8 @@
   - **Built with their consumer packages:** the remaining F5 primitives and F7 ports.
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
-- **Next:** Phase 4 (B1, B2, B3, B4).
+- **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
+- **Next:** Phase 5 (I1-I9).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1111,6 +1112,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/account/MailScreen.tsx`, `P/models/mail.ts`, `P/api/partyApi.ts` (`sendMail` + `quantity`/`source`, `refreshMail`, `deleteMail`, `getPostage`), `P/screens/account/SettingsScreen.tsx:245-284`.
 - **Endpoints:** `GET /mail`, `POST /mail/collect|delete|refresh {id}`, `GET /mail/postage`, `POST /merchant/send-mail {recipient, subject, message, quantity, source?{pack, slot, item}}`.
 - **Dependencies:** F3, F5, B3 (bankboi items for the picker), S2 (auth-pending poll).
+- **As built (ground rule 2):** the dashboard's two-pane dialog becomes the Mail screen: the inbox list, a bottom sheet for the selected message, and an inline compose card. The attachment picker is a searchable list grouped by source instead of a 7-column sprite grid. Copy, disabled states and request bodies follow `send-mail-dialog.tsx`. "Prepare mail" in Settings opens this composer with the earthiverse / aldata_auth draft (the `setMailDraft` path). Setting auth-pending after that send is left to S2, which owns the pending poll.
 
 ---
 

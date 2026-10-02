@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Copy, Eye, EyeOff } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useRoster, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
@@ -164,7 +165,7 @@ function ALDataSection() {
   const [keyVisible, setKeyVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [preparingMail, setPreparingMail] = useState(false)
+  const navigate = useNavigate()
   const aldata = dynamicState.aldata
 
   return (
@@ -245,39 +246,16 @@ function ALDataSection() {
             setBusy(true)
             setError(null)
             const result = key ? { kind: 'success' as const, value: key } : await api.revealAlDataKey()
-            if (result.kind === 'success') {
-              setKey(result.value)
-              setPreparingMail(true)
-            } else setError(result.message)
+            // use-party-console.tsx: Prepare mail opens the mail composer
+            // with the earthiverse / aldata_auth draft (postage shown there).
+            if (result.kind === 'success') navigate('/mail', { state: { draft: { recipient: 'earthiverse', subject: 'aldata_auth', message: result.value } } })
+            else setError(result.message)
             setBusy(false)
           }}
         >
           Prepare mail
         </Button>
       </div>
-
-      {preparingMail && key && (
-        <div className="mt-3 rounded-md border border-border bg-background p-3">
-          <p className="text-xs text-muted-foreground">
-            To <span className="font-mono">earthiverse</span>, subject <span className="font-mono">aldata_auth</span>. Do not resend - each message costs gold.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <Button
-              size="sm"
-              onClick={async () => {
-                const result = await api.sendMail('earthiverse', 'aldata_auth', key)
-                if (result.kind === 'failure') setError(result.message)
-                else setPreparingMail(false)
-              }}
-            >
-              Send
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setPreparingMail(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
 
       <p className="mt-3 text-xs text-muted-foreground">
         Public market browsing needs no key. Publishing requires authentication: generate a unique key, then Prepare mail to send it to ALData for verification. ALData stores this key in

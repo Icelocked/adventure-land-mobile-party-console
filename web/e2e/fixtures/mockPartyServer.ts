@@ -128,6 +128,8 @@ export class MockPartyServer {
   bankPacks: Record<string, (Record<string, unknown> | null)[]> = {}
   bankGold = 0
   mailMessages: Record<string, unknown>[] = []
+  mailPostage: number | null = null
+  mailActions: { action: string; id?: unknown }[] = []
   standListings: Record<string, unknown>[] = []
   bestiaryCatalog: Record<string, unknown>[] = []
   skillCatalog: Record<string, unknown>[] = []
@@ -716,9 +718,16 @@ export class MockPartyServer {
       else listings.push(listing)
       return { status: 200, json: { ok: true } }
     }
-    if (path === 'mail/collect') {
+    if (path === 'mail/collect' || path === 'mail/delete' || path === 'mail/refresh') {
+      const action = path.slice('mail/'.length)
+      this.mailActions.push({ action, id: body.id })
       const message = this.mailMessages.find((m) => m.id === body.id)
-      if (message) message.taken = true
+      if (action === 'collect' && message) message.taken = true
+      if (action === 'delete') {
+        // http mail delete: refuses while an attachment is uncollected.
+        if (message?.item && message.taken !== true) return { status: 409, json: { error: 'collect the attachment first' } }
+        this.mailMessages = this.mailMessages.filter((m) => m.id !== body.id)
+      }
       return { status: 200, json: { ok: true } }
     }
     if (
@@ -960,7 +969,9 @@ export class MockPartyServer {
       // that to the broad command fallback registered above (lower
       // priority) instead of wrongly answering it with the inbox snapshot.
       if (route.request().method() !== 'GET') return route.fallback()
-      return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length } })
+      if (new URL(route.request().url()).pathname.endsWith('/mail/postage'))
+        return this.mailPostage === null ? route.fulfill({ status: 503, json: { error: 'unavailable' } }) : route.fulfill({ json: { gold: this.mailPostage } })
+      return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length, updatedAt: Date.now(), error: null } })
     })
     await page.route('**/console-update', (route) =>
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
