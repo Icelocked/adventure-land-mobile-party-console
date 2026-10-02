@@ -6,47 +6,6 @@ import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
 import type { MerchantJob } from '@/models'
 
-const STUCK_PRODUCTION_ATTEMPT_ID = 'Patinder:1790863565429:zq4qk8ap6o'
-const STUCK_PRODUCTION_MERCHANT = 'Patinder'
-
-function StuckProductionRecovery() {
-  const api = usePartyApi()
-  const refreshNow = useRefreshDynamicStateNow()
-  const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  if (done) return <p className="mb-2 text-xs text-muted-foreground">Stuck production attempt cleared.</p>
-  return (
-    <div className="mb-2 rounded-md border border-amber-600/40 bg-amber-500/10 p-2">
-      <p className="text-xs text-muted-foreground">
-        One-time fix: tells the server the stuck coat upgrade (level 6→7) is done, since it never got that
-        confirmation when its local record was cleared separately - that's what's been blocking every production job
-        since.
-      </p>
-      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
-      <Button
-        size="sm"
-        variant="outline"
-        className="mt-1.5"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true)
-          setError(null)
-          const result = await api.completeProductionAttempt(STUCK_PRODUCTION_MERCHANT, STUCK_PRODUCTION_ATTEMPT_ID, false)
-          setBusy(false)
-          if (result.kind === 'failure') setError(result.message)
-          else {
-            setDone(true)
-            await refreshNow()
-          }
-        }}
-      >
-        {busy ? 'Clearing…' : 'Clear stuck production attempt'}
-      </Button>
-    </div>
-  )
-}
-
 const jobLabel = (job: MerchantJob): string => job.routine ?? job.reason
 
 // A handful of retries on the same error is normal (a realm hop, a brief
@@ -84,17 +43,6 @@ export function MerchantQueueSection({ current, queue }: { current?: MerchantJob
           character state.
         </p>
       )}
-      {/* ONE-TIME recovery for the specific stuck production attempt found
-       *  2026-10-01: Patinder's coat upgrade (level 6->7) was left with no
-       *  `completed` field in the coordinator's own state.production.attempts
-       *  after its client-side localStorage journal was cleared separately -
-       *  that clear never told the server the attempt was done, and
-       *  beginProduction() refuses ALL future production work (any item,
-       *  upgrade or compound) while any attempt is left incomplete. Remove
-       *  this block once confirmed fixed - it's hardcoded to this one attempt. */}
-      {current?.reason?.includes('compound') || current?.reason?.includes('upgrade') ? (
-        <StuckProductionRecovery />
-      ) : null}
       {current && (
         <p className="text-sm">
           Now: {jobLabel(current)} → {current.target}

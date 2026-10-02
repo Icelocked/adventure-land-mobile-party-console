@@ -1,7 +1,7 @@
 # BUILD-PLAN: PWA ↔ party-console v1.2.0, 1:1 parity
 
 ## Progress (updated 2026-10-02)
-- **Phase 0:** PR-0a `166727f`, PR-0b `df8d619`, PR-0c `b7238d4`, PR-0d `08dda78`, PR-0e `bf012c2` shipped. **PR-0f (P0-21) is waiting** on a live check that the debug banner shows `leader="<name>"`.
+- **Phase 0:** complete - PR-0a `166727f`, PR-0b `df8d619`, PR-0c `b7238d4`, PR-0d `08dda78`, PR-0e `bf012c2`, PR-0f (after the live check showed `leader="Sadokunn"`).
 - **Phase 1:**
   - **Shipped:** F1 `f3a0d7e`, F2 + F3 `f080eb1`, F4 `9a232b4`, the item-options redesign `bcfcd1f`, F6 + F7 test setup `7cdcbbf`, F8 `873f4e9`.
   - **Built with their consumer packages:** the remaining F5 primitives and F7 ports.
