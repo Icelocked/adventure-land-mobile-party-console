@@ -28,6 +28,8 @@ export function isModifiedItem(item: Item): boolean {
 export interface InventoryEntry {
   slot: number
   item: Item
+  // An upgrade/compound in progress on this slot (item-operation-overlay.tsx).
+  operation?: unknown
 }
 
 export interface EquippedEntry {
