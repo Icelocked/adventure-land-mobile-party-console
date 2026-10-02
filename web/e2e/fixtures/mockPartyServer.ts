@@ -44,6 +44,8 @@ export interface MockCharacter {
   conditions?: { id: string; name: string; remainingMs?: number }[]
   // Equipped slots as the live stream sends them ({slot: {item}}), incl. a merchant's trade1..N.
   slots?: Record<string, { item: MockItem; price?: number } | null>
+  // Extra characterDetails fields (the script's stats: str, attack, combatStats, characterDollHtml, ...).
+  diagnostics?: Record<string, unknown>
   // This character's own Hunt quest assignment - mirrors state.statuses[name].monsterHunt,
   // exposed via characterDetails in the real state?section=core&dashboard=1 response.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
@@ -344,7 +346,7 @@ export class MockPartyServer {
         // public-state.ts bankboiSummaries: no items/slots on core.
         bankbois: ((full.bankbois as Record<string, unknown>[]) ?? []).map((entry) => omit(entry, ['items', 'slots'])),
         // diagnosticCharacters() allowlists monsterHunt (among others).
-        characterDetails: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level, seenAt: Date.now(), monsterHunt: c.monsterHunt ?? null }])),
+        characterDetails: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level, seenAt: Date.now(), monsterHunt: c.monsterHunt ?? null, ...c.diagnostics }])),
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
         serverNow: Date.now(),
         bankGold: this.bankGold,

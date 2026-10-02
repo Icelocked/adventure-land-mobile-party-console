@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
-import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useTargetMonsterType } from '@/data/useTargetMonsterType'
 import { defaultRestockPolicy, resolveFarmingContext } from '@/models'
 import { useCatalogLookup } from '@/lib/catalogLookup'
@@ -37,7 +37,6 @@ export function CharacterDetailScreen() {
   const isMerchant = name === dynamicState.merchantCharacter
   const refreshNow = useRefreshDynamicStateNow()
   const catalogFor = useCatalogLookup(dynamicState.merchantCatalog)
-  const roster = useRoster()
   const [actionTarget, setActionTarget] = useState<ItemActionTarget | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [luckySlotOpen, setLuckySlotOpen] = useState(false)
@@ -187,7 +186,6 @@ export function CharacterDetailScreen() {
           target={actionTarget}
           characterName={name}
           isMerchant={isMerchant}
-          roster={roster}
           catalog={dynamicState.merchantCatalog}
           monsters={dynamicState.bestiaryCatalog}
           onLuckySlotData={actionOnLucky && actionTarget.kind === 'inventory' ? () => setLuckySlotOpen(true) : undefined}

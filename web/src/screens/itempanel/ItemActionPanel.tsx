@@ -10,7 +10,7 @@ import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem } from '@/models'
 import { StandListingForm } from '@/components/StandListingForm'
-import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog, RosterMember } from '@/models'
+import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog } from '@/models'
 
 export type ItemActionTarget = { kind: 'inventory'; slot: number; item: Item } | { kind: 'equipment'; slotName: string; item: Item }
 
@@ -23,7 +23,6 @@ export function ItemActionPanel({
   target,
   characterName,
   isMerchant,
-  roster,
   catalog,
   monsters,
   onLuckySlotData,
@@ -32,7 +31,6 @@ export function ItemActionPanel({
   target: ItemActionTarget
   characterName: string
   isMerchant: boolean
-  roster: Record<string, RosterMember>
   catalog: MerchantCatalog | null | undefined
   monsters: BestiaryMonster[]
   // lucky-slot-menu.tsx "Show lucky slot data", when this is the merchant's lucky slot.
@@ -149,10 +147,8 @@ export function ItemActionPanel({
       <GearComparisonSheet
         item={item}
         meta={meta}
-        characterCtype={roster[characterName]?.ctype ?? ''}
-        equippedSlots={characters[characterName]?.inventory?.slots ?? {}}
+        characterName={characterName}
         slot={typeof comparing === 'string' ? comparing : undefined}
-        catalogFor={catalogFor}
         onClose={() => setComparing(false)}
       />
     )}
