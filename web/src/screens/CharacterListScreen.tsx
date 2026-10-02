@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CloudOff, RefreshCw, Settings } from 'lucide-react'
+import { CloudOff, Menu, RefreshCw } from 'lucide-react'
 import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
-import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
+import { AccountMenu } from '@/screens/character-detail/AccountMenu'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,9 @@ export function CharacterListScreen() {
   const connected = useConnected()
   const dynamicState = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()
-  const openServerSettings = useOpenServerSettings()
+  // The account menu (Settings, Logs, Bank, ...) must be reachable with no
+  // character online; the server-address override lives in Settings.
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // use-party-console.tsx chars: bankbois get their own cards, not party ones.
   const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
@@ -36,8 +38,8 @@ export function CharacterListScreen() {
           <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={openServerSettings} aria-label="Server settings">
-            <Settings className="size-4" />
+          <Button variant="ghost" size="icon-sm" onClick={() => setMenuOpen(true)} aria-label="Menu">
+            <Menu className="size-5" />
           </Button>
         </div>
       </header>
@@ -57,6 +59,7 @@ export function CharacterListScreen() {
           ))}
         </ul>
       )}
+      {menuOpen && <AccountMenu onClose={() => setMenuOpen(false)} />}
     </div>
   )
 }

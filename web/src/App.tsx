@@ -8,6 +8,7 @@ import { ServerSettingsDialogContext } from '@/lib/ServerSettingsDialogContext'
 import { PairingGate } from '@/screens/PairingGate'
 import { ActionToastHost } from '@/components/ActionToastHost'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CharacterListScreen } from '@/screens/CharacterListScreen'
@@ -54,6 +55,7 @@ export default function App() {
         <PartyDataProvider settings={settings} key={settings.baseUrl}>
           <ServerSettingsDialogContext.Provider value={() => setShowOverride(true)}>
             <BrowserRouter>
+              <ErrorBoundary>
               <Routes>
                 <Route path="/" element={<CharacterListScreen />} />
                 <Route path="/characters/:name" element={<CharacterDetailScreen />} />
@@ -72,6 +74,7 @@ export default function App() {
                 <Route path="/logs" element={<LogsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
               </Routes>
+              </ErrorBoundary>
             </BrowserRouter>
           </ServerSettingsDialogContext.Provider>
         </PartyDataProvider>

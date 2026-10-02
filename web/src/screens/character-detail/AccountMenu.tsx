@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useMail } from '@/data/PartyDataProvider'
 
 /** The account-wide tools menu, reachable from any character's hamburger
  *  icon - the web equivalent of the Android app's hamburger drawer
@@ -16,6 +17,8 @@ const ITEMS: { label: string; path: string }[] = [
   { label: 'Inspect Stand', path: '/stand' },
   { label: 'View Market', path: '/market' },
   { label: 'Inspect Bank', path: '/bank' },
+  { label: 'Merchant routines', path: '/routines' },
+  { label: 'WTB orders', path: '/wtb' },
   { label: 'Upgrade offerings', path: '/offerings' },
   { label: 'Logs', path: '/logs' },
   { label: 'Settings', path: '/settings' },
@@ -23,6 +26,8 @@ const ITEMS: { label: string; path: string }[] = [
 
 export function AccountMenu({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
+  // mail-count.tsx: "Mail (N)" while the inbox has messages.
+  const mailCount = useMail().count
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="p-4">
@@ -38,6 +43,7 @@ export function AccountMenu({ onClose }: { onClose: () => void }) {
               }}
             >
               {item.label}
+              {item.path === '/mail' && mailCount > 0 ? ` (${mailCount})` : ''}
             </button>
           ))}
         </div>
