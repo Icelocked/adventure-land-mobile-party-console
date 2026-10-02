@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
@@ -100,6 +101,7 @@ export function FarmingSection({
   const [backupFocus, setBackupFocus] = useState<string[]>([])
   const [pickingArea, setPickingArea] = useState(false)
   const [busy, setBusy] = useState(false)
+  const configLoaded = useConfigLoaded()
   const [error, setError] = useState<string | null>(null)
 
   // CharacterDetailScreen's route has no per-character `key`, so switching
@@ -155,7 +157,7 @@ export function FarmingSection({
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {MODES.map((mode) => (
-          <Chip key={mode.id} selected={farmingPolicy === mode.id} disabled={pickingBackup || pickingArea} onClick={() => void selectMode(mode.id)}>
+          <Chip key={mode.id} selected={farmingPolicy === mode.id} disabled={!configLoaded || pickingBackup || pickingArea} onClick={() => void selectMode(mode.id)}>
             {mode.label}
           </Chip>
         ))}
@@ -163,6 +165,7 @@ export function FarmingSection({
           <span className="text-xs text-muted-foreground">Currently: {effectiveMode}</span>
         )}
       </div>
+      <ConfigLoadingNote />
       {farmArea?.active && (
         <p className="mt-1.5 text-xs text-muted-foreground">
           Active farming zone: {farmArea.active.map} ({Math.round(farmArea.active.x)}, {Math.round(farmArea.active.y)})
@@ -230,6 +233,7 @@ export function FarmingSection({
           variant="outline"
           size="sm"
           className="min-w-0 flex-1 justify-start overflow-hidden"
+          disabled={!configLoaded}
           onClick={() => setShowFocus((v) => !v)}
         >
           <span className="truncate">{focusSummary(monsterFocus, bestiaryCatalog)}</span>

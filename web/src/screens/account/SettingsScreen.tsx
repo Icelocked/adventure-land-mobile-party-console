@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Copy, Eye, EyeOff } from 'lucide-react'
-import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
+import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useRoster, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ export function SettingsScreen() {
   const dynamicState = useDynamicState()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   const openServerSettings = useOpenServerSettings()
   const [requirePairing, setRequirePairing] = useState<boolean | null>(null)
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
@@ -39,10 +41,11 @@ export function SettingsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Seed once, from the real config value - never from the empty default.
   useEffect(() => {
-    if (bankboiPrefix == null) setBankboiPrefix(dynamicState.bankboiPrefix)
+    if (bankboiPrefix == null && configLoaded) setBankboiPrefix(dynamicState.bankboiPrefix)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dynamicState.bankboiPrefix])
+  }, [configLoaded, dynamicState.bankboiPrefix])
 
   return (
     <AccountScreenScaffold title="Settings" onRefresh={() => void refreshNow()}>
@@ -67,9 +70,10 @@ export function SettingsScreen() {
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-1 text-sm font-medium">Bankboi prefix</div>
           <div className="flex gap-2">
-            <Input value={bankboiPrefix ?? ''} onChange={(e) => setBankboiPrefix(e.target.value)} className="flex-1" />
-            <Button onClick={() => void api.setBankboiPrefix(bankboiPrefix ?? '')}>Save</Button>
+            <Input value={bankboiPrefix ?? ''} disabled={bankboiPrefix == null} onChange={(e) => setBankboiPrefix(e.target.value)} className="flex-1" />
+            <Button disabled={bankboiPrefix == null} onClick={() => void api.setBankboiPrefix(bankboiPrefix ?? '')}>Save</Button>
           </div>
+          <ConfigLoadingNote />
         </div>
 
         <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
@@ -80,6 +84,7 @@ export function SettingsScreen() {
           <input
             type="checkbox"
             checked={dynamicState.anniversaryAutoChat}
+            disabled={!configLoaded}
             onChange={(e) => void api.setAnniversaryAutoChat(e.target.checked).then(() => refreshNow())}
             className="size-4"
           />

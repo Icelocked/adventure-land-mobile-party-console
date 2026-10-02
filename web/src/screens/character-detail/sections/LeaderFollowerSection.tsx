@@ -1,4 +1,5 @@
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Chip } from '@/components/Chip'
 import { SectionCard } from '../SectionCard'
 import type { PartyStateDynamic } from '@/models'
@@ -10,6 +11,7 @@ import type { PartyStateDynamic } from '@/models'
 export function LeaderFollowerSection({ characterName, dynamicState }: { characterName: string; dynamicState: PartyStateDynamic }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   const isLeader = dynamicState.leader === characterName
   const isFollowing = dynamicState.followers[characterName] === true
 
@@ -18,6 +20,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
       <div className="flex gap-3">
         <Chip
           selected={isLeader}
+          disabled={!configLoaded}
           onClick={async () => {
             if (isLeader) return
             await api.setLeader(characterName)
@@ -28,6 +31,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         </Chip>
         <Chip
           selected={isFollowing}
+          disabled={!configLoaded}
           onClick={async () => {
             await api.setFollow(characterName, !isFollowing)
             await refreshNow()
@@ -36,6 +40,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
           Follow
         </Chip>
       </div>
+      <ConfigLoadingNote />
       {!isLeader && dynamicState.leader && <p className="mt-1.5 text-xs text-muted-foreground">Following {dynamicState.leader}</p>}
     </SectionCard>
   )

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { npcSaleValue } from '@/lib/itemFormulas'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import type { CatalogItem, StandBid } from '@/models'
 export function WtbScreen() {
   const dynamicState = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -28,9 +30,10 @@ export function WtbScreen() {
   return (
     <AccountScreenScaffold title="WTB orders" onRefresh={() => void refreshNow()}>
       <div className="px-3 pb-2">
-        <Button size="sm" onClick={() => setAdding(true)}>
+        <Button size="sm" disabled={!configLoaded} onClick={() => setAdding(true)}>
           Add WTB order
         </Button>
+        <ConfigLoadingNote />
       </div>
 
       {bids.length === 0 ? (

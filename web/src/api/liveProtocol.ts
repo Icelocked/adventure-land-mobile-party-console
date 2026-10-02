@@ -50,7 +50,7 @@ export class LiveReceiver {
    *  healthy connection (used to decide whether to reset the heartbeat
    *  watchdog timer). */
   accept(message: LiveMessage): boolean {
-    if (message.sequence < 0) return false
+    if (!message || !Number.isSafeInteger(message.sequence) || typeof message.epoch !== 'string') return false
     if (message.type === 'heartbeat') return message.epoch === this.epoch
     if (message.type !== 'snapshot' && message.type !== 'delta') return false
     if (message.type === 'delta' && (message.epoch !== this.epoch || message.sequence <= this.sequence)) return false

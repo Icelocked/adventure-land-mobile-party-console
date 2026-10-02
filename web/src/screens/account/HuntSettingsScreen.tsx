@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,7 @@ export function HuntSettingsScreen() {
   }, [dynamicState.bestiaryCatalog])
 
   const settings = dynamicState.huntSettings
+  const configLoaded = useConfigLoaded()
   const [relocate, setRelocate] = useState(true)
   const [blacklistDeaths, setBlacklistDeaths] = useState(true)
   const [deathThreshold, setDeathThreshold] = useState('3')
@@ -81,7 +83,7 @@ export function HuntSettingsScreen() {
         </label>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button
-          disabled={saving}
+          disabled={!configLoaded || saving}
           onClick={async () => {
             setSaving(true)
             setError(null)
@@ -99,6 +101,7 @@ export function HuntSettingsScreen() {
         >
           {saving ? 'Saving...' : 'Save settings'}
         </Button>
+        <ConfigLoadingNote />
       </div>
 
       <div className="flex items-center justify-between px-3 pb-1 pt-2">

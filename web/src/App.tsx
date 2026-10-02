@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { PartyDataProvider } from '@/data/PartyDataProvider'
+import { AUTH_LOSS_EVENT } from '@/api/partyApi'
 import { loadServerSettings, saveServerSettings, clearServerSettings, SAME_ORIGIN_SETTINGS, type ServerSettings } from '@/config/serverConfig'
 import { ServerSettingsDialogContext } from '@/lib/ServerSettingsDialogContext'
 import { PairingGate } from '@/screens/PairingGate'
@@ -31,6 +32,19 @@ const queryClient = new QueryClient()
 export default function App() {
   const [settings, setSettings] = useState<ServerSettings>(() => loadServerSettings())
   const [showOverride, setShowOverride] = useState(false)
+  // query-cache.tsx's DashboardQueries: once any party-api request reports
+  // the session is gone, drop cached data and offer a reconnect.
+  const [sessionLost, setSessionLost] = useState(false)
+  useEffect(() => {
+    const lost = () => {
+      queryClient.clear()
+      setSessionLost(true)
+    }
+    window.addEventListener(AUTH_LOSS_EVENT, lost)
+    return () => window.removeEventListener(AUTH_LOSS_EVENT, lost)
+  }, [])
+
+  if (sessionLost) return <SessionLostScreen />
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -116,5 +130,14 @@ function OverrideDialog({
         </div>
       </div>
     </div>
+  )
+}
+
+function SessionLostScreen() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+      <p className="text-sm">Session expired. Reconnect this browser.</p>
+      <Button onClick={() => window.location.reload()}>Reconnect</Button>
+    </main>
   )
 }

@@ -61,9 +61,27 @@ async function timedFetch(url: string, init: RequestInit = {}, timeoutMs: number
   }
 }
 
-async function getText(url: string): Promise<ApiResult<string>> {
+/** Fired on window when a party-api request shows the browser's session is
+ *  gone - query-cache.tsx's authenticationLost(): a 401/403, or a redirect
+ *  (the hosting gateway answers unpaired requests with 302 -> /setup,
+ *  tools/hosting/authorize.ts). App.tsx renders the reconnect screen. */
+export const AUTH_LOSS_EVENT = 'party-auth-loss'
+
+function isAuthLoss(response: Response): boolean {
+  return response.status === 401 || response.status === 403 || response.redirected
+}
+
+function signalAuthLoss(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_LOSS_EVENT))
+}
+
+async function getText(url: string, detectAuthLoss = false): Promise<ApiResult<string>> {
   try {
     const response = await timedFetch(url, {}, GET_TIMEOUT_MS)
+    if (detectAuthLoss && isAuthLoss(response)) {
+      signalAuthLoss()
+      return fail('Session expired. Reconnect this browser.', 401)
+    }
     const text = await response.text()
     return response.ok ? ok(text) : fail(`HTTP ${response.status}`, response.status)
   } catch (error) {
@@ -135,7 +153,20 @@ export class PartyApiClient {
    *  /party-api/state that don't belong on the SSE stream. Returns the
    *  raw body string; callers decode with the exact slice-type they need. */
   async get(path: string): Promise<ApiResult<string>> {
-    return getText(this.url(path))
+    return getText(this.url(path), true)
+  }
+
+  /** get() + JSON.parse, where an unparseable body (an HTML page from a
+   *  proxy or captive portal) is a failure rather than a thrown
+   *  SyntaxError that would kill the caller's poll loop. */
+  async getJson<T>(path: string): Promise<ApiResult<T>> {
+    const result = await this.get(path)
+    if (result.kind === 'failure') return result
+    try {
+      return ok(JSON.parse(result.value) as T)
+    } catch {
+      return fail('Unexpected non-JSON response')
+    }
   }
 
   async getRoot(path: string): Promise<ApiResult<string>> {
@@ -174,12 +205,13 @@ export class PartyApiClient {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      if (isAuthLoss(response)) signalAuthLoss()
       const text = await response.text()
-      if (!response.ok) {
+      if (!response.ok || response.redirected) {
         const parsed = parseCommandResult(text)
         const message = parsed.error ?? `HTTP ${response.status}`
         resolveActionToast(toastId, 'failed', message)
-        return fail(message)
+        return fail(message, response.status)
       }
       const parsed = parseCommandResult(text)
       resolveActionToast(toastId, parsed.ok === false ? 'failed' : 'sent', parsed.error)

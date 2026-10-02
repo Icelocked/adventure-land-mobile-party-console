@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,7 @@ export function MerchantControlsSection({
   const api = usePartyApi()
   const navigate = useNavigate()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -60,7 +62,7 @@ export function MerchantControlsSection({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <Chip selected={forceStand} onClick={() => void run(() => api.setForceStand(!forceStand))}>
+        <Chip selected={forceStand} disabled={!configLoaded} onClick={() => void run(() => api.setForceStand(!forceStand))}>
           Force stand · {forceStand ? 'On' : 'Off'}
         </Chip>
         <Chip selected={gatheringModes.includes('mining')} onClick={() => void run(() => api.setGathering('mining', !gatheringModes.includes('mining')))}>
@@ -92,7 +94,8 @@ export function MerchantControlsSection({
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('settings')}>
           Collection settings
         </Button>
-        {expanded === 'settings' && (
+        {expanded === 'settings' && !configLoaded && <ConfigLoadingNote />}
+        {expanded === 'settings' && configLoaded && (
           <CollectionSettingsForm
             threshold={threshold}
             itemCollectionThreshold={itemCollectionThreshold}
