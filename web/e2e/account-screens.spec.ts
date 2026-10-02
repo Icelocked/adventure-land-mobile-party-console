@@ -104,6 +104,7 @@ test('Bank: marking an item for NPC sale shows a marked indicator', async ({ pag
   await page.goto('/bank')
   await page.getByText('Iron Ore').click()
   await page.getByRole('button', { name: 'Sell to NPC', exact: true }).click()
+  await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
   // Bank-sourced NPC sales queue for the merchant to collect (they don't
   // vanish instantly) - the row should still be there, now marked.
@@ -122,7 +123,7 @@ test('Bank: marking for stand shows as already-marked and can be unmarked', asyn
   await page.goto('/bank')
   await page.getByText('Iron Ore').click()
   await page.getByRole('button', { name: 'Mark for stand', exact: true }).click()
-  await page.getByLabel('Price').fill('100')
+  await page.getByRole('textbox', { name: 'Stand price' }).fill('100')
   await page.getByRole('button', { name: 'List' }).click()
 
   await expect(page.getByRole('button', { name: 'Unmark for stand' })).toBeVisible()
@@ -161,6 +162,8 @@ test('Stand: Remove drops a listing', async ({ page }) => {
   await page.goto('/stand')
   await expect(page.getByText('Iron Ore')).toBeVisible()
   await page.getByRole('button', { name: 'Remove' }).click()
+  // stand-sheet.tsx: the second tap confirms.
+  await page.getByRole('button', { name: 'Really remove?' }).click()
 
   await expect(page.getByText('Nothing listed on the stand.')).toBeVisible()
 })

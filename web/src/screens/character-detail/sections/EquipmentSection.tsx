@@ -19,7 +19,9 @@ export function EquipmentSection({
   catalogFor: (id: string) => CatalogItem | undefined
   onSlotTap: (slotName: string, entry: EquippedEntry | null) => void
 }) {
-  const entries = Object.entries(slots)
+  // equipment.tsx: a merchant's trade1..N slots are its stand, not gear -
+  // unequipping one would close the stand and pull the listing.
+  const entries = Object.entries(slots).filter(([slot]) => !slot.startsWith('trade'))
   if (entries.length === 0) return null
 
   return (

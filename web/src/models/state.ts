@@ -399,6 +399,16 @@ export function canDeconstruct(item: Item, catalog: DeconstructionCatalog): bool
  *  "{item.name}@+{level or 0}" - see automatic-commerce-rule-key.ts. */
 export const autoMarkRuleKey = (item: Item): string => `${item.name}@+${item.level ?? 0}`
 
+/** automatic-commerce-rule-key.tsx, verbatim - the key autoStandMarks and
+ *  autoNpcSales use. */
+export const automaticCommerceRuleKey = (item: Item): string =>
+  JSON.stringify({
+    name: item.name,
+    level: Math.max(0, Number(item.level) || 0),
+    p: item.p || null,
+    stat_type: item.stat_type || null,
+  })
+
 /** Whether a mark's own carried `item` still matches what's actually in
  *  that slot right now - ported from item-identity.ts's sameMarkedItem
  *  (name+level are the two fields that matter here; a quantity change on

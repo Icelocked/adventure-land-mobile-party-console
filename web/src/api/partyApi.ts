@@ -1,4 +1,4 @@
-import type { Item, RestockPolicy, StandSearchListing } from '@/models'
+import type { Item, RestockPolicy, StandListing, StandSearchListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 
@@ -283,12 +283,20 @@ export class PartyApiClient {
    *  slot/item and reuses the same slot rather than creating a new one). */
   async markForStand(
     item: Item,
-    slot: number,
+    slot: number | undefined,
     price: number,
-    options: { bankPack?: string; quantity?: number; remove?: boolean; id?: string } = {},
+    options: { bankPack?: string; quantity: number; markAll?: boolean; remove?: boolean; id?: string },
   ): Promise<ApiResult<CommandResult>> {
-    const { bankPack, quantity = 1, remove = false, id } = options
-    return this.post('merchant/stand', { id, item, slot, bankPack, price, quantity, remove })
+    // use-party-console.tsx saveStandListing - quantity is required: the
+    // server overwrites an existing listing's quantity with it.
+    const { bankPack, quantity, markAll = false, remove = false, id } = options
+    return this.post('merchant/stand', { id, slot, item, bankPack, price, quantity, markAll, remove })
+  }
+
+  /** use-party-console.tsx removeStandListing: the whole listing back, so
+   *  the server can find live and bank-sourced entries by id. */
+  async removeStandListing(listing: StandListing): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/stand', { ...listing, remove: true })
   }
 
   /** POST /party-api/merchant/npc-sale from the item-action panel - source
@@ -304,13 +312,18 @@ export class PartyApiClient {
     character: string,
     item: Item,
     slot: number,
-    options: { isMerchant?: boolean; quantity?: number; remove?: boolean; acknowledged?: boolean } = {},
+    options: { isMerchant: boolean; quantity: number; acknowledged: boolean },
   ): Promise<ApiResult<CommandResult>> {
-    const { isMerchant = false, quantity = 1, remove = false, acknowledged = false } = options
-    const body: Record<string, unknown> = { source: isMerchant ? 'merchant' : 'character', slot, item, quantity, remove }
-    if (!isMerchant) body.character = character
-    if (acknowledged) body.acknowledged = true
-    return this.post('merchant/npc-sale', body)
+    // use-party-console.tsx confirmNpcSale.
+    const { isMerchant, quantity, acknowledged } = options
+    return this.post('merchant/npc-sale', {
+      source: isMerchant ? 'merchant' : 'character',
+      character: isMerchant ? undefined : character,
+      slot,
+      item,
+      quantity,
+      acknowledged,
+    })
   }
 
   /** POST /party-api/merchant/npc-sale with source "bank" - sells a bank
@@ -320,12 +333,10 @@ export class PartyApiClient {
     item: Item,
     pack: string,
     slot: number,
-    options: { quantity?: number; remove?: boolean; acknowledged?: boolean } = {},
+    options: { quantity: number; acknowledged: boolean },
   ): Promise<ApiResult<CommandResult>> {
-    const { quantity = 1, remove = false, acknowledged = false } = options
-    const body: Record<string, unknown> = { source: 'bank', pack, slot, item, quantity, remove }
-    if (acknowledged) body.acknowledged = true
-    return this.post('merchant/npc-sale', body)
+    // use-party-console.tsx confirmNpcSale (bank source).
+    return this.post('merchant/npc-sale', { source: 'bank', pack, slot, item, quantity: options.quantity, acknowledged: options.acknowledged })
   }
 
   /** POST /party-api/bank/unlock (http/bank-unlock.ts) - queues a merchant
@@ -360,14 +371,18 @@ export class PartyApiClient {
 
   /** POST /party-api/merchant/auto-npc-sale - a standing "always sell
    *  this item type to an NPC" rule. */
-  async autoNpcSale(character: string, item: Item, remove = false): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/auto-npc-sale', { character, item, action: remove ? 'remove' : 'set' })
+  async autoNpcSale(character: string | undefined, item: Item, remove = false): Promise<ApiResult<CommandResult>> {
+    // connected-inventory.tsx: `character` is omitted for the configured
+    // merchant (its rule is the account-wide one); with it, the server
+    // stores a per-player rule that never fires for the merchant.
+    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set' })
   }
 
   /** POST /party-api/merchant/auto-stand - a standing "always list this
    *  item type on the stand at this price" rule, merchant-only. */
-  async autoStand(character: string, item: Item, price: number, remove = false): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/auto-stand', { character, item, price, action: remove ? 'remove' : 'set' })
+  async autoStand(item: Item, price: number, remove = false): Promise<ApiResult<CommandResult>> {
+    // use-party-console.tsx saveStandListing (auto): no character - the rule is the merchant's.
+    return this.post('merchant/auto-stand', { item, price, action: remove ? 'remove' : 'set' })
   }
 
   /** POST /party-api/merchant/auto-npc-sale with action "clear-all"

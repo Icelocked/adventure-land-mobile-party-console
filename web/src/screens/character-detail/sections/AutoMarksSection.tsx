@@ -34,10 +34,13 @@ export function AutoMarksSection({
 }) {
   const api = usePartyApi()
 
+  // connected-inventory.tsx: the configured merchant's rules are the
+  // account-wide ones (no `character`), everyone else's are per-player.
+  const npcScope = characterName === dynamicState.merchantCharacter ? undefined : characterName
   const npcEntries: RuleEntry[] = Object.entries(dynamicState.autoNpcSales)
-    .filter(([, rule]) => (isMerchant ? rule.character == null : rule.character === characterName))
-    .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(characterName, rule.item, true) }))
-  const clearNpc = () => api.clearAllAutoNpcSales(isMerchant ? undefined : characterName)
+    .filter(([, rule]) => (npcScope === undefined ? rule.character == null : rule.character === characterName))
+    .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(npcScope, rule.item, true) }))
+  const clearNpc = () => api.clearAllAutoNpcSales(npcScope)
 
   const deconEntries: RuleEntry[] = Object.entries(dynamicState.autoDeconstruction[characterName] ?? {}).map(([key, rule]) => ({
     key,
@@ -64,7 +67,7 @@ export function AutoMarksSection({
       key,
       item: rule.item,
       detail: `${rule.price}g`,
-      onRemove: () => api.autoStand(characterName, rule.item, rule.price, true),
+      onRemove: () => api.autoStand(rule.item, rule.price, true),
     }))
 
     upgradeEntries = Object.entries(dynamicState.autoUpgradeMarks).flatMap(([owner, rules]) =>
