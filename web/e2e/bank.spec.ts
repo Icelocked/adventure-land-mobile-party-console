@@ -102,3 +102,49 @@ test('Bank storage: floors show access, key unlocks show owned count, gold unloc
   await storage.getByRole('button', { name: 'Confirm unlock' }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'bank/unlock')?.body).toEqual({ pack: 'items3', kind: 'gold' })
 })
+
+test('Bankbois: the first one asks before reserving bank slots; items open the bank options; delete is two-step and only when empty', async ({ page }) => {
+  const server = bankServer()
+  server.extraState = { bankboiPrefix: 'Vault' }
+  await server.install(page)
+  const bodies = posts(page)
+
+  await page.goto('/bank')
+  const section = page.getByRole('region', { name: 'Bankbois' })
+  await expect(section.getByText(/No bankbois yet/)).toBeVisible()
+  await section.getByRole('button', { name: 'Create bankboi' }).click()
+  await expect(section.getByText('This will reserve 7 slots from bank pane 1 for BankBoi logistics.')).toBeVisible()
+  await section.getByRole('group', { name: 'Create first BankBoi?' }).getByRole('button', { name: 'Create BankBoi' }).click()
+  await expect(section.getByText('Success: Vault0 created · provisioning queued')).toBeVisible()
+  expect(bodies.some((b) => b.path === 'bankbois/create')).toBe(true)
+
+  server.extraState = {
+    ...server.extraState,
+    bankbois: [
+      { name: 'Vault0', ctype: 'merchant', state: 'idle', items: [] },
+      { name: 'Vault1', ctype: 'merchant', state: 'idle', items: [{ slot: 0, item: { name: 'ironore', q: 9 } }] },
+    ],
+  }
+  await expect(section.getByText('Vault1')).toBeVisible({ timeout: 20_000 })
+  const card = section.locator('div.rounded-md', { hasText: 'Vault1' }).first()
+  await expect(card.getByRole('button', { name: 'Delete' })).toBeDisabled()
+
+  await card.getByRole('button', { name: /Iron Ore x9/ }).click()
+  await page.getByRole('button', { name: 'Mark for withdrawal' }).click()
+  await expect.poll(() => bodies.find((b) => b.body.type === 'withdraw')?.body).toMatchObject({ pack: 'bankboi:Vault1', slot: 0 })
+
+  const empty = section.locator('div.rounded-md', { hasText: 'Vault0' }).first()
+  await empty.getByRole('button', { name: 'Delete' }).click()
+  await empty.getByRole('button', { name: 'Really? ×' }).click()
+  await expect.poll(() => bodies.some((b) => b.path === 'bankbois/Vault0/delete')).toBe(true)
+})
+
+test('Bankbois: creating is blocked until a bankboi name is set', async ({ page }) => {
+  const server = bankServer()
+  await server.install(page)
+
+  await page.goto('/bank')
+  const section = page.getByRole('region', { name: 'Bankbois' })
+  await expect(section.getByText('Set bankboi name in settings first')).toBeVisible()
+  await expect(section.getByRole('button', { name: 'Create bankboi' })).toBeDisabled()
+})

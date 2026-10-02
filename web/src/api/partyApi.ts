@@ -287,6 +287,17 @@ export class PartyApiClient {
     return this.post('steam/recover', {})
   }
 
+  /** POST /bankbois/create - provision a new bankboi storage worker; the
+   *  response carries {bankboi: {name}}. */
+  async createBankboi(): Promise<ApiResult<CommandResult>> {
+    return this.post('bankbois/create', {})
+  }
+
+  /** POST /bankbois/:name/delete - only for an empty bankboi. */
+  async deleteBankboi(name: string): Promise<ApiResult<CommandResult>> {
+    return this.post(`bankbois/${encodeURIComponent(name)}/delete`, {})
+  }
+
   /** POST /roster/create - create (and spawn) a new character. */
   async createCharacter(name: string, ctype: string, look: number): Promise<ApiResult<CommandResult>> {
     return this.post('roster/create', { name, class: ctype, look })
