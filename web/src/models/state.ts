@@ -27,6 +27,11 @@ export interface MerchantJob {
   recoveryAttempts?: number
   lastDeferredReason?: string
   firstDeferredAt?: number
+  // Read by routineFor (merchant/routines.ts) to name the job's routine.
+  manual?: boolean
+  bidItemId?: string
+  order?: unknown
+  autoExchangeKeys?: string[]
 }
 
 /** One HP or MP auto-potion threshold - see restock-policy.tsx. */
@@ -168,6 +173,11 @@ export interface StandListing {
  *  `quantity` (its own `unitPrice` is per-unit). */
 export interface MarketListing {
   key?: string
+  // Ponty listings can combine several underlying listings (ponty.ts).
+  keys?: string[]
+  // Where the PWA got it from - neither feed tags itself reliably
+  // (Ponty listings carry no `source`), so MarketScreen sets this on merge.
+  origin?: 'aldata' | 'ponty'
   source?: string
   seller?: string
   item: Item
@@ -492,6 +502,9 @@ export interface RealmControl {
   activeRealm?: string
   homeRealm?: string
   realms: RealmOption[]
+  // A realm switch/home change in progress - the dashboard disables
+  // switching meanwhile. Opaque until the full realm panel (R2) lands.
+  operation?: unknown
 }
 
 /** The slice of GET /party-api/state that changes often enough to poll

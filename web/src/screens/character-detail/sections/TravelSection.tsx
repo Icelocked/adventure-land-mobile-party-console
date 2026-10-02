@@ -21,6 +21,12 @@ export function TravelSection({
 }) {
   const api = usePartyApi()
   const [showPlaces, setShowPlaces] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const report = async (request: Promise<{ kind: string; message?: string }>) => {
+    setError(null)
+    const result = await request
+    if (result.kind === 'failure') setError(result.message ?? 'Command failed')
+  }
 
   return (
     <SectionCard title="Travel">
@@ -29,17 +35,18 @@ export function TravelSection({
           {isMerchant ? 'Send merchant to...' : 'Send to...'}
         </Button>
         {isMerchant ? (
-          <Button size="sm" onClick={() => void api.sendCharacterTo(characterName, 'main', 0, 0, 'home')}>
+          <Button size="sm" onClick={() => void report(api.goHome(characterName))}>
             Go home
           </Button>
         ) : (
           !isLeader && (
-            <Button size="sm" onClick={() => void api.returnToLeader(characterName)}>
+            <Button size="sm" onClick={() => void report(api.returnToLeader(characterName))}>
               Return to leader
             </Button>
           )
         )}
       </div>
+      {error && <p role="alert" className="mt-1.5 text-sm text-destructive">{error}</p>}
       {showPlaces && (
         <div className="mt-2 flex flex-col gap-1">
           {travelPlaces.map((place) => (

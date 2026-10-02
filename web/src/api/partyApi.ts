@@ -1,4 +1,4 @@
-import type { Item, RestockPolicy, StandListing, StandSearchListing } from '@/models'
+import type { Item, MarketListing, RestockPolicy, StandListing, StandSearchListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 
@@ -228,6 +228,12 @@ export class PartyApiClient {
    *  needs. */
   async sendCommand(character: string, fields: Record<string, unknown>): Promise<ApiResult<CommandResult>> {
     return this.post('command', { character, ...fields })
+  }
+
+  /** inventory-panel.tsx's merchant "Go home": returns the merchant to its
+   *  home spot and the home realm (manual-commands.ts goHome). */
+  async goHome(character: string): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, { type: 'go-home' })
   }
 
   /** Every item-mark/equip/use/give command on /party-api/command needs
@@ -695,10 +701,9 @@ export class PartyApiClient {
     acceptHigherLevels: boolean,
     replaceStandEntry?: string,
   ): Promise<ApiResult<CommandResult>> {
-    const body: Record<string, unknown> = { itemId, price, quantity, minimumQuality, useStandSlot, acceptHigherLevels }
-    if (priorityOverride !== null) body.priorityOverride = priorityOverride
-    if (replaceStandEntry !== undefined) body.replaceStandEntry = replaceStandEntry
-    return this.post('merchant/bid', body)
+    // use-party-console.tsx saveStandBid: priorityOverride is always sent -
+    // null clears it (merchant-bid.ts keeps the old value when it's absent).
+    return this.post('merchant/bid', { itemId, price, quantity, minimumQuality, clear: false, priorityOverride, useStandSlot, acceptHigherLevels, replaceStandEntry })
   }
 
   /** POST /party-api/merchant/bid with `clear: true` - cancels a WTB order. */
@@ -797,15 +802,18 @@ export class PartyApiClient {
   /** POST /party-api/merchant/aldata-order - buys from one ALData public
    *  listing. Server only reads the listing's `key` plus the desired
    *  quantity; it must still exist and be fresh (<120s old). */
-  async buyAlData(listingKey: string, buyQuantity: number): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/aldata-order', { listing: { key: listingKey }, buyQuantity })
+  async buyAlData(listing: MarketListing, buyQuantity: number): Promise<ApiResult<CommandResult>> {
+    // use-party-console.tsx buyALDataListing: the listing as received.
+    const { origin: _origin, ...wire } = listing
+    return this.post('merchant/aldata-order', { listing: wire, buyQuantity })
   }
 
   /** POST /party-api/merchant/ponty-order - `keys` lets the server
    *  combine several Ponty listings into one purchase; this app always
    *  buys a single listing. */
-  async buyPonty(listingKey: string, quantity: number, unitPrice: number): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/ponty-order', { keys: [listingKey], quantity, unitPrice })
+  async buyPonty(listing: MarketListing): Promise<ApiResult<CommandResult>> {
+    // use-party-console.tsx buyPontyListing: the whole listing.
+    return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
   }
 
   /** POST /party-api/merchant/stand-search - starts a live search for a

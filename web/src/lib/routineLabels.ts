@@ -51,3 +51,35 @@ export const AUTOMATIC_ROUTINE_KEYS = new Set([
 ])
 
 export const hasEnableToggle = (key: string): boolean => AUTOMATIC_ROUTINE_KEYS.has(key) || key === 'fishing' || key === 'mining'
+
+/** runtime/coordinator/merchant/routines.ts routineFor (v1.2.0), verbatim -
+ *  which routine a queued merchant job belongs to. */
+export interface RoutineJob {
+  reason: string
+  manual?: boolean
+  bidItemId?: string
+  routine?: string
+  order?: unknown
+  autoExchangeKeys?: string[]
+}
+const purchases = new Set(['stand purchases', 'stand bid purchases', 'ALData marketplace purchases', 'Ponty purchases'])
+const aliases: Record<string, string> = {
+  'stand search': 'manual marketplace purchases',
+  'marked items': 'party collection',
+  'npc sale pickup': 'npc sales',
+  'auto npc sale pickup': 'auto npc sales',
+  'upgrades and compounds': 'manual upgrades',
+}
+function purchaseRoutine(job: RoutineJob): string {
+  return job.manual === true || (!job.bidItemId && job.reason !== 'stand bid purchases') ? 'manual marketplace purchases' : 'stand bid purchases'
+}
+function exchangeRoutine(job: RoutineJob): string {
+  return job.autoExchangeKeys?.length ? 'automatic exchange' : 'manual exchange'
+}
+export function routineFor(job: RoutineJob): string {
+  if (job.reason === 'exchange') return exchangeRoutine(job)
+  if (job.routine) return job.routine
+  if (purchases.has(job.reason)) return purchaseRoutine(job)
+  if (job.reason === 'merchant commerce') return (job.order as { crafts?: unknown[] })?.crafts?.length ? 'manual crafting' : 'manual buying'
+  return aliases[job.reason] || job.reason
+}
