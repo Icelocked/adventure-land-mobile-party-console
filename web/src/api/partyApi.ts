@@ -1,4 +1,4 @@
-import type { Item, StandSearchListing } from '@/models'
+import type { Item, RestockPolicy, StandSearchListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 
@@ -263,12 +263,9 @@ export class PartyApiClient {
 
   /** POST /party-api/restock - one character's HP/MP auto-potion
    *  thresholds. */
-  async saveRestock(character: string, hpMin: number, hpMax: number, mpMin: number, mpMax: number): Promise<ApiResult<CommandResult>> {
-    return this.post('restock', {
-      character,
-      hp: { min: hpMin, max: hpMax },
-      mp: { min: mpMin, max: mpMax },
-    })
+  async saveRestock(character: string, policy: RestockPolicy): Promise<ApiResult<CommandResult>> {
+    // use-party-console.tsx saveRestock: the whole policy, potion item included.
+    return this.post('restock', { character, hp: policy.hp, mp: policy.mp })
   }
 
   /** `/party-api/command` type "withdraw" - pulls one item out of the
@@ -653,16 +650,18 @@ export class PartyApiClient {
   /** POST /party-api/hunt-blacklist - `action:"clear"` drops everything,
    *  `action:"remove"` drops one monster (needs `monsterId`), `action:
    *  "add"` manually blacklists one (needs `monsterId`). */
-  async updateHuntBlacklist(action: 'add' | 'remove' | 'clear', monsterId?: string): Promise<ApiResult<CommandResult>> {
-    const body: Record<string, unknown> = { action }
+  async updateHuntBlacklist(character: string, action: 'add' | 'remove' | 'clear', monsterId?: string): Promise<ApiResult<CommandResult>> {
+    // connected-character-card.tsx always scopes to the character; without
+    // it the server edits the leader's list (farming-scope.ts).
+    const body: Record<string, unknown> = { action, character }
     if (monsterId !== undefined) body.monsterId = monsterId
     return this.post('hunt-blacklist', body)
   }
 
   /** POST /party-api/hunt-settings - a partial patch (only send the
    *  fields changing; server merges over the existing settings). */
-  async saveHuntSettings(patch: Partial<{ relocateIfCompeting: boolean; blacklistDeaths: boolean; deathThreshold: number; blacklistExpirations: boolean; expirationThreshold: number }>): Promise<ApiResult<CommandResult>> {
-    return this.post('hunt-settings', patch)
+  async saveHuntSettings(character: string, patch: Partial<{ relocateIfCompeting: boolean; blacklistDeaths: boolean; deathThreshold: number; blacklistExpirations: boolean; expirationThreshold: number }>): Promise<ApiResult<CommandResult>> {
+    return this.post('hunt-settings', { ...patch, character })
   }
 
   /** POST /party-api/merchant/bid - places or edits a standing "buy this

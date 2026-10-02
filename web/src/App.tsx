@@ -66,7 +66,7 @@ export default function App() {
                 <Route path="/bank" element={<BankScreen />} />
                 <Route path="/merchant/:mode" element={<MerchantCommerceScreen />} />
                 <Route path="/routines" element={<RoutinesScreen />} />
-                <Route path="/hunt-settings" element={<HuntSettingsScreen />} />
+                <Route path="/characters/:name/hunt-settings" element={<HuntSettingsScreen />} />
                 <Route path="/wtb" element={<WtbScreen />} />
                 <Route path="/offerings" element={<OfferingsScreen />} />
                 <Route path="/logs" element={<LogsScreen />} />

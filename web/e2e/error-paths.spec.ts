@@ -216,11 +216,12 @@ test('ItemActionPanel: delivering an item to another character shows it queued o
 test('Hunt settings: Clear all requires confirmation before it actually clears the blacklist', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
-  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
+  server.leader = 'MainLeader'
   server.huntBlacklist = { osnake: { monsterId: 'osnake', at: Date.now(), deaths: 4, reason: 'deaths' } }
   await server.install(page)
 
-  await page.goto('/hunt-settings')
+  await page.goto('/characters/MainLeader/hunt-settings')
   await expect(page.getByText('osnake')).toBeVisible()
 
   await page.getByRole('button', { name: 'Clear all' }).click()

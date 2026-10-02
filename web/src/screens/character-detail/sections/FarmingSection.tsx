@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
 import type { Catalog } from '@/lib/farmingZones'
-import type { BestiaryMonster, Condition, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
+import type { BestiaryMonster, Condition, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 import { formatDuration } from '@/lib/itemFormulas'
 
 /** monster-focus-picker.tsx's own trigger-button label, ported verbatim -
@@ -248,7 +248,7 @@ export function FarmingSection({
         >
           <MapPin className="size-4" />
         </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate('/hunt-settings')}>
+        <Button variant="outline" size="sm" onClick={() => navigate(`/characters/${encodeURIComponent(characterName)}/hunt-settings`)}>
           Hunt settings...
         </Button>
       </div>
@@ -257,7 +257,7 @@ export function FarmingSection({
           characterName={characterName}
           monsterFocus={monsterFocus}
           monsterSearchRadius={monsterSearchRadius}
-          bestiaryCatalog={bestiaryCatalog}
+          monsterChoices={monsterChoices}
           onClose={() => setShowFocus(false)}
         />
       )}
@@ -334,17 +334,25 @@ function LiveCombatStatus({
   )
 }
 
+// monster-choice.tsx's MonsterChoice - the server's monsterChoices carry a
+// display name and sprite alongside the spawn geometry farmingZones reads.
+type MonsterChoice = Catalog[number] & { name?: string; sprite?: Sprite | null }
+
+/** monster-focus-picker.tsx + monster-radius-control.tsx's rules in this
+ *  screen's form: "All monsters" is its own row (picking a monster drops
+ *  it), an empty selection is saved as [] (never ['all']), Fairy can't be
+ *  picked, and the radius is only sent when changed. */
 function MonsterFocusForm({
   characterName,
   monsterFocus,
   monsterSearchRadius,
-  bestiaryCatalog,
+  monsterChoices,
   onClose,
 }: {
   characterName: string
   monsterFocus: string[]
   monsterSearchRadius: number
-  bestiaryCatalog: BestiaryMonster[]
+  monsterChoices: MonsterChoice[]
   onClose: () => void
 }) {
   const api = usePartyApi()
@@ -354,27 +362,57 @@ function MonsterFocusForm({
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fairyExplanation, setFairyExplanation] = useState(false)
 
-  const filtered = bestiaryCatalog.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
-  const toggle = (id: string) => setSelected((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]))
+  const choices: [string, string, Sprite | null][] = [
+    ['all', 'All monsters', null],
+    ...monsterChoices.map((monster) => [monster.id, `${monster.name ?? monster.id} · ${monster.id}`, monster.sprite ?? null] as [string, string, Sprite | null]),
+  ]
+  const query = search.trim().toLowerCase()
+  const filtered = query ? choices.filter(([id, label]) => id.toLowerCase().includes(query) || label.toLowerCase().includes(query)) : choices
+  const toggle = (id: string, checked: boolean) => {
+    if (id === 'tinyp') return setFairyExplanation(true)
+    if (id === 'all') return setSelected(checked ? ['all'] : [])
+    const rest = selected.filter((value) => value !== 'all')
+    setSelected(checked ? [...rest, id] : rest.filter((value) => value !== id))
+  }
 
   return (
-    <div className="mt-2 rounded-md border border-border p-2">
-      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters..." className="mb-2" />
-      <div className="max-h-64 overflow-y-auto">
-        {filtered.map((monster) => (
-          <label key={monster.id} className="flex items-center gap-2 py-1">
-            <input type="checkbox" checked={selected.includes(monster.id)} onChange={() => toggle(monster.id)} className="size-4" />
-            <SpriteIcon sprite={monster.sprite} size={24} />
-            <span className="text-sm">{monster.name}</span>
-          </label>
-        ))}
+    <div role="group" aria-label="Monster focus" className="mt-2 rounded-md border border-border p-2">
+      <div className="mb-2 flex gap-2">
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters..." className="flex-1" />
+        <Button size="sm" variant="outline" onClick={() => setSelected([])}>
+          Clear all
+        </Button>
       </div>
+      <div className="max-h-64 overflow-y-auto">
+        {filtered.map(([id, label, sprite]) =>
+          id === 'tinyp' ? (
+            <button key={id} type="button" aria-disabled="true" onClick={() => setFairyExplanation(true)} className="flex w-full items-center justify-between py-1 text-left text-sm text-muted-foreground">
+              <span>{label}</span>
+              <span className="text-xs">Disabled</span>
+            </button>
+          ) : (
+            <label key={id} className="flex items-center gap-2 py-1">
+              <input type="checkbox" checked={selected.includes(id)} onChange={(e) => toggle(id, e.target.checked)} className="size-4" />
+              {sprite ? <SpriteIcon sprite={sprite} size={24} /> : <span className="grid size-6 place-items-center">*</span>}
+              <span className="text-sm">{label}</span>
+            </label>
+          ),
+        )}
+        {!filtered.length && <p className="py-4 text-center text-sm text-muted-foreground">No matching monsters</p>}
+      </div>
+      {fairyExplanation && (
+        <p role="status" className="mt-2 text-xs text-muted-foreground">
+          Fairy has no verified regular spawn route. Enable “Passively hunt fairy” to attack on sight.
+        </p>
+      )}
       <label className="mt-2 block text-xs text-muted-foreground">
-        Search radius
-        <Input value={radius} onChange={(e) => /^\d*$/.test(e.target.value) && setRadius(e.target.value)} className="mt-1" />
+        Monster search radius
+        <Input aria-label="Monster search radius" inputMode="numeric" value={radius} onChange={(e) => setRadius(e.target.value)} className="mt-1" />
       </label>
-      {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
+      <p className="mt-1 text-xs text-muted-foreground">Clearing monster focus resets this to 400.</p>
+      {error && <p role="alert" className="mt-1.5 text-sm text-destructive">{error}</p>}
       <div className="mt-2 flex justify-end gap-2">
         <Button size="sm" variant="outline" onClick={onClose}>
           Cancel
@@ -383,9 +421,18 @@ function MonsterFocusForm({
           size="sm"
           disabled={saving}
           onClick={async () => {
+            let nextRadius: number | undefined
+            if (radius !== String(monsterSearchRadius)) {
+              const value = Math.round(Number(radius))
+              if (!radius.trim() || !Number.isFinite(value) || value < 1 || value > 10000) {
+                setError('Enter a radius from 1 to 10,000.')
+                return
+              }
+              nextRadius = value
+            }
             setSaving(true)
             setError(null)
-            const result = await api.setFocus(characterName, selected.length ? selected : ['all'], Number(radius) || 400)
+            const result = await api.setFocus(characterName, selected, nextRadius)
             setSaving(false)
             if (result.kind === 'failure') setError(result.message)
             else {
