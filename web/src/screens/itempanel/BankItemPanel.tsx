@@ -136,9 +136,9 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
 
           {canUpgrade && (
             <>
-              <TapRow label="Mark for Upgrade" onClick={() => toggle('upgrade')} />
+              <TapRow label="Mark for upgrade" onClick={() => toggle('upgrade')} />
               {expanded === 'upgrade' && <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void withdraw(false, tiers)} />}
-              <TapRow label="Auto-mark for Upgrade" onClick={() => toggle('autoupgrade')} />
+              <TapRow label="Auto mark for upgrade" onClick={() => toggle('autoupgrade')} />
               {expanded === 'autoupgrade' && (
                 <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void run(() => api.itemCommand('auto-upgrade-mark', merchant!, item, -1, { tiers }))} />
               )}

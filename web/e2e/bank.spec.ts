@@ -32,7 +32,7 @@ test('Bank: search dims non-matches; reserved items1 slots are labelled', async 
   await server.install(page)
 
   await page.goto('/bank')
-  await expect(page.getByText('RESERVED')).toBeVisible()
+  await expect(page.getByText('RESERVED', { exact: true })).toBeVisible()
   await page.getByRole('searchbox', { name: 'Search bank items' }).fill('bow')
   await expect(page.getByRole('button', { name: /Bow \+2/ })).not.toHaveClass(/opacity-25/)
   await expect(page.getByRole('button', { name: /Iron Ore x5/ })).toHaveClass(/opacity-25/)
@@ -46,7 +46,7 @@ test('Bank: tapping an item opens its options with Item details first; upgrade m
   await page.goto('/bank')
   await page.getByRole('button', { name: /Bow \+2/ }).click()
   await expect(page.getByRole('button', { name: 'Item details' })).toBeVisible()
-  await page.getByRole('button', { name: 'Mark for Upgrade', exact: true }).click()
+  await page.getByRole('button', { name: 'Mark for upgrade', exact: true }).click()
   await page.getByRole('button', { name: /\+2 → \+4/ }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'command')?.body).toMatchObject({ character: 'Patinder', type: 'withdraw', pack: 'items1', slot: 1, upgradeTiers: 2 })
 })
@@ -58,7 +58,7 @@ test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as t
 
   await page.goto('/bank')
   await page.getByRole('button', { name: /Bow \+2/ }).click()
-  await page.getByRole('button', { name: 'Auto-mark for Upgrade' }).click()
+  await page.getByRole('button', { name: 'Auto mark for upgrade' }).click()
   await page.getByRole('button', { name: /\+2 → \+3/ }).click()
   await expect.poll(() => bodies.find((b) => b.body.type === 'auto-upgrade-mark')?.body).toMatchObject({ character: 'Patinder', slot: -1, tiers: 1 })
 

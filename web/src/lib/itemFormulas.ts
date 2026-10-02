@@ -11,6 +11,11 @@ import type { ItemDropSource, ItemMeta, MerchantExchangeItem } from '@/models'
 // Matches the game server's can_equip_item types (item-actions.ts). Elixirs are consumed effects, not equipment.
 const equipmentTypes = new Set(['helmet', 'pants', 'chest', 'weapon', 'amulet', 'earring', 'shoes', 'gloves', 'ring', 'shield', 'belt', 'source', 'orb', 'quiver', 'cape', 'misc_offhand', 'tool'])
 export const isEquipment = (definition?: Record<string, unknown>): boolean => equipmentTypes.has(String(definition?.type ?? ''))
+/** item-actions.ts isUsable, verbatim. */
+export const isUsable = (definition?: Record<string, unknown>): boolean =>
+  ['elixir', 'licence', 'spawner'].includes(String(definition?.type || '')) || Array.isArray(definition?.gives)
+/** upgrade-rule-tiers.tsx, verbatim. */
+export const upgradeRuleTiers = (rule?: unknown): number => Number(typeof rule === 'object' && rule ? (rule as { tiers?: unknown }).tiers : rule) || 0
 
 /** comparison-slots.tsx ported verbatim - which equip slot(s) a given item type could
  *  replace, for gear-comparison-dialog.tsx's "Compare with equipped". */
