@@ -93,8 +93,10 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.goto('/characters/Merchantina')
   await page.getByRole('button', { name: 'Menu' }).click()
   await page.getByRole('button', { name: 'Mail' }).click()
-  await page.getByRole('button', { name: 'Collect' }).click()
-  await expect(page.getByText('(collected)')).toBeVisible()
+  await page.getByText('Loot').click()
+  await page.getByRole('button', { name: 'Collect attachment' }).click()
+  await expect(page.getByText('Collected', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
 
   await page.goto('/characters/Merchantina')
   await page.getByRole('button', { name: 'Menu' }).click()

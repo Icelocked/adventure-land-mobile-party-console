@@ -856,8 +856,14 @@ export class PartyApiClient {
    *  should match before calling: recipient ^[A-Za-z0-9_]{1,40}$,
    *  subject 1-74 chars, message <=1000 chars. No item/gold attachment
    *  for v1. */
-  async sendMail(recipient: string, subject: string, message: string): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/send-mail', { recipient, subject, message })
+  async sendMail(mail: { recipient: string; subject: string; message: string; quantity: number; source?: { pack: string; slot: number; item: Item } }): Promise<ApiResult<CommandResult>> {
+    // send-mail-dialog.tsx onSend body, verbatim.
+    return this.post('merchant/send-mail', mail)
+  }
+
+  /** POST /mail/refresh|collect|delete {id} - send-mail-dialog.tsx mailAction. */
+  async mailAction(action: 'refresh' | 'collect' | 'delete', id?: string): Promise<ApiResult<CommandResult>> {
+    return this.post(`mail/${action}`, { id })
   }
 
   /** POST /party-api/mail/collect - collects an attached item/gold from a

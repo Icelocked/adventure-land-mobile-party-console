@@ -192,7 +192,9 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
 
     const mail = async () => {
       const result = await api.getJson<Partial<MailSnapshot>>('mail')
+      // mail-query.ts: a failed refresh keeps the last inbox and shows why.
       if (result.kind === 'success') queryClient.setQueryData(QK.mail, { messages: [], count: 0, ...result.value })
+      else queryClient.setQueryData<MailSnapshot>(QK.mail, (previous) => ({ messages: [], count: 0, ...previous, error: result.message || 'Mail unavailable' }))
     }
 
     // `escape` is the smallest request (usually `{escape:null}`), so its

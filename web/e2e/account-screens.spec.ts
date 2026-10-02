@@ -143,11 +143,59 @@ test('Mail: Collect marks the attachment as taken', async ({ page }) => {
   await server.install(page)
 
   await page.goto('/mail')
-  await expect(page.getByRole('button', { name: 'Collect' })).toBeVisible()
-  await page.getByRole('button', { name: 'Collect' }).click()
+  await expect(page.getByText('Attachment available')).toBeVisible()
+  await page.getByText('Loot').click()
+  await expect(page.getByText('Unclaimed')).toBeVisible()
+  // send-mail-dialog.tsx: delete is blocked while the attachment is uncollected.
+  await expect(page.getByRole('button', { name: 'Delete message' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Collect attachment' }).click()
 
-  await expect(page.getByRole('button', { name: 'Collect' })).not.toBeVisible()
-  await expect(page.getByText('(collected)')).toBeVisible()
+  await expect(page.getByText('Collected', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Collect attachment' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Delete message' }).click()
+  await page.getByRole('button', { name: 'Confirm permanent deletion' }).click()
+  await expect.poll(() => server.mailActions.map((a) => a.action)).toEqual(['collect', 'delete'])
+  await expect(page.getByText('No received mail.')).toBeVisible()
+})
+
+test('Mail: compose with a bank attachment sends the dashboard body after a second tap', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.bankPacks = { items0: [{ slot: 4, item: { name: 'ironore', q: 20 } }] }
+  server.mailPostage = 50000
+  server.mailMessages = [{ id: 'mail-1', from: 'Friend', to: 'Merchantina', subject: 'Hello', message: 'line one', sent: '2026-10-01T00:00:00Z', taken: false }]
+  await server.install(page)
+
+  await page.goto('/mail')
+  await page.getByText('Hello').click()
+  await page.getByRole('button', { name: 'Reply' }).click()
+  const compose = page.getByRole('region', { name: 'Write message' })
+  await expect(compose.getByLabel('Character name')).toHaveValue('Friend')
+  await expect(compose.getByText('Postage: 50,000 gold per message, charged by Adventure Land.')).toBeVisible()
+
+  await compose.getByLabel('Subject').fill('Ore')
+  await compose.getByLabel('Search attachments').fill('iron')
+  await compose.getByRole('group', { name: 'Bank · items0' }).getByText('Iron Ore').click()
+  await expect(compose.getByText('The attached items also leave your inventory.', { exact: false })).toBeVisible()
+  // Stackable: the quantity must be 1-20 before Send enables.
+  await expect(compose.getByRole('button', { name: 'Send mail' })).toBeDisabled()
+  await compose.getByLabel('Quantity (1–20)').fill('25')
+  await expect(compose.getByRole('button', { name: 'Send mail' })).toBeDisabled()
+  await compose.getByLabel('Quantity (1–20)').fill('5')
+  await compose.getByRole('button', { name: 'Send mail' }).click()
+  expect(server.lastOrder).toBeNull()
+  await compose.getByRole('button', { name: 'Really send mail?' }).click()
+  await expect.poll(() => server.lastOrder).toEqual({
+    path: 'merchant/send-mail',
+    recipient: 'Friend',
+    subject: 'Ore',
+    message: '',
+    quantity: 5,
+    source: { pack: 'items0', slot: 4, item: { name: 'ironore', q: 20 } },
+  })
+  await expect(page.getByRole('region', { name: 'Write message' })).not.toBeVisible()
 })
 
 test('Stand: Remove drops a listing', async ({ page }) => {
@@ -165,4 +213,25 @@ test('Stand: Remove drops a listing', async ({ page }) => {
   await page.getByRole('button', { name: 'Really remove?' }).click()
 
   await expect(page.getByText('Nothing listed on the stand.')).toBeVisible()
+})
+
+test('ALData Prepare mail opens the mail composer with the auth draft (use-party-console.tsx setMailDraft)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.extraState = { aldata: { listings: [], hasKey: true, auth: 'NO' } }
+  await server.install(page)
+  await page.route('**/party-api/aldata/key', (route) => route.fulfill({ json: { key: 'secret-key' } }))
+
+  await page.goto('/settings')
+  await page.getByRole('button', { name: 'Prepare mail' }).click()
+  await expect(page).toHaveURL(/\/mail/)
+  const compose = page.getByRole('region', { name: 'Write message' })
+  await expect(compose.getByLabel('Character name')).toHaveValue('earthiverse')
+  await expect(compose.getByLabel('Subject')).toHaveValue('aldata_auth')
+  await expect(compose.getByLabel('Message')).toHaveValue('secret-key')
+  await expect(compose.getByText('Postage estimate unavailable.', { exact: false })).toBeVisible()
+  await compose.getByRole('button', { name: 'Send mail' }).click()
+  await compose.getByRole('button', { name: 'Really send mail?' }).click()
+  await expect.poll(() => server.lastOrder).toEqual({ path: 'merchant/send-mail', recipient: 'earthiverse', subject: 'aldata_auth', message: 'secret-key', quantity: 1 })
 })
