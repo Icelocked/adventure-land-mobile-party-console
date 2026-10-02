@@ -304,6 +304,16 @@ export class MockPartyServer {
     const full: Record<string, unknown> = { roster: this.roster(), ...this.dynamicState() }
     if (section === 'config') return pick(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS])
     if (section === 'catalog') return { ...pick(full, CATALOG_FIELDS), referenceRevision: 'mock' }
+    // public-state.ts fastPayload / inventoryCharacters - the live-stream fallback.
+    if (section === 'fast')
+      return {
+        characters: Object.fromEntries(
+          // fastCharacters: the whole status minus items/slots and other omitted fields.
+          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}) }]),
+        ),
+      }
+    if (section === 'inventory')
+      return { characters: Object.fromEntries(this.characters.map((c) => [c.name, { items: (c.items ?? []).map((item, slot) => (item ? { slot, item } : null)), slots: c.slots ?? {} }])) }
     if (section === 'bank') return { ...pick(full, BANK_FIELDS), ...(dashboard ? { bankbois: full.bankbois ?? [] } : {}) }
     if (section === 'market') return pick(full, MARKET_FIELDS)
     if (section === 'logs') return { gameLogs: {}, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }

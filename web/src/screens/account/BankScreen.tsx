@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ExpandChevron } from '@/components/ExpandChevron'
@@ -21,6 +21,7 @@ import type { BankVault, CatalogItem, CharacterState, DeconstructionCatalog, Dec
  *  the item is actually deconstructible, and NPC sale with an all-stack
  *  variant. Tap a row to expand its action strip. */
 export function BankScreen() {
+  useDomainInterest('bank')
   const dynamicState = useDynamicState()
   const characters = useCharacters()
   const refreshNow = useRefreshDynamicStateNow()
