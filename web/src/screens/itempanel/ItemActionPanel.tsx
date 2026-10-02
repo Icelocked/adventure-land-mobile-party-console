@@ -5,6 +5,7 @@ import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuanti
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
+import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem } from '@/models'
@@ -272,6 +273,13 @@ function InventoryActions({
       autoDeconstruct,
   )
   const command = (type: string, itemSlot: number | null | undefined, extra?: Record<string, unknown>) => run(() => api.itemCommand(type, characterName, item, itemSlot, extra))
+  // Inline confirmations keep their own error; success closes the panel.
+  const confirmWith = async (action: () => Promise<ApiResult<CommandResult>>) => {
+    const result = await action()
+    if (result.kind === 'failure') return result.message
+    run(async () => result)
+    return null
+  }
 
   return (
     <div>
@@ -390,8 +398,28 @@ function InventoryActions({
       {(!!merchant || deconstructable) && <div className="my-1 h-px bg-border" />}
       {deconstructable && (
         <>
-          <TapRow label="Mark for deconstruction" disabled={!!deconstruction} className="text-orange-400" onClick={() => run(() => api.markForDeconstruction(characterName, item, slot))} />
-          <TapRow label="Auto mark for deconstruction" disabled={autoDeconstruct} className="text-orange-400" onClick={() => run(() => api.autoDeconstruct(characterName, item))} />
+          <TapRow label="Mark for deconstruction" disabled={!!deconstruction} className="text-orange-400" onClick={() => toggle('decon')} />
+          {expanded === 'decon' && (
+            <DeconstructionConfirmation
+              item={item}
+              auto={false}
+              catalog={state.deconstructionCatalog}
+              catalogFor={catalogFor}
+              onCancel={() => onExpand(null)}
+              onConfirm={() => confirmWith(() => api.markForDeconstruction(characterName, item, slot))}
+            />
+          )}
+          <TapRow label="Auto mark for deconstruction" disabled={autoDeconstruct} className="text-orange-400" onClick={() => toggle('autodecon')} />
+          {expanded === 'autodecon' && (
+            <DeconstructionConfirmation
+              item={item}
+              auto
+              catalog={state.deconstructionCatalog}
+              catalogFor={catalogFor}
+              onCancel={() => onExpand(null)}
+              onConfirm={() => confirmWith(() => api.autoDeconstruct(characterName, item))}
+            />
+          )}
         </>
       )}
 
@@ -413,10 +441,17 @@ function InventoryActions({
               }}
             />
           )}
-          <TapRow
-            label={autoNpcSaleMarked ? 'Update auto sell to NPC…' : 'Auto sell to NPC…'}
-            onClick={() => configLoaded && run(() => api.autoNpcSale(isMerchant ? undefined : characterName, item))}
-          />
+          <TapRow label={autoNpcSaleMarked ? 'Update auto sell to NPC…' : 'Auto sell to NPC…'} disabled={!configLoaded} onClick={() => toggle('autonpc')} />
+          {expanded === 'autonpc' && (
+            <AutoNpcSaleConfirmation
+              item={item}
+              meta={meta}
+              name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
+              character={isMerchant ? undefined : characterName}
+              onCancel={() => onExpand(null)}
+              onConfirm={() => confirmWith(() => api.autoNpcSale(isMerchant ? undefined : characterName, item))}
+            />
+          )}
         </>
       )}
 

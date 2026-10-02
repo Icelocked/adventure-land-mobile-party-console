@@ -16,7 +16,7 @@ test('Bank: deconstruction options are hidden unless the item is actually decons
   }
   // Only wcoat is deconstructible - matches deconstruction.ts's
   // canDeconstruct requiring a catalog entry to exist at all.
-  server.deconstructionCatalog = { wcoat: { compound: false } }
+  server.deconstructionCatalog = { wcoat: { compound: false, rewards: [{ name: 'leather', quantity: 1, chance: 1 }] } }
   await server.install(page)
 
   await page.goto('/bank')
@@ -26,10 +26,11 @@ test('Bank: deconstruction options are hidden unless the item is actually decons
 
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
+  await page.getByRole('group', { name: 'Mark for deconstruction?' }).getByRole('button', { name: 'Mark for deconstruction' }).click()
   // Bank-sourced deconstruction queues for the merchant to actually
   // collect - the item stays in the pack (with a marked indicator) until
   // then, it doesn't vanish the instant it's marked.
-  await expect(page.getByText('Wolf Coat')).toBeVisible()
+  await expect(page.getByText('Wolf Coat', { exact: true })).toBeVisible()
   await expect(page.getByText('Deconstruct', { exact: true })).toBeVisible()
 })
 

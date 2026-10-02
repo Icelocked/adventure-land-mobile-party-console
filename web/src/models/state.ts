@@ -330,6 +330,7 @@ export interface DeconstructionMark {
   item: Item
   quantity: number
   state: 'collecting' | 'withdrawing' | 'ready' | 'running' | 'blocked' | 'complete'
+  error?: string
   auto?: boolean
   storage?: { pack: string; slot: number }
 }
@@ -411,6 +412,15 @@ export interface DeconstructionCatalogEntry {
   rewards?: { name: string; quantity: number; chance: number }[]
 }
 export type DeconstructionCatalog = Record<string, DeconstructionCatalogEntry>
+
+/** deconstruction.ts's deconstructionRewards, verbatim: recipe rolls are
+ *  independent; compounded items return three items at one lower level. */
+export function deconstructionRewards(item: Item, catalog: DeconstructionCatalog) {
+  const definition = catalog[item.name]
+  if (!definition) return null
+  if (definition.compound && Number(item.level) > 0) return [{ name: item.name, level: Number(item.level) - 1, quantity: 3, chance: 1 }]
+  return definition.rewards?.map((reward) => ({ ...reward, level: 0 })) || null
+}
 
 /** deconstruction.ts's canDeconstruct, ported verbatim. */
 export function canDeconstruct(item: Item, catalog: DeconstructionCatalog): boolean {

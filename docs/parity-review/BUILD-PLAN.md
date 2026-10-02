@@ -8,8 +8,8 @@
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
-- **Phase 5:** I1 + I5 `eba3e29`, I2 (this commit).
-- **Next:** Phase 5 (I3, I4, I6, I7, I8).
+- **Phase 5:** I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 (this commit).
+- **Next:** Phase 5 (I6, I7, I8).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1176,6 +1176,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/itempanel/ItemActionPanel.tsx`, `P/screens/account/BankScreen.tsx:407-424`, `P/screens/character-detail/sections/AutoMarksSection.tsx`, `P/api/partyApi.ts` (`markForDeconstruction` + `id`/`retry`/`remove`).
 - **Endpoints:** `POST /deconstruction/mark {character, slot, item}` / `{character, id, retry:true}` / `{character, id, remove:true}` / `{pack, slot, item, all}`; `POST /deconstruction/auto`.
 - **Dependencies:** P0-01, F5, F7 #25.
+- **As built (ground rule 2):** the confirmation dialogs (deconstruction manual/auto/bank and automatic NPC sale) render inline under their row in the options list, the same way the NPC-sale and stand forms already do. Their copy, disabled states and bodies follow the dashboard. The pending deconstruction and NPC-sale marks join the merchant's "Auto deconstruction" and "Auto NPC sales" lists, which have Retry (blocked only) and remove by id, disabled while running.
 
 #### I4 — NPC-sale management (S)
 - **Rows:** A227–A229.

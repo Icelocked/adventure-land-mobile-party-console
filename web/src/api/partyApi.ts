@@ -450,6 +450,21 @@ export class PartyApiClient {
     return this.post('deconstruction/mark', { character, item, slot, remove })
   }
 
+  /** connected-inventory.tsx onDeconstruction(remove) / onRetryDeconstruction:
+   *  a pending mark by id, on its owner. */
+  async removeDeconstructionMark(character: string, id: string, slot: number, item: Item): Promise<ApiResult<CommandResult>> {
+    return this.post('deconstruction/mark', { character, slot, item, remove: true, id })
+  }
+
+  async retryDeconstructionMark(character: string, id: string): Promise<ApiResult<CommandResult>> {
+    return this.post('deconstruction/mark', { character, id, retry: true })
+  }
+
+  /** connected-inventory.tsx onRemoveNpcSale: a manual NPC-sale mark by id. */
+  async removeNpcSaleMark(character: string, id: string): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/npc-sale', { character, id, remove: true })
+  }
+
   /** POST /party-api/deconstruction/auto - a standing "always
    *  deconstruct this item type" rule, separate from marking one
    *  instance. */

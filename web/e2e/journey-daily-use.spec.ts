@@ -28,7 +28,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
   server.bankGold = 100
   server.bankPacks = { items1: [{ slot: 0, item: { name: 'wcoat', level: 0 } }] }
-  server.deconstructionCatalog = { wcoat: { compound: false } }
+  server.deconstructionCatalog = { wcoat: { compound: false, rewards: [{ name: 'leather', quantity: 1, chance: 1 }] } }
   server.craftable = [{ id: 'ironsword', name: 'Iron Sword', cost: 100, materials: [{ id: 'ironore', name: 'Iron Ore', quantity: 3, level: 0 }] }]
   server.mailMessages = [{ id: 'mail-1', from: 'Warriorname', subject: 'Loot', item: { name: 'wcoat' }, taken: false }]
   await server.install(page)
@@ -56,6 +56,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   // 3. On Priestname, mark the carried item for auto-sell.
   await page.getByTestId('inventory-slot-0').click()
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
+  await page.getByRole('button', { name: 'Enable auto sale' }).click()
   await expect(page.getByRole('button', { name: 'Auto sell to NPC…' })).not.toBeVisible()
 
   // 4. A detour through the account menu to the bank, to clear an item -
@@ -66,6 +67,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await expect(page.getByText('Wolf Coat')).toBeVisible()
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
+  await page.getByRole('group', { name: 'Mark for deconstruction?' }).getByRole('button', { name: 'Mark for deconstruction' }).click()
   await expect(page.getByText('No bank data yet.')).not.toBeVisible()
   // Bank-sourced deconstruction queues for the merchant to collect - the
   // item stays put (now marked), it doesn't vanish the instant it's marked.
