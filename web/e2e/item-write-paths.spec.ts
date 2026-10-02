@@ -36,7 +36,7 @@ test('Stand: listing a stack defaults to the whole stack at the item value', asy
 
   await page.goto('/characters/Patinder')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Mark for Stand' }).click()
+  await page.getByRole('button', { name: 'Mark for stand', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Stand price' })).toHaveValue('6400')
   await expect(page.getByRole('textbox', { name: 'Stand quantity' })).toHaveValue('200')
   await page.getByRole('button', { name: 'List', exact: true }).click()
@@ -103,7 +103,7 @@ test('Auto NPC sale: on the configured merchant the rule is account-wide (no cha
 
   await page.goto('/characters/Patinder')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Auto-sell to NPC' }).click()
+  await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toEqual({ item: { name: 'ironore', q: 5 }, action: 'set' })
   expect(Object.values(server.autoNpcSales)).toEqual([{ item: { name: 'ironore', q: 5 } }])
@@ -120,7 +120,7 @@ test('Auto NPC sale: on any other character the rule is scoped to that character
 
   await page.goto('/characters/Ranger1')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Auto-sell to NPC' }).click()
+  await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toEqual({ item: { name: 'ironore', q: 5 }, character: 'Ranger1', action: 'set' })
 })
@@ -135,7 +135,7 @@ test('Sell to NPC: a stack defaults to the whole stack, Cancel sends nothing', a
 
   await page.goto('/characters/Patinder')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
   const sheet = page.getByRole('group', { name: 'Sell to NPC' })
   await expect(sheet.getByRole('textbox', { name: 'Sale quantity' })).toHaveValue('200')
   await expect(sheet.getByText(/You will receive: 12,000g/)).toBeVisible()
@@ -143,7 +143,7 @@ test('Sell to NPC: a stack defaults to the whole stack, Cancel sends nothing', a
   await page.waitForTimeout(300)
   expect(bodies).toHaveLength(0)
 
-  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
   await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toEqual({ source: 'merchant', slot: 0, item: { name: 'ironore', q: 200 }, quantity: 200, acknowledged: false })
@@ -160,9 +160,9 @@ test('Auto exchange: an already-marked item is not offered again (the server wou
 
   await page.goto('/characters/Patinder')
   await page.getByTestId('inventory-slot-0').click()
-  const row = page.getByRole('button', { name: /Auto exchange/ })
-  await expect(row).toHaveText(/already marked/)
-  await row.click()
+  // automatic-item-actions.tsx: disabled once the rule exists.
+  const row = page.getByRole('button', { name: 'Auto exchange' })
+  await expect(row).toBeDisabled()
   await page.waitForTimeout(300)
   expect(bodies.filter((b) => b.type === 'auto-exchange')).toHaveLength(0)
 })
@@ -178,7 +178,7 @@ test('Auto exchange: only offered on the configured merchant', async ({ page }) 
 
   await page.goto('/characters/Bankboi0')
   await page.getByTestId('inventory-slot-0').click()
-  await expect(page.getByRole('button', { name: 'Equip' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mark for bank', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Auto exchange/ })).toHaveCount(0)
 })
 
@@ -191,7 +191,7 @@ test('Auto compound: targets stop at +7 even when the item could go higher', asy
 
   await page.goto('/characters/Patinder')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Auto-mark for Compound' }).click()
+  await page.getByRole('button', { name: 'Auto compound' }).click()
   await expect(page.getByRole('button', { name: /^\+7/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /^\+8/ })).toHaveCount(0)
 })

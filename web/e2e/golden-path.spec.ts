@@ -34,10 +34,10 @@ test('pairing, then marking an inventory item auto-sell, shows it under Automati
 
   // Open the inventory item's action panel and mark it for auto-sell.
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Auto-sell to NPC' }).click()
+  await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
 
   // The panel closes itself on success (see ItemActionPanel's run()).
-  await expect(page.getByRole('button', { name: 'Auto-sell to NPC' })).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Auto sell to NPC…' })).not.toBeVisible()
 
   // Automatic rules starts collapsed - expand "Auto NPC sales" and confirm
   // the marked item shows up with both its name AND its sprite (the exact

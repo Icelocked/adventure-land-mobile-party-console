@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { useCharacters, useCharacterDiagnosticsMap, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
-import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment } from '@/lib/itemFormulas'
+import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuantity, primaryStatScrollCost, STAT_SCROLLS, isEquipment, isUsable, comparisonSlotsFor, upgradeRuleTiers } from '@/lib/itemFormulas'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
-import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
+import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem } from '@/models'
 import { StandListingForm } from '@/components/StandListingForm'
 import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog, RosterMember } from '@/models'
 
@@ -44,7 +44,7 @@ export function ItemActionPanel({
   const catalogFor = useCatalogLookup(catalog)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [comparing, setComparing] = useState(false)
+  const [comparing, setComparing] = useState<string | boolean>(false)
   const [showingDetails, setShowingDetails] = useState(false)
 
   const run = async (action: () => Promise<ApiResult<CommandResult>>) => {
@@ -115,16 +115,15 @@ export function ItemActionPanel({
             meta={meta}
             characterName={characterName}
             isMerchant={isMerchant}
-            roster={roster}
             buyable={catalog?.buyable ?? []}
             statScrollInventory={statScrollInventory}
             expanded={expanded}
             onExpand={setExpanded}
             run={run}
-            onCompare={isEquipment(meta?.definition) ? () => setComparing(true) : undefined}
+            onCompare={(slot) => setComparing(slot ?? true)}
           />
         ) : (
-          <EquipmentActions target={target} meta={meta} characterName={characterName} isMerchant={isMerchant} run={run} />
+          <EquipmentActions target={target} meta={meta} characterName={characterName} run={run} />
         )}
       </SheetContent>
     </Sheet>
@@ -151,6 +150,7 @@ export function ItemActionPanel({
         meta={meta}
         characterCtype={roster[characterName]?.ctype ?? ''}
         equippedSlots={characters[characterName]?.inventory?.slots ?? {}}
+        slot={typeof comparing === 'string' ? comparing : undefined}
         catalogFor={catalogFor}
         onClose={() => setComparing(false)}
       />
@@ -159,20 +159,25 @@ export function ItemActionPanel({
   )
 }
 
-export function TapRow({ label, onClick }: { label: string; onClick: () => void }) {
+export function TapRow({ label, onClick, disabled, title, className = '' }: { label: string; onClick: () => void; disabled?: boolean; title?: string; className?: string }) {
   return (
-    <button onClick={onClick} className="w-full rounded-md py-2 text-left text-sm hover:bg-accent">
+    <button onClick={onClick} disabled={disabled} title={title} className={`w-full rounded-md py-2 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-50 ${className}`}>
       {label}
     </button>
   )
 }
 
+// inventory-panel.tsx comparison submenu labels.
+const COMPARISON_SLOT_LABELS: Record<string, string> = { mainhand: 'Main hand', offhand: 'Off hand', ring1: 'Ring 1', ring2: 'Ring 2', earring1: 'Earring 1', earring2: 'Earring 2' }
+const CLEAR_MARKS_TITLE = 'Clear this item’s manual marks and matching shared automatic rules'
+
+/** inventory-panel.tsx's item context menu, in its order and with its
+ *  labels and gating, as this app's options list. */
 function InventoryActions({
   target,
   meta,
   characterName,
   isMerchant,
-  roster,
   buyable,
   statScrollInventory,
   expanded,
@@ -184,68 +189,153 @@ function InventoryActions({
   meta: ItemMeta | undefined
   characterName: string
   isMerchant: boolean
-  roster: Record<string, RosterMember>
   buyable: { id: string; cost: number }[]
   statScrollInventory: Record<string, number>
   expanded: string | null
   onExpand: (value: string | null) => void
   run: (action: () => Promise<ApiResult<CommandResult>>) => void
-  onCompare?: () => void
+  onCompare: (slot?: string) => void
 }) {
   const api = usePartyApi()
-  const dynamicState = useDynamicState()
-  const { item, slot } = target
-  const level = item.level ?? 0
-  // use-party-console.tsx: bankbois are storage workers, never delivery targets.
-  const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
-  const others = Object.keys(roster).filter((name) => name !== characterName && !bankboiNames.has(name))
-  const toggle = (key: string) => onExpand(expanded === key ? null : key)
-  // inventory-panel.tsx only offers upgrade/compound actions when the
-  // account has a merchant character at all (upgrading always routes
-  // through them), independent of which character's item this is.
-  const hasMerchant = !!dynamicState.merchantCharacter
-  const canUpgrade = hasMerchant && !!meta?.upgradeable && itemMaximumLevel(meta) > level
-  const canCompound = hasMerchant && !!meta?.compoundable
-  const canStatScroll = isMerchant && !!meta?.definition.stat
-  // "Buy another level 0" (upgrade-actions.tsx) only for non-merchant holders - the merchant buys
-  // directly via the commerce screen instead.
-  const canBuyAnother = !isMerchant && !!meta?.buyable
-  // exchangeable/autoExchangeMarked (inventory-panel.tsx) - NPC exchange only runs off the merchant's own inventory.
-  // merchant-item-commands.ts only accepts auto-exchange on the configured merchant.
-  const exchangeable = characterName === dynamicState.merchantCharacter && Number((meta?.definition.e as number | undefined) ?? 0) > 0
+  const state = useDynamicState()
+  const characters = useCharacters()
+  const diagnostics = useCharacterDiagnosticsMap()
   const configLoaded = useConfigLoaded()
-  const autoExchangeMarked = exchangeable && !!dynamicState.autoExchanges[`${item.name}@${level}`]
-  const canEquipOnDelivery = isMerchant && isEquipment(meta?.definition)
-  const standListing = dynamicState.standListings.find((listing) => listing.bankPack == null && listing.slot === slot && sameMarkedItem(listing.item, item))
-  // A delivery's `slot` refers to the SENDER's own inventory (the item
-  // stays right where it is, still visible/actionable, until the
-  // merchant actually travels there and hands it off) - only meaningful
-  // for the merchant's own items, matching inventory-panel.tsx's
-  // deliveryTarget, which is the only place the dashboard tracks this.
-  const deliveryTarget = isMerchant
-    ? Object.entries(dynamicState.merchantDeliveries).find(([, marks]) => marks.some((mark) => mark.slot === slot && sameMarkedItem(mark.item, item)))?.[0]
-    : undefined
+  const { item, slot } = target
+  const level = Number(item.level) || 0
+  const toggle = (key: string) => onExpand(expanded === key ? null : key)
+  const merchant = state.merchantCharacter ?? null
+  const sharedRules = !!state.merchantRules
+  const ruleName = sharedRules ? String(merchant) : characterName
+  const equipment = isEquipment(meta?.definition)
+  const itemType = String(meta?.definition.type || '')
+  const ownSlots = characters[characterName]?.inventory?.slots ?? {}
+  const catalogFor = useCatalogLookup(state.merchantCatalog)
+  const equippedName = (slotName: string) => {
+    const equipped = ownSlots[slotName]
+    return equipped ? String(equipped.meta?.definition.name || catalogFor(equipped.item.name)?.name || equipped.item.name) : 'Empty'
+  }
+  const comparisonSlots = comparisonSlotsFor(meta, characters[characterName]?.vitals?.ctype ?? '')
+  const same = (mark: { slot?: number; item?: Item } | Item) =>
+    'item' in mark && mark.item ? mark.slot === slot && sameMarkedItem(mark.item, item) : sameMarkedItem(mark as Item, item)
+
+  // The same per-tile state InventorySection derives for its banner.
+  const autoItemMarks = state.autoItemMarks[ruleName] ?? {}
+  const autoRuleKey = `${item.name}@+${Math.max(0, level)}`
+  const autoMarkMode = autoItemMarks[autoRuleKey] || (level === 0 ? autoItemMarks[item.name] : undefined)
+  const bankMarked = (state.marked[characterName] ?? []).some(same)
+  const merchantMarkedItem = (state.merchantMarked[characterName] ?? []).some(same)
+  const deliveryTarget = isMerchant ? Object.keys(state.merchantDeliveries).find((name) => (state.merchantDeliveries[name] ?? []).some(same)) : undefined
+  const standListing = isMerchant ? state.standListings.find((listing) => !listing.bankPack && listing.slot === slot && sameMarkedItem(listing.item, item)) : undefined
+  const standFull = state.standListings.length >= 16
+  const merchantWeaponMarked = isMerchant && !!state.merchantWeapon?.item && sameMarkedItem(state.merchantWeapon.item, item)
+  const upgradeMark = meta?.upgradeable ? (state.upgrades[characterName] ?? []).find((mark) => !mark.equipped && mark.slot === slot && sameMarkedItem(mark.item, item)) : undefined
+  const autoUpgradeRule = (state.autoUpgradeMarks[ruleName] ?? {})[autoRuleKey]
+  const autoUpgradeTiers = upgradeRuleTiers(autoUpgradeRule)
+  const statScrollMark = isMerchant ? (state.statScrolls[characterName] ?? []).find((mark) => !mark.equipped && mark.slot === slot && sameMarkedItem(mark.item, item)) : undefined
+  const compoundGroup = (state.compounds[characterName] ?? []).find((group) => group.items.some((mark) => mark.slot === slot && sameMarkedItem(mark.item, item)))
+  const autoCompoundMark = (state.autoCompounds[ruleName] ?? []).find((mark) => mark.name === item.name)
+  const autoExchangeMarked = isMerchant && !!state.autoExchanges[`${item.name}@${item.level || 0}`]
+  const exchangeable = isMerchant && Number(meta?.definition.e || 0) > 0
+  const automaticSaleKey = automaticCommerceRuleKey(item)
+  const autoNpcSaleMarked = !!state.autoNpcSales[sharedRules || isMerchant ? automaticSaleKey : JSON.stringify([characterName, automaticSaleKey])]
+  const npcSale = state.npcSaleMarks.find(
+    (mark) => (isMerchant ? mark.source === 'merchant' : mark.source === 'character' && mark.character === characterName) && mark.slot === slot && automaticCommerceRuleKey(mark.item) === automaticSaleKey,
+  )
+  const deconstruction = state.deconstructionMarks.find((mark) => mark.owner === characterName && mark.slot === slot && mark.state !== 'complete' && sameMarkedItem(item, mark.item))
+  const autoDeconstruct = !!(state.autoDeconstruction[ruleName] ?? {})[automaticSaleKey]
+  const autoStandMarked = isMerchant && !!state.autoStandMarks[automaticSaleKey]
+  const deconstructable = canDeconstruct(item, state.deconstructionCatalog)
+  const upgradeMax = Math.max(0, itemMaximumLevel(meta) - level)
+  const compoundMax = Math.min(7, itemMaximumLevel(meta))
+  // use-party-console.tsx: online party members other than this one; bankbois are storage workers.
+  const bankboiNames = new Set(state.bankbois.map((bankboi) => bankboi.name))
+  const deliveryTargets = Object.entries(diagnostics)
+    .filter(([name, detail]) => name !== characterName && Number(detail.seenAt) > 0 && !bankboiNames.has(name))
+    .map(([name]) => name)
+  const anyMark = Boolean(
+    bankMarked ||
+      merchantMarkedItem ||
+      autoMarkMode ||
+      upgradeMark ||
+      autoUpgradeRule ||
+      statScrollMark ||
+      compoundGroup ||
+      autoCompoundMark ||
+      autoExchangeMarked ||
+      merchantWeaponMarked ||
+      npcSale ||
+      autoNpcSaleMarked ||
+      standListing ||
+      autoStandMarked ||
+      deconstruction ||
+      autoDeconstruct,
+  )
+  const command = (type: string, itemSlot: number | null | undefined, extra?: Record<string, unknown>) => run(() => api.itemCommand(type, characterName, item, itemSlot, extra))
 
   return (
     <div>
-      <TapRow label="Equip" onClick={() => run(() => api.itemCommand('equip', characterName, item))} />
-      {onCompare && <TapRow label="Compare with equipped" onClick={onCompare} />}
-      <TapRow label="Use item" onClick={() => run(() => api.itemCommand('use-item', characterName, item, slot))} />
-      <TapRow label="Mark for Bank" onClick={() => run(() => api.itemCommand('mark', characterName, item, slot))} />
-      <TapRow label="Auto-mark for Bank" onClick={() => run(() => api.itemCommand('auto-item-mark', characterName, item, undefined, { mode: 'bank' }))} />
-      <TapRow label="Mark for Merchant" onClick={() => run(() => api.itemCommand('merchant-mark', characterName, item, slot))} />
-      <TapRow label="Auto-mark for Merchant" onClick={() => run(() => api.itemCommand('auto-item-mark', characterName, item, undefined, { mode: 'merchant' }))} />
+      {equipment && <TapRow label="Equip" onClick={() => command('equip', undefined)} />}
+      {isUsable(meta?.definition) && <TapRow label={itemType === 'elixir' ? 'Use elixir' : 'Use'} onClick={() => command('use-item', slot)} />}
+      {equipment &&
+        (comparisonSlots.length > 1 ? (
+          <>
+            <TapRow label="Compare with equipped" onClick={() => toggle('compare')} />
+            {expanded === 'compare' && (
+              <div className="py-1 pl-4">
+                {comparisonSlots.map((comparisonSlot) => (
+                  <button key={comparisonSlot} onClick={() => onCompare(comparisonSlot)} className="flex w-full items-center justify-between rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent">
+                    <span>{COMPARISON_SLOT_LABELS[comparisonSlot] ?? comparisonSlot}</span>
+                    <span className="text-xs text-muted-foreground">{equippedName(comparisonSlot)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <TapRow label="Compare with equipped" onClick={() => onCompare()} />
+        ))}
+
+      <TapRow label="Deliver to…" onClick={() => toggle('give')} />
+      {expanded === 'give' && (
+        <div className="py-1 pl-4">
+          {!deliveryTargets.length && <p className="py-1 text-xs text-muted-foreground">No other character is online.</p>}
+          {deliveryTargets.map((other) =>
+            isMerchant && equipment ? (
+              <div key={other}>
+                <div className="py-1 text-xs text-muted-foreground">
+                  {other}
+                  {deliveryTarget === other ? ' ✓' : ''}
+                </div>
+                <TapRow label="Don't equip" onClick={() => command('give', slot, { target: other, equipOnDelivery: false })} />
+                <TapRow label="Equip" onClick={() => command('give', slot, { target: other, equipOnDelivery: true })} />
+              </div>
+            ) : (
+              <TapRow key={other} label={other} onClick={() => command('give', slot, { target: other })} />
+            ),
+          )}
+        </div>
+      )}
+
+      {isMerchant && meta?.definition.stat ? (
+        <>
+          <TapRow
+            label={statScrollMark ? `Stat scroll: ${statScrollMark.statType.toUpperCase()}` : item.stat_type ? `Change stat scroll · ${item.stat_type.toUpperCase()}` : 'Add stat scroll'}
+            onClick={() => toggle('statscroll')}
+          />
+          {expanded === 'statscroll' && <StatScrollPicker meta={meta} item={item} statScrollInventory={statScrollInventory} onPick={(statType) => command('stat-scroll-mark', slot, { statType })} />}
+        </>
+      ) : null}
+
+      {/* automatic-item-actions.tsx section="exchange". The server toggles this rule. */}
+      {!!merchant && exchangeable && <TapRow label="Auto exchange" disabled={!configLoaded || autoExchangeMarked} onClick={() => command('auto-exchange', slot)} />}
+
+      <TapRow label="Mark for bank" disabled={bankMarked} onClick={() => command('mark', slot)} />
+      {!!merchant && <TapRow label="Auto mark for bank" disabled={autoMarkMode === 'bank'} onClick={() => command('auto-item-mark', undefined, { mode: 'bank' })} />}
 
       {isMerchant && (
         <>
-          <TapRow
-            label="Mark for Stand"
-            onClick={() => {
-              // connected-inventory.tsx onStand: a new listing needs a free slot.
-              if (!standListing && dynamicState.standListings.length >= 16) return run(async () => ({ kind: 'failure', message: 'Merchant stand is full (16/16)' }))
-              toggle('stand')
-            }}
-          />
+          <TapRow label={standListing ? 'Edit stand listing' : 'Mark for stand'} disabled={standFull && !standListing} onClick={() => toggle('stand')} />
           {expanded === 'stand' && (
             <StandListingForm
               item={item}
@@ -254,174 +344,158 @@ function InventoryActions({
               onSubmit={({ price, quantity, markAll }) => run(() => api.markForStand(item, slot, price, { id: standListing?.id, quantity, markAll }))}
             />
           )}
-          <TapRow label="Auto-stand this item" onClick={() => toggle('autostand')} />
+        </>
+      )}
+      {!!merchant && isMerchant && (
+        <>
+          <TapRow label={autoStandMarked ? 'Update auto mark for stand…' : 'Auto mark for stand…'} onClick={() => toggle('autostand')} />
           {expanded === 'autostand' && (
             <StandListingForm
               auto
               item={item}
               itemValue={meta?.definition.g as number | undefined}
-              existing={dynamicState.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined}
+              existing={state.autoStandMarks[automaticSaleKey] as { price?: number } | undefined}
               onSubmit={({ price }) => run(() => api.autoStand(item, price))}
             />
           )}
         </>
       )}
 
-      <TapRow label="Mark for NPC Sale" onClick={() => toggle('npcsale')} />
-      {expanded === 'npcsale' && (
-        <NpcSaleSheet
-          item={item}
-          meta={meta}
-          location={`${isMerchant ? 'Merchant inventory' : `${characterName} inventory - the merchant will collect it`} · slot ${slot}`}
-          available={Number(item.q || 1)}
-          onCancel={() => onExpand(null)}
-          onConfirm={async (quantity, acknowledged) => {
-            const result = await api.markForNpcSale(characterName, item, slot, { isMerchant, quantity, acknowledged })
-            if (result.kind === 'failure') return result.message
-            run(async () => result)
-            return null
-          }}
-        />
+      {/* upgrade-actions.tsx (offerings are U1). */}
+      {!!merchant && meta?.upgradeable && upgradeMax > 0 && (
+        <>
+          <TapRow label={`Mark for upgrade${upgradeMark ? ` · ${upgradeMark.tiers || 1} tier${(upgradeMark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
+          {expanded === 'upgrade' && <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => command('upgrade-mark', slot, { tiers })} />}
+          <TapRow label={`Auto mark for upgrade${autoUpgradeTiers ? ` · ${autoUpgradeTiers} tier${autoUpgradeTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('autoupgrade')} />
+          {expanded === 'autoupgrade' && <UpgradeTierPicker meta={meta} level={level} current={autoUpgradeTiers} onPick={(tiers) => command('auto-upgrade-mark', slot, { tiers })} />}
+        </>
       )}
-      <TapRow
-        label="Auto-sell to NPC"
-        onClick={() => configLoaded && run(() => api.autoNpcSale(characterName === dynamicState.merchantCharacter ? undefined : characterName, item))}
-      />
-      <TapRow label="Mark for Deconstruction" onClick={() => run(() => api.markForDeconstruction(characterName, item, slot))} />
-      <TapRow label="Auto-deconstruct" onClick={() => run(() => api.autoDeconstruct(characterName, item))} />
+      {!!merchant && !isMerchant && meta?.buyable && <TapRow label="Buy another level 0" onClick={() => command('buy-copy', undefined)} />}
 
-      {canUpgrade && (
+      {!!merchant && meta?.compoundable && !compoundGroup && <TapRow label="Mark for compounding" onClick={() => command('compound-mark', slot)} />}
+      {!!merchant && meta?.compoundable && level < compoundMax && (
         <>
-          <TapRow label="Mark for Upgrade" onClick={() => toggle('upgrade')} />
-          {expanded === 'upgrade' && (
-            <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => run(() => api.itemCommand('upgrade-mark', characterName, item, slot, { tiers }))} />
-          )}
-          <TapRow label="Auto-mark for Upgrade" onClick={() => toggle('autoupgrade')} />
-          {expanded === 'autoupgrade' && (
-            <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => run(() => api.itemCommand('auto-upgrade-mark', characterName, item, slot, { tiers }))} />
-          )}
+          <TapRow label={autoCompoundMark?.targetTier ? `Auto compound to +${autoCompoundMark.targetTier}` : 'Auto compound'} onClick={() => toggle('autocompound')} />
+          {expanded === 'autocompound' && <CompoundTierPicker meta={meta} level={level} buyable={buyable} onPick={(targetTier) => command('auto-compound-mark', null, { targetTier })} />}
         </>
       )}
-      {canCompound && (
+
+      {!isMerchant && (
         <>
-          <TapRow label="Mark for Compound" onClick={() => run(() => api.itemCommand('compound-mark', characterName, item, slot))} />
-          {/* automatic-item-actions.tsx: only while below the +7 auto-compound cap. */}
-          {level < Math.min(7, itemMaximumLevel(meta)) && <TapRow label="Auto-mark for Compound" onClick={() => toggle('autocompound')} />}
-          {expanded === 'autocompound' && (
-            <CompoundTierPicker
-              meta={meta}
-              level={level}
-              buyable={buyable}
-              onPick={(targetTier) => run(() => api.itemCommand('auto-compound-mark', characterName, item, null, { targetTier }))}
-            />
-          )}
+          <TapRow label="Mark for merchant" disabled={merchantMarkedItem} onClick={() => command('merchant-mark', slot)} />
+          <TapRow label="Auto mark for merchant" disabled={autoMarkMode === 'merchant'} onClick={() => command('auto-item-mark', undefined, { mode: 'merchant' })} />
         </>
       )}
-      {canStatScroll && (
+
+      {(!!merchant || deconstructable) && <div className="my-1 h-px bg-border" />}
+      {deconstructable && (
         <>
-          <TapRow label={item.stat_type ? `Change stat scroll · ${item.stat_type.toUpperCase()}` : 'Add stat scroll'} onClick={() => toggle('statscroll')} />
-          {expanded === 'statscroll' && (
-            <StatScrollPicker
-              meta={meta}
+          <TapRow label="Mark for deconstruction" disabled={!!deconstruction} className="text-orange-400" onClick={() => run(() => api.markForDeconstruction(characterName, item, slot))} />
+          <TapRow label="Auto mark for deconstruction" disabled={autoDeconstruct} className="text-orange-400" onClick={() => run(() => api.autoDeconstruct(characterName, item))} />
+        </>
+      )}
+
+      {!!merchant && (
+        <>
+          <TapRow label="Sell to NPC…" className="text-rose-400" onClick={() => toggle('npcsale')} />
+          {expanded === 'npcsale' && (
+            <NpcSaleSheet
               item={item}
-              statScrollInventory={statScrollInventory}
-              onPick={(statType) => run(() => api.itemCommand('stat-scroll-mark', characterName, item, slot, { statType }))}
+              meta={meta}
+              location={`${isMerchant ? 'Merchant inventory' : `${characterName} inventory - the merchant will collect it`} · slot ${slot}`}
+              available={Number(item.q || 1)}
+              onCancel={() => onExpand(null)}
+              onConfirm={async (quantity, acknowledged) => {
+                const result = await api.markForNpcSale(characterName, item, slot, { isMerchant, quantity, acknowledged })
+                if (result.kind === 'failure') return result.message
+                run(async () => result)
+                return null
+              }}
             />
           )}
+          <TapRow
+            label={autoNpcSaleMarked ? 'Update auto sell to NPC…' : 'Auto sell to NPC…'}
+            onClick={() => configLoaded && run(() => api.autoNpcSale(isMerchant ? undefined : characterName, item))}
+          />
         </>
       )}
-      {canBuyAnother && <TapRow label="Buy another level 0" onClick={() => run(() => api.itemCommand('buy-copy', characterName, item))} />}
 
-      {exchangeable && (
-        <TapRow
-          // The server toggles this rule (merchant-item-commands.ts), so a tap
-          // before autoExchanges has loaded could silently remove it.
-          label={!configLoaded ? 'Auto exchange · loading settings…' : autoExchangeMarked ? 'Auto exchange · already marked' : 'Auto exchange'}
-          onClick={() => configLoaded && !autoExchangeMarked && run(() => api.itemCommand('auto-exchange', characterName, item, slot))}
-        />
-      )}
-
-      {others.length > 0 && (
-        <>
-          <TapRow label={deliveryTarget ? `Deliver to... · queued for ${deliveryTarget}` : 'Deliver to...'} onClick={() => toggle('give')} />
-          {expanded === 'give' &&
-            (canEquipOnDelivery
-              ? others.map((other) => (
-                  <div key={other} className="py-1 pl-4">
-                    <div className="py-1 text-xs text-muted-foreground">
-                      → {other}
-                      {other === deliveryTarget ? ' ✓' : ''}
-                    </div>
-                    <TapRow
-                      label="  Don't equip"
-                      onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other, equipOnDelivery: false }))}
-                    />
-                    <TapRow
-                      label="  Equip"
-                      onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other, equipOnDelivery: true }))}
-                    />
-                  </div>
-                ))
-              : others.map((other) => (
-                  <TapRow
-                    key={other}
-                    label={`  → ${other}${other === deliveryTarget ? ' ✓' : ''}`}
-                    onClick={() => run(() => api.itemCommand('give', characterName, item, slot, { target: other }))}
-                  />
-                )))}
-        </>
-      )}
-      <TapRow label="Clear marks" onClick={() => run(() => api.itemCommand('clear-item-marks', characterName, item, slot))} />
+      {anyMark && <TapRow label="Clear all marks" title={CLEAR_MARKS_TITLE} className="mt-2 text-red-500" onClick={() => command('clear-item-marks', slot)} />}
     </div>
   )
 }
 
+/** equip-slot.tsx's menu: Unequip (the elixir only shows its active
+ *  effect), upgrade marks, and Clear all marks when anything matches. */
 function EquipmentActions({
   target,
   meta,
   characterName,
-  isMerchant,
   run,
 }: {
   target: Extract<ItemActionTarget, { kind: 'equipment' }>
   meta: ItemMeta | undefined
   characterName: string
-  isMerchant: boolean
   run: (action: () => Promise<ApiResult<CommandResult>>) => void
 }) {
   const api = usePartyApi()
+  const state = useDynamicState()
   const { item, slotName } = target
-  const level = item.level ?? 0
+  const level = Number(item.level) || 0
   const [expanded, setExpanded] = useState<string | null>(null)
   const toggle = (key: string) => setExpanded((current) => (current === key ? null : key))
-  const canUpgrade = !!meta?.upgradeable && itemMaximumLevel(meta) > level
+  const upgradeMax = Math.max(0, itemMaximumLevel(meta) - level)
+  const merchant = state.merchantCharacter ?? null
+  const sharedRules = !!state.merchantRules
+  const ruleName = sharedRules ? String(merchant) : characterName
+  const isMerchant = characterName === merchant
+  const key = `${item.name}@+${Math.max(0, level)}`
+  const autoUpgradeRule = (state.autoUpgradeMarks[ruleName] ?? {})[key]
+  const autoTiers = upgradeRuleTiers(autoUpgradeRule)
+  const mark = (state.upgrades[characterName] ?? []).find((entry) => entry.equipped && entry.slot === slotName && sameMarkedItem(entry.item, item))
+  const statScrollMark = (state.statScrolls[characterName] ?? []).find((entry) => entry.slot === slotName && sameMarkedItem(entry.item, item))
+  // inventory-panel.tsx hasAutomaticMarks.
+  const commerceKey = automaticCommerceRuleKey(item)
+  const autoItemMarks = state.autoItemMarks[ruleName] ?? {}
+  const hasAutomaticMarks = Boolean(
+    autoItemMarks[key] ||
+      (!item.level && autoItemMarks[item.name]) ||
+      autoUpgradeRule ||
+      (state.autoCompounds[ruleName] ?? []).some((rule) => rule.name === item.name) ||
+      (state.autoDeconstruction[ruleName] ?? {})[commerceKey] ||
+      state.autoNpcSales[sharedRules || isMerchant ? commerceKey : JSON.stringify([characterName, commerceKey])] ||
+      (isMerchant && (state.autoStandMarks[commerceKey] || state.autoExchanges[`${item.name}@${item.level || 0}`] || (state.merchantWeapon?.item && sameMarkedItem(item, state.merchantWeapon.item)))),
+  )
 
   return (
     <div>
       {slotName !== 'elixir' && !slotName.startsWith('trade') && <TapRow label="Unequip" onClick={() => run(() => api.itemCommand('unequip', characterName, item, slotName))} />}
-      {slotName === 'elixir' && (
-        <button disabled className="w-full rounded-md py-2 text-left text-sm text-muted-foreground">
-          Active elixir effect
-        </button>
-      )}
-      {canUpgrade && (
+      {slotName === 'elixir' && <TapRow label="Active elixir effect" disabled onClick={() => {}} />}
+      {meta?.upgradeable && upgradeMax > 0 && (
         <>
-          <TapRow label="Mark for Upgrade" onClick={() => toggle('upgrade')} />
+          <TapRow label={`Mark for upgrade${mark ? ` · ${mark.tiers || 1} tier${(mark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
           {expanded === 'upgrade' && (
             <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => run(() => api.itemCommand('upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))} />
           )}
-          <TapRow label="Auto-mark for Upgrade" onClick={() => toggle('autoupgrade')} />
+          <TapRow label={`Auto mark for upgrade${autoTiers ? ` · ${autoTiers} tier${autoTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('autoupgrade')} />
           {expanded === 'autoupgrade' && (
             <UpgradeTierPicker
               meta={meta}
               level={level}
+              current={autoTiers}
               onPick={(tiers) => run(() => api.itemCommand('auto-upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))}
             />
           )}
         </>
       )}
-      {isMerchant && <TapRow label="Buy copy" onClick={() => run(() => api.itemCommand('buy-copy', characterName, item))} />}
-      <TapRow label="Clear marks" onClick={() => run(() => api.itemCommand('clear-item-marks', characterName, item, slotName, { equipped: true }))} />
+      {(hasAutomaticMarks || mark || statScrollMark) && (
+        <TapRow
+          label="Clear all marks"
+          title={CLEAR_MARKS_TITLE}
+          className="mt-2 text-red-500"
+          onClick={() => run(() => api.itemCommand('clear-item-marks', characterName, item, slotName, { equipped: true }))}
+        />
+      )}
     </div>
   )
 }
@@ -430,13 +504,18 @@ function EquipmentActions({
  *  (this panel's tap-only pattern has no context-menu submenu equivalent)
  *  - one row per achievable target tier, "+N → +N+tiers" with the scroll
  *  gold cost, instead of silently always marking a single tier. */
-export function UpgradeTierPicker({ meta, level, onPick }: { meta: ItemMeta | undefined; level: number; onPick: (tiers: number) => void }) {
+export function UpgradeTierPicker({ meta, level, current, onPick }: { meta: ItemMeta | undefined; level: number; current?: number; onPick: (tiers: number) => void }) {
   const max = Math.max(0, itemMaximumLevel(meta) - level)
   if (max <= 0) return null
   return (
     <div className="py-1 pl-4">
       {Array.from({ length: max }, (_, index) => index + 1).map((tiers) => (
-        <button key={tiers} onClick={() => onPick(tiers)} className="flex w-full items-center justify-between rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent">
+        <button
+          key={tiers}
+          disabled={current === tiers}
+          onClick={() => onPick(tiers)}
+          className="flex w-full items-center justify-between rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+        >
           <span>
             +{level} → +{level + tiers}
           </span>

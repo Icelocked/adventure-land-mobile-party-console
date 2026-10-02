@@ -20,6 +20,7 @@ export function GearComparisonSheet({
   characterCtype,
   equippedSlots,
   catalogFor,
+  slot,
   onClose,
 }: {
   item: Item
@@ -27,6 +28,8 @@ export function GearComparisonSheet({
   characterCtype: string
   equippedSlots: Record<string, EquippedEntry | null>
   catalogFor: (id: string) => CatalogItem | undefined
+  // inventory-panel.tsx: the slot picked from the Compare submenu (rings, earrings, one-handed weapons).
+  slot?: string
   onClose: () => void
 }) {
   const candidates = useMemo(() => {
@@ -34,6 +37,7 @@ export function GearComparisonSheet({
     return list.length > 0 ? list : [String(meta?.definition.type ?? '')]
   }, [meta, characterCtype])
   const replacementSlot =
+    slot ??
     candidates.find((slot) => equippedSlots[slot]?.item.name === item.name) ?? candidates.find((slot) => !equippedSlots[slot]) ?? candidates[0]
   const equipped = replacementSlot ? equippedSlots[replacementSlot] : null
   const equippedMeta = (equipped ? catalogFor(equipped.item.name)?.meta : undefined) ?? undefined

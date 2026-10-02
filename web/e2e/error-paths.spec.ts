@@ -38,13 +38,13 @@ test('ItemActionPanel: a failed action shows its error and keeps the panel open'
   await page.getByTestId('inventory-slot-0').click()
 
   server.failOnce['merchant/npc-sale'] = 'Item is currently reserved for crafting'
-  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
   await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByText('Item is currently reserved for crafting')).toBeVisible()
   // ItemActionPanel's run() only calls onClose() on success - confirm the
   // sheet is genuinely still open, not just that the error text rendered.
-  await expect(page.getByRole('button', { name: 'Mark for NPC Sale' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sell to NPC…', exact: true })).toBeVisible()
 })
 
 test('ItemActionPanel: marking an item for upgrade shows a badge on its inventory slot', async ({ page }) => {
@@ -59,7 +59,7 @@ test('ItemActionPanel: marking an item for upgrade shows a badge on its inventor
   // Regression: marking for upgrade used to produce zero visible feedback
   // anywhere in the app (the wire fields for pending one-time marks were
   // never modeled) - the panel just closed and nothing changed on screen.
-  await page.getByRole('button', { name: 'Mark for Upgrade', exact: true }).click()
+  await page.getByRole('button', { name: 'Mark for upgrade', exact: true }).click()
   await page.getByRole('button', { name: /^\+0 → \+1 /, exact: false }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('+0 → +1')
@@ -74,7 +74,7 @@ test('ItemActionPanel: marking an item for compounding shows a badge on its inve
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Mark for Compound', exact: true }).click()
+  await page.getByRole('button', { name: 'Mark for compounding' }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('+0 → +1')
 })
@@ -132,7 +132,7 @@ test('ItemActionPanel: marking a modified item for NPC sale from the merchant wo
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
 
   // The confirmation sheet shows the warning, and selling is refused
   // until it's acknowledged (use-party-console.tsx confirmNpcSale).
@@ -177,7 +177,7 @@ test('ItemActionPanel: marking an item for NPC sale shows a badge on its invento
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Mark for NPC Sale' }).click()
+  await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
   await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
@@ -188,11 +188,13 @@ test('ItemActionPanel: marking an item for deconstruction shows a badge on its i
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 0 }] })
   server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
+  // inventory-panel.tsx only offers deconstruction for catalogued items.
+  server.deconstructionCatalog = { wcoat: { compound: false } }
   await server.install(page)
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Mark for Deconstruction' }).click()
+  await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('Deconstruction')
 })
@@ -210,7 +212,7 @@ test('ItemActionPanel: delivering an item to another character shows it queued o
   // Renamed from "Give to..." to match the dashboard's own "Deliver to…"
   // wording - and marking a delivery used to leave no trace anywhere
   // once the panel closed.
-  await page.getByRole('button', { name: 'Deliver to...' }).click()
+  await page.getByRole('button', { name: 'Deliver to…' }).click()
   await page.getByRole('button', { name: /Warriorname/ }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('To Warriorname')

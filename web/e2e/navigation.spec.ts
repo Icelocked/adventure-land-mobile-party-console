@@ -38,7 +38,7 @@ test('Tapping an item opens its options list; Item details is one of the options
   await page.getByTestId('inventory-slot-0').click()
   const options = page.getByRole('button', { name: 'Item details' })
   await expect(options).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Mark for Bank', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mark for bank', exact: true })).toBeVisible()
   // The details pane is not shown until asked for.
   await expect(page.getByText('Sell to NPC', { exact: true })).toHaveCount(0)
 

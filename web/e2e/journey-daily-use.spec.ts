@@ -55,8 +55,8 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
 
   // 3. On Priestname, mark the carried item for auto-sell.
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Auto-sell to NPC' }).click()
-  await expect(page.getByRole('button', { name: 'Auto-sell to NPC' })).not.toBeVisible()
+  await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
+  await expect(page.getByRole('button', { name: 'Auto sell to NPC…' })).not.toBeVisible()
 
   // 4. A detour through the account menu to the bank, to clear an item -
   // then back to right where we left off (Priestname), same as tabbing

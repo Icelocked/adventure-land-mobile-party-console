@@ -8,8 +8,8 @@
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
-- **Phase 5:** I1 + I5 (this commit).
-- **Next:** Phase 5 (I2, I3, I4, I6, I7, I8).
+- **Phase 5:** I1 + I5 `eba3e29`, I2 (this commit).
+- **Next:** Phase 5 (I3, I4, I6, I7, I8).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1160,6 +1160,11 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/inventory-panel.tsx:770-1068`, `item-actions.ts`, `automatic-item-actions.tsx`, `comparison-slot-label.tsx`, `clear-item-marks.tsx`, `equip-slot.tsx:117-138`.
 - **PWA files:** `P/screens/itempanel/ItemActionPanel.tsx`, `P/screens/itempanel/GearComparisonSheet.tsx:36-37`.
 - **Dependencies:** F1, F2 (presence), F5.
+- **As built:**
+  - The options list follows `inventory-panel.tsx`'s menu order, labels and disabled states. Submenus (compare slot, deliver target, tiers) expand inline.
+  - PWA-only extras were removed: the "queued for X" suffix on Deliver to, "Buy copy" on equipped items, and the always-shown "Clear marks".
+  - BankItemPanel's upgrade labels now match `upgrade-actions.tsx`.
+  - Upgrade offerings ("Upgrade with …", "Add upgrade rule") are left to U1.
 
 #### I3 — Deconstruction (M)
 - **Rows:** A218–A222.
