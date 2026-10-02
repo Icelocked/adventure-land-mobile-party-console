@@ -15,8 +15,9 @@ export type ItemActionTarget = { kind: 'inventory'; slot: number; item: Item } |
 
 /** The bottom-docked item panel replacing desktop's left-click-details/
  *  right-click-menu split - ported from ui/itempanel/ItemActionPanel.kt.
- *  Item details are the first thing shown (the full ItemDetailBrowser),
- *  mutating actions follow as a single tap-only list below them. */
+ *  Tapping an item opens its options list; "Item details" is the first
+ *  option and opens the full ItemDetailBrowser in its own sheet (owner's
+ *  layout decision - the details pane no longer hosts the options). */
 export function ItemActionPanel({
   target,
   characterName,
@@ -41,6 +42,7 @@ export function ItemActionPanel({
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [comparing, setComparing] = useState(false)
+  const [showingDetails, setShowingDetails] = useState(false)
 
   const run = async (action: () => Promise<ApiResult<CommandResult>>) => {
     const result = await action()
@@ -90,18 +92,10 @@ export function ItemActionPanel({
           </div>
         </div>
 
-        <ItemDetailBrowser
-          rootItemId={item.name}
-          rootLevel={item.level ?? 0}
-          rootStatType={item.stat_type}
-          rootGift={item.gift === true}
-          rootExpires={item.expires}
-          catalog={catalog}
-          monsters={monsters}
-        />
-
         {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
         <div className="my-2 border-t border-border" />
+
+        <TapRow label="Item details" onClick={() => setShowingDetails(true)} />
 
         {target.kind === 'inventory' ? (
           <InventoryActions
@@ -122,6 +116,22 @@ export function ItemActionPanel({
         )}
       </SheetContent>
     </Sheet>
+
+    {showingDetails && (
+      <Sheet open onOpenChange={(open) => !open && setShowingDetails(false)}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+          <ItemDetailBrowser
+            rootItemId={item.name}
+            rootLevel={item.level ?? 0}
+            rootStatType={item.stat_type}
+            rootGift={item.gift === true}
+            rootExpires={item.expires}
+            catalog={catalog}
+            monsters={monsters}
+          />
+        </SheetContent>
+      </Sheet>
+    )}
 
     {comparing && (
       <GearComparisonSheet
