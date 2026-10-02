@@ -26,3 +26,22 @@ test('Account menu includes Merchant routines and WTB orders', async ({ page }) 
   await page.getByRole('button', { name: 'Merchant routines' }).click()
   await expect(page).toHaveURL(/\/routines$/)
 })
+
+test('Tapping an item opens its options list; Item details is one of the options', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58, items: [{ name: 'ironore', q: 5 }] })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore', value: 100 })
+  await server.install(page)
+
+  await page.goto('/characters/Patinder')
+  await page.getByTestId('inventory-slot-0').click()
+  const options = page.getByRole('button', { name: 'Item details' })
+  await expect(options).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mark for Bank', exact: true })).toBeVisible()
+  // The details pane is not shown until asked for.
+  await expect(page.getByText('Sell to NPC', { exact: true })).toHaveCount(0)
+
+  await options.click()
+  await expect(page.getByText('Sell to NPC', { exact: true })).toBeVisible()
+})
