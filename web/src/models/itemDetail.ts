@@ -1,4 +1,5 @@
 import type { Sprite } from './sprite'
+import type { ItemSuggestedPrice } from '@/lib/suggestedItemValue'
 
 /** Mirrors model/ItemDetail.kt - the full per-item reference data behind
  *  party-console's "left-click an item" details dialog (item-details.tsx/
@@ -40,6 +41,8 @@ export interface ItemWorldInfo {
   set?: ItemSetInfo | null
   drops?: ItemDropSource[]
   usedIn?: ItemCraftUse[]
+  // suggested-item-value.tsx's precomputed per-source prices.
+  suggestedPrices?: ItemSuggestedPrice[]
 }
 
 export interface ItemRecipe {

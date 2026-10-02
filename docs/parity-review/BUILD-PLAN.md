@@ -8,7 +8,8 @@
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
-- **Next:** Phase 5 (I1-I9).
+- **Phase 5:** I1 + I5 (this commit).
+- **Next:** Phase 5 (I2, I3, I4, I6, I7, I8).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1135,6 +1136,11 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/character-detail/sections/InventorySection.tsx`, `P/lib/markBadge.ts` (delete in favour of `lib/itemActionBanner.ts`), `P/components/ItemTile.tsx`, `P/models/item.ts`.
 - **Endpoints:** state only (`items[i].operation/meta`, every mark/rule map, `standPriceHistory`, `merchantWeapon`).
 - **Dependencies:** P0-01, F5, F7 #10/#24/#26/#40.
+- **As built (ground rule 2):**
+  - Tap opens the options list (the dashboard's right-click menu).
+  - The dashboard's hover tooltip becomes a long press (or right click). On the merchant it shows suggested-price details plus the deconstruction and NPC-sale state. Elsewhere it shows the banner's title.
+  - On the lucky slot, "Show lucky slot data" is an extra entry in the options list. An empty lucky slot opens a one-entry sheet.
+  - `markBadge.ts` was deleted. `suggestedItemValue` and `upgradeEstimate` were ported verbatim into `lib/suggestedItemValue.ts`.
 
 #### I2 — Item context-menu gating, labels and targets (M)
 - **Rows:** A191, A192, A194, A195, A200, A201, A210–A212, A214–A217, A241.
@@ -1189,6 +1195,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/equipment.tsx`, `equipment-slots.tsx`, `equip-slot.tsx`.
 - **PWA files:** `P/screens/character-detail/sections/EquipmentSection.tsx`, `CharacterDetailScreen.tsx:161`.
 - **Dependencies:** P0-13, F5, F7 #26.
+- **As built:** shipped with I1 in the same commit. It uses the shared banner, stat-badge and clover ports. The elixir's options list shows a disabled "Active elixir effect" entry in place of Unequip.
 
 #### I6 — Item details completeness (M)
 - **Rows:** A261–A263, A266, A268–A270, A274, A276.
