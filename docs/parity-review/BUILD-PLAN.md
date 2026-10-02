@@ -310,6 +310,7 @@ Tests are Playwright specs using the fidelity-fixed mock from P0-03 and assertin
   - Then reorder one row: only that priority changes.
 
 ### P0-07 — Hunt settings and blacklist: send `character`, read the owner's profile, no save before load
+- **As built:** follows `hunt-settings-control.tsx` exactly: each control saves its own field immediately (thresholds on blur when changed), so there is no Save button.
 - **Rows:** A136–A139.
 - **Broken today:**
   - **Requests are unscoped.** `P/api/partyApi.ts:617-627` sends no `character`, so the server falls back to `mainOwner() = party.leader` (`R/http/farming-scope.ts:17-18`, `R/application.ts:1878-1880, 2139-2140`).
@@ -359,6 +360,7 @@ Tests are Playwright specs using the fidelity-fixed mock from P0-03 and assertin
   - Radius 0 shows an error and no POST.
 
 ### P0-09 — Restock: real defaults, no zeroing of untouched fields
+- **As built (ground rule 1):** no extra validation. `restock-controls.tsx` strips non-digits, so a cleared field saves 0 there too. The destructive bug (untouched fields zeroed) was the never-loaded seed, fixed by P0-01/P0-05 plus the 5/20/0/0 defaults. The whole policy, including each potion `item`, is sent as on the dashboard.
 - **Rows:** A380.
 - **Broken today:**
   - `P/screens/character-detail/CharacterDetailScreen.tsx:198` defaults the policy to 0/0/0/0.
@@ -389,6 +391,7 @@ Tests are Playwright specs using the fidelity-fixed mock from P0-03 and assertin
   - Mock `anniversaryAutoChat:true` → checked; untick → body `{anniversaryAutoChat:false}`.
 
 ### P0-11 — Bankboi prefix: no blank wipe, trim, validate
+- **As built (ground rule 1):** an empty prefix is still sendable, because the dashboard and server allow it. The accidental wipe came from seeding before config loaded, which is now fixed.
 - **Rows:** A060.
 - **Broken today:**
   - The field seeds from the never-fetched `bankboiPrefix` (`P/screens/account/SettingsScreen.tsx:22, 43-45`).

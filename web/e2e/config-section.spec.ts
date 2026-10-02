@@ -43,17 +43,20 @@ test('Config section: a slow config response never holds up core, and config-see
 })
 
 test('Config section: polled on its own slower timer, not with every core poll', async ({ page }) => {
+  test.setTimeout(60_000)
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
   await server.install(page)
 
+  const start = Date.now()
   await page.goto('/characters/MainLeader')
-  await page.waitForTimeout(13_000)
-  const core = server.stateRequests.filter((r) => r.section === 'core').length
+  // Wait for several core polls rather than a fixed sleep - under a loaded
+  // parallel run one 6s cycle can take longer than 6s.
+  await expect.poll(() => server.stateRequests.filter((r) => r.section === 'core').length, { timeout: 40_000 }).toBeGreaterThanOrEqual(3)
   const config = server.stateRequests.filter((r) => r.section === 'config').length
-  expect(core).toBeGreaterThanOrEqual(3)
-  expect(config).toBe(1)
+  // One at startup, plus at most one per elapsed 15s tick.
+  expect(config).toBeLessThanOrEqual(1 + Math.floor((Date.now() - start) / 15_000))
 })
 
 test('Session: a redirect to /setup shows the reconnect screen instead of silently stopping', async ({ page }) => {

@@ -1,17 +1,33 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { resolveFarmingContext, type HuntSettings } from '@/models'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 
-/** hunt-settings-control.tsx + the Hunt blacklist viewer from farming-
- *  mode-control.tsx's settings dialog, ported as their own screen. */
+// runtime/coordinator/hunt/settings.ts defaultHuntSettings.
+const DEFAULT_HUNT_SETTINGS: HuntSettings = {
+  relocateIfCompeting: true,
+  blacklistDeaths: true,
+  deathThreshold: 1,
+  blacklistExpirations: true,
+  expirationThreshold: 1,
+}
+
+/** hunt-settings-control.tsx + the Hunt blacklist from farming-mode-
+ *  control.tsx's settings dialog, for one character. Like the dashboard,
+ *  every control saves its own field as soon as it changes (thresholds on
+ *  blur), always scoped with `character`; a character following the leader
+ *  sees the leader's settings read-only. */
 export function HuntSettingsScreen() {
+  const { name = '' } = useParams()
   const dynamicState = useDynamicState()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const configLoaded = useConfigLoaded()
   // Monster names/sprites live in the bestiary catalog, NOT the item
   // catalog (useCatalogLookup) - a monster id like "booboo" would never
   // resolve there.
@@ -20,89 +36,103 @@ export function HuntSettingsScreen() {
     return (id: string) => byId.get(id)
   }, [dynamicState.bestiaryCatalog])
 
-  const settings = dynamicState.huntSettings
-  const configLoaded = useConfigLoaded()
-  const [relocate, setRelocate] = useState(true)
-  const [blacklistDeaths, setBlacklistDeaths] = useState(true)
-  const [deathThreshold, setDeathThreshold] = useState('3')
-  const [blacklistExpirations, setBlacklistExpirations] = useState(false)
-  const [expirationThreshold, setExpirationThreshold] = useState('1')
-  const [seeded, setSeeded] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const context = resolveFarmingContext(dynamicState, name)
+  const inherited = !!context.followingLeader
+  const settings = { ...DEFAULT_HUNT_SETTINGS, ...context.settings }
+  const editable = configLoaded && !inherited
+
+  const [deaths, setDeaths] = useState(String(settings.deathThreshold))
+  const [expirations, setExpirations] = useState(String(settings.expirationThreshold))
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [blacklistBusy, setBlacklistBusy] = useState(false)
   const [confirmingClearAll, setConfirmingClearAll] = useState(false)
 
   useEffect(() => {
-    if (!seeded && settings) {
-      setRelocate(settings.relocateIfCompeting)
-      setBlacklistDeaths(settings.blacklistDeaths)
-      setDeathThreshold(String(settings.deathThreshold))
-      setBlacklistExpirations(settings.blacklistExpirations)
-      setExpirationThreshold(String(settings.expirationThreshold))
-      setSeeded(true)
-    }
-  }, [seeded, settings])
+    setDeaths(String(settings.deathThreshold))
+    setExpirations(String(settings.expirationThreshold))
+  }, [settings.deathThreshold, settings.expirationThreshold])
 
-  const blacklist = Object.entries(dynamicState.huntBlacklist).sort(([a], [b]) => a.localeCompare(b))
+  const save = async (patch: Partial<HuntSettings>) => {
+    if (!editable) return
+    setBusy(true)
+    setError(null)
+    const result = await api.saveHuntSettings(name, patch)
+    setBusy(false)
+    if (result.kind === 'failure') setError(result.message)
+    else await refreshNow()
+  }
+
+  const threshold = (key: 'deathThreshold' | 'expirationThreshold', text: string) => {
+    const n = Number(text)
+    if (!text.trim() || !Number.isSafeInteger(n) || n < 1) {
+      setError('Thresholds must be positive whole numbers.')
+      return
+    }
+    if (n !== settings[key]) void save({ [key]: n })
+  }
+
+  const blacklist = Object.entries(context.blacklist).sort(([a], [b]) => a.localeCompare(b))
 
   const clearBlacklist = async (monsterId?: string) => {
     setBlacklistBusy(true)
-    const result = await api.updateHuntBlacklist(monsterId ? 'remove' : 'clear', monsterId)
+    setError(null)
+    const result = await api.updateHuntBlacklist(name, monsterId ? 'remove' : 'clear', monsterId)
     setBlacklistBusy(false)
     if (result.kind === 'failure') setError(result.message)
     else await refreshNow()
   }
 
   return (
-    <AccountScreenScaffold title="Hunt settings" onRefresh={() => void refreshNow()}>
-      <div className="flex flex-col gap-3 p-3">
+    <AccountScreenScaffold title={`Hunt settings · ${context.owner}`} onRefresh={() => void refreshNow()}>
+      <fieldset disabled={!editable || busy} className="flex flex-col gap-3 p-3">
+        {inherited && <p className="text-xs text-muted-foreground">Settings inherited from the leader ({context.owner}).</p>}
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={relocate} onChange={(e) => setRelocate(e.target.checked)} className="size-4" />
-          Relocate if competing with another party
+          <input
+            type="checkbox"
+            checked={settings.relocateIfCompeting}
+            onChange={(e) => void save({ relocateIfCompeting: e.target.checked })}
+            className="size-4"
+          />
+          Relocate to different spawn if competing
         </label>
+        <p className="-mt-2 text-xs text-muted-foreground">Relocate only when everyone’s hunt radius is empty and a competing farmer is nearby.</p>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={blacklistDeaths} onChange={(e) => setBlacklistDeaths(e.target.checked)} className="size-4" />
-          Blacklist after
+          <input type="checkbox" checked={settings.blacklistDeaths} onChange={(e) => void save({ blacklistDeaths: e.target.checked })} className="size-4" />
+          Blacklist hunts after
           <Input
-            value={deathThreshold}
-            onChange={(e) => /^\d*$/.test(e.target.value) && setDeathThreshold(e.target.value)}
+            aria-label="Deaths before blacklisting"
+            inputMode="numeric"
+            value={deaths}
+            disabled={!settings.blacklistDeaths}
+            onChange={(e) => setDeaths(e.target.value)}
+            onBlur={() => threshold('deathThreshold', deaths)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             className="w-16"
           />
           deaths
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={blacklistExpirations} onChange={(e) => setBlacklistExpirations(e.target.checked)} className="size-4" />
-          Blacklist after
+          <input type="checkbox" checked={settings.blacklistExpirations} onChange={(e) => void save({ blacklistExpirations: e.target.checked })} className="size-4" />
+          Blacklist hunts after
           <Input
-            value={expirationThreshold}
-            onChange={(e) => /^\d*$/.test(e.target.value) && setExpirationThreshold(e.target.value)}
+            aria-label="Expired hunts before blacklisting"
+            inputMode="numeric"
+            value={expirations}
+            disabled={!settings.blacklistExpirations}
+            onChange={(e) => setExpirations(e.target.value)}
+            onBlur={() => threshold('expirationThreshold', expirations)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             className="w-16"
           />
-          expirations
+          hunts expire
         </label>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button
-          disabled={!configLoaded || saving}
-          onClick={async () => {
-            setSaving(true)
-            setError(null)
-            const result = await api.saveHuntSettings({
-              relocateIfCompeting: relocate,
-              blacklistDeaths,
-              deathThreshold: Number(deathThreshold) || 1,
-              blacklistExpirations,
-              expirationThreshold: Number(expirationThreshold) || 1,
-            })
-            setSaving(false)
-            if (result.kind === 'failure') setError(result.message)
-            else await refreshNow()
-          }}
-        >
-          {saving ? 'Saving...' : 'Save settings'}
-        </Button>
+        <p className="text-xs text-muted-foreground">
+          Failures accumulate per monster across Hunts. Clearing its blacklist entry resets its counts. Turning a rule off keeps counts and existing blacklist entries.
+        </p>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <ConfigLoadingNote />
-      </div>
+      </fieldset>
 
       <div className="flex items-center justify-between px-3 pb-1 pt-2">
         <h2 className="text-sm font-semibold">Hunt blacklist</h2>
@@ -112,7 +142,7 @@ export function HuntSettingsScreen() {
             <Button
               size="sm"
               variant="destructive"
-              disabled={blacklistBusy}
+              disabled={!editable || blacklistBusy}
               onClick={() => {
                 setConfirmingClearAll(false)
                 void clearBlacklist()
@@ -125,7 +155,7 @@ export function HuntSettingsScreen() {
             </Button>
           </div>
         ) : (
-          <Button size="sm" variant="destructive" disabled={blacklistBusy || blacklist.length === 0} onClick={() => setConfirmingClearAll(true)}>
+          <Button size="sm" variant="destructive" disabled={!editable || blacklistBusy || blacklist.length === 0} onClick={() => setConfirmingClearAll(true)}>
             Clear all
           </Button>
         )}
@@ -143,7 +173,7 @@ export function HuntSettingsScreen() {
                   {entry.reason} · {new Date(entry.at).toLocaleString()}
                 </p>
               </div>
-              <Button size="sm" variant="outline" disabled={blacklistBusy} onClick={() => void clearBlacklist(id)}>
+              <Button size="sm" variant="outline" disabled={!editable || blacklistBusy} onClick={() => void clearBlacklist(id)}>
                 Clear
               </Button>
             </div>

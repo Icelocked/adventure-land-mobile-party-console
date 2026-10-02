@@ -85,6 +85,26 @@ const BANK_FIELDS = ['bank', 'bankVaults', 'bankCurrent', 'bankQueue'] as const
 const MARKET_FIELDS = ['aldata', 'ponty', 'standPriceHistory'] as const
 const LOGS_FIELDS = ['gameLogs', 'combatLogs', 'merchantActivity'] as const
 
+// merchant/initial-settings.ts defaults (party-console v1.2.0) - the keys
+// the server accepts in /merchant/routine-priorities.
+const DEFAULT_ROUTINE_PRIORITIES: Record<string, number> = {
+  'merchant luck': 100, 'inventory cleanout': 95, 'manual visit': 90, deliveries: 90, withdrawals: 90,
+  'ALData authentication': 90, 'party collection': 90, restock: 90, 'gold threshold': 85, 'npc sales': 80,
+  'auto npc sales': 80, 'auto npc sale pickup': 80, 'manual marketplace purchases': 76, 'upgrade preview': 70,
+  'manual upgrades': 70, 'auto upgrade': 70, 'manual compounds': 70, 'manual buying': 65, 'manual crafting': 65,
+  'npc sale pickup': 80, deconstruction: 80, 'deconstruction pickup': 80, 'stand purchases': 75,
+  'stand bid purchases': 75, 'ALData marketplace purchases': 76, 'ALData marketplace sales': 76,
+  'upgrades and compounds': 70, 'auto compound': 68, 'manual exchange': 67, 'automatic exchange': 67,
+  'merchant commerce': 65, 'merchant donation': 60, 'join giveaway': 55, 'stand search': 50,
+  'stand maintenance': 40, fishing: 20, mining: 20, 'merchant idle': 0, 'manual bank exchange': 80,
+  'bank unlock': 90, 'send mail': 90, 'collect mail': 90,
+}
+const DEFAULT_MERCHANT_AUTOMATIONS: Record<string, boolean> = {
+  deliveries: true, withdrawals: true, 'merchant luck': true, 'party collection': true, 'auto npc sales': true,
+  restock: true, 'gold threshold': true, 'inventory cleanout': true, 'auto compound': true, 'auto upgrade': true,
+  'automatic exchange': true, 'stand bid purchases': true, 'join giveaway': true,
+}
+
 function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
   return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]))
 }
@@ -108,6 +128,7 @@ export class MockPartyServer {
   merchantActivity: Record<string, unknown>[] = []
   merchantRoutinePriorities: Record<string, number> = {}
   merchantAutomations: Record<string, boolean> = {}
+  gatheringModes: string[] = []
   standBids: Record<string, Record<string, unknown>> = {}
   aldataListings: Record<string, unknown>[] = []
   pontyListings: Record<string, unknown>[] = []
@@ -117,6 +138,7 @@ export class MockPartyServer {
   upgradeOfferingRules: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   monsterFocusByCharacter: Record<string, string[]> = {}
+  monsterSearchRadiusByCharacter: Record<string, number> = {}
   // The leader's own effective focus (party-state.tsx's flat field) -
   // the real server deliberately keeps monsterFocusByCharacter[leader]
   // empty (navigation/focus.ts's characterFocus() deletes it there),
@@ -224,6 +246,7 @@ export class MockPartyServer {
       merchantActivity: this.merchantActivity,
       merchantRoutinePriorities: this.merchantRoutinePriorities,
       merchantAutomations: this.merchantAutomations,
+      gatheringModes: this.gatheringModes,
       standBids: this.standBids,
       realmControl: this.realmControl,
       upgradeOfferingRules: this.upgradeOfferingRules,
@@ -231,6 +254,7 @@ export class MockPartyServer {
       luckySlotTracking: this.luckySlotTracking,
       huntBlacklist: this.huntBlacklist,
       monsterFocusByCharacter: this.monsterFocusByCharacter,
+      monsterSearchRadiusByCharacter: this.monsterSearchRadiusByCharacter,
       monsterFocus: this.monsterFocus,
       monsterChoices: this.monsterChoices,
       phoenixRouteOrder: this.phoenixRouteOrder,
@@ -418,6 +442,20 @@ export class MockPartyServer {
     this.mapStreamClients.clear()
     this.sseServer?.close()
     this.sseServer = null
+  }
+
+  private huntScope(character: unknown): { profile: string | null } | { status: number; error: string } {
+    if (character === undefined) return { profile: null }
+    const name = String(character)
+    const member = this.characters.find((c) => c.name === name)
+    if (!member) return { status: 400, error: 'unknown character' }
+    if (member.ctype === 'merchant') return { status: 409, error: 'Merchants do not run Monster Hunts' }
+    if (this.leader && this.leader !== name && this.followers[name]) return { status: 409, error: 'following leader settings' }
+    return { profile: name === this.leader ? null : name }
+  }
+
+  private updateProfile(name: string, patch: Record<string, unknown>) {
+    this.farmingProfiles = { ...this.farmingProfiles, [name]: { ...(this.farmingProfiles[name] ?? {}), ...patch } }
   }
 
   /** Applies one POST body against the given logical /party-api/<path>,
@@ -614,20 +652,85 @@ export class MockPartyServer {
       this.lastOrder = { path, ...body }
       return { status: 200, json: { ok: true } }
     }
-    if (path === 'hunt-settings') {
-      this.huntSettings = { ...(this.huntSettings ?? {}), ...body }
+    if (path === 'dashboard-preferences') {
+      // Mirrors http/dashboard-import.ts preferences().
+      const prefix = body.bankboiPrefix
+      if (prefix !== undefined && (typeof prefix !== 'string' || (prefix !== '' && !/^[A-Za-z0-9_]{3,11}$/.test(prefix))))
+        return { status: 400, json: { error: 'Use 3–11 letters, numbers, or underscores' } }
+      if (body.anniversaryAutoChat !== undefined && typeof body.anniversaryAutoChat !== 'boolean') return { status: 400, json: { error: 'Invalid chat setting' } }
+      if (prefix !== undefined) this.extraState = { ...this.extraState, bankboiPrefix: prefix }
+      if (body.anniversaryAutoChat !== undefined) this.extraState = { ...this.extraState, anniversaryAutoChat: body.anniversaryAutoChat }
       return { status: 200, json: { ok: true } }
     }
-    if (path === 'hunt-blacklist') {
-      if (body.action === 'clear') this.huntBlacklist = {}
-      else if (body.action === 'remove') delete this.huntBlacklist[String(body.monsterId)]
+    if (path === 'merchant/force-stand' && typeof body.enabled === 'boolean') {
+      this.extraState = { ...this.extraState, merchantForceStand: body.enabled }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'focus') {
+      // Mirrors http/focus.ts validation + navigation/focus.ts placement:
+      // the leader's focus lives in the flat monsterFocus field.
+      const focus = body.monsterFocus
+      if (!Array.isArray(focus) || focus.some((entry) => entry === 'tinyp' || typeof entry !== 'string' || !/^[a-z0-9_]+$/i.test(entry)))
+        return { status: 400, json: { error: 'invalid monster focus' } }
+      const radius = body.monsterSearchRadius
+      if (radius !== undefined && !(Number(radius) >= 1 && Number(radius) <= 10000))
+        return { status: 400, json: { error: 'monster search radius must be between 1 and 10000' } }
+      const normalized = focus.includes('all') ? ['all'] : [...new Set(focus as string[])]
+      const name = body.character ? String(body.character) : null
+      if (!name || name === this.leader) {
+        this.monsterFocus = normalized
+        const { [String(this.leader)]: _leader, ...rest } = this.monsterFocusByCharacter
+        this.monsterFocusByCharacter = rest
+      } else this.monsterFocusByCharacter = { ...this.monsterFocusByCharacter, [name]: normalized }
+      if (name && radius !== undefined) this.monsterSearchRadiusByCharacter = { ...this.monsterSearchRadiusByCharacter, [name]: Number(radius) }
+      return { status: 200, json: { ok: true, character: name, monsterFocus: normalized } }
+    }
+    if (path === 'hunt-settings' || path === 'hunt-blacklist') {
+      // Mirrors http/farming-scope.ts: no `character` edits the leader's
+      // (top-level) settings; a follower or merchant is refused; any other
+      // character edits its own farmingProfiles entry.
+      const scope = this.huntScope(body.character)
+      if ('error' in scope) return { status: scope.status, json: { error: scope.error } }
+      const { character: _character, action, monsterId, ...patch } = body
+      if (path === 'hunt-settings') {
+        if (scope.profile) this.updateProfile(scope.profile, { huntSettings: { ...((this.farmingProfiles[scope.profile]?.huntSettings as object) ?? {}), ...patch } })
+        else this.huntSettings = { ...(this.huntSettings ?? {}), ...patch }
+        return { status: 200, json: { ok: true } }
+      }
+      const current = scope.profile ? ((this.farmingProfiles[scope.profile]?.huntBlacklist as Record<string, Record<string, unknown>>) ?? {}) : this.huntBlacklist
+      const next = { ...current }
+      if (action === 'clear') for (const key of Object.keys(next)) delete next[key]
+      else if (action === 'remove') delete next[String(monsterId)]
+      else if (action === 'add') next[String(monsterId)] = { monsterId, at: Date.now(), deaths: 0, reason: 'manual' }
+      if (scope.profile) this.updateProfile(scope.profile, { huntBlacklist: next })
+      else this.huntBlacklist = next
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/routine-priorities') {
+      // Mirrors http/routine-priorities.ts + merchant-configuration.ts
+      // setGathering: unknown keys are dropped, priorities must be 0-100
+      // integers, and fishing/mining in `enabled` toggle gatheringModes.
       this.lastRoutineSave = body
-      this.merchantRoutinePriorities = { ...this.merchantRoutinePriorities, ...(body.priorities as Record<string, number>) }
-      this.merchantAutomations = { ...this.merchantAutomations, ...(body.enabled as Record<string, boolean>) }
-      return { status: 200, json: { ok: true } }
+      const priorities = (body.priorities ?? null) as Record<string, unknown> | null
+      if (!priorities || typeof priorities !== 'object') return { status: 400, json: { error: 'provide routine priorities' } }
+      for (const [reason, raw] of Object.entries(priorities)) {
+        if (!(reason in DEFAULT_ROUTINE_PRIORITIES)) continue
+        const priority = Number(raw)
+        if (!Number.isInteger(priority) || priority < 0 || priority > 100)
+          return { status: 400, json: { error: 'priorities must be whole numbers from 0 to 100' } }
+        this.merchantRoutinePriorities = { ...this.merchantRoutinePriorities, [reason]: priority }
+      }
+      const enabled = (body.enabled ?? null) as Record<string, unknown> | null
+      if (enabled && typeof enabled === 'object') {
+        for (const reason of Object.keys(DEFAULT_MERCHANT_AUTOMATIONS))
+          if (typeof enabled[reason] === 'boolean') this.merchantAutomations = { ...this.merchantAutomations, [reason]: enabled[reason] as boolean }
+        for (const mode of ['fishing', 'mining']) {
+          const on = enabled[mode]
+          if (typeof on !== 'boolean' || this.gatheringModes.includes(mode) === on) continue
+          this.gatheringModes = on ? [...this.gatheringModes, mode] : this.gatheringModes.filter((entry) => entry !== mode)
+        }
+      }
+      return { status: 200, json: { ok: true, priorities: this.merchantRoutinePriorities, enabled: this.merchantAutomations } }
     }
     if (path === 'merchant/bid') {
       const itemId = String(body.itemId)

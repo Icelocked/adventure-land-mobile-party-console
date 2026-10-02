@@ -68,7 +68,11 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
         disabled={!configLoaded || !dirty || saving}
         onClick={async () => {
           setSaving(true)
-          await api.saveRestock(characterName, Number(hpMin) || 0, Number(hpMax) || 0, Number(mpMin) || 0, Number(mpMax) || 0)
+          // restock-controls.tsx: digits only, so a cleared field is 0 there too.
+          await api.saveRestock(characterName, {
+            hp: { ...serverPolicy.hp, min: Number(hpMin), max: Number(hpMax) },
+            mp: { ...serverPolicy.mp, min: Number(mpMin), max: Number(mpMax) },
+          })
           await refreshNow()
           setDirty(false)
           setSaving(false)

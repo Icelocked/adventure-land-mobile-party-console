@@ -22,6 +22,7 @@ export function SettingsScreen() {
   const openServerSettings = useOpenServerSettings()
   const [requirePairing, setRequirePairing] = useState<boolean | null>(null)
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
+  const [prefixStatus, setPrefixStatus] = useState<{ saved: true } | { error: string } | null>(null)
   const [showRealms, setShowRealms] = useState(false)
   const [realmError, setRealmError] = useState<string | null>(null)
   const [setHome, setSetHome] = useState(false)
@@ -70,9 +71,33 @@ export function SettingsScreen() {
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-1 text-sm font-medium">Bankboi prefix</div>
           <div className="flex gap-2">
-            <Input value={bankboiPrefix ?? ''} disabled={bankboiPrefix == null} onChange={(e) => setBankboiPrefix(e.target.value)} className="flex-1" />
-            <Button disabled={bankboiPrefix == null} onClick={() => void api.setBankboiPrefix(bankboiPrefix ?? '')}>Save</Button>
+            <Input
+              aria-label="Default name for bankboi"
+              value={bankboiPrefix ?? ''}
+              maxLength={11}
+              disabled={bankboiPrefix == null}
+              onChange={(e) => {
+                setBankboiPrefix(e.target.value)
+                setPrefixStatus(null)
+              }}
+              className="flex-1"
+            />
+            <Button
+              disabled={bankboiPrefix == null}
+              onClick={async () => {
+                setPrefixStatus(null)
+                const result = await api.setBankboiPrefix((bankboiPrefix ?? '').trim())
+                setPrefixStatus(result.kind === 'success' ? { saved: true } : { error: result.message })
+                if (result.kind === 'success') await refreshNow()
+              }}
+            >
+              {prefixStatus && 'saved' in prefixStatus ? 'Saved' : 'Save name'}
+            </Button>
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use 3–11 letters, numbers, or underscores. A number is added automatically, such as {bankboiPrefix || 'MyBank'}0.
+          </p>
+          {prefixStatus && 'error' in prefixStatus && <p role="alert" className="mt-1 text-sm text-destructive">{prefixStatus.error}</p>}
           <ConfigLoadingNote />
         </div>
 

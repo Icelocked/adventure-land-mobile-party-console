@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
@@ -170,6 +170,32 @@ function CollectionSettingsForm({
 }) {
   const [thresholdInput, setThresholdInput] = useState(String(threshold))
   const [slotsInput, setSlotsInput] = useState(String(itemCollectionThreshold))
+  const [thresholdError, setThresholdError] = useState<string | null>(null)
+  const [slotsError, setSlotsError] = useState<string | null>(null)
+  // use-party-console.tsx: follow the server value until the user edits.
+  const thresholdDirty = useRef(false)
+  const slotsDirty = useRef(false)
+  useEffect(() => {
+    if (!thresholdDirty.current) setThresholdInput(String(threshold))
+  }, [threshold])
+  useEffect(() => {
+    if (!slotsDirty.current) setSlotsInput(String(itemCollectionThreshold))
+  }, [itemCollectionThreshold])
+
+  const saveThreshold = () => {
+    setThresholdError(null)
+    const n = Number(thresholdInput)
+    if (!Number.isSafeInteger(n) || n < 0) return setThresholdError('Enter a non-negative whole number')
+    thresholdDirty.current = false
+    onSetThresholds(n, undefined)
+  }
+  const saveSlots = () => {
+    setSlotsError(null)
+    const value = Number(slotsInput)
+    if (!Number.isSafeInteger(value) || value < 1 || value > 42) return setSlotsError('Use an item-slot threshold from 1 to 42')
+    slotsDirty.current = false
+    onSetThresholds(undefined, value)
+  }
 
   return (
     <div className="flex flex-col gap-3 py-1 pl-3">
@@ -187,21 +213,39 @@ function CollectionSettingsForm({
       <div className="flex items-end gap-2">
         <label className="flex-1 text-xs text-muted-foreground">
           Collect above (gold)
-          <Input value={thresholdInput} onChange={(e) => /^\d*$/.test(e.target.value) && setThresholdInput(e.target.value)} className="mt-1" />
+          <Input
+            inputMode="numeric"
+            value={thresholdInput}
+            onChange={(e) => {
+              thresholdDirty.current = true
+              setThresholdInput(e.target.value.replace(/[^0-9]/g, ''))
+            }}
+            className="mt-1"
+          />
         </label>
-        <Button size="sm" onClick={() => onSetThresholds(Number(thresholdInput) || 0, undefined)}>
+        <Button size="sm" onClick={saveThreshold}>
           Apply
         </Button>
       </div>
+      {thresholdError && <p role="alert" className="-mt-2 text-sm text-destructive">{thresholdError}</p>}
       <div className="flex items-end gap-2">
         <label className="flex-1 text-xs text-muted-foreground">
           Marked slots required (1-42)
-          <Input value={slotsInput} onChange={(e) => /^\d*$/.test(e.target.value) && setSlotsInput(e.target.value)} className="mt-1" />
+          <Input
+            inputMode="numeric"
+            value={slotsInput}
+            onChange={(e) => {
+              slotsDirty.current = true
+              setSlotsInput(e.target.value.replace(/[^0-9]/g, ''))
+            }}
+            className="mt-1"
+          />
         </label>
-        <Button size="sm" onClick={() => onSetThresholds(undefined, Math.min(42, Math.max(1, Number(slotsInput) || 1)))}>
+        <Button size="sm" onClick={saveSlots}>
           Apply
         </Button>
       </div>
+      {slotsError && <p role="alert" className="-mt-2 text-sm text-destructive">{slotsError}</p>}
     </div>
   )
 }

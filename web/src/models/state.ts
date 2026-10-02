@@ -48,6 +48,13 @@ export const emptyRestockPolicy = (): RestockPolicy => ({
   mp: { min: 0, max: 0 },
 })
 
+/** restock-controls.tsx's `defaults` - what the dashboard shows (and saves)
+ *  for a character with no policy yet. */
+export const defaultRestockPolicy = (): RestockPolicy => ({
+  hp: { min: 5, max: 20, item: 'hpot1' },
+  mp: { min: 0, max: 0, item: 'mpot1' },
+})
+
 /** Shared bank vault (bank-sheet.tsx's BankSnapshot) - packs keys are pack
  *  names like "items1"/"bank_b1"; each pack is a fixed-length list of
  *  entries, same empty-slot-preserving shape as a character's inventory. */
@@ -768,6 +775,7 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
     savedMode: personal?.farmingPolicy || (name === state.leader ? state.farmingPolicy : undefined) || 'auto',
     effectiveMode: effective?.farmingPolicy || (legacy ? state.farmingPolicy : undefined) || 'auto',
     blacklist: effective?.huntBlacklist || (legacy ? state.huntBlacklist : undefined) || {},
+    settings: effective?.huntSettings || (legacy ? state.huntSettings ?? undefined : undefined),
     hunt: effective?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
   }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
-import { AUTOMATIC_ROUTINE_KEYS, ROUTINE_LABELS, hasEnableToggle } from '@/lib/routineLabels'
+import { ROUTINE_LABELS, hasEnableToggle } from '@/lib/routineLabels'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
@@ -20,8 +20,16 @@ export function RoutinesScreen() {
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
 
-  const [draft, setDraft] = useState<Record<string, number>>(dynamicState.merchantRoutinePriorities)
-  const [enabledDraft, setEnabledDraft] = useState<Record<string, boolean>>(dynamicState.merchantAutomations)
+  // party-management-panels.tsx: fishing/mining aren't automations - their
+  // switches mirror the standing gathering modes.
+  const priorities = dynamicState.merchantRoutinePriorities
+  const enabled: Record<string, boolean> = {
+    ...dynamicState.merchantAutomations,
+    fishing: dynamicState.gatheringModes.includes('fishing'),
+    mining: dynamicState.gatheringModes.includes('mining'),
+  }
+  const [draft, setDraft] = useState<Record<string, number>>(priorities)
+  const [enabledDraft, setEnabledDraft] = useState<Record<string, boolean>>(enabled)
   const [seeded, setSeeded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,19 +39,24 @@ export function RoutinesScreen() {
   // polling guard - after that, only local edits and Save change it.
   useEffect(() => {
     if (!seeded && configLoaded) {
-      setDraft(dynamicState.merchantRoutinePriorities)
-      setEnabledDraft(dynamicState.merchantAutomations)
+      setDraft(priorities)
+      setEnabledDraft(enabled)
       setSeeded(true)
     }
-  }, [seeded, configLoaded, dynamicState.merchantRoutinePriorities, dynamicState.merchantAutomations])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeded, configLoaded, dynamicState.merchantRoutinePriorities, dynamicState.merchantAutomations, dynamicState.gatheringModes])
 
   const sortedKeys = Object.keys(ROUTINE_LABELS).sort(
     (a, b) => (draft[b] ?? 50) - (draft[a] ?? 50) || ROUTINE_LABELS[a].localeCompare(ROUTINE_LABELS[b]),
   )
+  // Deliveries/withdrawals are switched on in Merchant settings; while off
+  // their rows are locked (routine-priorities-dialog.tsx disabledRoutine).
+  const disabledRoutine = (key: string) => ['deliveries', 'withdrawals'].includes(key) && enabled[key] === false
+  const movableKeys = sortedKeys.filter((key) => !disabledRoutine(key))
 
   const move = (source: string, target: string, after: boolean) => {
-    if (source === target) return
-    const keys = sortedKeys.filter((key) => key !== source)
+    if (source === target || disabledRoutine(source) || disabledRoutine(target)) return
+    const keys = movableKeys.filter((key) => key !== source)
     const index = keys.indexOf(target) + (after ? 1 : 0)
     keys.splice(index, 0, source)
     const next = { ...draft }
@@ -55,14 +68,17 @@ export function RoutinesScreen() {
     setDraft(next)
   }
 
-  const enabledCount = Object.keys(ROUTINE_LABELS).filter((key) => !hasEnableToggle(key) || enabledDraft[key] !== false).length
+  const enabledCount = Object.keys(ROUTINE_LABELS).filter((key) => !disabledRoutine(key) && (!hasEnableToggle(key) || enabledDraft[key] !== false)).length
 
   return (
     <AccountScreenScaffold title={`Merchant routines · ${enabledCount}/${Object.keys(ROUTINE_LABELS).length} enabled`}>
       <p className="px-3 pb-2 text-xs text-muted-foreground">Higher priorities run first. Equal priorities run oldest first. Enabled controls only automatic scheduling.</p>
       <div className="flex flex-col gap-1.5 px-3">
-        {sortedKeys.map((key, index) => (
-          <div key={key} className="flex items-center gap-2 rounded-md border border-border bg-card p-2">
+        {sortedKeys.map((key) => {
+          const locked = disabledRoutine(key)
+          const index = movableKeys.indexOf(key)
+          return (
+          <div key={key} aria-disabled={locked || undefined} className="flex items-center gap-2 rounded-md border border-border bg-card p-2">
             {hasEnableToggle(key) && (
               <input
                 type="checkbox"
@@ -72,10 +88,14 @@ export function RoutinesScreen() {
                 className="size-4"
               />
             )}
-            <span className="min-w-0 flex-1 truncate text-sm">{ROUTINE_LABELS[key]}</span>
+            <span className={`min-w-0 flex-1 truncate text-sm ${locked ? 'text-muted-foreground' : ''}`}>
+              {ROUTINE_LABELS[key]}
+              {locked && <span className="block text-xs text-muted-foreground">Enable in Merchant settings</span>}
+            </span>
             <Input
               aria-label={`${ROUTINE_LABELS[key]} priority`}
-              value={String(draft[key] ?? 50)}
+              disabled={locked}
+              value={String(locked ? (priorities[key] ?? 90) : (draft[key] ?? priorities[key] ?? 50))}
               onChange={(e) => {
                 const value = Math.max(0, Math.min(100, Number(e.target.value.replace(/\D/g, '')) || 0))
                 setDraft((old) => ({ ...old, [key]: value }))
@@ -86,8 +106,8 @@ export function RoutinesScreen() {
               variant="ghost"
               size="icon-xs"
               aria-label={`Move ${ROUTINE_LABELS[key]} up`}
-              disabled={index === 0}
-              onClick={() => move(key, sortedKeys[index - 1], false)}
+              disabled={locked || index <= 0}
+              onClick={() => move(key, movableKeys[index - 1], false)}
             >
               <ArrowUp className="size-4" />
             </Button>
@@ -95,13 +115,14 @@ export function RoutinesScreen() {
               variant="ghost"
               size="icon-xs"
               aria-label={`Move ${ROUTINE_LABELS[key]} down`}
-              disabled={index === sortedKeys.length - 1}
-              onClick={() => move(key, sortedKeys[index + 1], true)}
+              disabled={locked || index === movableKeys.length - 1}
+              onClick={() => move(key, movableKeys[index + 1], true)}
             >
               <ArrowDown className="size-4" />
             </Button>
           </div>
-        ))}
+          )
+        })}
       </div>
       <div className="sticky bottom-0 border-t border-border bg-background p-3">
         {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
@@ -111,9 +132,15 @@ export function RoutinesScreen() {
           onClick={async () => {
             setSaving(true)
             setError(null)
-            const priorities = Object.fromEntries(Object.keys(ROUTINE_LABELS).map((key) => [key, draft[key] ?? 50]))
-            const enabled = Object.fromEntries([...AUTOMATIC_ROUTINE_KEYS, 'fishing', 'mining'].map((key) => [key, enabledDraft[key] !== false]))
-            const result = await api.saveRoutinePriorities(priorities, enabled)
+            // routine-priorities-dialog.tsx's save: the seeded server maps with
+            // the user's edits, never synthesised values.
+            const nextPriorities = { ...draft }
+            if (disabledRoutine('deliveries')) delete nextPriorities.deliveries
+            if (disabledRoutine('withdrawals')) delete nextPriorities.withdrawals
+            const nextEnabled = { ...enabledDraft }
+            delete nextEnabled.deliveries // This toggle belongs to Merchant settings.
+            delete nextEnabled.withdrawals
+            const result = await api.saveRoutinePriorities(nextPriorities, nextEnabled)
             setSaving(false)
             if (result.kind === 'failure') setError(result.message)
             else await refreshNow()

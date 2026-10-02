@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
 import { useCharacters, useCoreFetchDebug, useDynamicState, useRefreshDynamicStateNow, useRoster } from '@/data/PartyDataProvider'
 import { useTargetMonsterType } from '@/data/useTargetMonsterType'
-import { resolveFarmingContext } from '@/models'
+import { defaultRestockPolicy, resolveFarmingContext } from '@/models'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { VitalsHeader } from './VitalsHeader'
 import { LeaderFollowerSection } from './sections/LeaderFollowerSection'
@@ -129,7 +129,9 @@ export function CharacterDetailScreen() {
                 // that's what followers/others inherit from) - reading only
                 // monsterFocusByCharacter here meant the leader's screen always
                 // showed "No monsters selected" even with a real focus configured.
-                monsterFocus={dynamicState.monsterFocusByCharacter[name]?.length ? dynamicState.monsterFocusByCharacter[name]! : (dynamicState.monsterFocus ?? [])}
+                // An explicitly empty [] entry is kept (`||`, as on the dashboard),
+                // and selectedFocus is use-party-console.tsx's verbatim.
+                monsterFocus={dynamicState.monsterFocusByCharacter[name] || (Array.isArray(dynamicState.monsterFocus) ? dynamicState.monsterFocus : [dynamicState.monsterFocus || 'goo'])}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
                 monsterChoices={dynamicState.monsterChoices}
@@ -195,7 +197,7 @@ export function CharacterDetailScreen() {
               catalogFor={catalogFor}
               onItemTap={(index, entry) => entry && setActionTarget({ kind: 'inventory', slot: index, item: entry.item })}
             />
-            <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? { hp: { min: 0, max: 0 }, mp: { min: 0, max: 0 } }} />
+            <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
             <AutoMarksSection characterName={name} isMerchant={vitals.ctype === 'merchant'} dynamicState={dynamicState} catalogFor={catalogFor} />
           </div>
