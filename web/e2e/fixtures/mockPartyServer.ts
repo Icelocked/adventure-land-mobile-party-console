@@ -340,7 +340,7 @@ export class MockPartyServer {
         // public-state.ts bankboiSummaries: no items/slots on core.
         bankbois: ((full.bankbois as Record<string, unknown>[]) ?? []).map((entry) => omit(entry, ['items', 'slots'])),
         // diagnosticCharacters() allowlists monsterHunt (among others).
-        characterDetails: Object.fromEntries(this.characters.map((c) => [c.name, { monsterHunt: c.monsterHunt ?? null }])),
+        characterDetails: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level, seenAt: Date.now(), monsterHunt: c.monsterHunt ?? null }])),
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
         serverNow: Date.now(),
         bankGold: this.bankGold,

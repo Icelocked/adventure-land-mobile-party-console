@@ -456,6 +456,8 @@ export const useConfigLoaded = (): boolean => useConfigLoadedAt() !== null
 export function useCharacterDiagnostics(name: string): CharacterDiagnostics | undefined {
   return useCachedValue<Record<string, CharacterDiagnostics>>(QK.characterDiagnostics, {})[name]
 }
+/** Every character's diagnostics (active slots only). */
+export const useCharacterDiagnosticsMap = (): Record<string, CharacterDiagnostics> => useCachedValue(QK.characterDiagnostics, {})
 /** query-cache.tsx presence: seen by the coordinator within the last 10s. */
 export function useCharacterOnline(name: string): boolean {
   const seenAt = Number(useCharacterDiagnostics(name)?.seenAt || 0)

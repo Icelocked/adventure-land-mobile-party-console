@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded, useDynamicState, useCharacters, useCharacterDiagnostics } from '@/data/PartyDataProvider'
+import { merchantPartyGroups } from '@/lib/partyGroups'
+import { abbreviatedGold } from '@/lib/gold'
+import { useClock } from '@/lib/duration'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
@@ -32,6 +35,25 @@ export function MerchantControlsSection({
   const navigate = useNavigate()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
+  const state = useDynamicState()
+  const characters = useCharacters()
+  const now = useClock()
+  const merchantDetails = useCharacterDiagnostics(state.merchantCharacter ?? '')
+  const groups = merchantPartyGroups(state, Object.keys(characters))
+  // party-reference-panels.tsx: the merchant's own XP-per-gold rate, 3.2 until known.
+  const xpPerGold = Number(merchantDetails?.donationXpPerGold) || 3.2
+  // merchant-card-controls.tsx readiness: the later of the merchant's and the party's cooldowns.
+  const readiness = (mode: 'fishing' | 'mining') => {
+    const ownCooldowns = merchantDetails?.gatheringCooldowns as Record<string, number> | undefined
+    const remaining = Math.max(0, Math.max(Number(ownCooldowns?.[mode] || 0), Number(state.gatheringCooldowns?.[mode] || 0)) - now)
+    if (!remaining) return <span className="text-emerald-500">✓ Ready</span>
+    const totalSeconds = Math.ceil(remaining / 1000)
+    return (
+      <span className="font-mono">
+        {Math.floor(totalSeconds / 60)}:{String(totalSeconds % 60).padStart(2, '0')}
+      </span>
+    )
+  }
   const [expanded, setExpanded] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -65,31 +87,49 @@ export function MerchantControlsSection({
         <Chip selected={forceStand} disabled={!configLoaded} onClick={() => void run(() => api.setForceStand(!forceStand))}>
           Force stand · {forceStand ? 'On' : 'Off'}
         </Chip>
-        <Chip selected={gatheringModes.includes('mining')} onClick={() => void run(() => api.setGathering('mining', !gatheringModes.includes('mining')))}>
-          Mining · {gatheringModes.includes('mining') ? 'On' : 'Off'}
-        </Chip>
-        <Chip selected={gatheringModes.includes('fishing')} onClick={() => void run(() => api.setGathering('fishing', !gatheringModes.includes('fishing')))}>
-          Fishing · {gatheringModes.includes('fishing') ? 'On' : 'Off'}
-        </Chip>
+        {(['mining', 'fishing'] as const).map((mode) => (
+          <Chip key={mode} selected={gatheringModes.includes(mode)} onClick={() => void run(() => api.setGathering(mode, !gatheringModes.includes(mode)))}>
+            {mode === 'mining' ? 'Mining' : 'Fishing'} · {gatheringModes.includes(mode) ? 'On' : 'Off'} ·{' '}
+            {state.gatheringNoTool?.[mode] && !gatheringModes.includes(mode) ? <span className="text-amber-500">No tool</span> : readiness(mode)}
+          </Chip>
+        ))}
       </div>
 
       <div className="mt-3 flex flex-col gap-1.5">
         <Button variant="outline" size="sm" className="justify-start" onClick={() => navigate('/routines')}>
           Routines
         </Button>
-        <Button variant="outline" size="sm" className="justify-start" onClick={() => void run(() => api.sendMerchantToParty())}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="justify-start"
+          onClick={() => (groups.length <= 1 ? void run(() => api.sendMerchantToParty(groups[0]?.id)) : toggle('party'))}
+        >
           Send to party
         </Button>
+        {expanded === 'party' && (
+          // send-to-party-control.tsx: pick a party group when there's more than one.
+          <div className="flex flex-col gap-1 py-1 pl-3">
+            <p className="text-xs text-muted-foreground">Select party group</p>
+            {groups.map((group) => (
+              <Button key={group.id} variant="outline" size="sm" className="h-auto justify-start whitespace-normal py-2 text-left" onClick={() => void run(() => api.sendMerchantToParty(group.id))}>
+                {group.members.join(' · ')}
+              </Button>
+            ))}
+          </div>
+        )}
 
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('donate')}>
           Donate gold
         </Button>
-        {expanded === 'donate' && <DonateForm onDonate={(amount) => run(() => api.donateGold(amount))} />}
+        {expanded === 'donate' && <DonateForm merchant={state.merchantCharacter ?? null} xpPerGold={xpPerGold} onDonate={(amount) => run(() => api.donateGold(amount))} />}
 
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('giveaway')}>
           Join giveaway
         </Button>
-        {expanded === 'giveaway' && <GiveawayForm onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))} />}
+        {expanded === 'giveaway' && (
+          <GiveawayForm realms={state.giveawayRealms ?? []} players={state.giveawayPlayers ?? {}} onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))} />
+        )}
 
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('settings')}>
           Collection settings
@@ -105,12 +145,6 @@ export function MerchantControlsSection({
           />
         )}
 
-        <Button variant="outline" size="sm" className="justify-start" onClick={() => void run(() => api.clearStaleOrders())}>
-          Clear stale orders
-        </Button>
-        <Button variant="outline" size="sm" className="justify-start" onClick={() => void run(() => api.clearMerchantActivity())}>
-          Clear activity history
-        </Button>
 
         {confirmingClear ? (
           <div className="flex items-center gap-2 py-1">
@@ -140,17 +174,34 @@ export function MerchantControlsSection({
   )
 }
 
-function DonateForm({ onDonate }: { onDonate: (amount: number) => void }) {
+function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null; xpPerGold: number; onDonate: (amount: number) => void }) {
   const [amount, setAmount] = useState('')
+  const [error, setError] = useState<string | null>(null)
   return (
-    <div className="flex items-end gap-2 py-1 pl-3">
-      <label className="flex-1 text-xs text-muted-foreground">
-        Gold amount
-        <Input value={amount} onChange={(e) => /^\d*$/.test(e.target.value) && setAmount(e.target.value)} className="mt-1" />
-      </label>
-      <Button size="sm" disabled={!Number(amount)} onClick={() => onDonate(Number(amount))}>
-        Donate
-      </Button>
+    <div className="flex flex-col gap-2 py-1 pl-3">
+      <p className="text-xs text-muted-foreground">{merchant || 'The merchant'} will withdraw any shortage, travel to the XP frog, and donate this amount.</p>
+      <div className="flex items-end gap-2">
+        <label className="flex-1 text-xs text-muted-foreground">
+          Donation amount
+          <Input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} className="mt-1" />
+        </label>
+        <Button
+          size="sm"
+          onClick={() => {
+            // use-party-console.tsx donateGold
+            const value = Number(amount)
+            if (!Number.isSafeInteger(value) || value < 1) return setError('Enter a positive whole-number donation')
+            setError(null)
+            onDonate(value)
+          }}
+        >
+          Donate
+        </Button>
+      </div>
+      <p className="font-mono text-xs text-violet-400">
+        Preview: {abbreviatedGold(Math.floor((Number(amount) || 0) * xpPerGold))} XP <span className="text-[10px] opacity-70">({xpPerGold} XP/gold)</span>
+      </p>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }
@@ -250,20 +301,70 @@ function CollectionSettingsForm({
   )
 }
 
-function GiveawayForm({ onJoin }: { onJoin: (realm: string, seller: string) => void }) {
+/** party-management-panels.tsx "Join giveaway": pick a realm, then a
+ *  player online there (searchable). */
+function GiveawayForm({
+  realms,
+  players,
+  onJoin,
+}: {
+  realms: { key: string; label: string }[]
+  players: Record<string, string[]>
+  onJoin: (realm: string, seller: string) => void
+}) {
   const [realm, setRealm] = useState('')
   const [seller, setSeller] = useState('')
+  const [search, setSearch] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const online = players[realm] ?? []
+  const matches = online.filter((name) => name.toLowerCase().includes(search.trim().toLowerCase()))
   return (
     <div className="flex flex-col gap-2 py-1 pl-3">
+      <p className="text-xs text-muted-foreground">The merchant will switch realms, travel to the main market, find this player, and enter every active giveaway they are hosting.</p>
       <label className="text-xs text-muted-foreground">
-        Server realm (e.g. US I)
-        <Input value={realm} onChange={(e) => setRealm(e.target.value)} className="mt-1" />
+        Server realm
+        <select
+          aria-label="Server realm"
+          value={realm}
+          onChange={(e) => {
+            setRealm(e.target.value)
+            setSeller('')
+          }}
+          className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground"
+        >
+          <option value="">Select a realm</option>
+          {realms.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="text-xs text-muted-foreground">
         Merchant name
-        <Input value={seller} onChange={(e) => setSeller(e.target.value)} className="mt-1" />
+        <Input disabled={!realm} placeholder={realm ? 'Search player name…' : 'Select a realm first'} value={seller || search} onChange={(e) => (setSeller(''), setSearch(e.target.value))} className="mt-1" />
       </label>
-      <Button size="sm" disabled={!realm.trim() || !seller.trim()} onClick={() => onJoin(realm.trim(), seller.trim())}>
+      {realm && !seller && (
+        <div className="max-h-40 overflow-y-auto">
+          {matches.map((name) => (
+            <button key={name} type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => setSeller(name)}>
+              {name}
+            </button>
+          ))}
+          {!matches.length && <p className="px-2 text-xs text-muted-foreground">No online players loaded for this realm.</p>}
+        </div>
+      )}
+      <span className="font-mono text-[10px] text-muted-foreground">{online.length} online players loaded</span>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      <Button
+        size="sm"
+        onClick={() => {
+          // use-party-console.tsx joinGiveaway
+          if (!realm.trim() || !seller.trim()) return setError('Enter both a server realm and merchant name')
+          setError(null)
+          onJoin(realm.trim(), seller.trim())
+        }}
+      >
         Join
       </Button>
     </div>

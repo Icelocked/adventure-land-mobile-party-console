@@ -41,7 +41,7 @@ test('Config section: a slow config response never holds up core, and config-see
   await expect(page.getByRole('button', { name: 'Follow', exact: true })).toBeDisabled()
   await expect(page.getByText('Loading settings…').first()).toBeVisible()
   // Merchant sections wait for the configured merchant (a config field), as on the dashboard.
-  await expect(page.getByText(/Now: restock/)).toBeVisible({ timeout: 25_000 })
+  await expect(page.getByText(/Party restock/)).toBeVisible({ timeout: 25_000 })
 })
 
 test('Config section: polled on its own slower timer, not with every core poll', async ({ page }) => {
@@ -89,5 +89,5 @@ test('Polling: a garbage (non-JSON) response does not stop later polls', async (
 
   await page.goto('/characters/Patinder')
   server.merchantCurrent = { id: 'merchant-1', target: 'Patinder', reason: 'restock' }
-  await expect(page.getByText(/Now: restock/)).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(/Party restock/)).toBeVisible({ timeout: 20_000 })
 })

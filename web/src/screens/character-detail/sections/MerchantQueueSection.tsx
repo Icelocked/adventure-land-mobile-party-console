@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
-import { RotateCw, X } from 'lucide-react'
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { X } from 'lucide-react'
+import { useDomainInterest, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { AUTOMATIC_ROUTINE_KEYS, ROUTINE_LABELS, routineFor } from '@/lib/routineLabels'
+import { merchantJobLabel } from '@/lib/merchantJobLabel'
+import { durationLabel } from '@/lib/duration'
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
-import type { MerchantJob } from '@/models'
-
-const jobLabel = (job: MerchantJob): string => job.routine ?? job.reason
+import type { ActivityEntry, MerchantJob } from '@/models'
 
 // A handful of retries on the same error is normal (a realm hop, a brief
 // inventory-full moment); past this it's a genuine stuck loop, not a
@@ -24,65 +24,152 @@ function stuckReason(job: MerchantJob | null | undefined): string | null {
   return stuckByAttempts || stuckByAge ? job.lastDeferredReason : null
 }
 
-/** Ports merchant-card-controls.tsx's "Merchant logistics" widget -
- *  current job + queued jobs, each cancellable, a realm-blocked job also
- *  retryable. Only ever rendered for the merchant character. */
-export function MerchantQueueSection({ current, queue }: { current?: MerchantJob | null; queue: MerchantJob[] }) {
-  const api = usePartyApi()
-  const refreshNow = useRefreshDynamicStateNow()
-  if (!current && queue.length === 0) return null
+/** merchant-card-controls.tsx's "Merchant logistics" and "Activity": the
+ *  current job and the queue (priority, label, target, status, cancel /
+ *  retry), the Merchant's Luck upkeep line, and the merchant's activity log
+ *  with its cleanup actions. Only ever rendered for the merchant. */
+export function MerchantQueueSection() {
+  const state = useDynamicState()
+  const catalog = state.merchantCatalog?.allItems ?? []
+  const current = state.merchantCurrent
+  const queue = state.merchantQueue
   const stuck = stuckReason(current)
+  const jobLabel = (job: MerchantJob) => merchantJobLabel(job, catalog)
+  const report = current?.commandReport as { state?: string; reason?: string } | undefined
+  const jobs = [
+    ...(current
+      ? [
+          {
+            job: current,
+            status:
+              report?.state === 'deferred'
+                ? `Waiting: ${report.reason || 'temporarily blocked'}`
+                : current.reason === 'marked items' && current.phase === 'processing'
+                  ? 'finishing collection'
+                  : current.phase || 'in progress',
+          },
+        ]
+      : []),
+    ...queue.map((job) => ({ job, status: 'queued' })),
+  ]
+  const mluck = state.mluckSchedule
 
   return (
     <SectionCard title={`Merchant logistics · ${queue.length} queued`}>
       {stuck && (
         <p className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
           Stuck: {stuck}
-          {current?.recoveryAttempts ? ` · retried ${current.recoveryAttempts}×` : ''} — this needs manual attention
-          in-game, not another retry. Cancelling the job below won't clear it if the cause is on the merchant's own
-          character state.
+          {current?.recoveryAttempts ? ` · retried ${current.recoveryAttempts}×` : ''} — this needs manual attention in-game, not another retry. Cancelling the job
+          below won't clear it if the cause is on the merchant's own character state.
         </p>
       )}
-      {current && (
-        <p className="text-sm">
-          Now: {jobLabel(current)} → {current.target}
-        </p>
-      )}
-      <div className="flex flex-col gap-1">
-        {queue.map((job) => (
-          <div key={job.id ?? `${job.target}-${job.reason}`} className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm text-muted-foreground">
-              {jobLabel(job)} → {job.target}
-              {job.realmBlockedReason ? ` (${job.realmBlockedReason})` : ''}
-            </span>
-            <div className="flex shrink-0 items-center gap-2">
-              {job.realmBlockedReason && (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Retry job"
-                  onClick={async () => {
-                    if (job.id) await api.retryMerchantJob(job.id)
-                    await refreshNow()
-                  }}
-                >
-                  <RotateCw className="size-4 text-muted-foreground" />
-                </Button>
-              )}
-              {/* merchant-card-controls.tsx: no cancel for standing gathering jobs. */}
-              {job.reason !== 'fishing' && job.reason !== 'mining' && <CancelJobControl job={job} />}
+      <div className="flex flex-col gap-1 font-mono text-xs">
+        {!jobs.length && <p className="text-muted-foreground">No queued work</p>}
+        {jobs.map(({ job, status }, index) => {
+          const target = job.target && job.reason !== 'join giveaway' ? ` · ${job.target}` : ''
+          const side = job.realmBlockedReason || (job.retryAt && job.retryAt > Date.now() ? `Retry at ${new Date(job.retryAt).toLocaleTimeString()}` : job.pauseReason || status)
+          return (
+            <div key={job.id || `${job.reason}-${index}`} className="flex min-w-0 items-center gap-2">
+              {status === 'queued' && job.reason !== 'fishing' && job.reason !== 'mining' && <CancelJobControl job={job} label={jobLabel(job)} />}
+              <span title={`${jobLabel(job)}${target}`} className={`min-w-0 flex-1 truncate ${index === 0 && current ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                <span className="mr-1 text-amber-600">P{job.priority ?? state.merchantRoutinePriorities[routineFor(job)] ?? 50}</span>
+                {jobLabel(job)}
+                {target}
+              </span>
+              <span className="max-w-32 shrink-0 truncate text-muted-foreground" title={side}>
+                {side}
+              </span>
+              {job.realmRetryExhausted && <RetryJobButton id={job.id} />}
             </div>
+          )
+        })}
+        {mluck && !jobs.some(({ job }) => job.reason === 'merchant luck' && job.target === mluck.target) && (
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-muted-foreground">Merchant&apos;s Luck upkeep · {mluck.target}</span>
+            <span className="shrink-0 text-muted-foreground/70">{mluck.status === 'scheduled' ? `dispatch in ${durationLabel(mluck.dispatchInMs)}` : mluck.status}</span>
           </div>
+        )}
+      </div>
+      <MerchantActivity />
+    </SectionCard>
+  )
+}
+
+function RetryJobButton({ id }: { id?: string }) {
+  const api = usePartyApi()
+  return (
+    <Button size="xs" variant="outline" disabled={!id} onClick={() => id && void api.retryMerchantJob(id)}>
+      Retry
+    </Button>
+  )
+}
+
+/** merchant-card-controls.tsx "Activity" + components/merchant-activity.tsx:
+ *  newest first, time (full date on tap/hover), "— details", coloured by
+ *  level, with Clear stale orders / Clear history and their results. */
+function MerchantActivity() {
+  const [open, setOpen] = useState(false)
+  return (
+    <details className="mt-3" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-xs font-medium uppercase text-amber-600">Activity</summary>
+      {open && <MerchantActivityLog />}
+    </details>
+  )
+}
+
+function MerchantActivityLog() {
+  // Logs poll at their fast cadence while this is open.
+  useDomainInterest('logs')
+  const api = usePartyApi()
+  const state = useDynamicState()
+  const [result, setResult] = useState<string | null>(null)
+  const entries: ActivityEntry[] = [...(state.merchantActivity ?? [])].reverse()
+  return (
+    <>
+      <div className="mt-2 flex items-center justify-end gap-3">
+        {result && <span className="mr-auto text-[11px] text-emerald-500">{result}</span>}
+        <button
+          type="button"
+          className="text-[11px] text-violet-400"
+          onClick={async () => {
+            const response = await api.clearStaleOrders()
+            if (response.kind === 'failure') return setResult(response.message || 'Cleanup failed')
+            const data = response.value.data ?? {}
+            setResult(`Removed ${Number(data.deliveriesRemoved) || 0} deliveries, ${Number(data.bankMarksRemoved) || 0} bank marks`)
+          }}
+        >
+          Clear stale orders
+        </button>
+        <button
+          type="button"
+          className="text-[11px] text-destructive"
+          onClick={async () => {
+            const response = await api.clearMerchantActivity()
+            setResult(response.kind === 'failure' ? response.message || 'Cleanup failed' : 'Activity history cleared')
+          }}
+        >
+          Clear history
+        </button>
+      </div>
+      <div className="mt-2 max-h-48 space-y-1 overflow-y-auto font-mono text-[11px] text-muted-foreground">
+        {entries.map((entry, index) => (
+          <p key={`${entry.at}-${index}`} className={entry.level === 'error' ? 'text-destructive' : entry.level === 'success' ? 'text-emerald-500' : undefined}>
+            <time className="mr-2 opacity-70" dateTime={new Date(entry.at).toISOString()} title={new Date(entry.at).toLocaleString()}>
+              {new Date(entry.at).toLocaleTimeString()}
+            </time>
+            {entry.message}
+            {entry.details != null && <span className="ml-1 opacity-75">— {typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details)}</span>}
+          </p>
         ))}
       </div>
-    </SectionCard>
+    </>
   )
 }
 
 /** merchant-cancel-job-control.tsx: cancelling an automatic routine's job
  *  also switches that routine off server-side (merchant-control.ts), so it
  *  asks first; a manual job cancels (and undoes its pending intent) at once. */
-function CancelJobControl({ job }: { job: MerchantJob }) {
+function CancelJobControl({ job, label }: { job: MerchantJob; label: string }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const reason = routineFor(job)
@@ -110,7 +197,7 @@ function CancelJobControl({ job }: { job: MerchantJob }) {
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label={`Cancel ${jobLabel(job)}`}
+        aria-label={`Cancel ${label}`}
         title={disablesRoutine ? 'Cancel job and disable routine' : 'Cancel and undo pending intent'}
         disabled={pending || !job.id}
         onClick={() => (disablesRoutine ? (setError(null), setConfirming(true)) : void cancelJob())}
@@ -118,7 +205,7 @@ function CancelJobControl({ job }: { job: MerchantJob }) {
         <X className="size-4 text-muted-foreground" />
       </Button>
       {(confirming || error) && (
-        <div role="alertdialog" aria-label={`Cancel ${ROUTINE_LABELS[reason] || reason}?`} className="fixed inset-x-3 bottom-3 z-50 rounded-lg border border-destructive/50 bg-card p-3 shadow-lg">
+        <div role="alertdialog" aria-label={`Cancel ${ROUTINE_LABELS[reason] || reason}?`} className="fixed inset-x-3 bottom-3 z-50 rounded-lg border border-destructive/50 bg-card p-3 font-sans shadow-lg">
           {confirming && (
             <>
               <p className="text-sm font-medium">Cancel {ROUTINE_LABELS[reason] || reason}?</p>

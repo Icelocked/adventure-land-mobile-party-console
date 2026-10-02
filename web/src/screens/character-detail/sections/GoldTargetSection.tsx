@@ -53,6 +53,24 @@ export function GoldTargetSection({ characterName, serverTarget }: { characterNa
           {saving ? 'Saving...' : 'Save'}
         </Button>
       </div>
+      {/* gold-target-control.tsx: save the target, then have the merchant
+       *  exchange gold and items with the bank for this character. */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        disabled={!configLoaded || saving}
+        onClick={async () => {
+          setSaving(true)
+          if (dirty) await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 })
+          await api.sendCommand(characterName, { type: 'bank' })
+          await refreshNow()
+          setDirty(false)
+          setSaving(false)
+        }}
+      >
+        Exchange gold and items with bank
+      </Button>
       <ConfigLoadingNote />
     </SectionCard>
   )

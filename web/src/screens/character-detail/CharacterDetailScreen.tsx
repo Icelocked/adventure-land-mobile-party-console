@@ -135,7 +135,7 @@ export function CharacterDetailScreen() {
                 huntBlacklist={farming.blacklist}
               />
             )}
-            {isMerchant && <MerchantQueueSection current={dynamicState.merchantCurrent} queue={dynamicState.merchantQueue} />}
+            {isMerchant && <MerchantQueueSection />}
             {isMerchant && (
               <MerchantControlsSection
                 forceStand={dynamicState.merchantForceStand}
