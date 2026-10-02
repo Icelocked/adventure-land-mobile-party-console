@@ -71,7 +71,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await expect(page.getByText('No bank data yet.')).not.toBeVisible()
   // Bank-sourced deconstruction queues for the merchant to collect - the
   // item stays put (now marked), it doesn't vanish the instant it's marked.
-  await expect(page.getByText('Wolf Coat')).toBeVisible()
+  await expect(page.getByText('Wolf Coat', { exact: true })).toBeVisible()
   await expect(page.getByText('Deconstruct', { exact: true })).toBeVisible()
 
   await page.goBack()
@@ -118,7 +118,8 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   // changes actually stuck (nothing silently reverted or went stale),
   // and Priestname's much-earlier auto-sell mark from step 3 is still
   // exactly where it should be after all this navigation.
+  // (Automatic rule lists are merchant-only on the dashboard; a per-player
+  // rule shows as the tile's banner.)
   await page.goto('/characters/Priestname')
-  await page.getByRole('button', { name: /Auto NPC sales \(1\)/ }).click()
-  await expect(page.getByText('Wolf Coat')).toBeVisible()
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
 })

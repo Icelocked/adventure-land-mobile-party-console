@@ -1,33 +1,54 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { Check, PackageOpen, X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
-import { displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
-import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ExpandChevron } from '@/components/ExpandChevron'
+import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
+import { upgradeRuleTiers } from '@/lib/itemFormulas'
 import { SectionCard } from '../SectionCard'
+import type { ApiResult, CommandResult } from '@/api/partyApi'
 import type { CatalogItem, Item, PartyStateDynamic } from '@/models'
 import { itemFromRuleKey } from '@/models'
+
+type Action = () => Promise<ApiResult<CommandResult>>
+
+interface RuleEdit {
+  id: string
+  value: number
+  label: string
+  min: number
+  max: number
+  allowUnlimited?: boolean
+  onSave: (value: number) => Action
+}
 
 interface RuleEntry {
   key: string
   item: Item
-  detail?: string | null
-  // A running mark can't be removed; a blocked one can be retried (inventory-panel.tsx).
+  detail?: string
+  // A running mark can't be removed; a blocked one can be retried.
   disabled?: boolean
-  onRetry?: () => Promise<unknown>
-  onRemove: () => Promise<unknown>
+  retry?: Action
+  upgradeTarget?: number
+  edits?: RuleEdit[]
+  onRemove: Action
 }
 
-/** Ports inventory-panel.tsx's seven "automaticSection(...)" blocks (via
- *  ui/characterdetail/sections/AutoMarksSection.kt) - not just setting a
- *  rule (the item action panel), but seeing and removing every standing
- *  rule. "Upgrade rules" (a separate offer-negotiation feature) is
- *  deliberately not ported, same as the Android app. */
+/** upgrade-rule-quantity.tsx, verbatim. */
+const upgradeRuleQuantity = (rule?: unknown) =>
+  typeof rule === 'object' && rule && Number.isSafeInteger(Number((rule as { quantity?: unknown }).quantity)) ? Number((rule as { quantity?: unknown }).quantity) : -1
+
+/** inventory-panel.tsx's automatic sections (merchant only): NPC sales,
+ *  deconstruction, stand, upgrades, compounds, merchant marks and bank
+ *  marks - each with a two-tap clear, two-tap remove per entry, inline
+ *  target/remaining edits for upgrade and compound rules, and Retry for a
+ *  blocked deconstruction. Every action surfaces its error. */
 export function AutoMarksSection({
   characterName,
   isMerchant,
-  dynamicState,
+  dynamicState: state,
   catalogFor,
 }: {
   characterName: string
@@ -36,203 +57,338 @@ export function AutoMarksSection({
   catalogFor: (id: string) => CatalogItem | undefined
 }) {
   const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const [error, setError] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<Item | null>(null)
+  if (!isMerchant) return null
 
-  // shared-rules.ts ruleOwner: with shared merchant rules, every member's
-  // rules live under the merchant (connected-inventory.tsx reads them there).
-  const owner = dynamicState.merchantRules ? (dynamicState.merchantCharacter ?? characterName) : characterName
-  // connected-inventory.tsx: the configured merchant's NPC rules are the
-  // account-wide ones (no `character`); the server also drops `character`
-  // in shared mode (automatic-sales.ts). Everyone else's are per-player.
-  const npcScope = characterName === dynamicState.merchantCharacter || dynamicState.merchantRules ? undefined : characterName
-  const npcEntries: RuleEntry[] = Object.entries(dynamicState.autoNpcSales)
-    .filter(([, rule]) => (npcScope === undefined ? rule.character == null : rule.character === characterName))
-    .map(([key, rule]): RuleEntry => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(npcScope, rule.item, true) }))
-    // inventory-panel.tsx: plus every manual NPC-sale mark, by id.
-    .concat(
-      isMerchant
-        ? dynamicState.npcSaleMarks.map((mark) => ({
-            key: mark.id,
-            item: mark.item,
-            detail: `${mark.character || dynamicState.merchantCharacter} · ${mark.quantity} × · ${mark.state || 'queued'}${mark.error ? ` · ${mark.error}` : ''}`,
-            disabled: mark.state === 'running',
-            onRemove: () => api.removeNpcSaleMark(mark.character || characterName, mark.id),
-          }))
-        : [],
-    )
-  const clearNpc = () => api.clearAllAutoNpcSales(npcScope)
+  const merchant = state.merchantCharacter ?? characterName
+  // connected-inventory.tsx ruleName: shared rules live under the merchant.
+  const ruleName = state.merchantRules ? merchant : characterName
+  const autoItemMarks = state.autoItemMarks[ruleName] ?? {}
+  const perform = async (action: Action) => {
+    setError(null)
+    const result = await action()
+    if (result.kind === 'failure') setError(result.message || 'Automatic rule update failed')
+    await refreshNow()
+  }
 
-  const deconEntries: RuleEntry[] = Object.entries(dynamicState.autoDeconstruction[owner] ?? {}).map(([key, rule]) => ({
-    key,
-    item: rule.item,
-    detail: 'Automatic',
-    onRemove: () => api.autoDeconstruct(characterName, rule.item, true),
-  }))
-  // inventory-panel.tsx: plus every pending deconstruction mark.
-  const deconMarks: RuleEntry[] = isMerchant
-    ? dynamicState.deconstructionMarks
-        .filter((mark) => mark.state !== 'complete')
-        .map((mark) => ({
-          key: mark.id,
-          item: mark.item,
-          detail: `${mark.owner} · ${mark.quantity} × · ${mark.state}${mark.error ? ` · ${mark.error}` : ''}`,
-          disabled: mark.state === 'running',
-          onRetry: mark.state === 'blocked' ? () => api.retryDeconstructionMark(mark.owner || characterName, mark.id) : undefined,
-          onRemove: () => api.removeDeconstructionMark(mark.owner || characterName, mark.id, mark.slot, mark.item),
-        }))
-    : []
-  // No bulk route for deconstruction (mark-commands.ts has one for bank/merchant marks, compound-
-  // commands.ts for upgrades/compounds, automatic-sales.ts for npc/stand - deconstruction doesn't) -
-  // inventory-panel.tsx's own clearAutomaticSection loops the existing per-rule remove the same way.
-  const clearDecon = () => Promise.all(deconEntries.map((entry) => entry.onRemove()))
-
-  const bankEntries: RuleEntry[] = Object.entries(dynamicState.autoItemMarks[owner] ?? {})
-    .filter(([, mode]) => mode === 'bank')
-    .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, 'bank', key) }))
-  const clearBank = () => api.clearAutoItemMarks(characterName, 'bank')
-
-  let standEntries: RuleEntry[] = []
-  let upgradeEntries: RuleEntry[] = []
-  let compoundEntries: RuleEntry[] = []
-  let merchantMarkEntries: RuleEntry[] = []
-
-  if (isMerchant) {
-    standEntries = Object.entries(dynamicState.autoStandMarks).map(([key, rule]) => ({
+  const npc: RuleEntry[] = [
+    ...Object.entries(state.autoNpcSales)
+      .filter(([, rule]) => !rule.character)
+      .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(undefined, rule.item, true) })),
+    ...state.npcSaleMarks.map((mark) => ({
+      key: mark.id,
+      item: mark.item,
+      detail: `${mark.character || merchant} · ${mark.quantity} × · ${mark.state || 'queued'}${mark.error ? ` · ${mark.error}` : ''}`,
+      disabled: mark.state === 'running',
+      onRemove: () => api.removeNpcSaleMark(mark.character || characterName, mark.id),
+    })),
+  ]
+  const autoDeconstruction = Object.values(state.autoDeconstruction[ruleName] ?? {})
+  const deconstruction: RuleEntry[] = [
+    ...Object.entries(state.autoDeconstruction[ruleName] ?? {}).map(([key, rule]) => ({
       key,
       item: rule.item,
-      detail: `${rule.price}g`,
-      onRemove: () => api.autoStand(rule.item, rule.price, true),
-    }))
-
-    upgradeEntries = Object.entries(dynamicState.autoUpgradeMarks).flatMap(([owner, rules]) =>
-      Object.keys(rules).map((ruleKey) => {
-        const item = itemFromRuleKey(ruleKey)
-        return {
-          key: `${owner}:${ruleKey}`,
-          item,
-          detail: owner !== characterName ? owner : null,
-          onRemove: () => api.removeAutoUpgradeRule(owner, item, ruleKey),
-        }
-      }),
-    )
-
-    compoundEntries = Object.entries(dynamicState.autoCompounds).flatMap(([owner, rules]) =>
-      rules.map((rule) => ({
-        key: `${owner}:${rule.name}`,
-        item: { name: rule.name },
-        detail: `target +${rule.targetTier}${owner !== characterName ? ` · ${owner}` : ''}`,
-        onRemove: () => api.removeAutoCompound(owner, rule.name, rule.targetTier),
+      detail: 'Automatic',
+      onRemove: () => api.autoDeconstruct(characterName, rule.item, true),
+    })),
+    ...state.deconstructionMarks
+      .filter((mark) => mark.state !== 'complete')
+      .map((mark) => ({
+        key: mark.id,
+        item: mark.item,
+        detail: `${mark.owner} · ${mark.quantity} × · ${mark.state}${mark.error ? ` · ${mark.error}` : ''}`,
+        disabled: mark.state === 'running',
+        retry: mark.state === 'blocked' ? () => api.retryDeconstructionMark(mark.owner || characterName, mark.id) : undefined,
+        onRemove: () => api.removeDeconstructionMark(mark.owner || characterName, mark.id, mark.slot, mark.item),
       })),
-    )
+  ]
+  const stand: RuleEntry[] = Object.entries(state.autoStandMarks).map(([key, rule]) => ({
+    key,
+    item: rule.item,
+    detail: `${rule.price.toLocaleString()}g`,
+    onRemove: () => api.autoStand(rule.item, rule.price, true),
+  }))
+  const upgrades: RuleEntry[] = Object.entries(state.autoUpgradeMarks).flatMap(([owner, rules]) =>
+    Object.entries(rules).map(([ruleKey, rule]) => {
+      const item = itemFromRuleKey(ruleKey)
+      const level = Number(item.level || 0)
+      const tiers = upgradeRuleTiers(rule)
+      const quantity = upgradeRuleQuantity(rule)
+      return {
+        key: `${owner}:${ruleKey}`,
+        item,
+        upgradeTarget: level + tiers,
+        detail: owner === characterName ? undefined : owner,
+        edits: [
+          {
+            id: 'target',
+            value: tiers,
+            label: `${tiers} tier${tiers === 1 ? '' : 's'} → +${level + tiers}`,
+            min: 1,
+            max: Math.max(1, 13 - level),
+            onSave: (value: number) => () => api.itemCommand('update-auto-upgrade-rule', owner, item, null, { ruleKey, tiers: value }),
+          },
+          {
+            id: 'quantity',
+            value: quantity,
+            label: quantity === -1 ? 'Remaining ∞' : quantity === 0 ? 'Completed' : `Remaining ${quantity}`,
+            min: 1,
+            max: 9999,
+            allowUnlimited: true,
+            onSave: (value: number) => () => api.itemCommand('update-auto-upgrade-rule', owner, item, null, { ruleKey, quantity: value }),
+          },
+        ],
+        onRemove: () => api.removeAutoUpgradeRule(owner, item, ruleKey),
+      }
+    }),
+  )
+  const compounds: RuleEntry[] = Object.entries(state.autoCompounds).flatMap(([owner, rules]) =>
+    rules.map((rule) => {
+      const quantity = rule.quantity as number | undefined
+      return {
+        key: `${owner}:${rule.name}`,
+        item: { name: rule.name, level: 0 },
+        detail: owner === characterName ? undefined : owner,
+        edits: [
+          {
+            id: 'target',
+            value: rule.targetTier,
+            label: `Target +${rule.targetTier}`,
+            min: 1,
+            max: 7,
+            onSave: (value: number) => () => api.itemCommand('auto-compound-mark', owner, { name: rule.name }, null, { targetTier: value }),
+          },
+          {
+            id: 'quantity',
+            value: Number.isSafeInteger(Number(quantity)) ? Number(quantity) : -1,
+            label: Number(quantity) === -1 || quantity === undefined ? 'Remaining ∞' : Number(quantity) === 0 ? 'Completed' : `Remaining ${quantity}`,
+            min: 1,
+            max: 9999,
+            allowUnlimited: true,
+            onSave: (value: number) => () => api.itemCommand('auto-compound-mark', owner, { name: rule.name }, null, { targetTier: rule.targetTier, quantity: value }),
+          },
+        ],
+        onRemove: () => api.removeAutoCompound(owner, rule.name, rule.targetTier),
+      }
+    }),
+  )
+  const markEntries = (mode: 'bank' | 'merchant'): RuleEntry[] =>
+    Object.entries(autoItemMarks)
+      .filter(([, value]) => value === mode)
+      .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, mode, key) }))
 
-    merchantMarkEntries = Object.entries(dynamicState.autoItemMarks[owner] ?? {})
-      .filter(([, mode]) => mode === 'merchant')
-      .map(([key]) => ({ key, item: itemFromRuleKey(key), onRemove: () => api.removeAutoItemMark(characterName, 'merchant', key) }))
-  }
-  const clearStand = () => api.clearAllAutoStand()
-  const clearUpgrades = () => api.clearAutoUpgrades(characterName)
-  const clearCompounds = () => api.clearAutoCompounds(characterName)
-  const clearMerchantMarks = () => api.clearAutoItemMarks(characterName, 'merchant')
+  const group = (title: string, color: string, entries: RuleEntry[], clear: () => Promise<unknown>) => (
+    <AutoRuleGroup key={title} title={title} color={color} entries={entries} catalogFor={catalogFor} perform={perform} onClear={clear} onView={setViewing} />
+  )
 
   return (
     <SectionCard title="Automatic rules">
-      <AutoRuleGroup title="Auto NPC sales" entries={npcEntries} catalogFor={catalogFor} onClearAll={clearNpc} />
-      <AutoRuleGroup title="Auto deconstruction" entries={[...deconEntries, ...deconMarks]} catalogFor={catalogFor} onClearAll={clearDecon} />
-      {isMerchant && (
-        <>
-          <AutoRuleGroup title="Auto stand marks" entries={standEntries} catalogFor={catalogFor} onClearAll={clearStand} />
-          <AutoRuleGroup title="Auto upgrades" entries={upgradeEntries} catalogFor={catalogFor} onClearAll={clearUpgrades} />
-          <AutoRuleGroup title="Auto compounds" entries={compoundEntries} catalogFor={catalogFor} onClearAll={clearCompounds} />
-          <AutoRuleGroup title="Auto merchant marks" entries={merchantMarkEntries} catalogFor={catalogFor} onClearAll={clearMerchantMarks} />
-        </>
+      {error && (
+        <p role="alert" className="mb-2 text-sm text-destructive">
+          {error}
+        </p>
       )}
-      <AutoRuleGroup title="Auto bank marks" entries={bankEntries} catalogFor={catalogFor} onClearAll={clearBank} />
+      <div className="flex flex-col gap-2">
+        {group('Auto NPC sales', 'border-rose-800 text-rose-400', npc, () => perform(() => api.clearAllAutoNpcSales(undefined)))}
+        {group('Auto deconstruction', 'border-orange-800 text-orange-400', deconstruction, async () => {
+          for (const rule of autoDeconstruction) await perform(() => api.autoDeconstruct(characterName, rule.item, true))
+        })}
+        {group('Auto stand marks', 'border-amber-800 text-amber-400', stand, () => perform(() => api.clearAllAutoStand()))}
+        {group('Auto upgrades', 'border-sky-800 text-sky-400', upgrades, () => perform(() => api.clearAutoUpgrades(characterName)))}
+        {group('Auto compounds', 'border-fuchsia-800 text-fuchsia-400', compounds, () => perform(() => api.clearAutoCompounds(characterName)))}
+        {group('Auto merchant marks', 'border-purple-800 text-purple-400', markEntries('merchant'), () => perform(() => api.clearAutoItemMarks(characterName, 'merchant')))}
+        {group('Auto bank marks', 'border-amber-800 text-amber-400', markEntries('bank'), () => perform(() => api.clearAutoItemMarks(characterName, 'bank')))}
+      </div>
+      {viewing && (
+        <Sheet open onOpenChange={(open) => !open && setViewing(null)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <ItemDetailBrowser rootItemId={viewing.name} rootLevel={viewing.level ?? 0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+          </SheetContent>
+        </Sheet>
+      )}
     </SectionCard>
   )
 }
 
 function AutoRuleGroup({
   title,
+  color,
   entries,
   catalogFor,
-  onClearAll,
+  perform,
+  onClear,
+  onView,
 }: {
   title: string
+  color: string
   entries: RuleEntry[]
   catalogFor: (id: string) => CatalogItem | undefined
-  onClearAll: () => Promise<unknown>
+  perform: (action: Action) => Promise<void>
+  onClear: () => Promise<unknown>
+  onView: (item: Item) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const [confirmingClear, setConfirmingClear] = useState(false)
-  const refreshNow = useRefreshDynamicStateNow()
+  const [open, setOpen] = useState(false)
+  const [clearArmed, setClearArmed] = useState(false)
+  const [removalArmed, setRemovalArmed] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [value, setValue] = useState('')
+  const stopEditing = () => {
+    setEditing(null)
+    setValue('')
+  }
 
   return (
-    <div className="py-1">
-      <button className="flex w-full items-center gap-1.5 text-left text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setExpanded((v) => !v)}>
-        <span className="min-w-0 flex-1">{title} ({entries.length})</span>
-        <ExpandChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div className="mt-1 flex flex-col gap-0.5 pl-4">
-          {entries.map((entry) => (
-            <div key={entry.key} className="flex items-center gap-2">
-              <SpriteIcon sprite={catalogFor(entry.item.name)?.sprite} size={24} />
-              <span className="min-w-0 flex-1 text-sm">
-                {displayName(entry.item.name, catalogFor)}
-                {entry.item.level != null ? ` +${entry.item.level}` : ''}
-                {entry.detail ? ` · ${entry.detail}` : ''}
-              </span>
-              {entry.onRetry && (
-                <Button
-                  variant="link"
-                  size="xs"
-                  onClick={async () => {
-                    await entry.onRetry!()
-                    await refreshNow()
-                  }}
+    <section aria-label={title} className={`rounded-md border ${color}`}>
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen((current) => !current)
+            setClearArmed(false)
+            setRemovalArmed(null)
+            stopEditing()
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs"
+        >
+          <ExpandChevron expanded={open} />
+          <span className="flex-1">{title}</span>
+          <span className="font-mono opacity-70">{entries.length}</span>
+        </button>
+        <button
+          type="button"
+          disabled={!entries.length}
+          aria-label={clearArmed ? `Really clear all ${title}` : `Clear all ${title}`}
+          title={clearArmed ? 'Click again to clear all' : 'Clear all'}
+          onClick={async () => {
+            if (!clearArmed) {
+              setClearArmed(true)
+              setRemovalArmed(null)
+              return
+            }
+            setClearArmed(false)
+            await onClear()
+          }}
+          className={`flex shrink-0 items-center justify-center gap-1 border-l px-2 disabled:opacity-30 ${clearArmed ? 'bg-rose-600 text-white' : 'text-rose-400'}`}
+        >
+          {clearArmed && <span className="text-[10px] font-semibold">Really?</span>}
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {open && (
+        <div className="flex flex-col gap-1 border-t border-current/30 px-3 py-2">
+          {!entries.length && <p className="text-xs text-muted-foreground">No active marks.</p>}
+          {entries.map((entry) => {
+            const definition = catalogFor(entry.item.name)
+            const label = `${definition?.name || entry.item.name}${entry.item.level ? ` +${entry.item.level}` : ''}`
+            const upgradeRange = entry.upgradeTarget === undefined ? null : `+${Number(entry.item.level || 0)} → +${entry.upgradeTarget}`
+            const armed = removalArmed === entry.key
+            return (
+              <div key={entry.key} className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border py-1 text-xs text-foreground last:border-b-0">
+                <button
+                  type="button"
+                  aria-label={`View ${label}${upgradeRange ? ` · ${upgradeRange}` : ''}`}
+                  onClick={() => onView(entry.item)}
+                  className={`relative shrink-0 border border-border ${upgradeRange ? 'h-14 w-16' : 'h-10 w-10'}`}
                 >
-                  Retry
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Remove"
-                disabled={entry.disabled}
-                onClick={async () => {
-                  await entry.onRemove()
-                  await refreshNow()
-                }}
-              >
-                <X className="size-4 text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
-          {entries.length > 0 &&
-            (confirmingClear ? (
-              <div className="mt-1 flex items-center gap-2">
-                <span className="flex-1 text-xs text-destructive">Really clear all?</span>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={async () => {
-                    setConfirmingClear(false)
-                    await onClearAll()
-                    await refreshNow()
+                  <span className={upgradeRange ? 'absolute inset-x-0 top-0 mx-auto grid h-10 w-10 place-items-center' : 'absolute inset-0 grid place-items-center'}>
+                    {definition?.sprite ? <SpriteIcon sprite={definition.sprite} size={40} /> : <PackageOpen className="h-5 w-5 text-muted-foreground" />}
+                  </span>
+                  {upgradeRange ? (
+                    <span className="absolute inset-x-0 bottom-0 border-t border-sky-800 bg-sky-950 text-center font-mono text-xs leading-4 text-sky-100">{upgradeRange}</span>
+                  ) : entry.item.level ? (
+                    <span className="absolute bottom-0 right-0 bg-black px-0.5 font-mono text-[9px] text-amber-200">+{entry.item.level}</span>
+                  ) : null}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">{label}</div>
+                  {entry.detail && <div className="truncate text-[10px] text-muted-foreground">{entry.detail}</div>}
+                </div>
+                {!armed &&
+                  entry.edits?.map((edit) => {
+                    const fieldKey = `${entry.key}:${edit.id}`
+                    const parsed = Number(value)
+                    const valid = Number.isSafeInteger(parsed) && ((edit.allowUnlimited && parsed === -1) || (parsed >= edit.min && parsed <= edit.max))
+                    const save = () => {
+                      stopEditing()
+                      void perform(edit.onSave(parsed))
+                    }
+                    return editing === fieldKey ? (
+                      <div
+                        key={edit.id}
+                        onBlur={(event) => {
+                          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) stopEditing()
+                        }}
+                        className="flex shrink-0 items-center gap-1"
+                      >
+                        <Input
+                          autoFocus
+                          aria-label={`New ${edit.id} for ${label}`}
+                          inputMode="numeric"
+                          value={value}
+                          onChange={(event) => setValue(event.target.value.replace(edit.allowUnlimited ? /[^0-9-]/g : /[^0-9]/g, ''))}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && valid) save()
+                            if (event.key === 'Escape') stopEditing()
+                          }}
+                          className="h-7 w-14 px-1 text-center font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Save ${edit.id} for ${label}`}
+                          disabled={!valid}
+                          onClick={save}
+                          className="flex h-7 w-7 items-center justify-center border border-emerald-400 bg-emerald-500 text-black disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        key={edit.id}
+                        type="button"
+                        title={`Edit ${edit.id}`}
+                        onClick={() => {
+                          setEditing(fieldKey)
+                          setValue(String(edit.value))
+                        }}
+                        className="shrink-0 border border-emerald-700 px-2 py-1 font-mono text-xs text-emerald-400"
+                      >
+                        {edit.label}
+                      </button>
+                    )
+                  })}
+                <button
+                  type="button"
+                  aria-label={armed ? `Really remove ${label}` : `Remove ${label}`}
+                  title={armed ? 'Click again to remove' : 'Remove'}
+                  disabled={entry.disabled}
+                  onClick={() => {
+                    if (!armed) {
+                      setRemovalArmed(entry.key)
+                      stopEditing()
+                      return
+                    }
+                    setRemovalArmed(null)
+                    void perform(entry.onRemove)
                   }}
+                  className={`flex h-7 shrink-0 items-center justify-center gap-1 border px-1.5 disabled:opacity-40 ${armed ? 'border-rose-300 bg-rose-600 text-white' : 'border-rose-800 text-rose-400'}`}
                 >
-                  Clear all
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setConfirmingClear(false)}>
-                  Cancel
-                </Button>
+                  {armed && <span className="text-[10px] font-semibold">Really?</span>}
+                  <X className="h-4 w-4" />
+                </button>
+                {entry.retry && (
+                  <button type="button" onClick={() => void perform(entry.retry!)} className="h-7 shrink-0 border border-orange-700 px-2 text-xs text-orange-400">
+                    Retry
+                  </button>
+                )}
               </div>
-            ) : (
-              <Button variant="link" size="xs" className="mt-1 justify-start text-destructive" onClick={() => setConfirmingClear(true)}>
-                Clear all
-              </Button>
-            ))}
+            )
+          })}
         </div>
       )}
-    </div>
+    </section>
   )
 }

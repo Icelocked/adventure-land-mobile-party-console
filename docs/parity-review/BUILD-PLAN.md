@@ -8,8 +8,8 @@
 - **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
-- **Phase 5:** I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 (this commit).
-- **Next:** Phase 5 (I6, I7, I8).
+- **Phase 5:** I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 (this commit).
+- **Next:** Phase 5 (I6, I7).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1242,6 +1242,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/character-detail/sections/AutoMarksSection.tsx` (`RuleEntry` gains `edits`/`retry`/`disabled`/`upgradeTarget`), `P/api/partyApi.ts` (`updateAutoUpgradeRule(owner, item, ruleKey, {tiers|quantity})`, `setAutoCompound(owner, name, targetTier, quantity)`).
 - **Endpoints:** `/command update-auto-upgrade-rule {ruleKey, tiers|quantity|remove}`, `/command auto-compound-mark {item:{name}, targetTier, quantity|remove}`.
 - **Dependencies:** P0-01, F1, F3, F7 #32.
+- **As built (ground rule 1):** like `inventory-panel.tsx`, the automatic-rule sections render only on the configured merchant, in the dashboard's order. Per-player NPC rules therefore show only as their tile banner, which matches the dashboard. Tapping a rule's sprite opens the item details sheet (the dashboard's `onSelect`). Offering rules are left to U1.
 
 ---
 
