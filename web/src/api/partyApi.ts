@@ -5,6 +5,9 @@ import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 export interface CommandResult {
   ok: boolean
   error?: string
+  // The whole parsed response - routes return extra fields the dashboard
+  // reads (occupants, missing, deliveriesRemoved, ...).
+  data?: Record<string, unknown>
 }
 
 // `status` is only present when the server actually answered (a real
@@ -12,10 +15,20 @@ export interface CommandResult {
 // response at all (network error, timeout, connection blocked). Callers
 // that need to tell "the server said no" apart from "I couldn't reach
 // the server" - see PairingGate's checkPaired - rely on this distinction.
-export type ApiResult<T> = { kind: 'success'; value: T } | { kind: 'failure'; message: string; status?: number }
+// `code` and `body` carry a rejection's own fields (query-actions.ts
+// PartyActionError.details) - e.g. code "auto_bank_confirmation_required",
+// or the `occupants` of a full stand.
+export type ApiResult<T> =
+  | { kind: 'success'; value: T }
+  | { kind: 'failure'; message: string; status?: number; code?: string; body?: Record<string, unknown> }
 
 const ok = <T>(value: T): ApiResult<T> => ({ kind: 'success', value })
-const fail = <T = never>(message: string, status?: number): ApiResult<T> => ({ kind: 'failure', message, status })
+const fail = <T = never>(message: string, status?: number, body?: Record<string, unknown>): ApiResult<T> => ({
+  kind: 'failure',
+  message,
+  status,
+  ...(body ? { body, code: typeof body.code === 'string' ? body.code : undefined } : {}),
+})
 
 // Bounded like the Android app's REST client (15s) - a request that
 // stalls after connecting (a network hiccup, a dropped Tailscale route)
@@ -123,8 +136,8 @@ function errorMessage(error: unknown): string {
 
 function parseCommandResult(text: string): CommandResult {
   try {
-    const parsed = JSON.parse(text) as Partial<CommandResult>
-    return { ok: parsed.ok ?? true, error: parsed.error }
+    const parsed = JSON.parse(text) as Record<string, unknown>
+    return { ok: (parsed.ok as boolean | undefined) ?? true, error: parsed.error as string | undefined, data: parsed }
   } catch {
     return { ok: true }
   }
@@ -211,7 +224,7 @@ export class PartyApiClient {
         const parsed = parseCommandResult(text)
         const message = parsed.error ?? `HTTP ${response.status}`
         resolveActionToast(toastId, 'failed', message)
-        return fail(message, response.status)
+        return fail(message, response.status, parsed.data)
       }
       const parsed = parseCommandResult(text)
       resolveActionToast(toastId, parsed.ok === false ? 'failed' : 'sent', parsed.error)
@@ -277,10 +290,11 @@ export class PartyApiClient {
   /** `/party-api/command` type "withdraw" - pulls one item out of the
    *  shared bank to a character's own bag. `pack` is the bank pack name,
    *  `slot` is that pack's slot index. */
-  async withdrawFromBank(character: string, item: Item, pack: string, slot: number, markAll = false): Promise<ApiResult<CommandResult>> {
-    const extra: Record<string, unknown> = { pack }
-    if (markAll) extra.markAll = true
-    return this.itemCommand('withdraw', character, item, slot, extra)
+  async withdrawFromBank(character: string, item: Item, pack: string, slot: number, markAll = false, removeAutoBankMark = false): Promise<ApiResult<CommandResult>> {
+    // bank-withdrawal.tsx: {character, type:'withdraw', pack, slot, item,
+    // markAll, removeAutoBankMark} - the last confirms dropping an
+    // automatic bank mark when the server asks (auto_bank_confirmation_required).
+    return this.post('command', { character, type: 'withdraw', pack, slot, item: { ...item }, markAll, removeAutoBankMark })
   }
 
   /** POST /party-api/merchant/stand - list an inventory item on the

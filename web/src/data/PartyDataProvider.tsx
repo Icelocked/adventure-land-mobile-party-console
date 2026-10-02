@@ -12,7 +12,7 @@ import type {
   GameLogEntry,
   InventoryEntry,
   MailSnapshot,
-  MonsterHuntStatus,
+  CharacterDiagnostics,
   PartyStateDynamic,
   RosterMember,
 } from '@/models'
@@ -204,8 +204,10 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       // cycle entirely - see refreshCatalogNow.
       const generation = ++dynamicStateGeneration.current
       const escapeStart = performance.now()
+      const escapeWallStart = Date.now()
       type CoreWire = Partial<PartyStateDynamic> & {
-        characterDetails?: Record<string, { monsterHunt?: MonsterHuntStatus | null }>
+        characterDetails?: Record<string, CharacterDiagnostics>
+        serverNow?: number
         characters?: Record<string, Pick<RosterMember, 'name' | 'ctype' | 'level' | 'server'>>
       }
       type LogsWire = {
@@ -241,7 +243,10 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       if (coreResult.kind === 'success' || bankResult.kind === 'success' || marketResult.kind === 'success' || logsResult.kind === 'success') {
         const coreRaw: CoreWire = coreResult.kind === 'success' ? coreResult.value : {}
         // bankbois: core only has item-less summaries; the bank section has the full entries.
-        const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, ...core } = coreRaw
+        const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, serverNow, ...core } = coreRaw
+        // live-metrics.ts synchronizeDashboardClock: offset from the midpoint of the round trip.
+        if (serverNow) queryClient.setQueryData(QK.serverOffset, serverNow - (escapeWallStart + Date.now()) / 2)
+        if (characterDetails) queryClient.setQueryData(QK.characterDiagnostics, characterDetails)
         if (summaries) {
           const roster = { ...rosterRef.current }
           for (const [name, summary] of Object.entries(summaries)) roster[name] = { ...roster[name], ...summary, name }
@@ -429,6 +434,17 @@ export const useCoreFetchDebug = (): CoreFetchDebug | null => useCachedValue(QK.
  *  would save empty defaults over the server's real values. */
 export const useConfigLoadedAt = (): number | null => useCachedValue(QK.configLoadedAt, null)
 export const useConfigLoaded = (): boolean => useConfigLoadedAt() !== null
+/** core's characterDetails for one character (active slots only). */
+export function useCharacterDiagnostics(name: string): CharacterDiagnostics | undefined {
+  return useCachedValue<Record<string, CharacterDiagnostics>>(QK.characterDiagnostics, {})[name]
+}
+/** query-cache.tsx presence: seen by the coordinator within the last 10s. */
+export function useCharacterOnline(name: string): boolean {
+  const seenAt = Number(useCharacterDiagnostics(name)?.seenAt || 0)
+  return Date.now() - seenAt < 10_000
+}
+/** Server clock minus this device's clock (live-metrics.ts serverOffset). */
+export const useServerOffset = (): number => useCachedValue(QK.serverOffset, 0)
 /** The configured merchant (config section) - the merchant ROLE. Never infer
  *  it from character class: bankbois and second merchants share the class. */
 export const useMerchantCharacter = (): string | null => useDynamicState().merchantCharacter ?? null

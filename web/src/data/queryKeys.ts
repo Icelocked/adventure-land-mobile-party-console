@@ -14,6 +14,10 @@ export const QK = {
   escape: ['escape'] as const,
   latencyMs: ['latencyMs'] as const,
   configLoadedAt: ['configLoadedAt'] as const,
+  // Per-character dashboard diagnostics (core's characterDetails) and the
+  // server clock offset - see PartyDataProvider's pollDynamicState.
+  characterDiagnostics: ['characterDiagnostics'] as const,
+  serverOffset: ['serverOffset'] as const,
   // Temporary diagnostic (see PartyDataProvider's refreshDynamicStateNow) -
   // tracks whether the big state?section=core fetch is actually landing
   // and what it reported, independent of whatever resolveFarmingContext/

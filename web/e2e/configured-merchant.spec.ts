@@ -40,3 +40,26 @@ test('Bankbois are not listed as party characters', async ({ page }) => {
   await expect(page.getByText('Patinder')).toBeVisible()
   await expect(page.getByText('Bankboi0')).toHaveCount(0)
 })
+
+test('Bank withdraw of an auto-bank-marked item asks to remove the mark, then retries with consent', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'ironore', level: 0, q: 5 } }] }
+  server.extraState = { autoItemMarks: { Patinder: { 'ironore@+0': 'bank' } } }
+  await server.install(page)
+  const bodies = postBodies(page, 'command')
+
+  await page.goto('/bank')
+  await page.getByText('Iron Ore').click()
+  await page.getByRole('button', { name: 'Mark for withdrawal' }).click()
+  const dialog = page.getByRole('group', { name: 'Remove automatic bank mark?' })
+  await expect(dialog).toBeVisible()
+  expect(bodies[0]).toMatchObject({ removeAutoBankMark: false })
+
+  await dialog.getByRole('button', { name: 'Confirm' }).click()
+  await expect.poll(() => bodies.length).toBe(2)
+  expect(bodies[1]).toMatchObject({ type: 'withdraw', removeAutoBankMark: true })
+  await expect.poll(() => server.withdrawals.Patinder?.length).toBe(1)
+})

@@ -289,6 +289,7 @@ function BankRow({
   // while the first is in flight would remove the mark it just added.
   const withdrawInFlight = useRef(false)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [confirmingWithdraw, setConfirmingWithdraw] = useState<'single' | 'all' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // A request matching the SAME {pack, slot} toggles the pending
@@ -325,12 +326,21 @@ function BankRow({
     await refreshNow()
   }
 
-  const withdraw = async (markAll: boolean) => {
+  const withdraw = async (markAll: boolean, confirmed = false) => {
     if (withdrawInFlight.current || !merchant) return
     withdrawInFlight.current = true
     setWithdrawing(true)
     try {
-      await run(() => api.withdrawFromBank(merchant, entry.item, pack, entry.slot, markAll))
+      const result = await api.withdrawFromBank(merchant, entry.item, pack, entry.slot, markAll, confirmed)
+      // bank-withdrawal.tsx: an automatic bank mark needs explicit consent.
+      if (result.kind === 'failure' && !confirmed && result.code === 'auto_bank_confirmation_required') {
+        setError(null)
+        setConfirmingWithdraw(markAll ? 'all' : 'single')
+        return
+      }
+      setConfirmingWithdraw(null)
+      setError(result.kind === 'failure' ? result.message : null)
+      await refreshNow()
     } finally {
       withdrawInFlight.current = false
       setWithdrawing(false)
@@ -470,6 +480,20 @@ function BankRow({
                 return null
               }}
             />
+          )}
+          {confirmingWithdraw && (
+            <div role="group" aria-label="Remove automatic bank mark?" className="my-1.5 flex flex-col gap-2 rounded-md border border-border p-2.5 pl-4">
+              <p className="text-sm font-medium">Remove automatic bank mark?</p>
+              <p className="text-xs text-muted-foreground">This item is automatically marked for bank. Allow withdrawal and remove mark?</p>
+              <div className="flex gap-2">
+                <Button size="sm" disabled={withdrawing} onClick={() => void withdraw(confirmingWithdraw === 'all', true)}>
+                  {withdrawing ? 'Withdrawing…' : 'Confirm'}
+                </Button>
+                <Button size="sm" variant="outline" disabled={withdrawing} onClick={() => setConfirmingWithdraw(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
           )}
           {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
         </>
