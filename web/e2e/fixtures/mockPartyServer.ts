@@ -732,6 +732,13 @@ export class MockPartyServer {
       this.lastOrder = { path, ...body }
       return { status: 200, json: { ok: true } }
     }
+    if (path === 'bankbois/create') {
+      const prefix = String(this.extraState.bankboiPrefix ?? 'Bankboi')
+      const existing = (this.extraState.bankbois as { name: string }[] | undefined) ?? []
+      const name = `${prefix}${existing.length}`
+      this.extraState = { ...this.extraState, bankbois: [...existing, { name, ctype: 'merchant', state: 'provisioning', items: [] }] }
+      return { status: 200, json: { ok: true, bankboi: { name } } }
+    }
     if (path === 'dashboard-preferences') {
       // Mirrors http/dashboard-import.ts preferences().
       const prefix = body.bankboiPrefix

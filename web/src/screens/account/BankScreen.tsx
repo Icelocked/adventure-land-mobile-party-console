@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { usePartyApi, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -91,6 +91,7 @@ export function BankScreen() {
           })}
         </div>
       )}
+      <BankboisSection catalogFor={catalogFor} matches={matches} onOpen={(pack, entry) => setOpened({ pack, entry })} />
       {opened && <BankItemPanel pack={opened.pack} entry={opened.entry} onClose={() => setOpened(null)} />}
     </AccountScreenScaffold>
   )
@@ -241,6 +242,121 @@ function AdditionalStorageSection() {
         </div>
       )}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </section>
+  )
+}
+
+/** bank-sheet.tsx "Bankbois": overflow storage workers - create one (the
+ *  first reserves 7 slots of bank pane 1, so it asks), each one's state,
+ *  load and error, its items (the same options as a bank item, on pack
+ *  bankboi:NAME), and a two-step delete once it's empty. */
+function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: string) => CatalogItem | undefined; matches: (entry: InventoryEntry) => boolean; onOpen: (pack: string, entry: InventoryEntry) => void }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const state = useDynamicState()
+  const bankbois = state.bankbois
+  const prefix = state.bankboiPrefix.trim()
+  const [busy, setBusy] = useState(false)
+  const [confirmFirst, setConfirmFirst] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const creating = useRef(false)
+
+  const create = async () => {
+    if (creating.current) return
+    creating.current = true
+    setBusy(true)
+    setResult(null)
+    const response = await api.createBankboi()
+    if (response.kind === 'failure') setResult({ ok: false, message: response.message || 'Bankboi creation failed' })
+    else {
+      setConfirmFirst(false)
+      const name = String((response.value.data?.bankboi as { name?: string } | undefined)?.name || 'bankboi')
+      setResult({ ok: true, message: `${name} created · provisioning queued` })
+      await refreshNow()
+    }
+    creating.current = false
+    setBusy(false)
+  }
+
+  return (
+    <section aria-label="Bankbois" className="mx-3 mb-3 flex flex-col gap-2 rounded-md border border-border bg-card p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Bankbois</p>
+          <p className="text-xs text-muted-foreground">Transparent overflow storage · {(state.bankboiQueue ?? []).length} staged or waiting</p>
+        </div>
+        <Button size="sm" disabled={busy || !prefix} onClick={() => (bankbois.length ? void create() : setConfirmFirst(true))}>
+          {busy ? 'Creating…' : 'Create bankboi'}
+        </Button>
+      </div>
+      {!prefix && <p role="alert" className="text-sm text-destructive">Set bankboi name in settings first</p>}
+      {confirmFirst && (
+        <div role="group" aria-label="Create first BankBoi?" className="flex flex-col gap-2 rounded-md border border-border p-2.5">
+          <p className="text-sm font-medium">Create first BankBoi?</p>
+          <p className="text-xs text-muted-foreground">This will reserve 7 slots from bank pane 1 for BankBoi logistics.</p>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmFirst(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={busy} onClick={() => void create()}>
+              {busy ? 'Creating…' : 'Create BankBoi'}
+            </Button>
+          </div>
+        </div>
+      )}
+      {result && (
+        <output className={`text-xs ${result.ok ? 'text-emerald-500' : 'text-destructive'}`}>
+          {result.ok ? 'Success: ' : 'Failed: '}
+          {result.message}
+        </output>
+      )}
+      {deleteError && <p role="alert" className="text-xs text-destructive">{deleteError}</p>}
+      {bankbois.length ? (
+        bankbois.map((bankboi) => {
+          const items = bankboi.items ?? []
+          const occupied = items.filter(Boolean).length
+          const empty = occupied === 0 && !Object.keys(bankboi.slots || {}).length && !Number(bankboi.gold)
+          const pack = `bankboi:${bankboi.name}`
+          return (
+            <div key={bankboi.name} className="rounded-md border border-border p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-mono text-sm">{bankboi.name}</span>
+                  <span className="ml-2 font-mono text-[10px] uppercase text-muted-foreground">
+                    {bankboi.transaction ? `${bankboi.transaction.mode} · ${bankboi.transaction.phase}` : bankboi.state}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">{occupied}/42</span>
+                  <Button
+                    size="xs"
+                    variant={deleting === bankboi.name ? 'destructive' : 'outline'}
+                    disabled={!empty}
+                    onClick={async () => {
+                      if (deleting !== bankboi.name) return setDeleting(bankboi.name)
+                      setDeleteError(null)
+                      const response = await api.deleteBankboi(bankboi.name)
+                      setDeleting(null)
+                      if (response.kind === 'failure') setDeleteError(response.message)
+                      else await refreshNow()
+                    }}
+                  >
+                    {deleting === bankboi.name ? 'Really? ×' : 'Delete'}
+                  </Button>
+                </div>
+              </div>
+              {bankboi.error && <p className="mt-1 text-xs text-destructive">{bankboi.error}</p>}
+              <div className="mt-2 flex flex-col gap-1">
+                {items.map((entry) => entry && <BankRow key={`${pack}:${entry.slot}`} entry={entry} pack={pack} catalogFor={catalogFor} dimmed={!matches(entry)} onOpen={() => onOpen(pack, entry)} />)}
+              </div>
+            </div>
+          )
+        })
+      ) : (
+        <p className="py-2 text-center text-xs text-muted-foreground">No bankbois yet. Reserved overflow cargo will wait safely until one is created.</p>
+      )}
     </section>
   )
 }
