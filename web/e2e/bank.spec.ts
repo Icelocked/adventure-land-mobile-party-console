@@ -70,3 +70,35 @@ test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as t
   await page.getByRole('button', { name: 'Clear all marks' }).click()
   await expect.poll(() => bodies.find((b) => b.body.type === 'clear-item-marks')?.body).toMatchObject({ character: 'Patinder', pack: 'items1', slot: 0 })
 })
+
+test('Bank storage: floors show access, key unlocks show owned count, gold unlocks confirm with the merchant and cost', async ({ page }) => {
+  const server = bankServer()
+  server.bankPacks = { ...server.bankPacks, items2: [] }
+  server.bankPacks.items1.push({ slot: 36, item: { name: 'basementkey', q: 1 } })
+  await server.install(page)
+  await page.route('**/party-api/state?*section=catalog*', async (route) => {
+    const json = server.stateSection('catalog', true) as Record<string, unknown>
+    json.bankVaults = [
+      { pack: 'items2', floor: 'bank', gold: 0 },
+      { pack: 'items3', floor: 'bank', gold: 75_000_000 },
+      { pack: 'items8', floor: 'bank_b', gold: 0, key: { id: 'basementkey', name: 'Basement Key' } },
+      { pack: 'items9', floor: 'bank_b', gold: 100_000_000 },
+    ]
+    await route.fulfill({ json })
+  })
+  const bodies = posts(page)
+
+  await page.goto('/bank')
+  const storage = page.getByRole('region', { name: 'Additional bank storage' })
+  await expect(storage.getByText('Main bank')).toBeVisible()
+  await expect(storage.getByText('Locked · requires Basement Key')).toBeVisible()
+  await expect(storage.getByText('Owned: 1')).toBeVisible()
+  await expect(storage.getByText('Vault purchases remain disabled until floor access is unlocked.')).toBeVisible()
+  // Gold vaults only on accessible floors.
+  await expect(storage.getByRole('button', { name: /Unlock items9/ })).toHaveCount(0)
+
+  await storage.getByRole('button', { name: /Unlock items3/ }).click()
+  await expect(storage.getByText('Patinder will spend 75,000,000 gold to permanently unlock items3.')).toBeVisible()
+  await storage.getByRole('button', { name: 'Confirm unlock' }).click()
+  await expect.poll(() => bodies.find((b) => b.path === 'bank/unlock')?.body).toEqual({ pack: 'items3', kind: 'gold' })
+})
