@@ -88,3 +88,25 @@ describe('orderCharacters (runtime/roster/character-order.ts)', () => {
     expect(orderCharacters(chars, [{ name: 'C' }, { name: 'B' }], null, null).map((c) => c.name)).toEqual(['C', 'B', 'A'])
   })
 })
+
+import { merchantJobLabel } from './merchantJobLabel'
+import { merchantPartyGroups } from './partyGroups'
+import { durationLabel } from './duration'
+
+describe('merchantJobLabel / merchantPartyGroups / durationLabel', () => {
+  it('labels jobs like the dashboard', () => {
+    expect(merchantJobLabel({ target: 'A', reason: 'restock' })).toBe('Party restock')
+    expect(merchantJobLabel({ target: 'A', reason: 'x', operationStage: 'retrieving' })).toBe('Bank retrieval')
+    expect(merchantJobLabel({ target: 'A', reason: 'join giveaway', seller: 'Gen', expectedItem: { name: 'gem0' } }, [{ id: 'gem0', name: 'Green Gem' }])).toBe("Join Gen's giveaway for Green Gem")
+    expect(merchantJobLabel({ target: 'A', reason: 'merchant commerce', order: { buys: [{ desiredLevel: 2 }] } })).toBe('Buy and upgrade')
+  })
+  it('groups followers under the leader, skipping the merchant and bankbois', () => {
+    expect(merchantPartyGroups({ leader: 'L', followers: { F: true }, merchantCharacter: 'M', bankbois: [{ name: 'B' }] }, ['F', 'L', 'S', 'M', 'B'])).toEqual([
+      { id: 'L', members: ['L', 'F'] },
+      { id: 'S', members: ['S'] },
+    ])
+  })
+  it('formats durations', () => {
+    expect([null, 0, 125_000, 3_600_500].map(durationLabel)).toEqual(['Active', 'Expiring', '2m 5s', '1h 1s'])
+  })
+})

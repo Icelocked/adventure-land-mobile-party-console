@@ -35,6 +35,6 @@ test('Merchant logistics: a freshly-deferred job (a couple retries, just started
   await server.install(page)
 
   await page.goto('/characters/Patinder')
-  await expect(page.getByText(/Now: restock/)).toBeVisible()
+  await expect(page.getByText(/Party restock/)).toBeVisible()
   await expect(page.getByText(/Stuck:/)).not.toBeVisible()
 })
