@@ -75,6 +75,8 @@ export class MockPartyServer {
   aldataListings: Record<string, unknown>[] = []
   pontyListings: Record<string, unknown>[] = []
   realmControl: Record<string, unknown> | null = null
+  merchantCurrent: Record<string, unknown> | null = null
+  merchantQueue: Record<string, unknown>[] = []
   upgradeOfferingRules: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   monsterFocusByCharacter: Record<string, string[]> = {}
@@ -154,6 +156,8 @@ export class MockPartyServer {
     return {
       bank: { gold: this.bankGold, packs: this.bankPacks },
       standListings: this.standListings,
+      merchantCurrent: this.merchantCurrent,
+      merchantQueue: this.merchantQueue,
       merchantCatalog: {
         // `meta.upgradeable`/`meta.compoundable` (read by itemFormulas'
         // itemMaximumLevel) are a separate nested field from the

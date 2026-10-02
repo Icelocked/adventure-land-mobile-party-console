@@ -17,6 +17,16 @@ export interface MerchantJob {
   phase?: string
   realmBlockedReason?: string
   realmRetryExhausted?: boolean
+  // Surfaced by merchant-scheduling.ts's own recovery/retry loop (confirmed
+  // against a live account: these fields already reach the client via
+  // projectMerchantJob, which only ever strips aldataKey - they just
+  // weren't modeled/shown before). A climbing recoveryAttempts with the
+  // same lastDeferredReason for several minutes means the job is
+  // genuinely stuck retrying, not just normally queued - see
+  // MerchantQueueSection's stuckJob().
+  recoveryAttempts?: number
+  lastDeferredReason?: string
+  firstDeferredAt?: number
 }
 
 /** One HP or MP auto-potion threshold - see restock-policy.tsx. */
