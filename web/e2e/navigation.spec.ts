@@ -45,3 +45,30 @@ test('Tapping an item opens its options list; Item details is one of the options
   await options.click()
   await expect(page.getByText('Sell to NPC', { exact: true })).toBeVisible()
 })
+
+test('Header: versions, party gold (bank + total) and the update indicator', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58, gold: 50_000 })
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, gold: 250_000 })
+  server.bankGold = 12_345_678
+  server.consoleUpdate = { current: '1.2.0', displayVersion: '1.2.0', available: true, phase: 'idle' }
+  await server.install(page)
+
+  await page.goto('/')
+  await expect(page.getByText('Game v830 · Console v1.2.0')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Party gold' })).toContainText('12.346m')
+  await expect(page.getByRole('button', { name: 'Party gold' })).toContainText('(12.646m total)')
+  await page.getByRole('button', { name: 'New version available' }).click()
+  await expect(page).toHaveURL(/\/settings$/)
+})
+
+test('Home: with no characters loaded, points to setup', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  await server.install(page)
+
+  await page.goto('/')
+  await expect(page.getByText(/No characters connected yet/)).toBeVisible()
+  await expect(page.getByRole('link', { name: 'open setup' })).toHaveAttribute('href', '/setup')
+})

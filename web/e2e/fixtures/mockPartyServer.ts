@@ -274,6 +274,9 @@ export class MockPartyServer {
       ponty: { listings: this.pontyListings },
       // A configured account always has a merchant (config section);
       // default to the first merchant-class character unless overridden.
+      // Core's activeSlots: one loaded slot per mock character.
+      activeSlots: this.characters.map((c, index) => ({ index, kind: 'headless', character: c.name, state: 'online' })),
+      gameVersion: 830,
       merchantCharacter: this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null),
       ...this.extraState,
     }
@@ -283,6 +286,9 @@ export class MockPartyServer {
    *  goldTargets, merchantCharacter, ...). Routed to its section exactly
    *  like a built-in field. */
   extraState: Record<string, unknown> = {}
+
+  /** GET /console-update (tools/update): null = service unavailable. */
+  consoleUpdate: Record<string, unknown> | null = { current: '1.2.0', displayVersion: '1.2.0', available: false, phase: 'idle' }
 
   /** undefined = the first merchant-class character (see dynamicState). */
   merchantCharacter: string | null | undefined = undefined
@@ -946,6 +952,9 @@ export class MockPartyServer {
       if (route.request().method() !== 'GET') return route.fallback()
       return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length } })
     })
+    await page.route('**/console-update', (route) =>
+      this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
+    )
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
     await page.route('**/party-api/dashboard-stream', async (route) => {
       const base = await this.startSseServer()

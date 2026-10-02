@@ -50,3 +50,28 @@ describe('automaticCommerceRuleKey (automatic-commerce-rule-key.tsx)', () => {
     expect(automaticCommerceRuleKey({ name: 'bow', level: -2, stat_type: 'dex' })).toBe('{"name":"bow","level":0,"p":null,"stat_type":"dex"}')
   })
 })
+
+import { abbreviatedGold, goldTotals, partyGoldNames } from './gold'
+
+describe('abbreviatedGold / partyGoldNames / goldTotals (abbreviated-gold.tsx, party-gold.tsx)', () => {
+  it('abbreviates like the dashboard header', () => {
+    expect([99_999, 100_000, 12_345_678, 2_500_000_000].map(abbreviatedGold)).toEqual(['99,999', '100.0K', '12.346m', '2.500b'])
+  })
+  it('counts only loaded, non-bankboi slots', () => {
+    const names = partyGoldNames({
+      activeSlots: [
+        { index: 0, character: 'A', state: 'online' },
+        { index: 1, character: 'B', state: 'offline' },
+        { index: 2, character: 'C', state: 'online' },
+        { index: 3, character: null, state: 'empty' },
+      ],
+      bankbois: [{ name: 'C', state: 'idle' }],
+    })
+    expect(names).toEqual(['A'])
+  })
+  it('is unknown while any balance is unknown', () => {
+    expect(goldTotals(100, [1, 2])).toEqual({ carried: 3, total: 103 })
+    expect(goldTotals(100, [1, undefined])).toEqual({ carried: null, total: null })
+    expect(goldTotals(null, [1])).toEqual({ carried: 1, total: null })
+  })
+})

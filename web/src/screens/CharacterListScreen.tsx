@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { CloudOff, Menu, RefreshCw } from 'lucide-react'
-import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded } from '@/data/PartyDataProvider'
 import { AccountMenu } from '@/screens/character-detail/AccountMenu'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
+import { PartyGold } from '@/components/PartyGold'
+import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import type { BestiaryMonster, CharacterState } from '@/models'
 
 /** Party overview - ported from ui/characterlist/CharacterListScreen.kt:
@@ -25,14 +27,38 @@ export function CharacterListScreen() {
   // use-party-console.tsx chars: bankbois get their own cards, not party ones.
   const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
   const names = Object.keys(characters).filter((name) => !bankboiNames.has(name))
-  const accountGold = (dynamicState.bank?.gold ?? 0) + Object.values(characters).reduce((sum, c) => sum + (c.vitals?.gold ?? 0), 0)
+  const updates = useConsoleUpdates().state
+  const navigate = useNavigate()
+  const settings = useServerSettings()
+  // party-workspace.tsx's empty states.
+  const configLoaded = useConfigLoaded()
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h1 className="text-lg font-semibold">Party</h1>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">Party</h1>
+            {/* console-updates.tsx ConsoleUpdateIndicator */}
+            {updates?.available && (
+              <button
+                type="button"
+                aria-label="New version available"
+                title="New version available"
+                onClick={() => navigate('/settings')}
+                className="inline-flex size-5 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white"
+              >
+                !
+              </button>
+            )}
+          </div>
+          {/* party-header.tsx version line */}
+          <span className="block font-mono text-[10px] text-muted-foreground">
+            {dynamicState.gameVersion ? `Game v${dynamicState.gameVersion} · ` : ''}Console {updates ? `v${updates.displayVersion || updates.current}` : 'loading…'}
+          </span>
+        </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span>{accountGold.toLocaleString()}g</span>
+          <PartyGold />
           <LatencyBadge />
           {!connected && <CloudOff className="size-4" aria-label="Disconnected" />}
           <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
@@ -50,7 +76,19 @@ export function CharacterListScreen() {
 
       {names.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-          <p className="text-muted-foreground">{connected ? 'No characters online yet.' : 'Connecting...'}</p>
+          {!configLoaded ? (
+            <p className="text-muted-foreground">Party Console is loading…</p>
+          ) : !connected ? (
+            <p className="text-muted-foreground">Reconnecting to Party Console…</p>
+          ) : (
+            <p className="text-muted-foreground">
+              No characters connected yet. Load a character or{' '}
+              <a className="text-primary underline" href={`${settings.baseUrl.replace(/\/+$/, '')}/setup`}>
+                open setup
+              </a>{' '}
+              to link Steam.
+            </p>
+          )}
         </div>
       ) : (
         <ul className="flex flex-col gap-2 p-3">

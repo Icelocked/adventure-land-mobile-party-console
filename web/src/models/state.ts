@@ -701,6 +701,8 @@ export interface PartyStateDynamic {
   characterAppearances?: Record<string, { skin?: string; characterSprite?: unknown; characterDollHtml?: string; updatedAt: number }>
   accountId?: string | null
   referenceRevision?: string
+  // Core's bank gold (null until the bank has been seen).
+  bankGold?: number | null
   // Giveaways
   giveawayRealms?: { key: string; label: string }[]
   giveawayPlayers?: Record<string, string[]>

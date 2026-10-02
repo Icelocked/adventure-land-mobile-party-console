@@ -38,7 +38,8 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await expect(page.getByText('Warriorname')).toBeVisible()
   await expect(page.getByText('Priestname')).toBeVisible()
   await expect(page.getByText('Merchantina')).toBeVisible()
-  await expect(page.getByText('3,600g')).toBeVisible() // account total: 1000+500+2000+100 bank
+  // party-gold.tsx total: 1000+500+2000 carried + 100 bank
+  await expect(page.getByRole('button', { name: 'Party gold' })).toContainText('(3,600 total)')
 
   // 2. Drill into Warriorname, start (but don't finish) editing their
   // monster focus, then get pulled away to Priestname mid-task - exactly
