@@ -60,10 +60,10 @@ describe('abbreviatedGold / partyGoldNames / goldTotals (abbreviated-gold.tsx, p
   it('counts only loaded, non-bankboi slots', () => {
     const names = partyGoldNames({
       activeSlots: [
-        { index: 0, character: 'A', state: 'online' },
-        { index: 1, character: 'B', state: 'offline' },
-        { index: 2, character: 'C', state: 'online' },
-        { index: 3, character: null, state: 'empty' },
+        { index: 0, kind: 'headless', character: 'A', state: 'online' },
+        { index: 1, kind: 'headless', character: 'B', state: 'offline' },
+        { index: 2, kind: 'headless', character: 'C', state: 'online' },
+        { index: 3, kind: 'headless', character: null, state: 'empty' },
       ],
       bankbois: [{ name: 'C', state: 'idle' }],
     })
@@ -73,5 +73,18 @@ describe('abbreviatedGold / partyGoldNames / goldTotals (abbreviated-gold.tsx, p
     expect(goldTotals(100, [1, 2])).toEqual({ carried: 3, total: 103 })
     expect(goldTotals(100, [1, undefined])).toEqual({ carried: null, total: null })
     expect(goldTotals(null, [1])).toEqual({ carried: 1, total: null })
+  })
+})
+
+import { orderCharacters } from './characterOrder'
+
+describe('orderCharacters (runtime/roster/character-order.ts)', () => {
+  it('puts the primary first, then Steam, then headless, merchants last', () => {
+    const chars = [{ name: 'M', ctype: 'merchant' }, { name: 'H', ctype: 'ranger' }, { name: 'S', ctype: 'mage' }, { name: 'P', ctype: 'priest' }]
+    expect(orderCharacters(chars, [], 'P', 'M', ['S']).map((c) => c.name)).toEqual(['P', 'S', 'H', 'M'])
+  })
+  it('breaks ties by roster order, then name', () => {
+    const chars = [{ name: 'B' }, { name: 'A' }, { name: 'C' }]
+    expect(orderCharacters(chars, [{ name: 'C' }, { name: 'B' }], null, null).map((c) => c.name)).toEqual(['C', 'B', 'A'])
   })
 })

@@ -148,6 +148,18 @@ function parseCommandResult(text: string): CommandResult {
  *  PartyApiClient.kt 1:1 - every command shape here was verified against
  *  the real coordinator source this project's whole way through; add a
  *  typed method here as each new screen needs one rather than guessing. */
+/** steam-client-setup.ts, verbatim: carry this browser's saved launcher
+ *  choices (set on the console's setup page) to the local launcher. */
+function steamClientSetup(body: Record<string, unknown>): Record<string, unknown> {
+  if (typeof localStorage === 'undefined') return body
+  try {
+    const setup = JSON.parse(localStorage.getItem('party-connection-setup') || 'null')
+    return setup ? { ...body, clientSetup: { placement: setup.placement, client: setup.client } } : body
+  } catch {
+    return body
+  }
+}
+
 export class PartyApiClient {
   private readonly settings: ServerSettings
 
@@ -252,6 +264,32 @@ export class PartyApiClient {
    *  needs. */
   async sendCommand(character: string, fields: Record<string, unknown>): Promise<ApiResult<CommandResult>> {
     return this.post('command', { character, ...fields })
+  }
+
+  /** use-party-console.tsx spawn (headless): load a roster member into an empty slot. */
+  async spawnSlot(slot: number, character: string): Promise<ApiResult<CommandResult>> {
+    return this.post(`slots/${slot}/spawn`, { character })
+  }
+
+  /** use-party-console.tsx logout (headless slot). */
+  async logoutSlot(slot: number): Promise<ApiResult<CommandResult>> {
+    return this.post(`slots/${slot}/logout`, {})
+  }
+
+  /** POST /steam/action - login (join Steam), primary (become/switch the
+   *  Steam primary view), headless (leave Steam, keep running), logout. */
+  async steamAction(character: string | null, action: 'login' | 'primary' | 'headless' | 'logout'): Promise<ApiResult<CommandResult>> {
+    return this.post('steam/action', steamClientSetup({ character, action }))
+  }
+
+  /** POST /steam/recover - recover a failed Steam handoff once characters are offline. */
+  async steamRecover(): Promise<ApiResult<CommandResult>> {
+    return this.post('steam/recover', {})
+  }
+
+  /** POST /roster/create - create (and spawn) a new character. */
+  async createCharacter(name: string, ctype: string, look: number): Promise<ApiResult<CommandResult>> {
+    return this.post('roster/create', { name, class: ctype, look })
   }
 
   /** inventory-panel.tsx's merchant "Go home": returns the merchant to its

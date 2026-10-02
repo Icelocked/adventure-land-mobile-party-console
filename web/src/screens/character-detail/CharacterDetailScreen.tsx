@@ -20,6 +20,8 @@ import { GoldTargetSection } from './sections/GoldTargetSection'
 import { AutoMarksSection } from './sections/AutoMarksSection'
 import { LuckySlotSection } from './sections/LuckySlotSection'
 import { AccountMenu } from './AccountMenu'
+import { SessionControls } from '@/components/SessionControls'
+import { PartyGold } from '@/components/PartyGold'
 import { ItemActionPanel, type ItemActionTarget } from '@/screens/itempanel/ItemActionPanel'
 
 /** Character focus screen: a sticky vitals header (never scrolls out of
@@ -43,7 +45,6 @@ export function CharacterDetailScreen() {
   const resolvedTargetType = useTargetMonsterType(name, vitals?.target)
   const farming = resolveFarmingContext(dynamicState, name)
   const others = Object.keys(characters).filter((n) => n !== name)
-  const accountGold = (dynamicState.bank?.gold ?? 0) + Object.values(characters).reduce((sum, c) => sum + (c.vitals?.gold ?? 0), 0)
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col">
@@ -51,9 +52,12 @@ export function CharacterDetailScreen() {
         <Button variant="ghost" size="icon-sm" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="size-5" />
         </Button>
-        <span className="font-medium">{name}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium">{name}</span>
+          <SessionControls name={name} />
+        </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>{accountGold.toLocaleString()}g</span>
+          <PartyGold />
           <LatencyBadge />
           <Button variant="ghost" size="icon-sm" onClick={() => void refreshNow()} aria-label="Refresh">
             <RefreshCw className="size-4" />
@@ -86,7 +90,6 @@ export function CharacterDetailScreen() {
           <VitalsHeader
             name={name}
             vitals={vitals}
-            accountGold={accountGold}
             bestiaryCatalog={dynamicState.bestiaryCatalog}
             resolvedTargetType={resolvedTargetType}
           />

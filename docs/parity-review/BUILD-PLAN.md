@@ -5,7 +5,8 @@
 - **Phase 1:**
   - **Shipped:** F1 `f3a0d7e`, F2 + F3 `f080eb1`, F4 `9a232b4`, the item-options redesign `bcfcd1f`, F6 + F7 test setup `7cdcbbf`, F8 `873f4e9`.
   - **Built with their consumer packages:** the remaining F5 primitives and F7 ports.
-- **Next:** Phase 2 (R1, R2, S1).
+- **Phase 2:** complete - R2 `50d0bb9`, S1 `29e991c`, R1 (this commit).
+- **Next:** Phase 3 (M1, M2, M3, M9).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.

@@ -15,7 +15,7 @@ export function partyGoldNames(state: Pick<PartyStateDynamic, 'activeSlots' | 'b
   return [
     ...new Set(
       (state.activeSlots || [])
-        .filter((slot) => slot.character && !['empty', 'offline', 'failed'].includes(String(slot.state)))
+        .filter((slot) => slot.character && !['empty', 'offline', 'failed'].includes(slot.state))
         .map((slot) => slot.character!),
     ),
   ].filter((name) => !excluded.has(name))

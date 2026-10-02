@@ -691,13 +691,13 @@ export interface PartyStateDynamic {
   // dashboard does where the shape is simple; `unknown` where it imports a
   // deep runtime type - the package that renders a field ports its shape.
   // Roster, slots, session
-  activeSlots?: { index: number; kind?: string; character?: string | null; primary?: boolean; [field: string]: unknown }[]
-  characterConnections?: unknown[]
-  steamSwitch?: unknown
+  activeSlots?: ActiveSlot[]
+  characterConnections?: CharacterConnection[]
+  steamSwitch?: SteamSwitch | null
   bankboiTransaction?: { bankboi: string; phase: string; mode: string } | null
   gameVersion?: number
   classChoices?: string[]
-  appearanceChoices?: Record<string, unknown[]>
+  appearanceChoices?: Record<string, AppearanceChoice[]>
   characterAppearances?: Record<string, { skin?: string; characterSprite?: unknown; characterDollHtml?: string; updatedAt: number }>
   accountId?: string | null
   referenceRevision?: string
@@ -1001,4 +1001,41 @@ export interface CharacterDiagnostics {
   anniversaryVisit?: unknown
   anniversaryState?: unknown
   [field: string]: unknown
+}
+
+/** active-slot.tsx */
+export interface ActiveSlot {
+  index: number
+  kind: 'native' | 'headless'
+  primary?: boolean
+  character: string | null
+  state: 'empty' | 'starting' | 'online' | 'stopping' | 'offline' | 'failed'
+}
+
+/** steam-switch.tsx - a Steam handoff in progress. */
+export interface SteamSwitch {
+  from: string | null
+  target: string | null
+  startedAt: number
+  timedOut: boolean
+  phase?: 'awaiting-realm-choice' | 'preparing' | 'release' | 'confirm-release' | 'navigate' | 'complete' | 'failed'
+  error?: string | null
+}
+
+/** runtime/roster/connection-status.ts CharacterConnection. */
+export interface CharacterConnection {
+  name: string
+  primary?: boolean
+  error?: string | null
+  since: number
+  seenAt: number
+  status: 'loading' | 'code' | 'stopped' | 'waiting' | 'connected' | 'lost'
+  delayed: boolean
+}
+
+/** appearance-choice.tsx - one of a class's starting looks. */
+export interface AppearanceChoice {
+  index: number
+  html?: string | null
+  layers?: unknown[]
 }

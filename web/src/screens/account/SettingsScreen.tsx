@@ -133,6 +133,12 @@ export function SettingsScreen() {
 
         <AppUpdateSection />
 
+        {dynamicState.steamSwitch?.phase === 'failed' && (
+          // party-inventory-panels.tsx: offered while a Steam handoff has failed.
+          <Button variant="outline" onClick={() => void api.steamRecover()}>
+            Recover Steam handoff after characters are offline
+          </Button>
+        )}
         {dynamicState.realmControl && <RealmSection control={dynamicState.realmControl} />}
 
         <div className="text-sm font-medium">Characters</div>
