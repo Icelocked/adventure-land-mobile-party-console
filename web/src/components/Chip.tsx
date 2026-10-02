@@ -9,6 +9,7 @@ export function Chip({ selected, onClick, children, disabled }: { selected: bool
     <button
       type="button"
       disabled={disabled}
+      aria-pressed={selected}
       onClick={onClick}
       className={cn(
         'shrink-0 rounded-full border px-3 py-1 text-sm transition disabled:opacity-50',

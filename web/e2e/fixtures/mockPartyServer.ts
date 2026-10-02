@@ -351,6 +351,16 @@ export class MockPartyServer {
       delete this.failOnce[path]
       return { status: 409, json: { ok: false, error } }
     }
+    if (path === 'formation') {
+      // Mirrors http/formation.ts: `leader` is only touched when the key is
+      // present (null clears it), `follow` only when `character` is sent.
+      if (body.leader !== undefined) this.leader = body.leader === null ? null : String(body.leader)
+      if (body.character !== undefined && body.follow !== undefined) {
+        if (typeof body.follow !== 'boolean') return { status: 400, json: { error: 'invalid follower' } }
+        this.followers = { ...this.followers, [String(body.character)]: body.follow }
+      }
+      return { status: 200, json: { ok: true, leader: this.leader, followers: this.followers } }
+    }
     if (path === 'merchant/auto-npc-sale') {
       // A rule on the configured merchant's OWN inventory is the
       // merchant's account-wide rule (character omitted); a rule on

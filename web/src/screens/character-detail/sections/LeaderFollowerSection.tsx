@@ -4,10 +4,9 @@ import { SectionCard } from '../SectionCard'
 import type { PartyStateDynamic } from '@/models'
 
 /** Ports party-workspace.tsx's leader RadioGroup + per-card follow
- *  Checkbox into two independent tap targets - both call the same POST
- *  /party-api/formation. Tapping "Leader" while already leader clears it
- *  (formation's leader field is name-or-null); tapping "Follow" just
- *  flips this character's own follow flag. */
+ *  Checkbox into two independent tap targets on POST /party-api/formation.
+ *  "Leader" sends only {leader} (a radio - tapping the current leader does
+ *  nothing, as on the dashboard); "Follow" sends only {character, follow}. */
 export function LeaderFollowerSection({ characterName, dynamicState }: { characterName: string; dynamicState: PartyStateDynamic }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -20,7 +19,8 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         <Chip
           selected={isLeader}
           onClick={async () => {
-            await api.setFormation(isLeader ? null : characterName, characterName, isFollowing)
+            if (isLeader) return
+            await api.setLeader(characterName)
             await refreshNow()
           }}
         >
@@ -29,7 +29,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         <Chip
           selected={isFollowing}
           onClick={async () => {
-            await api.setFormation(dynamicState.leader ?? null, characterName, !isFollowing)
+            await api.setFollow(characterName, !isFollowing)
             await refreshNow()
           }}
         >

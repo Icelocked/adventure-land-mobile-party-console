@@ -215,11 +215,18 @@ export class PartyApiClient {
     return this.post('command', body)
   }
 
-  /** POST /party-api/formation - leader is the party leader's name (or
-   *  null to clear it), independent of follow, this character's own
-   *  follow-the-leader toggle. */
-  async setFormation(leader: string | null, character: string, follow: boolean): Promise<ApiResult<CommandResult>> {
-    return this.post('formation', { character, follow, leader })
+  /** POST /party-api/formation {leader} - mirrors party-workspace.tsx's
+   *  leader RadioGroup. The server only touches `leader` when the key is
+   *  present (formation.ts), so this must never be sent with a follow
+   *  change. */
+  async setLeader(leader: string): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { leader })
+  }
+
+  /** POST /party-api/formation {character, follow} - mirrors
+   *  connected-character-card.tsx's Follow checkbox. */
+  async setFollow(character: string, follow: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { character, follow })
   }
 
   /** POST /party-api/restock - one character's HP/MP auto-potion
