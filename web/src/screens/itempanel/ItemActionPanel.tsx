@@ -147,7 +147,7 @@ export function ItemActionPanel({
   )
 }
 
-function TapRow({ label, onClick }: { label: string; onClick: () => void }) {
+export function TapRow({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="w-full rounded-md py-2 text-left text-sm hover:bg-accent">
       {label}
@@ -413,7 +413,7 @@ function EquipmentActions({
  *  (this panel's tap-only pattern has no context-menu submenu equivalent)
  *  - one row per achievable target tier, "+N → +N+tiers" with the scroll
  *  gold cost, instead of silently always marking a single tier. */
-function UpgradeTierPicker({ meta, level, onPick }: { meta: ItemMeta | undefined; level: number; onPick: (tiers: number) => void }) {
+export function UpgradeTierPicker({ meta, level, onPick }: { meta: ItemMeta | undefined; level: number; onPick: (tiers: number) => void }) {
   const max = Math.max(0, itemMaximumLevel(meta) - level)
   if (max <= 0) return null
   return (

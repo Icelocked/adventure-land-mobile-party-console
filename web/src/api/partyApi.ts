@@ -339,11 +339,20 @@ export class PartyApiClient {
   /** `/party-api/command` type "withdraw" - pulls one item out of the
    *  shared bank to a character's own bag. `pack` is the bank pack name,
    *  `slot` is that pack's slot index. */
-  async withdrawFromBank(character: string, item: Item, pack: string, slot: number, markAll = false, removeAutoBankMark = false): Promise<ApiResult<CommandResult>> {
+  async withdrawFromBank(
+    character: string,
+    item: Item,
+    pack: string,
+    slot: number,
+    markAll = false,
+    removeAutoBankMark = false,
+    upgradeTiers?: number,
+  ): Promise<ApiResult<CommandResult>> {
     // bank-withdrawal.tsx: {character, type:'withdraw', pack, slot, item,
     // markAll, removeAutoBankMark} - the last confirms dropping an
     // automatic bank mark when the server asks (auto_bank_confirmation_required).
-    return this.post('command', { character, type: 'withdraw', pack, slot, item: { ...item }, markAll, removeAutoBankMark })
+    // upgradeTiers: bank "Mark for upgrade" withdraws the item to upgrade it (party-inventory-panels.tsx onBankUpgrade).
+    return this.post('command', { character, type: 'withdraw', pack, slot, item: { ...item }, markAll, ...(upgradeTiers ? { upgradeTiers } : {}), removeAutoBankMark })
   }
 
   /** POST /party-api/merchant/stand - list an inventory item on the

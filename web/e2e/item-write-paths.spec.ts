@@ -83,8 +83,9 @@ test('Stand: bank "Mark all for stand" sends markAll', async ({ page }) => {
 
   await page.goto('/bank')
   await page.getByText('Iron Ore').first().click()
-  await page.getByRole('button', { name: 'Mark all for stand' }).click()
-  await expect(page.getByRole('checkbox', { name: /Mark all for stand/ })).toBeChecked()
+  await page.getByRole('button', { name: 'Mark for stand', exact: true }).click()
+  // stand dialog: "Mark all for stand" lists every identical copy.
+  await page.getByRole('checkbox', { name: /Mark all for stand/ }).check()
   await page.getByRole('button', { name: 'List', exact: true }).click()
 
   await expect.poll(() => bodies.length).toBe(1)
