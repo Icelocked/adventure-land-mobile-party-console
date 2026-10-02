@@ -873,3 +873,44 @@ export interface GameLogEntry {
 export interface PartyStateGameLogs {
   gameLogs: Record<string, GameLogEntry[]>
 }
+
+/** One character's entry in core's `characterDetails` - the allow-list in
+ *  runtime/coordinator/telemetry/public-state-characters.ts
+ *  (diagnosticCharacters). Only present for characters in active slots, so
+ *  a missing field means "unknown", never 0. */
+export interface CharacterDiagnostics {
+  name?: string
+  ctype?: string
+  server?: string
+  level?: number
+  seenAt?: number
+  ping?: number
+  owner?: string | number
+  skin?: string
+  characterSprite?: unknown
+  characterDollHtml?: string
+  primaryStat?: string
+  attack?: number
+  frequency?: number
+  range?: number
+  speed?: number
+  unrestrictedSpeed?: number
+  armor?: number
+  resistance?: number
+  str?: number
+  int?: number
+  dex?: number
+  vit?: number
+  fortitude?: number
+  luck?: number
+  goldBonus?: number
+  xpBonus?: number
+  combatStats?: Record<string, unknown>
+  monsterHunt?: MonsterHuntStatus | null
+  monsterAchievements?: unknown
+  monsterAchievementKills?: unknown
+  tracktrix?: unknown
+  anniversaryVisit?: unknown
+  anniversaryState?: unknown
+  [field: string]: unknown
+}

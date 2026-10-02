@@ -616,6 +616,10 @@ export class MockPartyServer {
     if (path === 'command' && body.type === 'withdraw') {
       const character = String(body.character)
       const item = body.item as MockItem
+      // transfer-commands.ts: an automatically bank-marked item needs consent.
+      const autoMarks = (this.extraState.autoItemMarks as Record<string, Record<string, string>> | undefined)?.[character]
+      if (autoMarks?.[`${item.name}@+${item.level ?? 0}`] === 'bank' && body.removeAutoBankMark !== true)
+        return { status: 409, json: { ok: false, error: 'Item is automatically marked for bank', code: 'auto_bank_confirmation_required' } }
       const pending = (this.withdrawals[character] ??= [])
       if (body.markAll === true) {
         this.forEachMatchingBankItem(item.name, (pack, slot, matchedItem) => {
