@@ -13,6 +13,9 @@ interface RuleEntry {
   key: string
   item: Item
   detail?: string | null
+  // A running mark can't be removed; a blocked one can be retried (inventory-panel.tsx).
+  disabled?: boolean
+  onRetry?: () => Promise<unknown>
   onRemove: () => Promise<unknown>
 }
 
@@ -43,14 +46,40 @@ export function AutoMarksSection({
   const npcScope = characterName === dynamicState.merchantCharacter || dynamicState.merchantRules ? undefined : characterName
   const npcEntries: RuleEntry[] = Object.entries(dynamicState.autoNpcSales)
     .filter(([, rule]) => (npcScope === undefined ? rule.character == null : rule.character === characterName))
-    .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(npcScope, rule.item, true) }))
+    .map(([key, rule]): RuleEntry => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(npcScope, rule.item, true) }))
+    // inventory-panel.tsx: plus every manual NPC-sale mark, by id.
+    .concat(
+      isMerchant
+        ? dynamicState.npcSaleMarks.map((mark) => ({
+            key: mark.id,
+            item: mark.item,
+            detail: `${mark.character || dynamicState.merchantCharacter} · ${mark.quantity} × · ${mark.state || 'queued'}${mark.error ? ` · ${mark.error}` : ''}`,
+            disabled: mark.state === 'running',
+            onRemove: () => api.removeNpcSaleMark(mark.character || characterName, mark.id),
+          }))
+        : [],
+    )
   const clearNpc = () => api.clearAllAutoNpcSales(npcScope)
 
   const deconEntries: RuleEntry[] = Object.entries(dynamicState.autoDeconstruction[owner] ?? {}).map(([key, rule]) => ({
     key,
     item: rule.item,
+    detail: 'Automatic',
     onRemove: () => api.autoDeconstruct(characterName, rule.item, true),
   }))
+  // inventory-panel.tsx: plus every pending deconstruction mark.
+  const deconMarks: RuleEntry[] = isMerchant
+    ? dynamicState.deconstructionMarks
+        .filter((mark) => mark.state !== 'complete')
+        .map((mark) => ({
+          key: mark.id,
+          item: mark.item,
+          detail: `${mark.owner} · ${mark.quantity} × · ${mark.state}${mark.error ? ` · ${mark.error}` : ''}`,
+          disabled: mark.state === 'running',
+          onRetry: mark.state === 'blocked' ? () => api.retryDeconstructionMark(mark.owner || characterName, mark.id) : undefined,
+          onRemove: () => api.removeDeconstructionMark(mark.owner || characterName, mark.id, mark.slot, mark.item),
+        }))
+    : []
   // No bulk route for deconstruction (mark-commands.ts has one for bank/merchant marks, compound-
   // commands.ts for upgrades/compounds, automatic-sales.ts for npc/stand - deconstruction doesn't) -
   // inventory-panel.tsx's own clearAutomaticSection loops the existing per-rule remove the same way.
@@ -107,7 +136,7 @@ export function AutoMarksSection({
   return (
     <SectionCard title="Automatic rules">
       <AutoRuleGroup title="Auto NPC sales" entries={npcEntries} catalogFor={catalogFor} onClearAll={clearNpc} />
-      <AutoRuleGroup title="Auto deconstruction" entries={deconEntries} catalogFor={catalogFor} onClearAll={clearDecon} />
+      <AutoRuleGroup title="Auto deconstruction" entries={[...deconEntries, ...deconMarks]} catalogFor={catalogFor} onClearAll={clearDecon} />
       {isMerchant && (
         <>
           <AutoRuleGroup title="Auto stand marks" entries={standEntries} catalogFor={catalogFor} onClearAll={clearStand} />
@@ -152,10 +181,23 @@ function AutoRuleGroup({
                 {entry.item.level != null ? ` +${entry.item.level}` : ''}
                 {entry.detail ? ` · ${entry.detail}` : ''}
               </span>
+              {entry.onRetry && (
+                <Button
+                  variant="link"
+                  size="xs"
+                  onClick={async () => {
+                    await entry.onRetry!()
+                    await refreshNow()
+                  }}
+                >
+                  Retry
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Remove"
+                disabled={entry.disabled}
                 onClick={async () => {
                   await entry.onRemove()
                   await refreshNow()

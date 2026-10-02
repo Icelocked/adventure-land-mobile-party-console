@@ -536,6 +536,11 @@ export class MockPartyServer {
       else this.autoNpcSales[key] = { item, ...(character ? { character } : {}) }
       return { status: 200, json: { ok: true } }
     }
+    if (path === 'merchant/npc-sale' && body.remove && body.id) {
+      // npc-sale.ts: a manual mark removed by id.
+      this.npcSaleMarks = this.npcSaleMarks.filter((mark) => mark.id !== body.id)
+      return { status: 200, json: { ok: true } }
+    }
     if (path === 'merchant/npc-sale' && !body.remove) {
       // Mirrors npc-sale.ts's validate(): the merchant's own items can
       // never use source "character" (that's rejected server-side with
@@ -600,6 +605,12 @@ export class MockPartyServer {
           quantity: Number(body.quantity) || 1,
         })
       }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'deconstruction/mark' && body.id) {
+      // deconstruction-commands: retry or remove a pending mark by id.
+      if (body.remove) this.deconstructionMarks = this.deconstructionMarks.filter((mark) => mark.id !== body.id)
+      else if (body.retry) this.deconstructionMarks = this.deconstructionMarks.map((mark) => (mark.id === body.id ? { ...mark, state: 'collecting' } : mark))
       return { status: 200, json: { ok: true } }
     }
     if (path === 'deconstruction/mark' && body.pack) {

@@ -6,6 +6,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { StandListingForm } from '@/components/StandListingForm'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
+import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type InventoryEntry } from '@/models'
 import { TapRow, UpgradeTierPicker } from './ItemActionPanel'
@@ -36,6 +37,13 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   const standFull = state.standListings.length >= 16
   const canUpgrade = !!merchant && !item.l && !(item as { b?: unknown }).b && !!meta?.upgradeable && itemMaximumLevel(meta) > level
 
+  const confirmWith = async (action: () => Promise<ApiResult<CommandResult>>) => {
+    const result = await action()
+    if (result.kind === 'failure') return result.message
+    await refreshNow()
+    onClose()
+    return null
+  }
   const run = async (action: () => Promise<ApiResult<CommandResult>>) => {
     setError(null)
     const result = await action()
@@ -147,8 +155,28 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
 
           {canDeconstruct(item, state.deconstructionCatalog) && merchant && (
             <>
-              <TapRow label="Mark for deconstruction" onClick={() => void run(() => api.markBankItemForDeconstruction(item, pack, entry.slot, false))} />
-              <TapRow label="Auto mark for deconstruction" onClick={() => void run(() => api.autoDeconstruct(merchant, item))} />
+              <TapRow label="Mark for deconstruction" onClick={() => toggle('decon')} />
+              {expanded === 'decon' && (
+                <DeconstructionConfirmation
+                  item={item}
+                  auto={false}
+                  catalog={state.deconstructionCatalog}
+                  catalogFor={catalogFor}
+                  onCancel={() => setExpanded(null)}
+                  onConfirm={() => confirmWith(() => api.markBankItemForDeconstruction(item, pack, entry.slot, false))}
+                />
+              )}
+              <TapRow label="Auto mark for deconstruction" onClick={() => toggle('autodecon')} />
+              {expanded === 'autodecon' && (
+                <DeconstructionConfirmation
+                  item={item}
+                  auto
+                  catalog={state.deconstructionCatalog}
+                  catalogFor={catalogFor}
+                  onCancel={() => setExpanded(null)}
+                  onConfirm={() => confirmWith(() => api.autoDeconstruct(merchant, item))}
+                />
+              )}
             </>
           )}
 
@@ -170,7 +198,17 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
             />
           )}
           {/* party-inventory-panels.tsx onBankAutoNpcSale: the rule is created for the merchant. */}
-          {merchant && !item.l && <TapRow label="Auto sell to NPC…" onClick={() => void run(() => api.autoNpcSale(merchant, item))} />}
+          {merchant && !item.l && <TapRow label="Auto sell to NPC…" onClick={() => toggle('autonpc')} />}
+          {merchant && expanded === 'autonpc' && (
+            <AutoNpcSaleConfirmation
+              item={item}
+              meta={meta}
+              name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
+              character={merchant}
+              onCancel={() => setExpanded(null)}
+              onConfirm={() => confirmWith(() => api.autoNpcSale(merchant, item))}
+            />
+          )}
 
           {merchant && (
             <TapRow

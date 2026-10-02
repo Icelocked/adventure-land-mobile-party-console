@@ -189,12 +189,13 @@ test('ItemActionPanel: marking an item for deconstruction shows a badge on its i
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 0 }] })
   server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
   // inventory-panel.tsx only offers deconstruction for catalogued items.
-  server.deconstructionCatalog = { wcoat: { compound: false } }
+  server.deconstructionCatalog = { wcoat: { compound: false, rewards: [{ name: 'leather', quantity: 1, chance: 1 }] } }
   await server.install(page)
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
   await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
+  await page.getByRole('group', { name: 'Mark for deconstruction?' }).getByRole('button', { name: 'Mark for deconstruction' }).click()
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('Deconstruction')
 })
