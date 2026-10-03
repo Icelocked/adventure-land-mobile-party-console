@@ -11,6 +11,7 @@ export const QK = {
   dynamicState: ['dynamicState'] as const,
   mail: ['mail'] as const,
   gameLogs: ['gameLogs'] as const,
+  logsError: ['logsError'] as const,
   escape: ['escape'] as const,
   latencyMs: ['latencyMs'] as const,
   configLoadedAt: ['configLoadedAt'] as const,

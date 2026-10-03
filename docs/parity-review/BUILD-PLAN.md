@@ -13,8 +13,8 @@
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
 - **Phase 9:** C4 `af3e32a`, C6 `8b86631` (done before C5 because the cave map builds on it), C5 `2fe1cf4`.
-- **Phase 10:** X1 `a9e2549`, C9 `ed25876`, I9 (this commit).
-- **Next:** Phase 10 (S2, S3).
+- **Phase 10:** X1 `a9e2549`, C9 `ed25876`, I9 `d717c92`, S3 (this commit).
+- **Next:** Phase 10 (S2).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1736,6 +1736,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/log-sidebar.tsx`, `RT/game-log-filters.ts`.
 - **PWA files:** `P/screens/account/LogsScreen.tsx`.
 - **Dependencies:** F7 #1, F8, F2 (`seenAt`).
+- **As built:** `LogsScreen` ("Live logs") is `log-sidebar.tsx` as a screen with the verbatim `lib/gameLogFilters.ts`: Game/Dashboard tabs, category toggles persisted in `party-log-filters`, the source select (anniversary activity included), the character filter (live ∪ log names ∪ bankbois), the status line (the logs fetch now records failures as `QK.logsError`; offline uses diagnostics `seenAt`), coloured rows with errors in red, the latest 1,000 in order with auto-follow.
 
 
 ---

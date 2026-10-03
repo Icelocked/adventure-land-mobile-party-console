@@ -207,6 +207,8 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
 
     const logs = async () => {
       const result = await section<LogsWire>('logs')
+      // log-sidebar.tsx: a failed refresh keeps the retained logs and says so.
+      queryClient.setQueryData(QK.logsError, result.kind !== 'success')
       if (result.kind !== 'success') return
       const { combatLogs, merchantActivity, gameLogs } = result.value
       mergeState({ ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}) })
@@ -467,6 +469,7 @@ export const useRoster = (): Record<string, RosterMember> => useCachedValue(QK.r
 export const useDynamicState = (): PartyStateDynamic => useCachedValue(QK.dynamicState, emptyPartyStateDynamic())
 export const useMail = (): MailSnapshot => useCachedValue(QK.mail, { messages: [], count: 0 })
 export const useGameLogs = (): Record<string, GameLogEntry[]> => useCachedValue(QK.gameLogs, {})
+export const useLogsError = (): boolean => useCachedValue(QK.logsError, false)
 export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.escape, null)
 /** Round-trip time of the smallest request in the last dynamic-state poll
  *  cycle (see refreshDynamicStateNow) - null until the first poll lands. */

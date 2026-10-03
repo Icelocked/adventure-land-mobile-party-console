@@ -144,6 +144,9 @@ export class MockPartyServer {
   skillCatalog: Record<string, unknown>[] = []
   combatLogs: Record<string, unknown[]> = {}
   merchantActivity: Record<string, unknown>[] = []
+  // section=logs gameLogs (game-log-filters.ts GameLog per character); failLogs makes the logs section fail.
+  gameLogs: Record<string, Record<string, unknown>[]> = {}
+  failLogs = false
   merchantRoutinePriorities: Record<string, number> = {}
   merchantAutomations: Record<string, boolean> = {}
   gatheringModes: string[] = []
@@ -347,7 +350,7 @@ export class MockPartyServer {
       return { characters: Object.fromEntries(this.characters.map((c) => [c.name, { items: (c.items ?? []).map((item, slot) => (item ? { slot, item } : null)), slots: c.slots ?? {} }])) }
     if (section === 'bank') return { ...pick(full, BANK_FIELDS), ...(dashboard ? { bankbois: full.bankbois ?? [] } : {}) }
     if (section === 'market') return pick(full, MARKET_FIELDS)
-    if (section === 'logs') return { gameLogs: {}, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }
+    if (section === 'logs') return { gameLogs: this.gameLogs, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }
     if (section === 'core') {
       if (!dashboard) return omit(full, [...CATALOG_FIELDS])
       const core = omit(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS, ...CATALOG_FIELDS, 'bank', 'ponty', 'combatLogs', 'merchantActivity', 'standPriceHistory'])
@@ -1060,6 +1063,7 @@ export class MockPartyServer {
         return route.fulfill({ status: 302, headers: { Location: '/setup' } })
       }
       if (section === 'config' && this.configDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.configDelayMs))
+      if (section === 'logs' && this.failLogs) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
       return route.fulfill({ json: this.stateSection(section, dashboard) })
     })
     await page.route('**/party-api/mail**', (route) => {
