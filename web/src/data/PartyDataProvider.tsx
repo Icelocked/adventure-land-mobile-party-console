@@ -112,6 +112,8 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   const interest = useRef<Record<string, number>>({})
   const lastAccountId = useRef<string | null>(null)
   const lastReferenceRevision = useRef<string | null>(null)
+  // The market domain's aldata (with listings) - wins over core's stripped copy.
+  const marketAldata = useRef<PartyStateDynamic['aldata']>(null)
   const catalogLoaded = useRef(false)
 
   const fetchers = useMemo(() => {
@@ -156,6 +158,10 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       const characterHunt = characterDetails
         ? Object.fromEntries(Object.entries(characterDetails).map(([name, detail]) => [name, detail.monsterHunt ?? null]))
         : undefined
+      // use-panel-model.ts lays the market domain over core, so core's
+      // aldata (listings/trades/buyOrders stripped) never replaces the
+      // market's copy once that has loaded.
+      if (marketAldata.current) patch.aldata = marketAldata.current
       mergeState({ ...patch, ...(characterHunt ? { characterHunt } : {}) })
       // query-cache.tsx keys the catalog by core's referenceRevision.
       if (patch.referenceRevision && patch.referenceRevision !== lastReferenceRevision.current) {
@@ -175,6 +181,23 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
         for (const member of rosterList) roster[member.name] = member
         applyRoster(roster)
       }
+    }
+
+    // query-cache.tsx market domain: before core's first referenceRevision
+    // it reads GET /aldata/market alone; afterwards the market section.
+    const market = async () => {
+      if (!lastReferenceRevision.current) {
+        const result = await api.getJson<PartyStateDynamic['aldata']>('aldata/market')
+        if (result.kind === 'success' && result.value) {
+          marketAldata.current = result.value
+          mergeState({ aldata: result.value })
+        }
+        return
+      }
+      const result = await section<Partial<PartyStateDynamic>>('market')
+      if (result.kind !== 'success') return
+      if (result.value.aldata) marketAldata.current = result.value.aldata
+      mergeState(result.value)
     }
 
     const simple = (name: string) => async () => {
@@ -275,7 +298,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       core: singleFlight(core),
       config: singleFlight(config),
       bank: singleFlight(simple('bank')),
-      market: singleFlight(simple('market')),
+      market: singleFlight(market),
       logs: singleFlight(logs),
       mail: singleFlight(mail),
       escape: singleFlight(escape),

@@ -893,16 +893,22 @@ export class PartyApiClient {
   /** POST /party-api/merchant/aldata-order - buys from one ALData public
    *  listing. Server only reads the listing's `key` plus the desired
    *  quantity; it must still exist and be fresh (<120s old). */
-  async buyAlData(listing: MarketListing, buyQuantity: number): Promise<ApiResult<CommandResult>> {
+  async buyAlData(listing: MarketListing | Record<string, unknown>, buyQuantity: number): Promise<ApiResult<CommandResult>> {
     // use-party-console.tsx buyALDataListing: the listing as received.
-    const { origin: _origin, ...wire } = listing
+    const { origin: _origin, groupedListings: _grouped, ...wire } = listing as Record<string, unknown>
     return this.post('merchant/aldata-order', { listing: wire, buyQuantity })
+  }
+
+  /** POST /party-api/merchant/aldata-sale - use-party-console.tsx
+   *  sellALDataOrder: sell owned copies into a live ALData buy order. */
+  async sellAlData(order: Record<string, unknown>, sellQuantity: number): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/aldata-sale', { order, sellQuantity })
   }
 
   /** POST /party-api/merchant/ponty-order - `keys` lets the server
    *  combine several Ponty listings into one purchase; this app always
    *  buys a single listing. */
-  async buyPonty(listing: MarketListing): Promise<ApiResult<CommandResult>> {
+  async buyPonty(listing: { key?: string; keys?: string[]; quantity: number; unitPrice?: number }): Promise<ApiResult<CommandResult>> {
     // use-party-console.tsx buyPontyListing: the whole listing.
     return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
   }

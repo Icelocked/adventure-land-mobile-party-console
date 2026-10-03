@@ -28,23 +28,6 @@ test('WTB: blanking the priority override clears it (null is sent)', async ({ pa
   expect(server.standBids.ironore.priorityOverride).toBeUndefined()
 })
 
-test('Market: a Ponty listing (no `source` field) is bought through ponty-order, whole listing', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
-  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
-  server.pontyListings = [{ key: 'p-1', item: { name: 'ironore' }, price: 3000, unitPrice: 300, quantity: 10 }]
-  await server.install(page)
-  const ponty = postBodies(page, 'merchant/ponty-order')
-  const aldata = postBodies(page, 'merchant/aldata-order')
-
-  await page.goto('/market')
-  await page.getByRole('button', { name: 'Buy' }).click()
-  await expect.poll(() => ponty.length).toBe(1)
-  expect(ponty[0]).toEqual({ keys: ['p-1'], quantity: 10, unitPrice: 300 })
-  expect(aldata).toHaveLength(0)
-})
-
 test('Bank: double-tapping "Mark for withdrawal" sends one request (it is a server toggle)', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

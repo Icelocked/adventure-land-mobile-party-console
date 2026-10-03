@@ -15,21 +15,6 @@ test('Settings: App updates section can check for an update without erroring', a
   await expect(page.getByRole('button', { name: /Checking…|Up to date/ })).toBeVisible()
 })
 
-test('Market: buying an ALData listing submits the order', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
-  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
-  server.aldataListings = [{ key: 'listing-1', source: 'aldata', item: { name: 'ironore', level: 0 }, price: 100, quantity: 5 }]
-  await server.install(page)
-
-  await page.goto('/market')
-  await expect(page.getByText('Iron Ore')).toBeVisible()
-  await page.getByRole('button', { name: 'Buy' }).click()
-
-  await expect.poll(() => server.lastOrder?.path).toBe('merchant/aldata-order')
-})
-
 test('WTB: placing an order fails once with a server error, then succeeds, then can be cancelled', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

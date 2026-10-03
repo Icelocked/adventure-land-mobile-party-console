@@ -9,8 +9,8 @@
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
-- **Phase 6:** M7 `cb447c3`, M5 `c734242`, M4 (this commit).
-- **Next:** Phase 6 (M6, M8).
+- **Phase 6:** M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 (this commit).
+- **Next:** Phase 6 (M8).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1312,6 +1312,13 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/account/MarketScreen.tsx` (tabs), `P/lib/market.ts`, `P/api/partyApi.ts` (`sellAlData(order, sellQuantity)`).
 - **Endpoints:** `POST /merchant/aldata-order {listing, buyQuantity}`, `/merchant/aldata-sale {order, sellQuantity}`, `/merchant/ponty-order {keys, quantity, unitPrice}`; state `aldata.listings/buyOrders/trades/error/merchantsUpdatedAt/auth`, `ponty`, `merchantBlacklist`, `autoBlacklistMerchants`, `bankGold`.
 - **Dependencies:** P0-19, F3, F5, F7 #42, M7 (Make/Add to WTB), M5 ("List").
+- **As built:**
+  - The market logic is ported verbatim to `lib/market.ts`: deal values, grouping, filters, blacklist, ownership and Ponty groups.
+  - Confirmations render inline under their row.
+  - "Make WTB" and classifieds' "Add to WTB" open the WTB dialog for that item and level, the same end point as the dashboard's WTB orders "Add".
+  - "List" and "Add to stand" open the stand form at the WTB price.
+  - **Data-layer fix (ground rule 1):** `use-panel-model.ts` lays the market domain over core, so core's `aldata` (listings/trades/buyOrders stripped) no longer replaces the market's copy. Before core's first `referenceRevision`, the market reads `GET /aldata/market` as `query-cache.tsx` does.
+  - The PWA-only player-stand search (A409, EXTRA) was removed per ground rule 3.
 
 #### M7 — WTB orders (M)
 - **Rows:** A410, A412–A417, A420–A422.

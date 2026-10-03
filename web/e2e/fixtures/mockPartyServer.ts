@@ -352,6 +352,8 @@ export class MockPartyServer {
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
         serverNow: Date.now(),
         bankGold: this.bankGold,
+        // public-state.ts core: the catalog's reference revision.
+        referenceRevision: 'mock',
       }
     }
     return full
@@ -752,6 +754,7 @@ export class MockPartyServer {
       path === 'merchant/order' ||
       path === 'merchant/exchange-order' ||
       path === 'merchant/aldata-order' ||
+      path === 'merchant/aldata-sale' ||
       path === 'merchant/ponty-order' ||
       path === 'merchant/stand-order' ||
       path === 'merchant/send-mail'
@@ -1004,6 +1007,8 @@ export class MockPartyServer {
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
     )
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
+    // aldata-routes.ts market(): the full ALData market state.
+    await page.route('**/party-api/aldata/market', (route) => route.fulfill({ json: (this.stateSection('market', true) as Record<string, unknown>).aldata ?? {} }))
     await page.route('**/party-api/dashboard-stream', async (route) => {
       const base = await this.startSseServer()
       return route.continue({ url: `${base}/dashboard-stream` })
