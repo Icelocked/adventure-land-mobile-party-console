@@ -39,7 +39,7 @@ test('Stand: listing a stack defaults to the whole stack at the item value', asy
   await page.getByRole('button', { name: 'Mark for stand', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Stand price' })).toHaveValue('6400')
   await expect(page.getByRole('textbox', { name: 'Stand quantity' })).toHaveValue('200')
-  await page.getByRole('button', { name: 'List', exact: true }).click()
+  await page.getByRole('group', { name: 'Merchant stand listing' }).getByRole('button', { name: 'Mark for stand' }).click()
 
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toMatchObject({ slot: 0, item: { name: 'cscroll1', q: 200 }, price: 6400, quantity: 200, markAll: false, remove: false })
@@ -61,7 +61,7 @@ test('Stand: removing a live listing sends its id, and editing a bank listing ke
   const rows = page.locator('div.rounded-md', { hasText: 'Iron Ore' })
   await rows.nth(1).getByRole('button', { name: 'Edit price' }).click()
   await page.getByRole('textbox', { name: 'Stand price' }).fill('450')
-  await page.getByRole('button', { name: 'List', exact: true }).click()
+  await page.getByRole('group', { name: 'Merchant stand listing' }).getByRole('button', { name: 'Mark for stand' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toMatchObject({ id: 'bank-1', bankPack: 'items1', slot: 7, price: 450, quantity: 4 })
 
@@ -86,7 +86,7 @@ test('Stand: bank "Mark all for stand" sends markAll', async ({ page }) => {
   await page.getByRole('button', { name: 'Mark for stand', exact: true }).click()
   // stand dialog: "Mark all for stand" lists every identical copy.
   await page.getByRole('checkbox', { name: /Mark all for stand/ }).check()
-  await page.getByRole('button', { name: 'List', exact: true }).click()
+  await page.getByRole('group', { name: 'Merchant stand listing' }).getByRole('button', { name: 'Mark for stand' }).click()
 
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toMatchObject({ bankPack: 'items1', markAll: true })

@@ -123,7 +123,7 @@ test('Bank: marking for stand shows as already-marked and can be unmarked', asyn
   await page.getByText('Iron Ore').click()
   await page.getByRole('button', { name: 'Mark for stand', exact: true }).click()
   await page.getByRole('textbox', { name: 'Stand price' }).fill('100')
-  await page.getByRole('button', { name: 'List' }).click()
+  await page.getByRole('group', { name: 'Merchant stand listing' }).getByRole('button', { name: 'Mark for stand' }).click()
 
   await expect.poll(() => server.standListings.length).toBe(1)
   await expect(page.getByText('Stand', { exact: true })).toBeVisible()

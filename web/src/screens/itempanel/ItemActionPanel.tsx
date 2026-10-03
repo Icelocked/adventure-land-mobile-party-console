@@ -351,9 +351,10 @@ function InventoryActions({
           {expanded === 'stand' && (
             <StandListingForm
               item={item}
-              itemValue={meta?.definition.g as number | undefined}
+              meta={meta}
               existing={standListing}
-              onSubmit={({ price, quantity, markAll }) => run(() => api.markForStand(item, slot, price, { id: standListing?.id, quantity, markAll }))}
+              onCancel={() => onExpand(null)}
+              onSubmit={({ price, quantity, markAll }) => confirmWith(() => api.markForStand(item, slot, price, { id: standListing?.id, quantity, markAll }))}
             />
           )}
         </>
@@ -365,9 +366,10 @@ function InventoryActions({
             <StandListingForm
               auto
               item={item}
-              itemValue={meta?.definition.g as number | undefined}
+              meta={meta}
               existing={state.autoStandMarks[automaticSaleKey] as { price?: number } | undefined}
-              onSubmit={({ price }) => run(() => api.autoStand(item, price))}
+              onCancel={() => onExpand(null)}
+              onSubmit={({ price }) => confirmWith(() => api.autoStand(item, price))}
             />
           )}
         </>
