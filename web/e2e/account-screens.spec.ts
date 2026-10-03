@@ -208,12 +208,16 @@ test('Stand: Remove drops a listing', async ({ page }) => {
   await server.install(page)
 
   await page.goto('/stand')
-  await expect(page.getByText('Iron Ore')).toBeVisible()
-  await page.getByRole('button', { name: 'Remove' }).click()
+  // Not in a live trade slot yet: it shows under "Queued sales for stand".
+  await expect(page.getByRole('region', { name: 'Queued sales for stand' }).getByText('Iron Ore')).toBeVisible()
+  const remove = page.getByRole('button', { name: 'Remove Iron Ore from stand' })
+  await remove.click()
   // stand-sheet.tsx: the second tap confirms.
-  await page.getByRole('button', { name: 'Really remove?' }).click()
+  await expect(remove).toContainText('Really remove?')
+  await remove.click()
 
-  await expect(page.getByText('Nothing listed on the stand.')).toBeVisible()
+  await expect(page.getByText('No sale items are occupying stand slots.')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Queued sales for stand' })).toHaveCount(0)
 })
 
 test('ALData Prepare mail opens the mail composer with the auth draft (use-party-console.tsx setMailDraft)', async ({ page }) => {

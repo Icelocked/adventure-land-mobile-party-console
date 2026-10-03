@@ -32,6 +32,8 @@ export interface CharacterVitals {
   farmingMode?: string
   conditions?: Condition[]
   inventorySize?: number
+  // live-protocol liveFields: whether the merchant's stand is open.
+  standOpen?: boolean
 }
 
 /** The character's carried items + what's equipped - arrives/updates

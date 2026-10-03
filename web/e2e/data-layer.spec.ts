@@ -15,8 +15,10 @@ test('An action refreshes the domains it touches right away (query-actions.ts)',
   await expect(page.getByText('Iron Ore')).toBeVisible()
   await page.waitForTimeout(500)
   const marketBefore = count(server, 'market')
-  await page.getByRole('button', { name: 'Remove' }).click()
-  await page.getByRole('button', { name: 'Really remove?' }).click()
+  const remove = page.getByRole('button', { name: 'Remove Iron Ore from stand' })
+  await remove.click()
+  await expect(remove).toContainText('Really remove?')
+  await remove.click()
   // merchant/stand is a "commerce" action: market refreshes immediately, not on its 10s timer.
   await expect.poll(() => count(server, 'market'), { timeout: 3_000 }).toBeGreaterThan(marketBefore)
 })
