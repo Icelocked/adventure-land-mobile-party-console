@@ -232,11 +232,11 @@ test('Hunt settings: Clear all requires confirmation before it actually clears t
 
   await page.getByRole('button', { name: 'Clear all' }).click()
   // A confirmation step must appear - the blacklist is not cleared yet.
-  await expect(page.getByText('Really clear all?')).toBeVisible()
+  await expect(page.getByText(/^Remove all \d+ blacklisted monsters for /)).toBeVisible()
   await expect(page.getByText('osnake')).toBeVisible()
 
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.getByText('Really clear all?')).not.toBeVisible()
+  await expect(page.getByText(/^Remove all \d+ blacklisted monsters for /)).not.toBeVisible()
   await expect(page.getByText('osnake')).toBeVisible()
 
   await page.getByRole('button', { name: 'Clear all' }).click()

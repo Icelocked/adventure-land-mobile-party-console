@@ -780,8 +780,17 @@ export class PartyApiClient {
 
   /** POST /party-api/hunt-settings - a partial patch (only send the
    *  fields changing; server merges over the existing settings). */
-  async saveHuntSettings(character: string, patch: Partial<{ relocateIfCompeting: boolean; blacklistDeaths: boolean; deathThreshold: number; blacklistExpirations: boolean; expirationThreshold: number }>): Promise<ApiResult<CommandResult>> {
+  async saveHuntSettings(
+    character: string,
+    patch: Partial<{ relocateIfCompeting: boolean; blacklistDeaths: boolean; deathThreshold: number; blacklistExpirations: boolean; expirationThreshold: number; preferredSpawns: Record<string, string> }>,
+  ): Promise<ApiResult<CommandResult>> {
     return this.post('hunt-settings', { ...patch, character })
+  }
+
+  /** POST /party-api/rare-hunting - connected-character-card.tsx onRareChange:
+   *  passive hunting rules and/or the field-generator toggle (party-wide). */
+  async setRareHunting(patch: { rules?: Record<string, Record<string, unknown>>; useFieldGenerators?: boolean }): Promise<ApiResult<CommandResult>> {
+    return this.post('rare-hunting', patch)
   }
 
   /** use-party-console.tsx saveStandBid, verbatim body: priorityOverride is

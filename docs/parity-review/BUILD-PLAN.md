@@ -10,8 +10,8 @@
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
-- **Phase 7:** C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 (this commit).
-- **Next:** Phase 7 (C2).
+- **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
+- **Next:** Phase 8.
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1403,6 +1403,18 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/character-detail/sections/FarmingSection.tsx`, `P/screens/account/HuntSettingsScreen.tsx` (now per character), new `PassiveHuntingScreen.tsx`, `P/api/partyApi.ts` (`setRareHunting`, hunt-settings `preferredSpawns`).
 - **Endpoints:** `POST /hunt-settings {…, preferredSpawns, character}`, `POST /hunt-blacklist {action:'add', monsterId, character}`, `POST /rare-hunting {useFieldGenerators} | {rules}`; state `passiveHunting`, `passiveRareHunts`, `monsterHunt.backup/turnIn`.
 - **Dependencies:** P0-01, P0-07, F7 #17/#20/#21/#23, X1 (monster details).
+- **As built (ground rule 2):**
+  - The farming card has the badge and the full Hunt status block. A separate "Fighting" line remains.
+  - The Hunt settings screen hosts the dashboard's settings-dialog content:
+    - the blacklist, with labels and the clear-all confirmation;
+    - the "Add to Hunt blacklist" picker;
+    - preferred hunt spawns;
+    - passive hunting (field generators plus the rule table).
+  - `passive-settings.ts`, `huntSpawnKey` and `huntBlacklistLabel` are ported verbatim in `lib/hunting.ts`.
+  - Not yet built:
+    - tapping a blacklisted monster for details (X1);
+    - the spawn map preview (C6);
+    - the dashboard's radius control in the settings dialog. The radius stays in the PWA's focus form.
 
 #### C3 — Focus priorities and farming-area routing (M)
 - **Rows:** A151–A155, A157.

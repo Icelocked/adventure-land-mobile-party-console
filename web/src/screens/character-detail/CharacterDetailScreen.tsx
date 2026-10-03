@@ -139,7 +139,6 @@ export function CharacterDetailScreen() {
                 position={{ map: vitals.map, x: vitals.x, y: vitals.y }}
                 target={vitals.target}
                 resolvedTargetType={resolvedTargetType}
-                conditions={vitals.conditions}
                 monsterHunt={farming.hunt}
                 characterHunt={dynamicState.characterHunt[name] ?? null}
                 huntBlacklist={farming.blacklist}
