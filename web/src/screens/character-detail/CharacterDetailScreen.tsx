@@ -101,7 +101,6 @@ export function CharacterDetailScreen() {
             <TravelSection
               characterName={name}
               isMerchant={isMerchant}
-              isLeader={dynamicState.leader === name}
               travelPlaces={dynamicState.travelPlaces}
             />
             {/* Merchant-class characters can't run hunts (farming-scope.ts) - a class capability, not the merchant role. */}

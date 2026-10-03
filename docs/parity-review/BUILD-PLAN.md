@@ -10,7 +10,8 @@
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
-- **Next:** Phase 7.
+- **Phase 7:** C8 `ee9986c`, C7 (this commit).
+- **Next:** Phase 7 (C1, C3, C2).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1428,6 +1429,10 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/character-travel-dialog.tsx`, `inventory-panel.tsx:1278-1297`, `escape-control.tsx`, `use-party-console.tsx:426-446, 720-736`.
 - **PWA files:** `P/screens/character-detail/sections/TravelSection.tsx`, `P/screens/CharacterListScreen.tsx:67-102`.
 - **Dependencies:** F3, F8 (escape cadence), F2 (leader presence).
+- **As built (ground rule 1):**
+  - On the leader, Return to leader is shown disabled (not hidden), as `inventory-panel.tsx`'s `leaderOnline` does.
+  - The travel dialog renders inline. Escape labels match `escape-control.tsx`.
+  - The in-dungeon "exit dungeon" escape variant goes with daily dungeons (C5).
 
 #### C8 — Per-character combat log (S)
 - **Rows:** A167, A168.
@@ -1436,6 +1441,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** new `P/screens/character-detail/sections/CombatLogSection.tsx`, `P/api/partyApi.ts` (`clearCombatLog(character)`).
 - **Endpoints:** `GET /state?section=logs` (`combatLogs[name]`), `POST /combat-log/:character/clear {}`.
 - **Dependencies:** F8 (logs fetched while visible).
+- **As built:** a collapsed section on the character screen. The logs domain is polled at the fast rate only while it is open.
 
 ---
 

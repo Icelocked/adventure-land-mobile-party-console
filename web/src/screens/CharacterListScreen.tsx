@@ -169,11 +169,24 @@ function PartyControls() {
 
   const running = !!escape && !['complete', 'failed-hold', 'released'].includes(escape.stage)
   const failed = !!error || (!!escape && escape.stage !== 'released' && (!!escape.error || escape.stage === 'failed-hold'))
-  const label = failed ? 'Escape · failed' : escape?.stage === 'complete' ? 'Escape · success' : 'Escape'
+  // escape-control.tsx labels.
+  const label = failed ? 'Escape - failed' : escape?.stage === 'complete' ? 'Escape - success' : 'Escape'
+  const [townError, setTownError] = useState<string | null>(null)
 
   return (
-    <div className="flex gap-2 px-3 pt-3">
-      <Button variant="outline" size="sm" className="flex-1" onClick={() => void api.sendPartyToTown()}>
+    <div className="px-3 pt-3">
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="flex-1"
+        onClick={async () => {
+          setTownError(null)
+          const result = await api.sendPartyToTown()
+          // use-party-console.tsx townParty: "Party town request failed".
+          if (result.kind === 'failure') setTownError(result.message || 'Party town request failed')
+        }}
+      >
         Send party to town
       </Button>
       <Button
@@ -193,6 +206,12 @@ function PartyControls() {
         {(busy || running) && <span className="mr-2 size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
         {label}
       </Button>
+    </div>
+      {(townError || error) && (
+        <p role="alert" className="mt-1 text-sm text-destructive">
+          {townError || error}
+        </p>
+      )}
     </div>
   )
 }
