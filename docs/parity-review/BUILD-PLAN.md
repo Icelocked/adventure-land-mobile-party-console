@@ -13,8 +13,8 @@
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
 - **Phase 9:** C4 `af3e32a`, C6 `8b86631` (done before C5 because the cave map builds on it), C5 `2fe1cf4`.
-- **Phase 10:** X1 (this commit).
-- **Next:** Phase 10 (I9, C9, S2, S3).
+- **Phase 10:** X1 `a9e2549`, C9 (this commit).
+- **Next:** Phase 10 (I9, S2, S3).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1692,6 +1692,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/skills-dialog.tsx`, `skill-range-label.tsx`.
 - **PWA files:** `P/screens/account/SkillsScreen.tsx`.
 - **Dependencies:** F7 #18/#48.
+- **As built:** `SkillsScreen` is `skills-dialog.tsx` as a screen (search across class and skill, per-class sprite grid with id and range); the detail pane is a sheet ("G.skills.id", explanation, range explainer, the shared `components/DefinitionGrid.tsx`). `lib/skillRange.ts` is the verbatim `skill-range-label.tsx`.
 
 #### S2 — Settings and console management (L)
 - **Rows:** A012, A056–A059, A062, A066–A070.
