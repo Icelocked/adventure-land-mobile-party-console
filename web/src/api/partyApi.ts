@@ -19,6 +19,17 @@ export interface CommandResult {
 // `code` and `body` carry a rejection's own fields (query-actions.ts
 // PartyActionError.details) - e.g. code "auto_bank_confirmation_required",
 // or the `occupants` of a full stand.
+/** wtb-preferences.tsx WTBOptions. */
+export type WtbOptions = {
+  editField?: 'price' | 'quantity' | 'priorityOverride'
+  value?: number | null
+  bidRevision?: number
+  preferencesOnly?: boolean
+  useStandSlot?: boolean
+  acceptHigherLevels?: boolean
+  replaceStandEntry?: string
+}
+
 export type ApiResult<T> =
   | { kind: 'success'; value: T }
   | { kind: 'failure'; message: string; status?: number; code?: string; body?: Record<string, unknown> }
@@ -767,30 +778,22 @@ export class PartyApiClient {
     return this.post('hunt-settings', { ...patch, character })
   }
 
-  /** POST /party-api/merchant/bid - places or edits a standing "buy this
-   *  item automatically, up to this price" order (wtborder-dialog.tsx).
-   *  `minimumQuality` is the item's +level (only meaningful for
-   *  upgradeable/compoundable items - the server itself zeroes it
-   *  otherwise). `replaceStandEntry` answers a 409 "stand is full" retry
-   *  by bouncing that occupant id - omit it on the first attempt. */
+  /** use-party-console.tsx saveStandBid, verbatim body: priorityOverride is
+   *  always sent (null clears it); options carry the dashboard's
+   *  useStandSlot/acceptHigherLevels/replaceStandEntry/preferencesOnly and
+   *  the single-field edit (editField + value + bidRevision, so a stale
+   *  edit is refused with 409). Cancel is clear: true with the bid's own
+   *  values (stand-sheet.tsx saveBid(id, true)). */
   async saveBid(
     itemId: string,
     price: number,
     quantity: number,
     minimumQuality: number,
-    priorityOverride: number | null,
-    useStandSlot: boolean,
-    acceptHigherLevels: boolean,
-    replaceStandEntry?: string,
+    clear: boolean,
+    priorityOverride?: number | null,
+    options?: WtbOptions,
   ): Promise<ApiResult<CommandResult>> {
-    // use-party-console.tsx saveStandBid: priorityOverride is always sent -
-    // null clears it (merchant-bid.ts keeps the old value when it's absent).
-    return this.post('merchant/bid', { itemId, price, quantity, minimumQuality, clear: false, priorityOverride, useStandSlot, acceptHigherLevels, replaceStandEntry })
-  }
-
-  /** POST /party-api/merchant/bid with `clear: true` - cancels a WTB order. */
-  async cancelBid(itemId: string): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/bid', { itemId, clear: true })
+    return this.post('merchant/bid', { itemId, price, quantity, minimumQuality, clear, priorityOverride, ...options })
   }
 
   /** `/party-api/command` type "upgrade-offering-rule" - creates (empty

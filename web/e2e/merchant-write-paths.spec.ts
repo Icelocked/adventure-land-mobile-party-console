@@ -19,12 +19,12 @@ test('WTB: blanking the priority override clears it (null is sent)', async ({ pa
   const bodies = postBodies(page, 'merchant/bid')
 
   await page.goto('/wtb')
-  await page.getByText('Iron Ore').click()
-  await page.getByPlaceholder('routine priority').fill('')
-  await page.getByRole('button', { name: 'Place WTB' }).click()
+  await page.getByRole('button', { name: 'Edit priority for Iron Ore' }).click()
+  await page.getByLabel('Priority for Iron Ore').fill('')
+  await page.getByLabel('Priority for Iron Ore').press('Enter')
 
   await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toMatchObject({ itemId: 'ironore', priorityOverride: null, clear: false })
+  expect(bodies[0]).toMatchObject({ itemId: 'ironore', priorityOverride: null, clear: false, editField: 'priorityOverride', value: null, bidRevision: 0 })
   expect(server.standBids.ironore.priorityOverride).toBeUndefined()
 })
 

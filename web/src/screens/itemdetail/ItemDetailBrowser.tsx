@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, DollarSign, HandCoins, SlidersHorizontal } from 'lucide-react'
 import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/data/PartyDataProvider'
-import { WtbForm } from '@/screens/account/WtbScreen'
+import { WtbDialog } from '@/components/Wtb'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
@@ -290,7 +290,15 @@ function ItemDetailContent({
       {activeTab === 'Exchange' && <ExchangeSection exchanges={exchanges} onNavigateItem={onNavigateItem} />}
       {activeTab === 'Drops' && world?.drops && <DropsSection drops={world.drops} onNavigateMonster={onNavigateMonster} />}
       {addingWtb && (
-        <WtbForm itemId={target.id} catalogItem={catalogItem} existing={state.standBids[target.id]} initialLevel={previewLevel} onClose={() => setAddingWtb(false)} />
+        <WtbDialog
+          item={{ name: target.id, level: previewLevel }}
+          meta={meta}
+          catalogFor={(id) => catalog?.allItems.find((entry) => entry.id === id)}
+          buyable={catalog?.buyable ?? []}
+          history={state.standPriceHistory?.[target.id]}
+          existing={state.standBids[target.id]}
+          onClose={() => setAddingWtb(false)}
+        />
       )}
       {comparing && (
         <GearComparisonSheet
