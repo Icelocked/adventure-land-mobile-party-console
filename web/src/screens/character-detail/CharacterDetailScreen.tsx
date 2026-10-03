@@ -22,6 +22,7 @@ import { AutoMarksSection } from './sections/AutoMarksSection'
 import { CombatLogSection } from './sections/CombatLogSection'
 import { StatusesSection } from './sections/StatusesSection'
 import { LuckySlotSection } from './sections/LuckySlotSection'
+import { MapSection } from './sections/MapSection'
 import { AccountMenu } from './AccountMenu'
 import { SessionControls } from '@/components/SessionControls'
 import { PartyGold } from '@/components/PartyGold'
@@ -102,6 +103,8 @@ export function CharacterDetailScreen() {
             slots={state?.inventory?.slots ?? {}}
             online={online}
           />
+          {/* connected-character-card.tsx: the live map sits under the card header. */}
+          <MapSection name={name} map={vitals.map} x={vitals.x} y={vitals.y} />
           <div className="flex-1 pb-6">
             {/* connected-character-card.tsx: statuses sit under HP/MP for every class. */}
             <StatusesSection characterName={name} conditions={vitals.conditions ?? []} />

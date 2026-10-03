@@ -1,39 +1,20 @@
 import { useEffect, useState } from 'react'
 import { mapStreamUrl } from '@/config/serverConfig'
 import { useServerSettings } from './PartyDataProvider'
-
-interface MapEntity {
-  id: string
-  mtype?: string | null
-}
-interface MapFrame {
-  entities?: MapEntity[]
-}
+import { subscribeMapFrames } from './useMapFrames'
 
 /**
  * Resolves a character's raw combat target (a per-instance entity id,
  * e.g. "2951603" - confirmed against the real client source,
  * characters/shared.js's `target: character.target`) into the monster's
- * actual type id (e.g. "crabx", matching the bestiary catalog), by
- * subscribing to that one character's live map/entities feed
- * (runtime/coordinator/telemetry/map-stream.ts) and looking the target id
- * up in the most recent frame's `entities` list - the same `entities`
- * array the game client itself builds every attack cycle (publishMapFrame),
- * each entry carrying both `id` (the instance id) and `mtype` (the type).
+ * actual type id (e.g. "crabx", matching the bestiary catalog), from that
+ * one character's live map frames (the shared map-stream subscription in
+ * useMapFrames.ts), looking the target id up in the latest frame's
+ * `entities` list - each entry carries both `id` and `mtype`.
  *
- * Deliberately scoped to ONE character at a time (only ever mounted on the
- * open character-detail screen, not the character list) - map frames are
- * relatively heavy and subscribing to every character's feed at once for a
- * cosmetic name lookup isn't a reasonable trade. Target id -> name misses
- * (e.g. between a fresh target and the next map frame arriving) resolve to
- * `null` rather than ever showing the raw id - see activityLine.ts's own
- * fallback for what callers show while this is null.
- *
- * Intentionally lighter than liveConnection.ts's dashboard-stream
- * connection (no watchdog/heartbeat-timeout reconnect logic) - this is
- * best-effort supplementary data, not the primary vitals channel, and
- * EventSource's own built-in auto-reconnect is an acceptable trade-off
- * for that lower stakes.
+ * Scoped to the open character-detail screen only. Misses (e.g. between a
+ * fresh target and the next frame) resolve to `null` rather than ever
+ * showing the raw id - see activityLine.ts's own fallback.
  */
 export function useTargetMonsterType(characterName: string, target: string | undefined): string | null {
   const settings = useServerSettings()
@@ -42,27 +23,14 @@ export function useTargetMonsterType(characterName: string, target: string | und
   useEffect(() => {
     setResolved(null)
     if (!target) return
-    const source = new EventSource(mapStreamUrl(settings, characterName))
-    source.onmessage = (event) => {
-      let frame: MapFrame | null = null
-      try {
-        frame = JSON.parse(event.data) as MapFrame
-      } catch {
-        return
-      }
-      // The game's own native code compares character.target against an
-      // entity's .id with no coercion at all (characters/shared.js:14442),
-      // meaning they're natively the same type - but this codebase's own
-      // serialization is asymmetric: mapEntity() explicitly casts entity
-      // ids to String() for the map-frame feed, while the vitals status's
-      // own `target` field (shared.js line ~387) does not. If the native
-      // type is numeric, comparing them directly (string !== number) would
-      // silently never match, for any target, regardless of timing -
-      // String() both sides to compare by value, not by type.
-      const entity = frame?.entities?.find((e) => String(e.id) === String(target))
-      setResolved(entity?.mtype ?? null)
-    }
-    return () => source.close()
+    return subscribeMapFrames(mapStreamUrl(settings, characterName), {
+      frame: (frame) => {
+        // String() both sides: mapEntity() casts entity ids to String() for
+        // this feed while the vitals status's own `target` is not coerced.
+        const entity = frame?.entities?.find((e) => String(e.id) === String(target))
+        setResolved(entity?.mtype ?? null)
+      },
+    })
   }, [settings, characterName, target])
 
   return resolved

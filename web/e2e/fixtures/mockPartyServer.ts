@@ -413,6 +413,17 @@ export class MockPartyServer {
   private mapFrameEntities = new Map<string, { id: string | number; mtype?: string }[]>()
   private mapStreamClients = new Map<string, Set<ServerResponse>>()
 
+  // Whole map frames (telemetry/map-stream.ts) for the live map, sent as-is.
+  setMapFrame(character: string, frame: Record<string, unknown>): void {
+    this.mapFrames.set(character, frame)
+    const data = `data: ${JSON.stringify(frame)}\n\n`
+    for (const client of this.mapStreamClients.get(character) ?? []) client.write(data)
+  }
+  private mapFrames = new Map<string, Record<string, unknown>>()
+  // GET /maps/:map definitions (map-definition.ts), and every request's path.
+  mapDefinitions: Record<string, Record<string, unknown>> = {}
+  mapDefinitionRequests: string[] = []
+
   setMapFrameEntities(character: string, entities: { id: string | number; mtype?: string }[]): void {
     this.mapFrameEntities.set(character, entities)
     const frame = `data: ${JSON.stringify({ entities })}\n\n`
@@ -449,6 +460,8 @@ export class MockPartyServer {
           })
           const existing = this.mapFrameEntities.get(character)
           if (existing) res.write(`data: ${JSON.stringify({ entities: existing })}\n\n`)
+          const frame = this.mapFrames.get(character)
+          if (frame) res.write(`data: ${JSON.stringify(frame)}\n\n`)
           const clients = this.mapStreamClients.get(character) ?? new Set()
           this.mapStreamClients.set(character, clients)
           clients.add(res)
@@ -1064,6 +1077,12 @@ export class MockPartyServer {
     await page.route('**/party-api/dashboard-stream', async (route) => {
       const base = await this.startSseServer()
       return route.continue({ url: `${base}/dashboard-stream` })
+    })
+    await page.route('**/party-api/maps/**', (route) => {
+      const url = new URL(route.request().url())
+      this.mapDefinitionRequests.push(url.pathname.replace(/^.*\/party-api\//, '') + url.search)
+      const definition = this.mapDefinitions[decodeURIComponent(url.pathname.replace(/^.*\/maps\//, ''))]
+      return definition ? route.fulfill({ json: definition }) : route.fulfill({ status: 404, json: { error: 'unknown map' } })
     })
     await page.route('**/party-api/map-stream/**', async (route) => {
       const base = await this.startSseServer()
