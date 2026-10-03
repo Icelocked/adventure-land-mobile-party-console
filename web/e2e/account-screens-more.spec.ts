@@ -41,8 +41,9 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   await expect(page.getByRole('button', { name: 'Edit price for Iron Ore' })).toHaveText('500g')
 
   // stand-sheet.tsx: cancel asks "Really cancel?" first.
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await page.getByRole('button', { name: 'Really cancel?' }).click()
+  const order = page.getByRole('group', { name: 'WTB Iron Ore' })
+  await order.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await order.getByRole('button', { name: 'Really cancel?' }).click()
   await expect(page.getByText('No active orders.')).toBeVisible()
 })
 
