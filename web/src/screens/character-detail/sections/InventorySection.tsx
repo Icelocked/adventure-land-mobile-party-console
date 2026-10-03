@@ -4,7 +4,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemOperationOverlay, LuckySlotOutline, MluckClover, SuggestedPriceDetails, itemLevelLabelClass } from '@/components/ItemTileParts'
 import { compactInventory, itemActionBanner, physicalInventory, statBadgeClass, validLuckySlot } from '@/lib/itemActionBanner'
-import { aggregateSlotTracking, luckySlotSearch } from '@/lib/luckySlot'
+import { aggregateSlotTracking, luckySlotSearch, normalizeSlotTracking } from '@/lib/luckySlot'
 import { TapRow } from '@/screens/itempanel/ItemActionPanel'
 import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
 import type { CatalogItem, InventoryEntry, Item, PartyStateDynamic } from '@/models'
@@ -37,6 +37,7 @@ export function InventorySection({
   catalogFor,
   onItemTap,
   onLuckySlotData,
+  localLucky,
 }: {
   characterName: string
   isMerchant: boolean
@@ -47,6 +48,7 @@ export function InventorySection({
   catalogFor: (id: string) => CatalogItem | undefined
   onItemTap: (entry: InventoryEntry, lucky: boolean) => void
   onLuckySlotData: () => void
+  localLucky?: unknown
 }) {
   const [open, setOpen] = useState(true)
   const [details, setDetails] = useState<TileDetails | null>(null)
@@ -76,7 +78,9 @@ export function InventorySection({
   const freeSlots = totalSlots - occupiedSlots
   const capacityColor = freeSlots < 5 ? 'text-rose-400' : freeSlots <= 10 ? 'text-orange-400' : 'text-muted-foreground'
   const luckyUpgradeSlot = state.luckyUpgradeSlots[characterName]
-  const nextUpgradeSlot = validLuckySlot(luckyUpgradeSlot) ? luckyUpgradeSlot : luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName] ?? {})).nextSlot
+  // connected-inventory.tsx: merge the character's live local stream.
+  const localLuckyStream = (localLucky ? normalizeSlotTracking(localLucky) : undefined) as Parameters<typeof aggregateSlotTracking>[1]
+  const nextUpgradeSlot = validLuckySlot(luckyUpgradeSlot) ? luckyUpgradeSlot : luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName] ?? {}, localLuckyStream)).nextSlot
   const luckySlotLabel = validLuckySlot(luckyUpgradeSlot) ? 'Verified lucky upgrade slot' : 'Next upgrade will test for lucky upgrade'
 
   return (

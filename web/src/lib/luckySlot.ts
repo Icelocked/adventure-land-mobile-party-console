@@ -2,16 +2,56 @@ import type { LuckySlotStreams, LuckySlotTracking, SlotRollStatistics } from '@/
 
 export const emptyRolls = (): SlotRollStatistics => ({ totalRolls: 0, sumRolls: 0, rollsAbove96_3: 0, perfectRolls: 0 })
 
-/** Sums every evidence stream into one combined slot table - ported from
- *  runtime/lucky-slot-tracking.ts's aggregateSlotTracking. The real
- *  version also merges in a live, not-yet-persisted local stream from the
- *  character's own connection; this read-only display only has the
- *  already-persisted streams the server broadcasts, which is what every
- *  other client (including party-console's own dashboard, most of the
- *  time) actually shows too. */
-export function aggregateSlotTracking(streams: LuckySlotStreams = {}): LuckySlotTracking {
+// runtime/lucky-slot-tracking.ts, verbatim: merge, validation and normalization.
+export function mergeSlotStream(previous: LuckySlotTracking, incoming: LuckySlotTracking): boolean {
+  let changed = false
+  for (const [slot, stats] of Object.entries(incoming.slots)) {
+    const old = previous.slots[slot]
+    if (old && (stats.totalRolls <= old.totalRolls || !(['sumRolls', 'rollsAbove96_3', 'perfectRolls'] as const).every((key) => stats[key] >= old[key]))) continue
+    previous.slots[slot] = { ...stats }
+    changed = true
+  }
+  return changed
+}
+export function validSlotStatistics(value: unknown): value is SlotRollStatistics {
+  if (!value || typeof value !== 'object') return false
+  const stats = value as SlotRollStatistics
+  return (
+    Number.isSafeInteger(stats.totalRolls) &&
+    stats.totalRolls > 0 &&
+    Number.isFinite(stats.sumRolls) &&
+    stats.sumRolls >= 0 &&
+    stats.sumRolls < stats.totalRolls &&
+    [stats.rollsAbove96_3, stats.perfectRolls].every((n) => Number.isSafeInteger(n) && n >= 0 && n <= stats.totalRolls) &&
+    stats.rollsAbove96_3 + stats.perfectRolls <= stats.totalRolls
+  )
+}
+function readStreamId(raw: object): string | undefined {
+  return 'streamId' in raw && typeof raw.streamId === 'string' && /^[a-z0-9]{1,30}-[a-z0-9-]{1,60}$/.test(raw.streamId) ? raw.streamId : undefined
+}
+export function normalizeSlotTracking(raw: unknown): LuckySlotTracking {
+  const result: LuckySlotTracking = { version: 1, slots: {} }
+  if (!raw || typeof raw !== 'object' || !('slots' in raw) || !raw.slots || typeof raw.slots !== 'object') return result
+  const streamId = readStreamId(raw)
+  if (streamId) (result as LuckySlotTracking & { streamId?: string }).streamId = streamId
+  for (const [slot, stats] of Object.entries(raw.slots as Record<string, unknown>)) {
+    if (/^(?:[0-9]|[1-3][0-9]|4[01])$/.test(slot) && validSlotStatistics(stats)) result.slots[slot] = { ...stats }
+  }
+  return result
+}
+
+/** runtime/lucky-slot-tracking.ts aggregateSlotTracking, verbatim: every
+ *  persisted stream, with the character's own live local stream merged into
+ *  its stream id so replays and moves neither double-count nor drop rolls. */
+export function aggregateSlotTracking(streams: LuckySlotStreams = {}, local?: LuckySlotTracking & { streamId?: string }): LuckySlotTracking {
+  const combined = { ...streams }
+  if (local?.streamId) {
+    const merged = normalizeSlotTracking(combined[local.streamId])
+    mergeSlotStream(merged, local)
+    combined[local.streamId] = merged
+  }
   const slots: LuckySlotTracking['slots'] = {}
-  for (const stream of Object.values(streams)) {
+  for (const stream of Object.values(combined)) {
     for (const [slot, stats] of Object.entries(stream.slots)) {
       const total = (slots[slot] ??= emptyRolls())
       total.totalRolls += stats.totalRolls

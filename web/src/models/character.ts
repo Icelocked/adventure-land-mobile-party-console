@@ -34,6 +34,8 @@ export interface CharacterVitals {
   inventorySize?: number
   // live-protocol liveFields: whether the merchant's stand is open.
   standOpen?: boolean
+  // char.tsx luckySlotTracking: the live local evidence stream, when the record carries it.
+  luckySlotTracking?: unknown
 }
 
 /** The character's carried items + what's equipped - arrives/updates

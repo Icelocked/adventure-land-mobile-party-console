@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { aggregateSlotTracking } from './luckySlot'
 import { blacklistRecord, groupAlData, groupPonty, priceComparison } from './market'
 import { itemActionBanner } from './itemActionBanner'
 import { suggestedItemValue, upgradeEstimate, UPGRADE_CHANCES } from './suggestedItemValue'
@@ -205,5 +206,19 @@ describe('stand-sheet.tsx market logic', () => {
     expect(blacklistRecord(list, false, 1000, 'T', 'US', 'I')).toBeUndefined()
     expect(blacklistRecord(list, true, 1000, 'T', 'US', 'I')).toBeTruthy()
     expect(blacklistRecord(list, true, 3000, 'T', 'US', 'I')).toBeUndefined()
+  })
+})
+
+describe('lucky-slot-tracking.ts aggregateSlotTracking', () => {
+  const stats = (totalRolls: number) => ({ totalRolls, sumRolls: totalRolls / 2, rollsAbove96_3: 0, perfectRolls: 0 })
+  it('merges the live local stream into its own stream without double-counting', () => {
+    const streams = { 'abc-1': { version: 1 as const, slots: { '5': stats(10) } }, 'def-2': { version: 1 as const, slots: { '5': stats(4) } } }
+    // The local copy of stream abc-1 has moved on to 12 rolls in slot 5 and 3 in slot 7.
+    const local = { version: 1 as const, streamId: 'abc-1', slots: { '5': stats(12), '7': stats(3) } }
+    const result = aggregateSlotTracking(streams, local)
+    expect(result.slots['5'].totalRolls).toBe(16)
+    expect(result.slots['7'].totalRolls).toBe(3)
+    // An older local snapshot never lowers the persisted counts.
+    expect(aggregateSlotTracking(streams, { version: 1, streamId: 'abc-1', slots: { '5': stats(8) } } as never).slots['5'].totalRolls).toBe(14)
   })
 })
