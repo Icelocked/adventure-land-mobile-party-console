@@ -21,7 +21,6 @@ const ITEMS: { label: string; path: string }[] = [
   { label: 'Inspect Bank', path: '/bank' },
   { label: 'Merchant routines', path: '/routines' },
   { label: 'WTB orders', path: '/wtb' },
-  { label: 'Upgrade offerings', path: '/offerings' },
   { label: 'Logs', path: '/logs' },
   { label: 'Settings', path: '/settings' },
 ]

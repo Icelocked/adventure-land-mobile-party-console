@@ -3,6 +3,7 @@ import { Check, PackageOpen, X } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ExpandChevron } from '@/components/ExpandChevron'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
@@ -10,7 +11,10 @@ import { upgradeRuleTiers } from '@/lib/itemFormulas'
 import { SectionCard } from '../SectionCard'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import type { CatalogItem, Item, PartyStateDynamic } from '@/models'
-import { itemFromRuleKey } from '@/models'
+import { itemFromRuleKey, UPGRADE_OFFERING_LABELS } from '@/models'
+import type { UpgradeOfferingRule } from '@/models'
+import { OfferingDialog } from '@/components/Offerings'
+import { useDynamicState } from '@/data/PartyDataProvider'
 
 type Action = () => Promise<ApiResult<CommandResult>>
 
@@ -197,6 +201,7 @@ export function AutoMarksSection({
         })}
         {group('Auto stand marks', 'border-amber-800 text-amber-400', stand, () => perform(() => api.clearAllAutoStand()))}
         {group('Auto upgrades', 'border-sky-800 text-sky-400', upgrades, () => perform(() => api.clearAutoUpgrades(characterName)))}
+        <UpgradeOfferingRules characterName={characterName} />
         {group('Auto compounds', 'border-fuchsia-800 text-fuchsia-400', compounds, () => perform(() => api.clearAutoCompounds(characterName)))}
         {group('Auto merchant marks', 'border-purple-800 text-purple-400', markEntries('merchant'), () => perform(() => api.clearAutoItemMarks(characterName, 'merchant')))}
         {group('Auto bank marks', 'border-amber-800 text-amber-400', markEntries('bank'), () => perform(() => api.clearAutoItemMarks(characterName, 'bank')))}
@@ -388,6 +393,101 @@ function AutoRuleGroup({
             )
           })}
         </div>
+      )}
+    </section>
+  )
+}
+
+/** upgrade-offering-controls.tsx UpgradeOfferingRules: the standing rules
+ *  with Edit / Remove, and a two-tap clear of them all. */
+function UpgradeOfferingRules({ characterName }: { characterName: string }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const state = useDynamicState()
+  const rules = state.upgradeOfferingRules
+  const catalog = state.merchantCatalog?.allItems ?? []
+  const nameOf = (id: string) => catalog.find((item) => item.id === id)?.name || id
+  const spriteOf = (id: string) => catalog.find((item) => item.id === id)?.sprite
+  const [open, setOpen] = useState(false)
+  const [clearArmed, setClearArmed] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [editing, setEditing] = useState<UpgradeOfferingRule | null>(null)
+  const [error, setError] = useState('')
+  const remove = async (rule: UpgradeOfferingRule) => {
+    const result = await api.removeOfferingRule(characterName, rule.id)
+    setError(result.kind === 'failure' ? result.message || 'Could not remove rule' : '')
+    await refreshNow()
+  }
+  const clear = async () => {
+    setClearing(true)
+    setError('')
+    for (const rule of rules) {
+      const result = await api.removeOfferingRule(characterName, rule.id)
+      if (result.kind === 'failure') {
+        setError(result.message || 'Could not clear upgrade rules')
+        break
+      }
+    }
+    setClearing(false)
+    setClearArmed(false)
+    await refreshNow()
+  }
+  return (
+    <section aria-label="Upgrade rules" className="rounded-md border border-sky-800 text-sky-400">
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen((value) => !value)
+            setClearArmed(false)
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs"
+        >
+          <ExpandChevron expanded={open} />
+          <span className="flex-1">Upgrade rules</span>
+          <span className="font-mono opacity-70">{rules.length}</span>
+        </button>
+        <button
+          type="button"
+          disabled={!rules.length || clearing}
+          aria-label={clearArmed ? 'Really clear all Upgrade rules' : 'Clear all Upgrade rules'}
+          title={clearArmed ? 'Click again to clear all' : 'Clear all'}
+          onClick={() => (clearArmed ? void clear() : setClearArmed(true))}
+          className={`flex shrink-0 items-center justify-center gap-1 border-l px-2 disabled:opacity-30 ${clearArmed ? 'bg-rose-600 text-white' : 'text-rose-400'}`}
+        >
+          {clearArmed && <span className="text-[10px] font-semibold">Really?</span>}
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-2 border-t border-sky-800 px-3 py-2 text-foreground">
+          {!rules.length && <p className="text-sm text-muted-foreground">No upgrade rules.</p>}
+          {rules.map((rule) => (
+            <div key={rule.id} className="flex flex-wrap items-center gap-2 border-b border-border py-1 text-xs last:border-b-0">
+              <SpriteIcon sprite={spriteOf(rule.name)} size={28} />
+              <span>{nameOf(rule.name)}</span>
+              <span>
+                +{rule.floor} → +{rule.ceiling}
+              </span>
+              <SpriteIcon sprite={spriteOf(rule.offering)} size={28} />
+              <span>{UPGRADE_OFFERING_LABELS[rule.offering]}</span>
+              <span className="text-sky-400">{rule.required ? 'Required' : 'When available'}</span>
+              <Button size="sm" variant="outline" disabled={clearing} onClick={() => setEditing(rule)}>
+                Edit
+              </Button>
+              <Button size="sm" variant="outline" disabled={clearing} onClick={() => void remove(rule)}>
+                Remove
+              </Button>
+            </div>
+          ))}
+          {editing && <OfferingDialog character={characterName} item={{ name: editing.name }} rule={editing} onClose={() => setEditing(null)} />}
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="px-3 pb-2 text-sm text-destructive">
+          {error}
+        </p>
       )}
     </section>
   )

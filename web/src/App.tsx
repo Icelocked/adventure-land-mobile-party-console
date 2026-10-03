@@ -25,7 +25,6 @@ import { MerchantCommerceScreen } from '@/screens/account/MerchantCommerceScreen
 import { RoutinesScreen } from '@/screens/account/RoutinesScreen'
 import { HuntSettingsScreen } from '@/screens/account/HuntSettingsScreen'
 import { WtbScreen } from '@/screens/account/WtbScreen'
-import { OfferingsScreen } from '@/screens/account/OfferingsScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
@@ -72,7 +71,6 @@ export default function App() {
                 <Route path="/routines" element={<RoutinesScreen />} />
                 <Route path="/characters/:name/hunt-settings" element={<HuntSettingsScreen />} />
                 <Route path="/wtb" element={<WtbScreen />} />
-                <Route path="/offerings" element={<OfferingsScreen />} />
                 <Route path="/logs" element={<LogsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
               </Routes>

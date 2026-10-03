@@ -7,6 +7,7 @@ import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { standIsFull } from '@/lib/standInspection'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
+import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem } from '@/models'
@@ -381,9 +382,19 @@ function InventoryActions({
       {!!merchant && meta?.upgradeable && upgradeMax > 0 && (
         <>
           <TapRow label={`Mark for upgrade${upgradeMark ? ` · ${upgradeMark.tiers || 1} tier${(upgradeMark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
-          {expanded === 'upgrade' && <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => command('upgrade-mark', slot, { tiers })} />}
+          {expanded === 'upgrade' && (
+            <>
+              <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => command('upgrade-mark', slot, { tiers })} />
+              <OfferingRows character={characterName} item={item} meta={meta} source={{ slot }} />
+            </>
+          )}
           <TapRow label={`Auto mark for upgrade${autoUpgradeTiers ? ` · ${autoUpgradeTiers} tier${autoUpgradeTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('autoupgrade')} />
-          {expanded === 'autoupgrade' && <UpgradeTierPicker meta={meta} level={level} current={autoUpgradeTiers} onPick={(tiers) => command('auto-upgrade-mark', slot, { tiers })} />}
+          {expanded === 'autoupgrade' && (
+            <>
+              <UpgradeTierPicker meta={meta} level={level} current={autoUpgradeTiers} onPick={(tiers) => command('auto-upgrade-mark', slot, { tiers })} />
+              <AddUpgradeRule character={characterName} item={item} meta={meta} />
+            </>
+          )}
         </>
       )}
       {!!merchant && !isMerchant && meta?.buyable && <TapRow label="Buy another level 0" onClick={() => command('buy-copy', undefined)} />}
@@ -518,7 +529,10 @@ function EquipmentActions({
         <>
           <TapRow label={`Mark for upgrade${mark ? ` · ${mark.tiers || 1} tier${(mark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
           {expanded === 'upgrade' && (
-            <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => run(() => api.itemCommand('upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))} />
+            <>
+              <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => run(() => api.itemCommand('upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))} />
+              <OfferingRows character={characterName} item={item} meta={meta} source={{ slot: slotName, equipped: true }} />
+            </>
           )}
           <TapRow label={`Auto mark for upgrade${autoTiers ? ` · ${autoTiers} tier${autoTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('autoupgrade')} />
           {expanded === 'autoupgrade' && (
@@ -529,6 +543,7 @@ function EquipmentActions({
               onPick={(tiers) => run(() => api.itemCommand('auto-upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))}
             />
           )}
+          {expanded === 'autoupgrade' && <AddUpgradeRule character={characterName} item={item} meta={meta} />}
         </>
       )}
       {(hasAutomaticMarks || mark || statScrollMark) && (

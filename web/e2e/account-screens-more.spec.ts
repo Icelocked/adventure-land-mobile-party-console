@@ -139,27 +139,6 @@ test('Settings: switching realm updates immediately (no stale data until the nex
   await expect(page.getByText('Current: US II · Home: US I')).toBeVisible()
 })
 
-test('Offerings: saving a rule fails once with a server error, then succeeds', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
-  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat', upgradeable: true })
-  await server.install(page)
-
-  await page.goto('/offerings')
-  await page.getByRole('button', { name: 'Add rule' }).click()
-  await page.getByPlaceholder('Search upgradeable items...').fill('Wolf Coat')
-  await page.getByText('Wolf Coat').click()
-
-  server.failOnce['command'] = 'Rule conflicts with an existing one'
-  await page.getByRole('button', { name: 'Confirm' }).click()
-  await expect(page.getByText('Rule conflicts with an existing one')).toBeVisible()
-
-  await page.getByRole('button', { name: 'Confirm' }).click()
-  await expect(page.getByPlaceholder('Search upgradeable items...')).not.toBeVisible()
-  await expect(page.getByText('+0 → +1 · Primling · Required')).toBeVisible()
-})
-
 test('Logs: shows an empty state with no activity', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true

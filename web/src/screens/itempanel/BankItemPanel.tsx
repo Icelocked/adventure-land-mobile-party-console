@@ -8,6 +8,7 @@ import { StandListingForm } from '@/components/StandListingForm'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { standIsFull } from '@/lib/standInspection'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
+import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type InventoryEntry } from '@/models'
 import { TapRow, UpgradeTierPicker } from './ItemActionPanel'
@@ -149,10 +150,19 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
           {canUpgrade && (
             <>
               <TapRow label="Mark for upgrade" onClick={() => toggle('upgrade')} />
-              {expanded === 'upgrade' && <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void withdraw(false, tiers)} />}
+              {expanded === 'upgrade' && (
+                <>
+                  <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void withdraw(false, tiers)} />
+                  {/* bank-upgrade-actions.tsx has no offering provider: these stay disabled. */}
+                  <OfferingRows character={merchant!} item={item} meta={meta} enabled={false} />
+                </>
+              )}
               <TapRow label="Auto mark for upgrade" onClick={() => toggle('autoupgrade')} />
               {expanded === 'autoupgrade' && (
-                <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void run(() => api.itemCommand('auto-upgrade-mark', merchant!, item, -1, { tiers }))} />
+                <>
+                  <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void run(() => api.itemCommand('auto-upgrade-mark', merchant!, item, -1, { tiers }))} />
+                  <AddUpgradeRule character={merchant!} item={item} meta={meta} enabled={false} />
+                </>
               )}
             </>
           )}

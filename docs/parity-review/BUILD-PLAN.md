@@ -11,8 +11,8 @@
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
-- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 (this commit).
-- **Next:** Phase 8 (U1, M10, M11).
+- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 (this commit).
+- **Next:** Phase 8 (M10, M11).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1485,6 +1485,12 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/itempanel/ItemActionPanel.tsx` (UpgradeTierPicker), new `P/components/UpgradePreviewPanel.tsx`, `P/screens/account/OfferingsScreen.tsx`.
 - **Endpoints:** `/command upgrade-mark {slot|equipped, tiers:1, offering}`, `POST /upgrade-preview {character, slot, item, refresh}`, `/command upgrade-offering-rule {rule}|{rule:{id}, remove:true}`; state `upgradeOfferingStock`, `upgradeOfferingRules`.
 - **Dependencies:** F1 (executor = merchant), F5, F7 #33.
+- **As built (ground rules 2 and 3):**
+  - Under Mark for upgrade, "Upgrade with …" (stock-gated, with an inline "Confirm upgrade") and the server preview panel (2 s poll, Refresh chances) render inline in the options list.
+  - "Add upgrade rule" sits under Auto mark for upgrade.
+  - "Upgrade rules" (Edit, Remove, two-tap clear) is in the merchant's automatic rules.
+  - As in the dashboard, the bank's offering rows are disabled (no offering provider there).
+  - The PWA-only standalone Offerings screen and its menu entry were removed.
 
 #### U2 — Upgrade/compound/stat-scroll mark labels (S)
 - **Rows:** A198, A204, A205, A207, A208, A239, A240.
