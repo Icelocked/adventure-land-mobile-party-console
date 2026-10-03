@@ -12,8 +12,8 @@
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
-- **Phase 9:** C4 (this commit).
-- **Next:** Phase 9 (C5, C6).
+- **Phase 9:** C4 `af3e32a`, C6 (this commit; done before C5 because the cave map builds on it).
+- **Next:** Phase 9 (C5).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1625,6 +1625,10 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** new `P/components/map/*`, `P/screens/character-detail/sections/MapSection.tsx`.
 - **Endpoints:** `GET /party-api/map-stream/:character` (SSE), `GET /party-api/maps/:map`.
 - **Dependencies:** F6. Mind mobile battery: render only while visible.
+- **As built:**
+  - `components/map/MapCanvas.tsx` is `map-canvas.tsx` verbatim apart from imports; `mapRendering.ts` holds the verbatim render buffer, map/tile/doll caches, `markerStyle` and the dreams gate; `mapTypes.ts` the frame and definition types.
+  - `data/useMapFrames.ts`: one shared EventSource per character's map stream (the target-type lookup now uses it too), `useVisible`, and `useMapDefinition` (`GET /maps/:map?revision=` keyed by core's `referenceRevision`).
+  - `MapSection` sits under the vitals header like the card's map: collapsed "map [x, y]" label (Cave zones read "Cave of Many Dreams" and use the stream's definition), 20 fps canvas only while open and the page is visible, "loading"/"reconnecting" badge, and a full-screen native-size view.
 
 ---
 
