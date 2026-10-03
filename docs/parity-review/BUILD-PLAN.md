@@ -9,8 +9,8 @@
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
-- **Phase 6:** M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 (this commit).
-- **Next:** Phase 6 (M8).
+- **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
+- **Next:** Phase 7.
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1359,6 +1359,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
   - `POST /merchant/blacklist {action:'configure', enabled} | {action:'add', seller, minutes} | {action:'clear', key?}`
   - state `autoStandBuys`, `autoBlacklistMerchants`, `merchantBlacklist`
 - **Dependencies:** P0-01, F6.
+- **As built:** a Marketplace settings screen at `/market/settings`, opened from the Market header like the dashboard's gear button. Copy, toggles, the manual block, strike records and the two-step Clear all follow `stand-sheet.tsx`.
 
 ---
 

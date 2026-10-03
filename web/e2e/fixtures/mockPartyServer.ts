@@ -849,6 +849,32 @@ export class MockPartyServer {
       }
       return { status: 200, json: { ok: true, priorities: this.merchantRoutinePriorities, enabled: this.merchantAutomations } }
     }
+    if (path === 'merchant/blacklist') {
+      // merchant-blacklist.ts createMerchantBlacklistRoute.
+      const blacklist = { ...((this.extraState.merchantBlacklist as Record<string, Record<string, unknown>> | undefined) ?? {}) }
+      const action = String(body.action || 'add')
+      if (action === 'configure') {
+        if (typeof body.enabled !== 'boolean') return { status: 400, json: { error: 'invalid blacklist setting' } }
+        this.extraState = { ...this.extraState, autoBlacklistMerchants: body.enabled }
+        return { status: 200, json: { ok: true } }
+      }
+      if (action === 'clear') {
+        if (typeof body.key === 'string') delete blacklist[body.key]
+        else for (const key of Object.keys(blacklist)) delete blacklist[key]
+      } else {
+        const seller = String(body.seller || '').trim()
+        if (!seller) return { status: 400, json: { error: 'enter a merchant name' } }
+        const minutes = Number(body.minutes)
+        if (!Number.isFinite(minutes) || (minutes !== -1 && minutes < 1)) return { status: 400, json: { error: 'duration must be minutes or -1 for forever' } }
+        blacklist[`${seller}||`] = { seller, serverRegion: '', serverIdentifier: '', reason: 'manual', failures: 0, until: minutes === -1 ? -1 : Date.now() + minutes * 60000, updatedAt: Date.now() }
+      }
+      this.extraState = { ...this.extraState, merchantBlacklist: blacklist }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'merchant/native-stand') {
+      if (body.action === 'configure') this.extraState = { ...this.extraState, autoStandBuys: body.enabled === true }
+      return { status: 200, json: { ok: true } }
+    }
     if (path === 'merchant/bid') {
       const itemId = String(body.itemId)
       const existing = this.standBids[itemId] as Record<string, unknown> | undefined
