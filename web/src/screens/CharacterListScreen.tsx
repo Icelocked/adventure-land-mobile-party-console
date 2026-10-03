@@ -1,3 +1,5 @@
+import { DungeonPanel } from '@/screens/dungeon/DungeonPanel'
+import { useDungeons } from '@/data/useDailyDungeon'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CloudOff, Menu, Plus, RefreshCw } from 'lucide-react'
@@ -100,6 +102,8 @@ export function CharacterListScreen() {
 
       {!connected && <div className="h-0.5 w-full animate-pulse bg-primary/60" />}
 
+      {/* party-workspace.tsx: the dungeon panel heads the party while a visit runs. */}
+      <DungeonPanel />
       {names.length > 0 && <PartyControls />}
 
       {names.length === 0 && !pending.length ? (
@@ -164,6 +168,9 @@ function PartyControls() {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const escape = useEscapeStatus()
+  // escape-control.tsx: inside a dungeon, Escape exits the dungeon instead.
+  const dungeon = useDungeons()
+  const inDungeon = !!dungeon.data && !['idle', 'held'].includes(dungeon.data.state.phase)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -193,8 +200,12 @@ function PartyControls() {
         variant={failed ? 'destructive' : 'outline'}
         size="sm"
         className="flex-1"
-        disabled={busy || running}
+        disabled={inDungeon ? dungeon.busy : busy || running}
         onClick={async () => {
+          if (inDungeon) {
+            await dungeon.action({ action: 'exit' })
+            return
+          }
           setBusy(true)
           setError(null)
           const result = await api.triggerEscape()
@@ -203,13 +214,18 @@ function PartyControls() {
           setBusy(false)
         }}
       >
-        {(busy || running) && <span className="mr-2 size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
-        {label}
+        {(inDungeon ? dungeon.busy : busy || running) && <span aria-label="Escape in progress" className="mr-2 size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+        {inDungeon ? 'Escape — exit dungeon' : label}
       </Button>
     </div>
       {(townError || error) && (
         <p role="alert" className="mt-1 text-sm text-destructive">
           {townError || error}
+        </p>
+      )}
+      {inDungeon && dungeon.actionError && (
+        <p role="alert" className="mt-1 text-sm text-destructive">
+          {dungeon.actionError}
         </p>
       )}
     </div>
