@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { blacklistRecord, groupAlData, groupPonty, priceComparison } from './market'
 import { itemActionBanner } from './itemActionBanner'
 import { suggestedItemValue, upgradeEstimate, UPGRADE_CHANCES } from './suggestedItemValue'
 import { routineFor } from './routineLabels'
@@ -164,5 +165,45 @@ describe('suggested-item-value.tsx / upgrade-estimate.tsx', () => {
     const item = { id: 'bow', name: 'Bow', cost: 1000, seller: '', upgradeable: true, upgradeChances: UPGRADE_CHANCES[0], scrollCosts: [1000, 40000, 1600000, 64000000] }
     expect(upgradeEstimate(item, 1, 7)).toEqual(upgradeEstimate({ ...item }, 1, 7))
     expect(upgradeEstimate(item, 1, 7).gold).toBeGreaterThan(1000)
+  })
+})
+
+describe('stand-sheet.tsx market logic', () => {
+  const listing = (key: string, extra: Record<string, unknown> = {}) => ({ key, seller: 'S', serverRegion: 'US', serverIdentifier: 'I', map: 'main', seenAt: 0, price: 10, quantity: 2, item: { name: 'x' }, ...extra })
+  it('groups identical seller/realm/map/price/item listings and sums quantity', () => {
+    const grouped = groupAlData([listing('a'), listing('b'), listing('c', { price: 11 })])
+    expect(grouped.map((entry) => [entry.key, entry.quantity, entry.groupedListings?.length])).toEqual([
+      ['a|b', 4, 2],
+      ['c', 2, 1],
+    ])
+  })
+  it('compares a price against the suggested value', () => {
+    expect(priceComparison(40, 100)).toEqual({ deal: true, badDeal: false, comparison: 'deal · 60% off' })
+    expect(priceComparison(250, 100)).toEqual({ deal: false, badDeal: true, comparison: '150% above' })
+    expect(priceComparison(80, 100).comparison).toBe('20% below')
+    expect(priceComparison(100, 100).comparison).toBe('at suggested')
+  })
+  it('groups Ponty lots by groupKey and freshness, keeping the highest unit price and the smallest lot', () => {
+    const now = 1_000_000
+    const rows = groupPonty(
+      [
+        { key: 'p1', groupKey: 'g', item: { name: 'x' }, quantity: 3, unitPrice: 100, price: 300, serverRegion: 'US', serverIdentifier: 'I', seenAt: now },
+        { key: 'p2', groupKey: 'g', item: { name: 'x' }, quantity: 2, unitPrice: 110, price: 220, serverRegion: 'EU', serverIdentifier: 'I', seenAt: now },
+        { key: 'p3', groupKey: 'g', item: { name: 'x' }, quantity: 9, unitPrice: 90, price: 810, serverIdentifier: 'PVP', seenAt: now },
+      ],
+      '',
+      now,
+      () => undefined,
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ quantity: 5, unitPrice: 110, minimumLot: 2, keys: ['p1', 'p2'], stale: false })
+    expect(rows[0].realms.size).toBe(2)
+  })
+  it('honours a blacklist record only while active, and automatic ones only when enabled', () => {
+    const list = { 'S||': { reason: 'manual', until: -1 }, 'T|US|I': { reason: 'auto', until: 2000 } }
+    expect(blacklistRecord(list, false, 1000, 'S', 'US', 'I')).toBeTruthy()
+    expect(blacklistRecord(list, false, 1000, 'T', 'US', 'I')).toBeUndefined()
+    expect(blacklistRecord(list, true, 1000, 'T', 'US', 'I')).toBeTruthy()
+    expect(blacklistRecord(list, true, 3000, 'T', 'US', 'I')).toBeUndefined()
   })
 })
