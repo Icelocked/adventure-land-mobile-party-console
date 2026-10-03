@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { QK } from '@/data/queryKeys'
 import { usePartyApi, useCharacters, useDynamicState, useMail, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup, displayName } from '@/lib/catalogLookup'
 import { Button } from '@/components/ui/button'
@@ -236,6 +238,7 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
   // The attachment sources include every bank pack and bankboi.
   useDomainInterest('bank')
   const api = usePartyApi()
+  const queryClient = useQueryClient()
   const refreshNow = useRefreshDynamicStateNow()
   const state = useDynamicState()
   const characters = useCharacters()
@@ -303,6 +306,7 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
       setConfirming(false)
       return
     }
+    if (recipient.trim() === 'earthiverse' && subject.trim() === 'aldata_auth') queryClient.setQueryData(QK.aldataAuthPending, true)
     await refreshNow()
     onClose()
   }

@@ -217,6 +217,9 @@ export class MockPartyServer {
   standFullOccupants: { id: string; itemId: string; kind: string; price: number; quantity: number }[] = []
 
   lastOrder: Record<string, unknown> | null = null
+  consoleActions: { name: string; body: unknown }[] = []
+  consoleDebug: Record<string, unknown> | null = { phase: 'idle', message: 'Ready' }
+  stateImports: { action: string; body: string; digest: string | null }[] = []
   // GET/POST /daily-dungeons (dungeons/contracts.ts DungeonView). POSTs are
   // recorded; onDungeonAction may change the view before it is returned.
   dailyDungeon: Record<string, unknown> = { state: { phase: 'idle', participants: [], protectFromEvents: true, commands: {} }, members: [] }
@@ -1050,7 +1053,8 @@ export class MockPartyServer {
     await page.route('**/setup/pairing', async (route) => {
       const body = (route.request().postDataJSON() as { requirePairing?: boolean }) ?? {}
       if (typeof body.requirePairing === 'boolean') this.requirePairing = body.requirePairing
-      return route.fulfill({ json: { ok: true } })
+      // tools/hosting/setup-routes.ts: replies with the stored requirement.
+      return route.fulfill({ json: { requirePairing: this.requirePairing } })
     })
 
     await page.route('**/party-api/state**', async (route) => {
@@ -1079,6 +1083,32 @@ export class MockPartyServer {
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
     )
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
+    // tools/update + debug-instance + dashboard-state (settings).
+    await page.route('**/console-update/*', async (route) => {
+      const name = new URL(route.request().url()).pathname.split('/').pop() ?? ''
+      this.consoleActions.push({ name, body: route.request().postDataJSON() })
+      return route.fulfill({ json: { ok: true } })
+    })
+    await page.route('**/console-debug**', async (route) => {
+      const path = new URL(route.request().url()).pathname
+      if (route.request().method() === 'POST') {
+        const name = path.split('/').pop() ?? ''
+        this.consoleActions.push({ name: `debug-${name}`, body: null })
+        this.consoleDebug = name === 'start' ? { phase: 'running', message: 'Debug instance running', project: 'debug', port: 9100, token: 'tok' } : { phase: 'idle', message: 'Ready' }
+      }
+      return this.consoleDebug ? route.fulfill({ json: this.consoleDebug }) : route.fulfill({ status: 503, json: { error: 'starting' } })
+    })
+    await page.route('**/party-api/dashboard-state**', async (route) => {
+      const request = route.request()
+      const path = new URL(request.url()).pathname.replace(/^.*\/party-api\//, '')
+      if (path === 'dashboard-state') return route.fulfill({ json: { filename: 'caraGarage.jsonl', canonicalPath: '/srv/console/caraGarage.jsonl', localPath: '/srv/.caracal/localStorage/caraGarage.jsonl', dockerPath: '/data/localStorage/caraGarage.jsonl', maxBytes: 1000 } })
+      if (path === 'dashboard-state/export') return route.fulfill({ json: { version: 1, settings: { leader: this.leader } } })
+      const body = request.postData() ?? ''
+      this.stateImports.push({ action: path.split('/').pop() ?? '', body, digest: request.headers()['x-state-preview'] ?? null })
+      if (body.includes('broken')) return route.fulfill({ status: 400, json: { error: 'Unrecognized state file' } })
+      const preview = { fields: ['marked', 'farmingPolicy'], characters: ['Leada'], digest: 'd1', skippedCharacters: { Stranger: ['autoItemMarks'] } }
+      return route.fulfill({ json: path.endsWith('import') ? { ...preview, backupPath: '/srv/backups/state-1.jsonl' } : preview })
+    })
     await page.route('**/party-api/daily-dungeons', async (route) => {
       const request = route.request()
       if (request.method() !== 'POST') return route.fulfill({ json: this.dailyDungeon })

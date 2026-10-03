@@ -12,6 +12,8 @@ export const QK = {
   mail: ['mail'] as const,
   gameLogs: ['gameLogs'] as const,
   logsError: ['logsError'] as const,
+  // use-party-console.tsx aldataAuthPending: set after the ALData auth mail is sent.
+  aldataAuthPending: ['aldataAuthPending'] as const,
   escape: ['escape'] as const,
   latencyMs: ['latencyMs'] as const,
   configLoadedAt: ['configLoadedAt'] as const,

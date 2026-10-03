@@ -5,8 +5,14 @@ import { usePartyApi } from '@/data/PartyDataProvider'
 export interface ConsoleUpdateStatus {
   current?: string
   displayVersion?: string
-  available?: boolean
+  // The available release's version.
+  available?: string | boolean
+  notes?: string
+  automatic?: boolean
+  managed?: boolean
   phase?: string
+  checkedAt?: number
+  error?: string
   [field: string]: unknown
 }
 

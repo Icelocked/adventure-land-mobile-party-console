@@ -898,6 +898,60 @@ export class PartyApiClient {
 
   /** GET /party-api/aldata/auth - checks whether ALData has confirmed the
    *  authentication mail yet ("NO" | "YES" | "CORRECT" | "WRONG"). */
+  /** GET /party-api/dashboard-state - the import source paths and size limit (dashboard-state-import.tsx). */
+  async dashboardStateInfo(): Promise<ApiResult<string>> {
+    return this.textWithError('GET', 'dashboard-state')
+  }
+
+  /** GET /party-api/dashboard-state/export - the settings JSON (settings-export.ts). */
+  async dashboardStateExport(): Promise<ApiResult<string>> {
+    return this.textWithError('GET', 'dashboard-state/export')
+  }
+
+  /** POST /party-api/dashboard-state/{preview,import} - the raw file as
+   *  text/plain; an import repeats the preview's digest in X-State-Preview. */
+  async dashboardStateRequest(action: 'preview' | 'import', source: string, digest?: string): Promise<ApiResult<string>> {
+    return this.textWithError('POST', `dashboard-state/${action}`, source, { 'Content-Type': 'text/plain;charset=UTF-8', ...(digest ? { 'X-State-Preview': digest } : {}) })
+  }
+
+  /** A party-api request whose failures keep the server's {error} text or raw body. */
+  private async textWithError(method: 'GET' | 'POST', path: string, body?: string, headers?: Record<string, string>): Promise<ApiResult<string>> {
+    const toastId = method === 'POST' ? beginActionToast() : null
+    try {
+      const response = await timedFetch(this.url(path), method === 'POST' ? { method, headers, body } : {}, method === 'GET' ? GET_TIMEOUT_MS : 120_000) // state files can be large
+      const text = await response.text()
+      if (response.ok) {
+        if (toastId !== null) resolveActionToast(toastId, 'sent')
+        return ok(text)
+      }
+      let message = text
+      try {
+        message = (JSON.parse(text) as { error?: string }).error || text
+      } catch {
+        // Preserve non-JSON server errors.
+      }
+      message = message || `HTTP ${response.status} ${response.statusText}`
+      if (toastId !== null) resolveActionToast(toastId, 'failed', message)
+      return fail(message, response.status)
+    } catch (error) {
+      if (toastId !== null) resolveActionToast(toastId, 'failed', errorMessage(error))
+      return fail(errorMessage(error))
+    }
+  }
+
+  /** POST /console-update/{check,download,restart,preferences} (console-updates.tsx). */
+  async consoleUpdateAction(name: 'check' | 'download' | 'restart' | 'preferences', value: Record<string, unknown> = {}): Promise<ApiResult<string>> {
+    return this.postRoot(`console-update/${name}`, value)
+  }
+
+  /** GET /console-debug and POST /console-debug/{start,stop} (debug-instance.tsx). */
+  async consoleDebug(): Promise<ApiResult<string>> {
+    return this.getRoot('console-debug')
+  }
+  async consoleDebugAction(name: 'start' | 'stop'): Promise<ApiResult<string>> {
+    return this.postRoot(`console-debug/${name}`, {})
+  }
+
   async checkAlDataAuth(): Promise<ApiResult<string>> {
     const result = await getText(this.url('aldata/auth'))
     if (result.kind === 'failure') return result

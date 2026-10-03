@@ -470,6 +470,7 @@ export const useDynamicState = (): PartyStateDynamic => useCachedValue(QK.dynami
 export const useMail = (): MailSnapshot => useCachedValue(QK.mail, { messages: [], count: 0 })
 export const useGameLogs = (): Record<string, GameLogEntry[]> => useCachedValue(QK.gameLogs, {})
 export const useLogsError = (): boolean => useCachedValue(QK.logsError, false)
+export const useAlDataAuthPending = (): boolean => useCachedValue(QK.aldataAuthPending, false)
 export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.escape, null)
 /** Round-trip time of the smallest request in the last dynamic-state poll
  *  cycle (see refreshDynamicStateNow) - null until the first poll lands. */
