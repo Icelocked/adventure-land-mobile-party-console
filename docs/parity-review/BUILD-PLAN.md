@@ -10,8 +10,8 @@
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
-- **Phase 7:** C8 `ee9986c`, C7 `a129ee1`, C1 (this commit).
-- **Next:** Phase 7 (C3, C2).
+- **Phase 7:** C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 (this commit).
+- **Next:** Phase 7 (C2).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1422,6 +1422,10 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/character-detail/sections/FarmingSection.tsx`, `P/components/FarmingAreaPicker.tsx`, `P/api/partyApi.ts` (`setFocus` + `monsterPriorities`, `routeToFarmingArea` + `label`).
 - **Endpoints:** `POST /focus {character, monsterFocus, monsterPriorities, monsterSearchRadius?}`, `/command party-monster-travel|character-travel {location, farmingMonsterIds, label}`, `POST /navigate-to-monster`.
 - **Dependencies:** P0-08, F7 #22, C6 (map preview can use static map images first).
+- **As built (ground rule 2):**
+  - The focus form keeps its Save button. Edited priorities go in the same `/focus` body, as the dashboard's priority change does.
+  - "Find selected monster" uses `canRouteToMonster` (aria-disabled, with `FOLLOWER_ROUTE_MESSAGE`).
+  - The farming-area map preview, "Enlarge map" and legend wait for the live-map renderer in C6.
 
 #### C7 — Travel and party-action results (S)
 - **Rows:** A159, A160, A162–A164.

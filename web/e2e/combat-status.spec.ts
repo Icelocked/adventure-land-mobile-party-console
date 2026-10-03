@@ -269,6 +269,8 @@ test('Route button opens the general farming-area picker and routes this charact
     type: 'party-monster-travel',
     location: { map: 'main', x: 50, y: 75 },
     farmingMonsterIds: ['crabx'],
+    // use-party-console.tsx startFarmingArea's label.
+    label: expect.stringMatching(/^the selected farming area in /),
   })
 })
 
@@ -329,6 +331,8 @@ test('An independent character (not the leader, not following) routes via charac
     type: 'character-travel',
     location: { map: 'main', x: 50, y: 75 },
     farmingMonsterIds: ['crabx'],
+    // use-party-console.tsx startFarmingArea's label.
+    label: expect.stringMatching(/^the selected farming area in /),
   })
 })
 
@@ -377,7 +381,10 @@ test('Route button is disabled for a follower - only the leader can route to a m
   await server.install(page)
 
   await page.goto('/characters/Follower1')
-  await expect(page.getByRole('button', { name: 'Only the leader can route to a monster' })).toBeDisabled()
+  // monster-route-button.tsx: aria-disabled with FOLLOWER_ROUTE_MESSAGE.
+  const route = page.getByRole('button', { name: 'only leader can route to monster' })
+  await expect(route).toHaveAttribute('aria-disabled', 'true')
+
 })
 
 test('Phoenix search order requires exactly 5 regions before starting the patrol', async ({ page }) => {
