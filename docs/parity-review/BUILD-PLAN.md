@@ -13,8 +13,8 @@
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
 - **Phase 9:** C4 `af3e32a`, C6 `8b86631` (done before C5 because the cave map builds on it), C5 `2fe1cf4`.
-- **Phase 10:** X1 `a9e2549`, C9 (this commit).
-- **Next:** Phase 10 (I9, S2, S3).
+- **Phase 10:** X1 `a9e2549`, C9 `ed25876`, I9 (this commit).
+- **Next:** Phase 10 (S2, S3).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1682,6 +1682,10 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/equipment-catalog-dialog.tsx`, `party-equipment-catalog-dialog.tsx`, `catalog-comparison.tsx`.
 - **PWA files:** `P/screens/account/CatalogScreen.tsx`, new `P/screens/account/CatalogComparisonScreen.tsx`.
 - **Dependencies:** F7 #28/#29, M7 (WTB entry).
+- **As built:**
+  - `CatalogScreen` is the equipment catalog (equipment types only, search by name/id/set, the 25 sorts with the sorted stat on each tile, type chips, class chips with Exclusive gear, the count line). Rows render in 120-item batches as the page scrolls; a tile opens item details (WTB included). The memoized catalog avoids a reset loop before the catalog loads.
+  - Item details' Compare picker has "From catalog": the item at the preview level becomes A and the catalog opens in comparison mode (type pre-selected, details closed). Add up to three, Compare selected / Cancel comparison / Back to catalog.
+  - `CatalogComparison.tsx` is the verbatim table (per-column preview level and stat scroll, delta and %, type/wtype/damage_type/ability rows, Remove). `lib/catalogComparison.ts` holds `EQUIPMENT_TYPES` and `comparisonEntry`.
 
 #### C9 — Skills reference (S)
 - **Rows:** A166.
