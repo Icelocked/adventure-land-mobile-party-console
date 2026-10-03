@@ -152,7 +152,9 @@ export interface SkillDefinition {
 export interface SkillEntry {
   id: string
   name: string
-  definition?: SkillDefinition
+  sprite?: Sprite | null
+  // skill-entry.ts: the full G.skills definition.
+  definition?: SkillDefinition & Record<string, unknown>
 }
 
 /** One activity-feed line (merchant-activity or combat log). */

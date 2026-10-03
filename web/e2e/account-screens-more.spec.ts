@@ -47,7 +47,7 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   await expect(page.getByText('No active orders.')).toBeVisible()
 })
 
-test('Skills: expanding a class shows a skill\'s definition', async ({ page }) => {
+test('Skills: search, range labels, and the full definition of a skill', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
@@ -55,15 +55,42 @@ test('Skills: expanding a class shows a skill\'s definition', async ({ page }) =
     {
       id: 'warrior',
       name: 'Warrior',
-      skills: [{ id: 'cleave', name: 'Cleave', definition: { range: 100, mp: 20, cooldown: 4000, explanation: 'Hits everything nearby' } }],
+      skills: [
+        { id: 'cleave', name: 'Cleave', definition: { range: 100, range_multiplier: 2, range_bonus: 10, mp: 20, cooldown: 4000, explanation: 'Hits everything nearby' } },
+        { id: 'charge', name: 'Charge', definition: { use_range: true, range_multiplier: 1.5, range_bonus: -5 } },
+      ],
+    },
+    {
+      id: 'skills',
+      name: 'Shared',
+      skills: [
+        { id: 'throw', name: 'Throw', definition: { range: 200 } },
+        { id: 'blink', name: 'Blink', definition: { global: true } },
+        { id: 'emote', name: 'Emote', definition: {} },
+      ],
     },
   ]
   await server.install(page)
 
   await page.goto('/skills')
-  await page.getByText('Warrior').click()
-  await expect(page.getByText('Hits everything nearby')).toBeVisible()
-  await expect(page.getByText('Range 100 · MP 20 · CD 4s')).toBeVisible()
+  const warrior = page.getByRole('region', { name: 'Warrior' })
+  await expect(warrior.getByRole('button', { name: /^Cleave cleave Range: 210$/ })).toBeVisible()
+  await expect(warrior.getByRole('button', { name: /^Charge charge Range: 1\.5 × attack range − 5$/ })).toBeVisible()
+  const shared = page.getByRole('region', { name: 'Shared' })
+  await expect(shared.getByRole('button', { name: /Range: 200 \+ character level$/ })).toBeVisible()
+  await expect(shared.getByRole('button', { name: /Range: Global$/ })).toBeVisible()
+  await expect(shared.getByRole('button', { name: /Range: Not specified$/ })).toBeVisible()
+
+  await page.getByPlaceholder('Search classes or skills…').fill('warrior')
+  await expect(shared).toHaveCount(0)
+  await expect(warrior.getByRole('button')).toHaveCount(2)
+
+  await warrior.getByRole('button', { name: /^Cleave/ }).click()
+  const details = page.getByRole('group', { name: 'Skill details' })
+  await expect(details.getByText('G.skills.cleave')).toBeVisible()
+  await expect(details.getByText('Hits everything nearby')).toBeVisible()
+  await expect(details.getByText('210', { exact: true })).toBeVisible()
+  await expect(details.getByText('4s', { exact: true })).toBeVisible()
 })
 
 test('Routines: moving a routine up changes its saved priority order', async ({ page }) => {
