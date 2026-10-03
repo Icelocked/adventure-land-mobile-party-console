@@ -82,7 +82,7 @@ function StandRow({ listing, catalogFor }: { listing: StandListing; catalogFor: 
         // source) with its current price and quantity.
         <StandListingForm
           item={listing.item}
-          itemValue={catalogFor(listing.item.name)?.meta?.definition.g as number | undefined}
+          meta={catalogFor(listing.item.name)?.meta}
           existing={listing}
           onSubmit={({ price, quantity, markAll }) =>
             void act(() => api.markForStand(listing.item, listing.slot, price, { id: listing.id, bankPack: listing.bankPack, quantity, markAll }))

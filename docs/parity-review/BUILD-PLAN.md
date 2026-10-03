@@ -9,8 +9,8 @@
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
-- **Phase 6:** M7 (this commit).
-- **Next:** Phase 6 (M5, M4, M6, M8).
+- **Phase 6:** M7 `cb447c3`, M5 (this commit).
+- **Next:** Phase 6 (M4, M6, M8).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1284,6 +1284,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/components/StandDialog.tsx` (from F5).
 - **Endpoints:** `POST /merchant/stand`, `/merchant/auto-stand`; state `standPriceHistory`, `aldata.listings`, `ponty`.
 - **Dependencies:** F5, F7 #10/#31.
+- **As built (ground rule 2):** the dialog stays inline as `StandListingForm` under its row in the options list, bank options and stand screen. Its copy, presets, guards and labels follow the dashboard. "Current number on market" counts fresh ALData listings against this device's clock (the dashboard uses the market query's fetch time).
 
 #### M6 — Market (L)
 - **Rows:** A396–A405, A407, A408.

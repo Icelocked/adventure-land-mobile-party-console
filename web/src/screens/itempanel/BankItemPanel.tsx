@@ -126,9 +126,10 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
           {expanded === 'stand' && (
             <StandListingForm
               item={item}
-              itemValue={meta?.definition.g as number | undefined}
+              meta={meta}
               existing={standListing}
-              onSubmit={({ price, quantity, markAll }) => void run(() => api.markForStand(item, entry.slot, price, { id: standListing?.id, bankPack: pack, quantity, markAll }))}
+              onCancel={() => setExpanded(null)}
+              onSubmit={({ price, quantity, markAll }) => confirmWith(() => api.markForStand(item, entry.slot, price, { id: standListing?.id, bankPack: pack, quantity, markAll }))}
             />
           )}
           {merchant && !item.l && <TapRow label="Auto mark for stand…" onClick={() => toggle('autostand')} />}
@@ -136,9 +137,10 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
             <StandListingForm
               auto
               item={item}
-              itemValue={meta?.definition.g as number | undefined}
+              meta={meta}
               existing={state.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined}
-              onSubmit={({ price }) => void run(() => api.autoStand(item, price))}
+              onCancel={() => setExpanded(null)}
+              onSubmit={({ price }) => confirmWith(() => api.autoStand(item, price))}
             />
           )}
 
