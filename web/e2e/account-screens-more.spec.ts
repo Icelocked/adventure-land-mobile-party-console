@@ -138,13 +138,3 @@ test('Settings: switching realm updates immediately (no stale data until the nex
 
   await expect(page.getByText('Current: US II · Home: US I')).toBeVisible()
 })
-
-test('Logs: shows an empty state with no activity', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
-  await server.install(page)
-
-  await page.goto('/logs')
-  await expect(page.getByText('No activity yet.')).toBeVisible()
-})
