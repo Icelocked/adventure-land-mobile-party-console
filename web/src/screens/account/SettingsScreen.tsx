@@ -100,28 +100,6 @@ export function SettingsScreen() {
           <ConfigLoadingNote />
         </div>
 
-        <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
-          <div>
-            <div className="text-sm font-medium">Anniversary auto-chat</div>
-            <div className="text-xs text-muted-foreground">Send anniversary chat message when receiving cake from a kiss</div>
-          </div>
-          <input
-            type="checkbox"
-            checked={dynamicState.anniversaryAutoChat}
-            disabled={!configLoaded}
-            onChange={(e) => void api.setAnniversaryAutoChat(e.target.checked).then(() => refreshNow())}
-            className="size-4"
-          />
-        </div>
-
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="mb-1 text-sm font-medium">Anniversary chat advertisement</div>
-          <p className="mb-2 text-xs text-muted-foreground">Sends the cake-slice trade advertisement to in-game chat right now.</p>
-          <Button variant="outline" onClick={() => void api.sendAnniversaryChatAdvertisement()}>
-            Send in-game chat now
-          </Button>
-        </div>
-
         <ALDataSection />
 
         <div className="rounded-md border border-border bg-card p-4">

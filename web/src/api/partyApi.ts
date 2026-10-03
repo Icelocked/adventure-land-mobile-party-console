@@ -351,6 +351,12 @@ export class PartyApiClient {
     return this.post('formation', { character, follow })
   }
 
+  /** POST /party-api/formation {character, eventSelections} -
+   *  connected-character-card.tsx onEventSelectionChange. */
+  async setEventSelections(character: string, eventSelections: string[]): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { character, eventSelections })
+  }
+
   /** POST /party-api/restock - one character's HP/MP auto-potion
    *  thresholds. */
   async saveRestock(character: string, policy: RestockPolicy): Promise<ApiResult<CommandResult>> {
