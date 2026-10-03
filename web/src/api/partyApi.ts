@@ -721,10 +721,14 @@ export class PartyApiClient {
   /** POST /party-api/focus - which monsters a character farms/hunts,
    *  per-character (unlike farming-mode). Omitting `monsterSearchRadius`
    *  leaves it unchanged server-side. */
-  async setFocus(character: string, monsterFocus: string[], monsterSearchRadius?: number): Promise<ApiResult<CommandResult>> {
-    const body: Record<string, unknown> = { character, monsterFocus }
-    if (monsterSearchRadius !== undefined) body.monsterSearchRadius = monsterSearchRadius
-    return this.post('focus', body)
+  async setFocus(character: string, monsterFocus: string[], monsterSearchRadius?: number, monsterPriorities?: Record<string, number>): Promise<ApiResult<CommandResult>> {
+    // use-party-console.tsx setFocus: priorities and radius only when given.
+    return this.post('focus', {
+      character,
+      monsterFocus,
+      ...(monsterPriorities ? { monsterPriorities } : {}),
+      ...(monsterSearchRadius !== undefined ? { monsterSearchRadius } : {}),
+    })
   }
 
   /** POST /party-api/navigate-to-monster - sends the whole party/convoy to
@@ -753,11 +757,13 @@ export class PartyApiClient {
     isLeader: boolean,
     location: { map: string; x: number; y: number },
     farmingMonsterIds: string[],
+    label?: string,
   ): Promise<ApiResult<CommandResult>> {
     return this.sendCommand(character, {
       type: isLeader ? 'party-monster-travel' : 'character-travel',
       location,
       farmingMonsterIds,
+      ...(label ? { label } : {}),
     })
   }
 

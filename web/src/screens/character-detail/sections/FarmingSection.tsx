@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
-import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded, useDynamicState } from '@/data/PartyDataProvider'
+import { canRouteToMonster, FOLLOWER_ROUTE_MESSAGE } from '@/lib/partyRouting'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
@@ -96,6 +97,12 @@ export function FarmingSection({
   const api = usePartyApi()
   const navigate = useNavigate()
   const refreshNow = useRefreshDynamicStateNow()
+  const state = useDynamicState()
+  // monster-route-button.tsx: only the leader or a non-follower can route.
+  const canRoute = canRouteToMonster({ leader: state.leader, followers: state.followers }, characterName)
+  const routeDescription = canRoute ? 'Find selected monster' : FOLLOWER_ROUTE_MESSAGE
+  // connected-character-card.tsx: the focus header shows the leader's (effective) radius.
+  const effectiveRadius = state.monsterSearchRadiusByCharacter[state.leader || characterName] || 400
   const [showFocus, setShowFocus] = useState(false)
   const [pickingBackup, setPickingBackup] = useState(false)
   const [backupFocus, setBackupFocus] = useState<string[]>([])
@@ -206,6 +213,8 @@ export function FarmingSection({
           bestiaryCatalog={bestiaryCatalog}
           ids={monsterFocus.filter((id) => id !== 'all')}
           character={position}
+          // party-workspace.tsx: prefer the character's saved waypoint, else the party's.
+          waypoint={state.characterLocations?.[characterName] || state.partyLocation}
           radius={monsterSearchRadius}
           busy={busy}
           savedPhoenixOrder={phoenixRouteOrder}
@@ -215,7 +224,7 @@ export function FarmingSection({
             try {
               const result = phoenixRouteOrder
                 ? await api.navigateToMonster('phoenix', { map: area.map, x: area.x, y: area.y }, phoenixRouteOrder)
-                : await api.routeToFarmingArea(characterName, isLeader, { map: area.map, x: area.x, y: area.y }, monsterFocus.filter((id) => id !== 'all'))
+                : await api.routeToFarmingArea(characterName, isLeader, { map: area.map, x: area.x, y: area.y }, [...new Set(monsterFocus.filter((id) => id !== 'all'))], `the selected farming area in ${area.mapName || area.map}`)
               if (result.kind === 'failure') setError(result.message)
               else {
                 setPickingArea(false)
@@ -228,7 +237,8 @@ export function FarmingSection({
         />
       )}
 
-      <div className="mt-2 flex items-center gap-2">
+      <p className="mb-1 mt-2 font-mono text-[10px] uppercase text-muted-foreground">Monster focus - {effectiveRadius}</p>
+      <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -241,10 +251,12 @@ export function FarmingSection({
         <Button
           variant="outline"
           size="icon"
-          aria-label={followingLeader ? 'Only the leader can route to a monster' : 'Find selected monster'}
-          title={followingLeader ? 'Only the leader can route to a monster' : 'Find selected monster'}
-          disabled={!!followingLeader || pickingBackup || pickingArea}
-          onClick={() => setPickingArea(true)}
+          aria-label={routeDescription}
+          title={routeDescription}
+          aria-disabled={!canRoute}
+          disabled={pickingBackup || pickingArea}
+          className={canRoute ? undefined : 'opacity-60'}
+          onClick={() => (canRoute ? setPickingArea(true) : setError(FOLLOWER_ROUTE_MESSAGE))}
         >
           <MapPin className="size-4" />
         </Button>
@@ -258,6 +270,12 @@ export function FarmingSection({
           monsterFocus={monsterFocus}
           monsterSearchRadius={monsterSearchRadius}
           monsterChoices={monsterChoices}
+          priorities={state.monsterPrioritiesByCharacter?.[characterName] ?? {}}
+          radiusContext={
+            state.followers?.[characterName] && state.leader && state.leader !== characterName
+              ? `Following ${state.leader}: effective radius ${state.monsterSearchRadiusByCharacter[state.leader] || 400}. This input saves ${characterName}'s own radius.`
+              : 'Radius for Leader'
+          }
           onClose={() => setShowFocus(false)}
         />
       )}
@@ -337,12 +355,16 @@ function MonsterFocusForm({
   monsterFocus,
   monsterSearchRadius,
   monsterChoices,
+  priorities,
+  radiusContext,
   onClose,
 }: {
   characterName: string
   monsterFocus: string[]
   monsterSearchRadius: number
   monsterChoices: MonsterChoice[]
+  priorities: Record<string, number>
+  radiusContext: string
   onClose: () => void
 }) {
   const api = usePartyApi()
@@ -353,6 +375,10 @@ function MonsterFocusForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fairyExplanation, setFairyExplanation] = useState(false)
+  // monster-focus-picker.tsx: per-monster target priority, 0–1000, default 50, higher wins.
+  const [priorityDrafts, setPriorityDrafts] = useState<Record<string, string>>({})
+  const priorityOf = (id: string) => priorityDrafts[id] ?? String(priorities[id] ?? 50)
+  const prioritiesChanged = Object.keys(priorityDrafts).length > 0
 
   const choices: [string, string, Sprite | null][] = [
     ['all', 'All monsters', null],
@@ -386,7 +412,18 @@ function MonsterFocusForm({
             <label key={id} className="flex items-center gap-2 py-1">
               <input type="checkbox" checked={selected.includes(id)} onChange={(e) => toggle(id, e.target.checked)} className="size-4" />
               {sprite ? <SpriteIcon sprite={sprite} size={24} /> : <span className="grid size-6 place-items-center">*</span>}
-              <span className="text-sm">{label}</span>
+              <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+              <Input
+                type="number"
+                min={0}
+                max={1000}
+                aria-label={`${label} priority`}
+                title="Target priority (higher wins)"
+                value={priorityOf(id)}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => setPriorityDrafts((current) => ({ ...current, [id]: event.target.value }))}
+                className="h-8 w-16 shrink-0 px-2 text-center font-mono text-xs"
+              />
             </label>
           ),
         )}
@@ -401,7 +438,8 @@ function MonsterFocusForm({
         Monster search radius
         <Input aria-label="Monster search radius" inputMode="numeric" value={radius} onChange={(e) => setRadius(e.target.value)} className="mt-1" />
       </label>
-      <p className="mt-1 text-xs text-muted-foreground">Clearing monster focus resets this to 400.</p>
+      <p className="mt-1 text-xs text-muted-foreground">{radiusContext} Clearing monster focus resets this to 400.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Targets in the selected spawn zone come first. This radius allows nearby targets only when no eligible targets are visible inside that zone.</p>
       {error && <p role="alert" className="mt-1.5 text-sm text-destructive">{error}</p>}
       <div className="mt-2 flex justify-end gap-2">
         <Button size="sm" variant="outline" onClick={onClose}>
@@ -422,7 +460,15 @@ function MonsterFocusForm({
             }
             setSaving(true)
             setError(null)
-            const result = await api.setFocus(characterName, selected, nextRadius)
+            let nextPriorities: Record<string, number> | undefined
+            if (prioritiesChanged) {
+              nextPriorities = { ...priorities }
+              for (const [id, draft] of Object.entries(priorityDrafts)) {
+                const parsed = Number(draft)
+                nextPriorities[id] = Number.isFinite(parsed) && draft.trim() ? Math.max(0, Math.min(1000, Math.round(parsed))) : 50
+              }
+            }
+            const result = await api.setFocus(characterName, selected, nextRadius, nextPriorities)
             setSaving(false)
             if (result.kind === 'failure') setError(result.message)
             else {
