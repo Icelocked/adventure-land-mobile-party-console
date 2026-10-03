@@ -13,8 +13,8 @@
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
 - **Phase 9:** C4 `af3e32a`, C6 `8b86631` (done before C5 because the cave map builds on it), C5 `2fe1cf4`.
-- **Phase 10:** X1 `a9e2549`, C9 `ed25876`, I9 `d717c92`, S3 (this commit).
-- **Next:** Phase 10 (S2).
+- **Phase 10:** X1 `a9e2549`, C9 `ed25876`, I9 `d717c92`, S3 `387ba99`, S2 (this commit).
+- **Next:** all planned packages are built. Remaining work is tracking new party-console releases.
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1722,6 +1722,12 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
   - `GET /console-debug`, `POST /console-debug/{start, stop}`
   - `GET /setup/state`, `POST /setup/pairing`, `GET /party-api/aldata/auth`
 - **Dependencies:** F3, F4, F7 #7/#8, B4 (Prepare mail composer).
+- **As built:**
+  - Settings ("Interface settings") follows the dashboard dialog's order: state import/export, realm, Characters (Create character, the member grid with live doll or saved appearance plus bankbois padded to eight slots, the bankboi name), ALData, hosting, console updates with debugging. The PWA's own server-address and app-update controls stay at the end.
+  - `settings/DashboardStateImport.tsx`: source paths, export (save picker or download), import with the size guard, preview (characters, skipped characters with labelled fields, fields, backup notice), and Import/Cancel sending the `X-State-Preview` digest; success shows the backup path. `PartyApiClient.dashboardState*` keep the server's error text.
+  - `settings/ConsoleSettings.tsx`: hosting (pairing checkbox disabled while busy/unknown, warning, authorized note, Load setup, error) and console updates (version, release and notes, phase status, Check now, Download and install, Restart now, automatic toggle, development-checkout notice, error) with the debug-instance controls.
+  - ALData: sending the earthiverse/aldata_auth mail sets `QK.aldataAuthPending`; Settings then shows the waiting banner and re-reads `/aldata/auth` every 15 s until CORRECT.
+  - Debug instance: `DebugBrowserBanner` on the party screen, and `SessionControls` become the "Debug browser" link (`data/useDebugBrowser.ts`).
 
 #### S3 — Logs (M)
 - **Rows:** A072–A079.

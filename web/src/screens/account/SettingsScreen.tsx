@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { QK } from '@/data/queryKeys'
+import { DashboardStateImport } from './settings/DashboardStateImport'
+import { ConsoleUpdateSettings, HostingSettings } from './settings/ConsoleSettings'
+import { AccountMembers } from './settings/AccountMembers'
+import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { Copy, Eye, EyeOff } from 'lucide-react'
-import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useRoster, useConfigLoaded } from '@/data/PartyDataProvider'
+import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { Button } from '@/components/ui/button'
@@ -9,37 +15,20 @@ import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
 import { applyPendingUpdate, checkForUpdate, subscribeUpdateStatus, type UpdateStatus } from '@/lib/serviceWorkerUpdate'
-import type { RosterMember } from '@/models'
 
-/** Ports hosting-settings.tsx (pairing toggle), account-settings.tsx
- *  (roster + bankboi prefix), and the realm-control block - see
- *  ui/account/SettingsScreen.kt. Console-update checks and dashboard-
- *  state import/export are a fast-follow, not in v1. */
+/** party-inventory-panels.tsx "Interface settings" as a screen, in its
+ *  order: state import/export, realm, characters (create, member grid,
+ *  bankboi name), ALData, hosting, console updates and debugging - then
+ *  this app's own connection and update controls. */
 export function SettingsScreen() {
-  const roster = useRoster()
   const dynamicState = useDynamicState()
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
   const openServerSettings = useOpenServerSettings()
-  const [requirePairing, setRequirePairing] = useState<boolean | null>(null)
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
   const [prefixStatus, setPrefixStatus] = useState<{ saved: true } | { error: string } | null>(null)
-
-  useEffect(() => {
-    void (async () => {
-      const result = await api.getRoot('setup/state')
-      if (result.kind === 'success') {
-        try {
-          const parsed = JSON.parse(result.value) as { requirePairing?: boolean }
-          setRequirePairing(parsed.requirePairing ?? false)
-        } catch {
-          // leave unset
-        }
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [creating, setCreating] = useState(false)
 
   // Seed once, from the real config value - never from the empty default.
   useEffect(() => {
@@ -48,27 +37,23 @@ export function SettingsScreen() {
   }, [configLoaded, dynamicState.bankboiPrefix])
 
   return (
-    <AccountScreenScaffold title="Settings" onRefresh={() => void refreshNow()}>
+    <AccountScreenScaffold title="Interface settings" onRefresh={() => void refreshNow()}>
       <div className="flex flex-col gap-3 p-3">
-        <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
-          <div>
-            <div className="text-sm font-medium">Require secure pairing</div>
-            <div className="text-xs text-muted-foreground">Extra login gate on top of network access</div>
-          </div>
-          <input
-            type="checkbox"
-            checked={requirePairing === true}
-            onChange={async (event) => {
-              const checked = event.target.checked
-              const result = await api.postRoot('setup/pairing', { requirePairing: checked })
-              if (result.kind === 'success') setRequirePairing(checked)
-            }}
-            className="size-4"
-          />
-        </div>
+        <DashboardStateImport />
+        {dynamicState.realmControl && <RealmSection control={dynamicState.realmControl} />}
 
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="mb-1 text-sm font-medium">Bankboi prefix</div>
+        <section aria-label="Characters" className="rounded-md border border-border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Characters</p>
+              <p className="font-mono text-[10px] uppercase text-slate-400">Create and add characters to your account roster.</p>
+            </div>
+            <Button variant="outline" onClick={() => setCreating(true)}>
+              Create character
+            </Button>
+          </div>
+          <AccountMembers />
+          <div className="mb-1 mt-4 text-sm font-medium">Default name for bankboi</div>
           <div className="flex gap-2">
             <Input
               aria-label="Default name for bankboi"
@@ -98,9 +83,11 @@ export function SettingsScreen() {
           </p>
           {prefixStatus && 'error' in prefixStatus && <p role="alert" className="mt-1 text-sm text-destructive">{prefixStatus.error}</p>}
           <ConfigLoadingNote />
-        </div>
+        </section>
 
         <ALDataSection />
+        <HostingSettings />
+        <ConsoleUpdateSettings />
 
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-1 text-sm font-medium">PWA connection</div>
@@ -118,15 +105,8 @@ export function SettingsScreen() {
             Recover Steam handoff after characters are offline
           </Button>
         )}
-        {dynamicState.realmControl && <RealmSection control={dynamicState.realmControl} />}
-
-        <div className="text-sm font-medium">Characters</div>
-        <div className="flex flex-col gap-1">
-          {Object.values(roster).map((member) => (
-            <RosterRow key={member.name} member={member} />
-          ))}
-        </div>
       </div>
+      {creating && <CreateCharacterSheet onClose={() => setCreating(false)} />}
     </AccountScreenScaffold>
   )
 }
@@ -144,15 +124,31 @@ function ALDataSection() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const pending = useAlDataAuthPending()
+  const [authStatus, setAuthStatus] = useState<string | null>(null)
   const aldata = dynamicState.aldata
+  // use-party-console.tsx: while the auth mail is in flight, /aldata/auth is re-read every 15 s until CORRECT.
+  useEffect(() => {
+    if (!pending) return
+    const check = async () => {
+      const result = await api.checkAlDataAuth()
+      setAuthStatus(result.kind === 'success' ? result.value : 'unknown')
+      if (result.kind === 'success' && result.value === 'CORRECT') queryClient.setQueryData(QK.aldataAuthPending, false)
+    }
+    void check()
+    const timer = setInterval(() => void check(), 15000)
+    return () => clearInterval(timer)
+  }, [pending, api, queryClient])
 
   return (
     <div className="rounded-md border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium">ALData</div>
+          {pending ? <output className="block text-sm text-amber-200">Waiting for mail delivery and ALData verification… Do not resend; each message costs gold.</output> : null}
           <div className="font-mono text-[10px] uppercase text-muted-foreground">
-            Auth: {aldata?.auth ?? 'NO'} · Publish: {aldata?.publishStatus ?? 'idle'}
+            Auth: {authStatus ?? aldata?.auth ?? 'NO'} · Publish: {aldata?.publishStatus ?? 'idle'}
           </div>
         </div>
         <Button
@@ -164,6 +160,10 @@ function ALDataSection() {
             setError(null)
             const result = await api.checkAlDataAuth()
             if (result.kind === 'failure') setError(result.message)
+            else {
+              setAuthStatus(result.value)
+              if (result.value === 'CORRECT') queryClient.setQueryData(QK.aldataAuthPending, false)
+            }
             await refreshNow()
             setBusy(false)
           }}
@@ -276,17 +276,6 @@ function AppUpdateSection() {
           {label}
         </Button>
       )}
-    </div>
-  )
-}
-
-function RosterRow({ member }: { member: RosterMember }) {
-  return (
-    <div className="flex items-center justify-between rounded-md border border-border bg-card p-3">
-      <span className="text-sm">{member.name}</span>
-      <span className="text-xs text-muted-foreground">
-        Lv {member.level} {member.ctype}
-      </span>
     </div>
   )
 }

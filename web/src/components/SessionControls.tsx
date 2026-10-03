@@ -1,3 +1,4 @@
+import { useDebugBrowser, useDebugGameUrl } from '@/data/useDebugBrowser'
 import { useRef, useState } from 'react'
 import { LogOut, Monitor, Server } from 'lucide-react'
 import { usePartyApi, useDynamicState } from '@/data/PartyDataProvider'
@@ -19,6 +20,9 @@ export function SessionControls({ name }: { name: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitting = useRef(false)
+  // character-session-controls.tsx: a debug instance offers its game browser instead.
+  const debugBrowser = useDebugBrowser()
+  const debugGameUrl = useDebugGameUrl()
   const native = slot?.kind === 'native'
   const disabled = !slot || pending || busy
   const changed =
@@ -60,6 +64,19 @@ export function SessionControls({ name }: { name: string }) {
 
   const iconClass = (on: boolean) => `rounded-md border p-1.5 disabled:opacity-40 ${on ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground'}`
 
+  if (debugBrowser)
+    return (
+      <a
+        href={debugGameUrl}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${name} · Debug browser ${slot?.primary ? 'primary' : 'companion'}`}
+        title="View the running debug game browser"
+        className="rounded border border-cyan-700 px-2 py-1 text-xs text-cyan-100"
+      >
+        Debug browser{slot?.primary ? ' · primary' : ''}
+      </a>
+    )
   return (
     <>
       <div className="flex shrink-0 items-center gap-1" aria-label={`${name} session controls`}>

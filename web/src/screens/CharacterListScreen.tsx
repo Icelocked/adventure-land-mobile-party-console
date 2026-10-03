@@ -1,4 +1,5 @@
 import { DungeonPanel } from '@/screens/dungeon/DungeonPanel'
+import { DebugBrowserBanner } from '@/components/DebugBrowserBanner'
 import { useDungeons } from '@/data/useDailyDungeon'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -101,6 +102,7 @@ export function CharacterListScreen() {
       </header>
 
       {!connected && <div className="h-0.5 w-full animate-pulse bg-primary/60" />}
+      <DebugBrowserBanner />
 
       {/* party-workspace.tsx: the dungeon panel heads the party while a visit runs. */}
       <DungeonPanel />
