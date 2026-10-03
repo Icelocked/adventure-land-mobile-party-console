@@ -816,6 +816,24 @@ export class PartyApiClient {
    *  of scrolls during automatic upgrades in this level range" rule. The
    *  server assigns a real id for new rules; the id sent back in the
    *  response/next poll is authoritative, not whatever was sent. */
+  /** POST /party-api/upgrade-preview - upgrade-preview-panel.tsx's 2 s poll
+   *  (a plain fetch there: no action toast, no domain refresh). `refresh`
+   *  queues a new server preview; otherwise the stored one is returned. */
+  async upgradePreview(body: Record<string, unknown>, signal?: AbortSignal): Promise<ApiResult<{ result?: unknown; status?: string; error?: string }>> {
+    try {
+      const response = await fetch(this.url('upgrade-preview'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
+      if (isAuthLoss(response)) {
+        signalAuthLoss()
+        return fail('Session expired. Reconnect this browser.', response.status)
+      }
+      const value = (await response.json().catch(() => ({}))) as { error?: string; result?: unknown; status?: string }
+      if (!response.ok) return fail(value.error || 'Server preview unavailable', response.status)
+      return ok(value)
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Server preview unavailable')
+    }
+  }
+
   async saveOfferingRule(character: string, id: string, name: string, floor: number, ceiling: number, offering: string, required: boolean): Promise<ApiResult<CommandResult>> {
     return this.sendCommand(character, { type: 'upgrade-offering-rule', rule: { id, name, floor, ceiling, offering, required } })
   }

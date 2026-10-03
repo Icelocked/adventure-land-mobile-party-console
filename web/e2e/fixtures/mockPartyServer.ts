@@ -149,6 +149,8 @@ export class MockPartyServer {
   merchantCurrent: Record<string, unknown> | null = null
   merchantQueue: Record<string, unknown>[] = []
   upgradeOfferingRules: Record<string, unknown>[] = []
+  upgradePreview: Record<string, unknown> | null = null
+  upgradePreviewRequests: Record<string, unknown>[] = []
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   monsterFocusByCharacter: Record<string, string[]> = {}
   monsterSearchRadiusByCharacter: Record<string, number> = {}
@@ -1038,6 +1040,12 @@ export class MockPartyServer {
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
     )
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
+    // upgrade-preview.ts: the stored server preview for the merchant's item.
+    await page.route('**/party-api/upgrade-preview', async (route) => {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      this.upgradePreviewRequests.push(body)
+      return route.fulfill({ json: this.upgradePreview ?? { status: 'idle' } })
+    })
     // aldata-routes.ts market(): the full ALData market state.
     await page.route('**/party-api/aldata/market', (route) => route.fulfill({ json: (this.stateSection('market', true) as Record<string, unknown>).aldata ?? {} }))
     await page.route('**/party-api/dashboard-stream', async (route) => {
