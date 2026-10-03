@@ -1632,6 +1632,12 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** new `P/components/map/*`, `P/screens/character-detail/sections/MapSection.tsx`.
 - **Endpoints:** `GET /party-api/map-stream/:character` (SSE), `GET /party-api/maps/:map`.
 - **Dependencies:** F6. Mind mobile battery: render only while visible.
+- **Follow-up (after C6):**
+  - The farming-area picker now has the dashboard's `FarmingAreaPreview`: area overlay and hunt radius, legend, "Enlarge map" as a full-screen view, the "Map preview unavailable" fallback, and one transient retry of `/maps`.
+  - **Beyond the dashboard (owner request, for spotting a hung character while away):**
+    - The console replays its last map frame and keeps the stream alive with keepalives, so a hung character's map looks live.
+    - The live map now shows the age of the latest frame (`frame.at`), on the map and in the native-size view.
+    - The party list shows each character's last status report (diagnostics `seenAt`), both on the server clock: live under 10 s, amber after, "may be hung" from 60 s (`lib/freshness.ts`, `components/FreshnessBadge.tsx`).
 - **As built:**
   - `components/map/MapCanvas.tsx` is `map-canvas.tsx` verbatim apart from imports; `mapRendering.ts` holds the verbatim render buffer, map/tile/doll caches, `markerStyle` and the dreams gate; `mapTypes.ts` the frame and definition types.
   - `data/useMapFrames.ts`: one shared EventSource per character's map stream (the target-type lookup now uses it too), `useVisible`, and `useMapDefinition` (`GET /maps/:map?revision=` keyed by core's `referenceRevision`).

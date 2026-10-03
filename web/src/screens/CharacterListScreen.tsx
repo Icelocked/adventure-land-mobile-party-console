@@ -1,10 +1,11 @@
 import { DungeonPanel } from '@/screens/dungeon/DungeonPanel'
 import { DebugBrowserBanner } from '@/components/DebugBrowserBanner'
+import { FreshnessBadge } from '@/components/FreshnessBadge'
 import { useDungeons } from '@/data/useDailyDungeon'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CloudOff, Menu, Plus, RefreshCw } from 'lucide-react'
-import { usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded, useRoster } from '@/data/PartyDataProvider'
+import { useCharacterDiagnostics, usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded, useRoster } from '@/data/PartyDataProvider'
 import { AccountMenu } from '@/screens/character-detail/AccountMenu'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
@@ -237,6 +238,7 @@ function PartyControls() {
 function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: CharacterState; bestiaryCatalog: BestiaryMonster[] }) {
   const vitals = state.vitals
   const { Icon, color } = classLook(vitals?.ctype ?? '')
+  const seenAt = Number(useCharacterDiagnostics(name)?.seenAt || 0)
 
   return (
     <li>
@@ -268,6 +270,8 @@ function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: C
                 </span>
                 <span>{vitals.gold.toLocaleString()}g</span>
               </div>
+              {/* Not on the dashboard: shows a character that stopped reporting (possibly hung). */}
+              {seenAt > 0 && <FreshnessBadge at={seenAt} className="mt-1" />}
             </>
           ) : (
             <div className="text-sm text-muted-foreground">offline</div>

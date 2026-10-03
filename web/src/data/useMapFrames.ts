@@ -74,12 +74,21 @@ export function useMapDefinition(map: string, enabled = true) {
   const revision = String(useDynamicState().referenceRevision || '0')
   const visible = useVisible()
   const [data, setData] = useState<MapDefinition | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
   useEffect(() => {
     if (!visible || !enabled || !map) return
     const key = `${revision}:${map}`
     let request = definitions.get(key)
     if (!request) {
-      request = api.getJson<MapDefinition>(`maps/${encodeURIComponent(map)}?revision=${revision}`).then((result) => {
+      const path = `maps/${encodeURIComponent(map)}?revision=${revision}`
+      // query-cache.tsx transientRetry: one retry after 1 s for network, 408, 429 and 5xx failures.
+      const transient = (status?: number) => status === undefined || status >= 500 || status === 408 || status === 429
+      request = api.getJson<MapDefinition>(path).then(async (first) => {
+        let result = first
+        if (result.kind === 'failure' && transient(result.status)) {
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+          result = await api.getJson<MapDefinition>(path)
+        }
         if (result.kind === 'failure') {
           definitions.delete(key)
           return null
@@ -90,11 +99,13 @@ export function useMapDefinition(map: string, enabled = true) {
     }
     let cancelled = false
     void request.then((value) => {
-      if (!cancelled && value) setData(value)
+      if (cancelled) return
+      if (value) setData(value)
+      else setFailed(key)
     })
     return () => {
       cancelled = true
     }
   }, [api, revision, map, enabled, visible])
-  return { data: data?.name === map ? data : null }
+  return { data: data?.name === map ? data : null, isError: failed === `${revision}:${map}` }
 }

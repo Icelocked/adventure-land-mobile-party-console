@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { Maximize2, X } from 'lucide-react'
+import { FarmingAreaPreview } from '@/components/map/FarmingAreaPreview'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -72,12 +74,8 @@ export function MonsterSpawns({ records }: { records?: SpawnRecord[] }) {
  *    by how many of the selected monsters share them, ranked by distance
  *    to the character's current position.
  *
- * No visual map-tile preview (party-console's MapCanvas/FarmingAreaPreview) -
- * that's a separate, large tile-rendering subsystem of its own. Ryan's own
- * component already tolerates the preview failing to load ("Map preview
- * unavailable. You can still choose this area."), so a text-only area
- * summary (map, coordinates, which monsters, shared-count) is a reasonable,
- * fully-functional substitute, not a silent downgrade.
+ * The selected area shows FarmingAreaPreview with the dashboard's legend and
+ * "Enlarge map" (a full-screen view here instead of a dialog).
  */
 export function FarmingAreaPicker({
   catalog,
@@ -128,6 +126,7 @@ export function FarmingAreaPicker({
   // on the very first render, not just when `ids` later changes.
   const [order, setOrder] = useState<string[]>(() => (phoenix ? startingOrder(areas) : []))
   const [error, setError] = useState<string | null>(null)
+  const [large, setLarge] = useState(false)
 
   // Reset the chosen area/order whenever the monster selection changes -
   // a previous choice may no longer even be a candidate.
@@ -261,7 +260,31 @@ export function FarmingAreaPicker({
           )
         })}
       </div>
-      {!phoenix && selected && <p className="mt-1 text-xs text-muted-foreground">Hunt radius: {radius}</p>}
+      {selected && (
+        <div className="mt-2">
+          <div className="h-72">
+            <FarmingAreaPreview area={selected} radius={radius} />
+          </div>
+          <p className="mt-2 text-sm text-cyan-200">Cyan: spawn area · White: waypoint</p>
+          <p className="text-sm text-amber-200">{phoenix ? 'Search uses shared sightings and overlapping visibility coverage.' : `Gold circle: hunt radius (${radius})`}</p>
+          <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => setLarge(true)}>
+            <Maximize2 className="size-4" /> Enlarge map
+          </Button>
+        </div>
+      )}
+      {large && selected && (
+        <div role="group" aria-label={`${selected.mapName || selected.map} farming area`} className="fixed inset-0 z-[70] flex flex-col bg-[#081713] p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-medium text-emerald-50">{selected.mapName || selected.map} farming area</span>
+            <button type="button" aria-label="Close enlarged map" onClick={() => setLarge(false)} className="rounded p-1 text-emerald-100">
+              <X className="size-5" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1">
+            <FarmingAreaPreview area={selected} radius={radius} />
+          </div>
+        </div>
+      )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
       <div className="mt-2 flex justify-end gap-2">
         <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
