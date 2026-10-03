@@ -870,7 +870,7 @@ export interface HuntBlacklistEntry {
  *  blacklisted (too many character deaths or quest expirations to it). */
 export interface HuntSettings {
   // hunt/spawn-preferences.ts - preferred spawn per monster (C2).
-  preferredSpawns?: Record<string, unknown>
+  preferredSpawns?: Record<string, string>
   relocateIfCompeting: boolean
   blacklistDeaths: boolean
   deathThreshold: number

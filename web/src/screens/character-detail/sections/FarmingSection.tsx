@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
-import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded, useDynamicState } from '@/data/PartyDataProvider'
+import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded, useDynamicState, useCharacterDiagnosticsMap, useCharacters } from '@/data/PartyDataProvider'
+import { durationLabel } from '@/lib/duration'
 import { canRouteToMonster, FOLLOWER_ROUTE_MESSAGE } from '@/lib/partyRouting'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -11,8 +12,7 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
 import type { Catalog } from '@/lib/farmingZones'
-import type { BestiaryMonster, Condition, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
-import { formatDuration } from '@/lib/itemFormulas'
+import type { BestiaryMonster, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 
 /** monster-focus-picker.tsx's own trigger-button label, ported verbatim -
  *  shows what's actually selected right now (names, or a count for "all"),
@@ -61,7 +61,6 @@ export function FarmingSection({
   position,
   target,
   resolvedTargetType,
-  conditions,
   monsterHunt,
   characterHunt,
   huntBlacklist,
@@ -89,7 +88,6 @@ export function FarmingSection({
   target?: string
   /** See data/useTargetMonsterType.ts - the real monster type resolved live from the map/entities stream. */
   resolvedTargetType?: string | null
-  conditions?: Condition[]
   monsterHunt?: MonsterHuntCycle | null
   characterHunt?: MonsterHuntStatus | null
   huntBlacklist: Record<string, HuntBlacklistEntry>
@@ -98,6 +96,15 @@ export function FarmingSection({
   const navigate = useNavigate()
   const refreshNow = useRefreshDynamicStateNow()
   const state = useDynamicState()
+  const diagnostics = useCharacterDiagnosticsMap()
+  const characters = useCharacters()
+  const inherited = !!followingLeader
+  // connected-character-card.tsx effectiveMode: the live mode, not the saved policy.
+  const liveMode =
+    (characters[characterName]?.vitals?.farmingMode as string | undefined) ||
+    (diagnostics[characterName] as { farmingMode?: string } | undefined)?.farmingMode ||
+    (state as { partyFarmingMode?: string }).partyFarmingMode ||
+    'default'
   // monster-route-button.tsx: only the leader or a non-follower can route.
   const canRoute = canRouteToMonster({ leader: state.leader, followers: state.followers }, characterName)
   const routeDescription = canRoute ? 'Find selected monster' : FOLLOWER_ROUTE_MESSAGE
@@ -149,37 +156,32 @@ export function FarmingSection({
 
   return (
     <SectionCard title="Farming">
-      <LiveCombatStatus
-        target={target}
-        resolvedTargetType={resolvedTargetType}
-        conditions={conditions}
-        monsterHunt={monsterHunt}
-        characterHunt={characterHunt}
-        huntBlacklist={huntBlacklist}
-        bestiaryCatalog={bestiaryCatalog}
-      />
-      <p className="mb-1.5 text-xs text-muted-foreground">
-        Account-wide - applies to the whole party.
-        {followingLeader ? ` Following ${followingLeader} - effective settings are theirs.` : ''}
-      </p>
+      <LiveCombatStatus target={target} resolvedTargetType={resolvedTargetType} bestiaryCatalog={bestiaryCatalog} />
+      {/* farming-mode-control.tsx badge: "Copy leader" or the saved policy, with the live mode. */}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase text-muted-foreground">Farming settings</span>
+        <span className="rounded border border-cyan-700 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan-400">
+          {inherited ? 'Copy leader' : farmingPolicy}
+          {!inherited && (farmingPolicy === 'auto' || farmingPolicy === 'hunt') ? ` · ${liveMode}` : ''}
+        </span>
+      </div>
+      {inherited && <p className="mb-1.5 text-xs text-cyan-500">Used when Follow is off.</p>}
       <div className="flex flex-wrap items-center gap-1.5">
         {MODES.map((mode) => (
           <Chip key={mode.id} selected={farmingPolicy === mode.id} disabled={!configLoaded || pickingBackup || pickingArea} onClick={() => void selectMode(mode.id)}>
             {mode.label}
           </Chip>
         ))}
-        {(farmingPolicy === 'auto' || farmingPolicy === 'hunt') && effectiveMode !== farmingPolicy && (
-          <span className="text-xs text-muted-foreground">Currently: {effectiveMode}</span>
-        )}
       </div>
       <ConfigLoadingNote />
-      {farmArea?.active && (
+      {!inherited && farmArea?.active && (
         <p className="mt-1.5 text-xs text-muted-foreground">
           Active farming zone: {farmArea.active.map} ({Math.round(farmArea.active.x)}, {Math.round(farmArea.active.y)})
           {farmArea.message && !/farming resumed/i.test(farmArea.message) ? ` · ${farmArea.message}` : ''}
         </p>
       )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
+      <HuntStatusBlock effectivePolicy={effectiveMode} hunt={monsterHunt} characterHunt={characterHunt} blacklist={huntBlacklist} />
 
       {pickingBackup && (
         <FarmingAreaPicker
@@ -283,61 +285,17 @@ export function FarmingSection({
   )
 }
 
-/** What this character is actually doing right now - current target, active
- *  buffs/debuffs, the party's current Hunt quest, and (if Hunt mode) this
- *  character's own quest assignment with a blacklist check. Mirrors
- *  party-console's farming-mode-control.tsx hunt-status block, scoped to
- *  one character's screen. */
-function LiveCombatStatus({
-  target,
-  resolvedTargetType,
-  conditions,
-  monsterHunt,
-  characterHunt,
-  huntBlacklist,
-  bestiaryCatalog,
-}: {
-  target?: string
-  resolvedTargetType?: string | null
-  conditions?: Condition[]
-  monsterHunt?: MonsterHuntCycle | null
-  characterHunt?: MonsterHuntStatus | null
-  huntBlacklist: Record<string, HuntBlacklistEntry>
-  bestiaryCatalog: BestiaryMonster[]
-}) {
+/** The character's current target ("Fighting X"); the Hunt lines live in
+ *  HuntStatusBlock, as in farming-mode-control.tsx. */
+function LiveCombatStatus({ target, resolvedTargetType, bestiaryCatalog }: { target?: string; resolvedTargetType?: string | null; bestiaryCatalog: BestiaryMonster[] }) {
   const targetMonster = target ? bestiaryCatalog.find((m) => m.id === (resolvedTargetType ?? target)) : undefined
-  const questMonster = monsterHunt?.target ? bestiaryCatalog.find((m) => m.id === monsterHunt.target) : undefined
-  const myQuestMonster = characterHunt?.id ? bestiaryCatalog.find((m) => m.id === characterHunt.id) : undefined
-  const myQuestBlacklisted = !!characterHunt?.id && !!huntBlacklist[characterHunt.id]
-  if (!target && !conditions?.length && !monsterHunt?.target && !characterHunt?.id) return null
+  if (!target) return null
   return (
-    <div className="mb-2 space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
-      {target && (
-        <div className="flex items-center gap-1.5 text-sm">
-          <SpriteIcon sprite={targetMonster?.sprite} size={20} />
-          <span>{targetMonster ? `Fighting ${targetMonster.name}` : 'Fighting'}</span>
-        </div>
-      )}
-      {monsterHunt?.target && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <SpriteIcon sprite={questMonster?.sprite} size={16} />
-          <span>
-            Party Hunt{monsterHunt.stage ? ` · ${monsterHunt.stage}` : ''}: {questMonster?.name ?? monsterHunt.target}
-            {monsterHunt.message ? ` · ${monsterHunt.message}` : ''}
-            {monsterHunt.owner ? ` · Quest owner: ${monsterHunt.owner}` : ''}
-          </span>
-        </div>
-      )}
-      {characterHunt?.id && (
-        <div className="flex items-center gap-1.5 text-xs">
-          <SpriteIcon sprite={myQuestMonster?.sprite} size={16} />
-          <span className={myQuestBlacklisted ? 'text-destructive' : 'text-muted-foreground'}>
-            My quest: {myQuestMonster?.name ?? characterHunt.id} · {characterHunt.count} left
-            {characterHunt.remainingMs ? ` · ${formatDuration(characterHunt.remainingMs)}` : ''}
-            {myQuestBlacklisted ? ' · Blacklisted — skipped for Hunt' : ''}
-          </span>
-        </div>
-      )}
+    <div className="mb-2 rounded-md border border-border bg-muted/30 p-2">
+      <div className="flex items-center gap-1.5 text-sm">
+        <SpriteIcon sprite={targetMonster?.sprite} size={20} />
+        <span>{targetMonster ? `Fighting ${targetMonster.name}` : 'Fighting'}</span>
+      </div>
     </div>
   )
 }
@@ -481,5 +439,53 @@ function MonsterFocusForm({
         </Button>
       </div>
     </div>
+  )
+}
+
+/** farming-mode-control.tsx's hunt status: shown while Hunt is the effective
+ *  policy or a Hunt (party or own) exists - stage and message, the backup
+ *  batch countdown per member (or the quest owner), the Daisy turn-in wait,
+ *  the target, and this character's own quest with its blacklist flag. */
+function HuntStatusBlock({
+  effectivePolicy,
+  hunt,
+  characterHunt,
+  blacklist,
+}: {
+  effectivePolicy: string
+  hunt?: MonsterHuntCycle | null
+  characterHunt?: MonsterHuntStatus | null
+  blacklist: Record<string, HuntBlacklistEntry>
+}) {
+  if (!(effectivePolicy === 'hunt' || hunt || characterHunt)) return null
+  return (
+    <section aria-label="Hunt status" className="mt-2 border-t border-amber-900/70 pt-2 font-mono text-[10px] text-amber-500">
+      <p className="font-semibold">
+        {effectivePolicy === 'hunt' ? 'Hunt status' : 'Last Hunt status'}
+        {hunt?.stage ? ` · ${hunt.stage}` : ''}
+      </p>
+      <p>{hunt?.message || (effectivePolicy === 'hunt' ? 'Preparing Monster Hunt cycle' : 'Hunt mode is not active')}</p>
+      {effectivePolicy !== 'hunt' ? <p>Current farming mode: {effectivePolicy}. Selecting Hunt rechecks eligible quests; blacklisted quests remain skipped.</p> : null}
+      {hunt?.backup ? (
+        <div className="mt-1">
+          <p>Next batch after every blacklisted quest expires · {durationLabel(Math.max(0, ...Object.values(hunt.backup.members).map((member) => member.remainingMs)))}</p>
+          {Object.entries(hunt.backup.members).map(([name, member]) => (
+            <p key={name}>
+              {name}: {!member.fresh ? 'waiting for fresh status' : member.ready ? 'ready' : `${member.target} · ${durationLabel(member.remainingMs)}`}
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1">Quest owner{hunt?.owner ? `: ${hunt.owner}` : ''} · when complete or expired</p>
+      )}
+      {hunt?.turnIn && hunt.turnIn.phase !== 'complete' ? <p className="mt-1">Events wait until Daisy reward claims finish.</p> : null}
+      {hunt?.target ? <p className="mt-1">Target: {hunt.target}</p> : null}
+      {characterHunt ? (
+        <p className="mt-1 text-emerald-500">
+          My quest: {characterHunt.id} · {characterHunt.count} left · {durationLabel(characterHunt.remainingMs)}
+          {characterHunt.id && blacklist[characterHunt.id] ? ' · Blacklisted — skipped for Hunt' : ''}
+        </p>
+      ) : null}
+    </section>
   )
 }

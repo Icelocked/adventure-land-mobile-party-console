@@ -21,7 +21,10 @@ test('Character detail: shows the current target, active conditions, and the par
   // combat-status line ("Fighting Crabxx") now resolve the same target name -
   // exact+case-sensitive distinguishes the Farming section's capitalized one.
   await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
-  await expect(page.getByText(/Party Hunt: Crabxx.*Chasing the next spawn/)).toBeVisible()
+  // farming-mode-control.tsx hunt status block.
+  const hunt = page.getByRole('region', { name: 'Hunt status' })
+  await expect(hunt.getByText('Chasing the next spawn')).toBeVisible()
+  await expect(hunt.getByText('Target: crabx')).toBeVisible()
   // active-statuses.tsx: conditions live in the collapsed "Active status" section.
   const statuses = page.getByRole('region', { name: 'Active status' })
   await statuses.getByRole('button', { name: /Active status/ }).click()
@@ -37,7 +40,7 @@ test('Character detail: shows nothing extra for a fighter with no current target
 
   await page.goto('/characters/Ranger1')
   await expect(page.getByText(/^Fighting /)).not.toBeVisible()
-  await expect(page.getByText(/^Party Hunt:/)).not.toBeVisible()
+  await expect(page.getByRole('region', { name: 'Hunt status' })).toHaveCount(0)
 })
 
 test('Character detail: shows this character\'s own Hunt quest, flagged when its target is blacklisted', async ({ page }) => {
@@ -55,7 +58,7 @@ test('Character detail: shows this character\'s own Hunt quest, flagged when its
   await server.install(page)
 
   await page.goto('/characters/Ranger1')
-  await expect(page.getByText(/My quest: Crabxx.*3 left.*2m/)).toBeVisible()
+  await expect(page.getByText(/My quest: crabx · 3 left · 2m/)).toBeVisible()
   await expect(page.getByText(/Blacklisted — skipped for Hunt/)).toBeVisible()
 })
 
@@ -84,7 +87,7 @@ test('Character detail: a character running independently (not the leader, not f
   await server.install(page)
 
   await page.goto('/characters/Independent1')
-  await expect(page.getByText(/My quest: Crabxx.*2 left/)).toBeVisible()
+  await expect(page.getByText(/My quest: crabx · 2 left/)).toBeVisible()
   await expect(page.getByText(/Blacklisted — skipped for Hunt/)).toBeVisible()
 })
 

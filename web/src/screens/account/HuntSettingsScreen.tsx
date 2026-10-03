@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { resolveFarmingContext, type HuntSettings } from '@/models'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
+import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type MonsterChoiceEntry } from './HuntExtras'
+import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
 
 // runtime/coordinator/hunt/settings.ts defaultHuntSettings.
 const DEFAULT_HUNT_SETTINGS: HuntSettings = {
@@ -73,6 +75,12 @@ export function HuntSettingsScreen() {
   }
 
   const blacklist = Object.entries(context.blacklist).sort(([a], [b]) => a.localeCompare(b))
+  const monsterChoices = dynamicState.monsterChoices as unknown as MonsterChoiceEntry[]
+  const passive = migratePassiveSettings(dynamicState.passiveHunting as PassiveSettings | null | undefined, (dynamicState.passiveRareHunts ?? {}) as Record<string, boolean>)
+  const afterwards = async <T extends { kind: string },>(result: T) => {
+    if (result.kind === 'success') await refreshNow()
+    return result
+  }
 
   const clearBlacklist = async (monsterId?: string) => {
     setBlacklistBusy(true)
@@ -134,11 +142,29 @@ export function HuntSettingsScreen() {
         <ConfigLoadingNote />
       </fieldset>
 
-      <div className="flex items-center justify-between px-3 pb-1 pt-2">
+      <div className="flex flex-col gap-3 px-3 pb-3">
+        <HuntSpawnSettings
+          catalog={monsterChoices}
+          preferred={(settings.preferredSpawns ?? {}) as Record<string, unknown>}
+          disabled={!editable}
+          onSave={async (patch) => afterwards(await api.saveHuntSettings(name, patch))}
+        />
+        <PassiveHuntingMenu settings={passive} catalog={monsterChoices} disabled={!editable} onSave={async (patch) => afterwards(await api.setRareHunting(patch))} />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2">
         <h2 className="text-sm font-semibold">Hunt blacklist</h2>
+        <HuntBlacklistPicker
+          catalog={monsterChoices}
+          blacklist={context.blacklist}
+          disabled={!editable || blacklistBusy}
+          onAdd={async (id) => afterwards(await api.updateHuntBlacklist(name, 'add', id))}
+        />
         {confirmingClearAll ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-destructive">Really clear all?</span>
+            <span className="text-xs text-destructive">
+              Remove all {blacklist.length} blacklisted monsters for {context.owner}? Hunt can accept quests for these monsters again.
+            </span>
             <Button
               size="sm"
               variant="destructive"
@@ -170,7 +196,8 @@ export function HuntSettingsScreen() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{monsterFor(id)?.name ?? id}</p>
                 <p className="text-xs text-muted-foreground">
-                  {entry.reason} · {new Date(entry.at).toLocaleString()}
+                  {huntBlacklistLabel(entry) ? `${huntBlacklistLabel(entry)} · ` : ''}
+                  {new Date(entry.at).toLocaleString()}
                 </p>
               </div>
               <Button size="sm" variant="outline" disabled={!editable || blacklistBusy} onClick={() => void clearBlacklist(id)}>
