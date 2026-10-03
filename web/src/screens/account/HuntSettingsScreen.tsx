@@ -5,7 +5,10 @@ import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { resolveFarmingContext, type HuntSettings } from '@/models'
+import { resolveFarmingContext, type BestiaryMonster, type HuntSettings } from '@/models'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { MonsterDetail } from '@/components/MonsterDetail'
+import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type MonsterChoiceEntry } from './HuntExtras'
 import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
@@ -27,6 +30,9 @@ const DEFAULT_HUNT_SETTINGS: HuntSettings = {
 export function HuntSettingsScreen() {
   const { name = '' } = useParams()
   const dynamicState = useDynamicState()
+  const [inspecting, setInspecting] = useState<BestiaryMonster | null>(null)
+  const [inspectError, setInspectError] = useState<string | null>(null)
+  const [drop, setDrop] = useState<string | null>(null)
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
@@ -192,20 +198,62 @@ export function HuntSettingsScreen() {
         <div className="flex flex-col gap-1.5 px-3 pb-4">
           {blacklist.map(([id, entry]) => (
             <div key={id} className="flex items-center gap-2.5 rounded-md border border-border bg-card p-2.5">
-              <SpriteIcon sprite={monsterFor(id)?.sprite} size={28} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{monsterFor(id)?.name ?? id}</p>
-                <p className="text-xs text-muted-foreground">
-                  {huntBlacklistLabel(entry) ? `${huntBlacklistLabel(entry)} · ` : ''}
-                  {new Date(entry.at).toLocaleString()}
-                </p>
-              </div>
+              {/* farming-mode-control.tsx: a blacklisted monster opens its details. */}
+              <button
+                type="button"
+                aria-label={`Inspect ${monsterFor(id)?.name || id}`}
+                onClick={() => {
+                  const monster = dynamicState.bestiaryCatalog.find((entry) => entry.id === id)
+                  if (monster) {
+                    setInspectError(null)
+                    setInspecting(monster)
+                  } else setInspectError(`Monster details are not available for ${id} yet.`)
+                }}
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+              >
+                <SpriteIcon sprite={monsterFor(id)?.sprite} size={28} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{monsterFor(id)?.name ?? id}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {huntBlacklistLabel(entry) ? `${huntBlacklistLabel(entry)} · ` : ''}
+                    {new Date(entry.at).toLocaleString()}
+                  </p>
+                </div>
+              </button>
               <Button size="sm" variant="outline" disabled={!editable || blacklistBusy} onClick={() => void clearBlacklist(id)}>
                 Clear
               </Button>
             </div>
           ))}
         </div>
+      )}
+      {inspectError && (
+        <p role="alert" className="px-3 pb-3 text-sm text-destructive">
+          {inspectError}
+        </p>
+      )}
+      {inspecting && (
+        <Sheet open onOpenChange={(open) => !open && setInspecting(null)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <MonsterDetail
+              monster={inspecting}
+              onInspectDrop={(itemId) => {
+                if (dynamicState.merchantCatalog?.allItems?.some((item) => item.id === itemId)) {
+                  setInspecting(null)
+                  setDrop(itemId)
+                }
+              }}
+              onNavigated={() => setInspecting(null)}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
+      {drop && (
+        <Sheet open onOpenChange={(open) => !open && setDrop(null)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <ItemDetailBrowser rootItemId={drop} rootLevel={0} catalog={dynamicState.merchantCatalog} monsters={dynamicState.bestiaryCatalog} />
+          </SheetContent>
+        </Sheet>
       )}
     </AccountScreenScaffold>
   )

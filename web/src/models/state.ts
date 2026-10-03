@@ -126,6 +126,9 @@ export interface BestiaryMonster {
   attack: number
   xp: number
   threat: number
+  // bestiary-monster.ts: attack range and the raw G.monsters definition.
+  range?: number
+  definition?: Record<string, unknown>
   sprite?: Sprite | null
   drops: BestiaryDrop[]
   spawnRecords: MonsterSpawnRecord[]

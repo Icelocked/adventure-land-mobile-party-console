@@ -5,6 +5,8 @@ import { WtbDialog } from '@/components/Wtb'
 import { standIsFull } from '@/lib/standInspection'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
+import { TracktrixBonusList } from '@/components/Tracktrix'
+import { MonsterDetail } from '@/components/MonsterDetail'
 import { ExchangeRewardTile } from '@/components/ExchangeReward'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
@@ -107,7 +109,10 @@ export function ItemDetailBrowser({
           onNavigateMonster={pushMonster}
         />
       ) : (
-        <MonsterDetailContent monster={monsters.find((m) => m.id === current.id)} onNavigateItem={pushItem} />
+        (() => {
+          const monster = monsters.find((m) => m.id === current.id)
+          return monster ? <MonsterDetail monster={monster} onInspectDrop={(id) => pushItem(id, 0)} /> : <p className="py-4 text-sm text-muted-foreground">No bestiary data for this monster yet.</p>
+        })()
       )}
       {exchangeAdd && trail.length === 1 && (
         <Button className="mt-3 w-full border border-emerald-500" disabled={!exchangeAdd.enabled} onClick={exchangeAdd.onAdd}>
@@ -324,35 +329,6 @@ function ItemDetailContent({
         />
       )}
     </div>
-  )
-}
-
-/** tracktrix-bonuses.tsx TracktrixBonusList. */
-function TracktrixBonusList({ data }: { data?: { active?: boolean; bonuses?: Record<string, number> | null } }) {
-  const bonuses = Object.entries(data?.bonuses || {}).filter(([, value]) => Number.isFinite(value) && value !== 0)
-  return (
-    <section aria-label="Current Tracktrix bonuses" className="mb-2 rounded border border-violet-700 p-3 text-sm">
-      <h4 className="mb-2 font-semibold">Current Tracktrix bonuses</h4>
-      {!data || (data.active && data.bonuses === null) ? (
-        <p>Waiting for Tracktrix data.</p>
-      ) : !data.active ? (
-        <p>Inactive — this character is not receiving Tracktrix bonuses.</p>
-      ) : !bonuses.length ? (
-        <p>No stat bonuses unlocked yet.</p>
-      ) : (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-          {bonuses.map(([stat, value]) => (
-            <div key={stat} className="flex justify-between gap-3">
-              <dt>{stat.replaceAll('_', ' ').toUpperCase()}</dt>
-              <dd className="font-mono text-emerald-400">
-                {value > 0 ? '+' : ''}
-                {value.toLocaleString()}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </section>
   )
 }
 
@@ -670,35 +646,6 @@ function DropsSection({ drops, onNavigateMonster }: { drops: ItemDropSource[]; o
           <RelatedItemRow key={`${drop.monsterId}-${index}`} name={drop.monsterName} sprite={drop.sprite} detail={formatDropRate(drop)} onClick={() => onNavigateMonster(drop.monsterId)} />
         ))}
       </div>
-    </div>
-  )
-}
-
-function MonsterDetailContent({ monster, onNavigateItem }: { monster: BestiaryMonster | undefined; onNavigateItem: (id: string, level: number) => void }) {
-  if (!monster) return <p className="py-4 text-sm text-muted-foreground">No bestiary data for this monster yet.</p>
-  const sorted = [...monster.drops].sort((a, b) => b.rate - a.rate)
-  return (
-    <div>
-      <div className="mb-1 text-base font-semibold">{monster.name}</div>
-      <p className="mb-2.5 text-sm text-muted-foreground">
-        HP {monster.hp.toLocaleString()} · ATK {monster.attack.toLocaleString()} · XP {monster.xp.toLocaleString()}
-      </p>
-      <div className="mb-1.5 text-sm font-semibold">Drops</div>
-      {sorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No known drops.</p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {sorted.map((drop) => (
-            <RelatedItemRow
-              key={drop.id}
-              name={drop.name + (drop.quantity > 1 ? ` x${drop.quantity}` : '')}
-              sprite={drop.sprite}
-              detail={`${(drop.rate * 100).toFixed(4)}%`}
-              onClick={() => onNavigateItem(drop.id, 0)}
-            />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

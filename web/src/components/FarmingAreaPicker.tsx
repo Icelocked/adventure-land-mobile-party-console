@@ -7,7 +7,7 @@ import type { Catalog } from '@/lib/farmingZones'
 import type { BestiaryMonster, Sprite } from '@/models'
 
 /** monster-choice.tsx SpawnRecord / MonsterChoice. */
-interface SpawnRecord {
+export interface SpawnRecord {
   sourceMap: string
   map: string
   mapName?: string
@@ -33,7 +33,7 @@ const SPAWN_REASONS: Record<string, string> = {
 }
 
 /** monster-spawns.tsx: every recorded spawn and why ordinary routing can't use it. */
-function MonsterSpawns({ records }: { records?: SpawnRecord[] }) {
+export function MonsterSpawns({ records }: { records?: SpawnRecord[] }) {
   return (
     <section className="rounded border border-emerald-800 p-3 text-sm">
       <h3 className="mb-2 font-semibold">Recorded spawn locations</h3>
