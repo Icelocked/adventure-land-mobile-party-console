@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
-import { useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, useRefreshDynamicStateNow, useCharacterDiagnosticsMap, useCharacterOnline } from '@/data/PartyDataProvider'
 import { useTargetMonsterType } from '@/data/useTargetMonsterType'
 import { defaultRestockPolicy, resolveFarmingContext } from '@/models'
 import { useCatalogLookup } from '@/lib/catalogLookup'
@@ -20,6 +20,7 @@ import { RestockSection } from './sections/RestockSection'
 import { GoldTargetSection } from './sections/GoldTargetSection'
 import { AutoMarksSection } from './sections/AutoMarksSection'
 import { CombatLogSection } from './sections/CombatLogSection'
+import { StatusesSection } from './sections/StatusesSection'
 import { LuckySlotSection } from './sections/LuckySlotSection'
 import { AccountMenu } from './AccountMenu'
 import { SessionControls } from '@/components/SessionControls'
@@ -45,6 +46,8 @@ export function CharacterDetailScreen() {
 
   const state = characters[name]
   const vitals = state?.vitals
+  const diagnostics = useCharacterDiagnosticsMap()
+  const online = useCharacterOnline(name)
   const resolvedTargetType = useTargetMonsterType(name, vitals?.target)
   const farming = resolveFarmingContext(dynamicState, name)
   const others = Object.keys(characters).filter((n) => n !== name)
@@ -95,8 +98,13 @@ export function CharacterDetailScreen() {
             vitals={vitals}
             bestiaryCatalog={dynamicState.bestiaryCatalog}
             resolvedTargetType={resolvedTargetType}
+            diagnostics={diagnostics[name]}
+            slots={state?.inventory?.slots ?? {}}
+            online={online}
           />
           <div className="flex-1 pb-6">
+            {/* connected-character-card.tsx: statuses sit under HP/MP for every class. */}
+            <StatusesSection characterName={name} conditions={vitals.conditions ?? []} />
             <LeaderFollowerSection characterName={name} dynamicState={dynamicState} />
             <TravelSection
               characterName={name}
