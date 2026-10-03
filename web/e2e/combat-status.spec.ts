@@ -22,7 +22,11 @@ test('Character detail: shows the current target, active conditions, and the par
   // exact+case-sensitive distinguishes the Farming section's capitalized one.
   await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
   await expect(page.getByText(/Party Hunt: Crabxx.*Chasing the next spawn/)).toBeVisible()
-  await expect(page.getByText(/Critical Strike.*1m/)).toBeVisible()
+  // active-statuses.tsx: conditions live in the collapsed "Active status" section.
+  const statuses = page.getByRole('region', { name: 'Active status' })
+  await statuses.getByRole('button', { name: /Active status/ }).click()
+  await expect(statuses.getByText('Critical Strike')).toBeVisible()
+  await expect(statuses.getByText(/^1m/)).toBeVisible()
 })
 
 test('Character detail: shows nothing extra for a fighter with no current target, conditions, or active Hunt', async ({ page }) => {

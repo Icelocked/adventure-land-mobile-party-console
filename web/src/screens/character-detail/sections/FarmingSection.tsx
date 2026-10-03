@@ -320,16 +320,6 @@ function LiveCombatStatus({
           </span>
         </div>
       )}
-      {!!conditions?.length && (
-        <div className="flex flex-wrap gap-1">
-          {conditions.map((condition) => (
-            <span key={condition.id} className="rounded bg-background px-1.5 py-0.5 text-xs" title={condition.explanation}>
-              {condition.name}
-              {condition.remainingMs ? ` (${formatDuration(condition.remainingMs)})` : ''}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

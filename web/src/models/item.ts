@@ -60,4 +60,8 @@ export interface Condition {
   remainingMs?: number
   stacks?: unknown
   source?: unknown
+  // condition.tsx: the status sprite, its G definition and live fields.
+  sprite?: Sprite | null
+  definition?: Record<string, unknown>
+  live?: Record<string, unknown>
 }
