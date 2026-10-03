@@ -5,6 +5,7 @@ import { WtbDialog } from '@/components/Wtb'
 import { standIsFull } from '@/lib/standInspection'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
+import { ExchangeRewardTile } from '@/components/ExchangeReward'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -18,6 +19,7 @@ import {
   definitionString,
   effectiveDropRate,
   exchangeSections,
+  exchangeTarget,
   formatDropRate,
   formatStatValue,
   itemMaximumLevel,
@@ -57,6 +59,7 @@ export function ItemDetailBrowser({
   rootMeta,
   context,
   onAddStand,
+  exchangeAdd,
   className,
 }: {
   rootItemId: string
@@ -72,6 +75,8 @@ export function ItemDetailBrowser({
   context?: { character: string; slot: number }
   // item-details.tsx "Add to stand": only for the merchant's inventory or the bank.
   onAddStand?: () => void
+  // item-details.tsx: the exchange catalog's "Add" for the inspected exchange.
+  exchangeAdd?: { enabled: boolean; onAdd: () => void }
   className?: string
 }) {
   const [trail, setTrail] = useState<DetailTarget[]>([{ kind: 'item', id: rootItemId, level: rootLevel }])
@@ -103,6 +108,11 @@ export function ItemDetailBrowser({
         />
       ) : (
         <MonsterDetailContent monster={monsters.find((m) => m.id === current.id)} onNavigateItem={pushItem} />
+      )}
+      {exchangeAdd && trail.length === 1 && (
+        <Button className="mt-3 w-full border border-emerald-500" disabled={!exchangeAdd.enabled} onClick={exchangeAdd.onAdd}>
+          Add
+        </Button>
       )}
     </div>
   )
@@ -148,7 +158,8 @@ function ItemDetailContent({
     setPreviewLevel(target.level)
   }, [target.id, target.level])
 
-  const exchanges = useMemo(() => exchangeSections(target.id, target.level, catalog?.exchangeable ?? []), [catalog, target.id, target.level])
+  // item-details.tsx: the exchange sections follow the preview-level slider.
+  const exchanges = useMemo(() => exchangeSections(target.id, previewLevel, catalog?.exchangeable ?? []), [catalog, target.id, previewLevel])
 
   const meta = isRoot ? detailMeta(catalogItem?.meta, rootMeta) : (catalogItem?.meta ?? undefined)
   const world = meta?.world
@@ -288,7 +299,9 @@ function ItemDetailContent({
       {activeTab === 'Set bonus' && world?.set && <SetBonusSection set={world.set} currentId={target.id} onNavigateItem={onNavigateItem} />}
       {activeTab === 'Craftable' && world?.recipe && <CraftableSection recipe={world.recipe} onNavigateItem={onNavigateItem} />}
       {activeTab === 'Ingredient in' && world?.usedIn && <IngredientInSection usedIn={world.usedIn} onNavigateItem={onNavigateItem} />}
-      {activeTab === 'Exchange' && <ExchangeSection exchanges={exchanges} onNavigateItem={onNavigateItem} />}
+      {activeTab === 'Exchange' && (
+        <ExchangeSection id={target.id} box={meta?.definition.type === 'box' || /box/i.test(target.id)} exchanges={exchanges} onNavigateItem={onNavigateItem} />
+      )}
       {activeTab === 'Drops' && world?.drops && <DropsSection drops={world.drops} onNavigateMonster={onNavigateMonster} />}
       {addingWtb && (
         <WtbDialog
@@ -450,17 +463,20 @@ function RelatedItemRow({
   sprite,
   detail,
   highlighted = false,
+  disabled = false,
   onClick,
 }: {
   name: string
   sprite?: Sprite | null
   detail: string
   highlighted?: boolean
+  disabled?: boolean
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         'flex w-full items-center gap-2 rounded-md border p-2 text-left transition',
         highlighted ? 'border-primary bg-primary/10' : 'border-border bg-background hover:border-primary/40',
@@ -548,7 +564,8 @@ function IngredientInSection({ usedIn, onNavigateItem }: { usedIn: ItemCraftUse[
 
 const NON_INSPECTABLE_KINDS = new Set(['empty', 'gold', 'shells', 'cx', 'cxbundle'])
 
-function ExchangeSection({ exchanges, onNavigateItem }: { exchanges: ExchangeSections; onNavigateItem: (id: string, level: number) => void }) {
+/** item-exchange-details.tsx: price, rewards (as reward tiles) and sources. */
+function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; box: boolean; exchanges: ExchangeSections; onNavigateItem: (id: string, level: number) => void }) {
   return (
     <div className="flex flex-col gap-3">
       {exchanges.prices.length > 0 && (
@@ -558,9 +575,9 @@ function ExchangeSection({ exchanges, onNavigateItem }: { exchanges: ExchangeSec
             {exchanges.prices.map((entry) => (
               <RelatedItemRow
                 key={entry.key}
-                name={`${entry.required} × ${entry.currencyName ?? entry.id}`}
+                name={`${entry.required.toLocaleString()} × ${entry.currencyName || entry.id}${entry.level ? ` +${entry.level}` : ''}`}
                 sprite={entry.currencySprite}
-                detail={`for ${entry.rewardQuantity ?? 1}`}
+                detail={`for ${entry.rewardQuantity || 1}`}
                 onClick={() => onNavigateItem(entry.id, entry.level)}
               />
             ))}
@@ -569,30 +586,43 @@ function ExchangeSection({ exchanges, onNavigateItem }: { exchanges: ExchangeSec
       )}
       {exchanges.rewards.length > 0 && (
         <div>
-          <div className="text-sm font-semibold">Exchange reward</div>
-          {exchanges.rewards.map((entry) => (
-            <div key={entry.key} className="mt-1.5">
-              <p className="mb-1 text-xs text-muted-foreground">
-                Exchange {entry.required} × {entry.currencyName ?? entry.name}
-                {entry.npc ? ` · ${entry.npc}` : ''}
-              </p>
-              <div className="flex flex-col gap-1">
-                {entry.reward ? (
-                  <RelatedItemRow name={entry.name} sprite={entry.sprite} detail="100%" onClick={() => onNavigateItem(entry.id, entry.level)} />
-                ) : (
-                  entry.results.map((result, index) => (
-                    <RelatedItemRow
-                      key={`${entry.key}-${index}`}
-                      name={`${result.quantity} × ${result.name}`}
-                      sprite={result.sprite}
-                      detail={rewardPercentage(result.chance)}
-                      onClick={() => !NON_INSPECTABLE_KINDS.has(result.kind) && onNavigateItem(result.id, 0)}
+          <div className="text-sm font-semibold">{box ? 'Rewards' : 'Exchange reward'}</div>
+          {exchanges.rewards.map((entry) => {
+            const [rewardId, rewardLevel] = entry.reward ? exchangeTarget(entry.reward) : [entry.id, 0]
+            return (
+              <div key={entry.key} className="mt-1.5">
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Exchange {entry.required} × {entry.currencyName || (entry.reward ? id : entry.name)}
+                  {entry.npc ? ` · ${entry.npc}` : ''}
+                </p>
+                <div className="flex flex-wrap items-stretch gap-2">
+                  {entry.reward ? (
+                    <ExchangeRewardTile
+                      reward={{ id: rewardId, level: rewardLevel, name: entry.name, quantity: entry.rewardQuantity || 1, sprite: entry.sprite, detail: '100%', onInspect: () => onNavigateItem(rewardId, rewardLevel) }}
                     />
-                  ))
-                )}
+                  ) : (
+                    entry.results.map((result, index) => (
+                      <ExchangeRewardTile
+                        key={`${entry.key}-${index}`}
+                        reward={{
+                          id: result.id,
+                          level: 0,
+                          name: result.name,
+                          quantity: result.quantity,
+                          sprite: result.sprite,
+                          kind: result.kind,
+                          detail: rewardPercentage(result.chance),
+                          onInspect: () => !NON_INSPECTABLE_KINDS.has(result.kind) && onNavigateItem(result.id, 0),
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
+          {id.startsWith('cosmo') && <p className="mt-2 text-xs text-muted-foreground">Base chances shown. Already-owned cosmetics change these odds.</p>}
+          {id === 'sixcake' && <p className="mt-2 text-xs text-muted-foreground">Table rewards shown; anniversary bonuses are awarded separately.</p>}
         </div>
       )}
       {exchanges.sources.length > 0 && (
@@ -603,7 +633,7 @@ function ExchangeSection({ exchanges, onNavigateItem }: { exchanges: ExchangeSec
             {exchanges.sources.map((source) => (
               <RelatedItemRow
                 key={source.entry.key}
-                name={`${source.entry.required} × ${source.entry.name}`}
+                name={`${source.entry.required.toLocaleString()} × ${source.entry.name}${source.entry.level ? ` +${source.entry.level}` : ''}`}
                 sprite={source.entry.sprite}
                 detail={rewardPercentage(source.chance)}
                 onClick={() => onNavigateItem(source.entry.id, source.entry.level)}

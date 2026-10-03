@@ -433,7 +433,7 @@ export interface ExchangeSections {
 }
 
 const REWARD_TARGET_REGEX = /^(.*)-(\d+)$/
-function exchangeTarget(reward: string): [string, number] {
+export function exchangeTarget(reward: string): [string, number] {
   const match = REWARD_TARGET_REGEX.exec(reward)
   const id = match?.[1] && match[1].length > 0 ? match[1] : reward
   const level = match?.[2] ? Number(match[2]) : 0

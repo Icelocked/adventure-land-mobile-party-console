@@ -588,7 +588,7 @@ export function UpgradeTierPicker({ meta, level, current, onPick }: { meta: Item
  *  "Auto compound" submenu, one row per tier up to itemMaximumLevel (7 for
  *  compoundables) with the real compound-scroll cost (compoundPassCost),
  *  not a free-form number input the way this used to work. */
-function CompoundTierPicker({ meta, level, buyable, onPick }: { meta: ItemMeta | undefined; level: number; buyable: { id: string; cost: number }[]; onPick: (tier: number) => void }) {
+export function CompoundTierPicker({ meta, level, buyable, onPick }: { meta: ItemMeta | undefined; level: number; buyable: { id: string; cost: number }[]; onPick: (tier: number) => void }) {
   // The server's validTier caps auto-compound targets at +7 (compound-commands.ts).
   const max = Math.max(0, Math.min(7, itemMaximumLevel(meta)) - level)
   if (max <= 0) return null
