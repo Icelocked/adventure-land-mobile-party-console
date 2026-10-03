@@ -192,6 +192,9 @@ export function MarketScreen() {
       <div className="flex flex-col gap-3 p-3">
         <p className="text-xs text-muted-foreground">Browse live offers and player-published classifieds. Public browsing requires no ALData key.</p>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/market/settings')}>
+            Marketplace settings
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/wtb')}>
             Manage WTB orders{Object.keys(state.standBids).length ? ` (${Object.keys(state.standBids).length})` : ''}
           </Button>

@@ -19,6 +19,7 @@ import { BestiaryScreen } from '@/screens/account/BestiaryScreen'
 import { SkillsScreen } from '@/screens/account/SkillsScreen'
 import { StandScreen } from '@/screens/account/StandScreen'
 import { MarketScreen } from '@/screens/account/MarketScreen'
+import { MarketplaceSettingsScreen } from '@/screens/account/MarketplaceSettingsScreen'
 import { BankScreen } from '@/screens/account/BankScreen'
 import { MerchantCommerceScreen } from '@/screens/account/MerchantCommerceScreen'
 import { RoutinesScreen } from '@/screens/account/RoutinesScreen'
@@ -65,6 +66,7 @@ export default function App() {
                 <Route path="/skills" element={<SkillsScreen />} />
                 <Route path="/stand" element={<StandScreen />} />
                 <Route path="/market" element={<MarketScreen />} />
+                <Route path="/market/settings" element={<MarketplaceSettingsScreen />} />
                 <Route path="/bank" element={<BankScreen />} />
                 <Route path="/merchant/:mode" element={<MerchantCommerceScreen />} />
                 <Route path="/routines" element={<RoutinesScreen />} />
