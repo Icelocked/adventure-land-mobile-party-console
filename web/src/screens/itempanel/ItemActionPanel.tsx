@@ -5,6 +5,7 @@ import { itemMaximumLevel, upgradeScrollCost, compoundPassCost, statScrollQuanti
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
+import { standIsFull } from '@/lib/standInspection'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
@@ -232,7 +233,8 @@ function InventoryActions({
   const merchantMarkedItem = (state.merchantMarked[characterName] ?? []).some(same)
   const deliveryTarget = isMerchant ? Object.keys(state.merchantDeliveries).find((name) => (state.merchantDeliveries[name] ?? []).some(same)) : undefined
   const standListing = isMerchant ? state.standListings.find((listing) => !listing.bankPack && listing.slot === slot && sameMarkedItem(listing.item, item)) : undefined
-  const standFull = state.standListings.length >= 16
+  // inventory-panel.tsx: standIsFull (sales + buy orders reserving a slot).
+  const standFull = standIsFull(state.standListings, state.standBids)
   const merchantWeaponMarked = isMerchant && !!state.merchantWeapon?.item && sameMarkedItem(state.merchantWeapon.item, item)
   const upgradeMark = meta?.upgradeable ? (state.upgrades[characterName] ?? []).find((mark) => !mark.equipped && mark.slot === slot && sameMarkedItem(mark.item, item)) : undefined
   const autoUpgradeRule = (state.autoUpgradeMarks[ruleName] ?? {})[autoRuleKey]

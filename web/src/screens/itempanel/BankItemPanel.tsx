@@ -6,6 +6,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { StandListingForm } from '@/components/StandListingForm'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
+import { standIsFull } from '@/lib/standInspection'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type InventoryEntry } from '@/models'
@@ -34,7 +35,8 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   // bank-sheet.tsx: the same identity checks the dashboard badges with.
   const withdrawMarked = !!merchant && (state.withdrawals[merchant] ?? []).some((w) => w.pack === pack && w.slot === entry.slot && sameMarkedItem(w.item, item))
   const standListing = state.standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, item))
-  const standFull = state.standListings.length >= 16
+  // bank-sheet.tsx: standIsFull, and an already-marked copy can still be edited.
+  const standFull = standIsFull(state.standListings, state.standBids)
   const canUpgrade = !!merchant && !item.l && !(item as { b?: unknown }).b && !!meta?.upgradeable && itemMaximumLevel(meta) > level
 
   const confirmWith = async (action: () => Promise<ApiResult<CommandResult>>) => {
@@ -121,7 +123,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
           {standListing ? (
             <TapRow label="Unmark for stand" onClick={() => void run(() => api.removeStandListing(standListing))} />
           ) : (
-            <TapRow label={standFull ? 'Mark for stand · stand is full (16/16)' : 'Mark for stand'} onClick={() => !standFull && toggle('stand')} />
+            <TapRow label="Mark for stand" disabled={standFull} onClick={() => toggle('stand')} />
           )}
           {expanded === 'stand' && (
             <StandListingForm

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, DollarSign, HandCoins, SlidersHorizontal } from 'lucide-react'
 import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/data/PartyDataProvider'
 import { WtbDialog } from '@/components/Wtb'
+import { standIsFull } from '@/lib/standInspection'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
@@ -158,7 +159,7 @@ function ItemDetailContent({
   const [comparePicker, setComparePicker] = useState<string | null | false>(false)
   const [comparing, setComparing] = useState<{ character: string; slot?: string } | null>(null)
   // stand-capacity.tsx standIsFull.
-  const standFull = state.standListings.length >= 16
+  const standFull = standIsFull(state.standListings, state.standBids)
   const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
   const comparable = isEquipment(meta?.definition)
   const tracktrix = context && ['tracker', 'supercomputer'].includes(target.id) ? (diagnostics[context.character]?.tracktrix as { active?: boolean; bonuses?: Record<string, number> | null } | undefined) : undefined

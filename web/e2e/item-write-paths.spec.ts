@@ -58,15 +58,17 @@ test('Stand: removing a live listing sends its id, and editing a bank listing ke
   const bodies = postBodies(page, 'merchant/stand')
 
   await page.goto('/stand')
-  const rows = page.locator('div.rounded-md', { hasText: 'Iron Ore' })
-  await rows.nth(1).getByRole('button', { name: 'Edit price' }).click()
+  // The bank listing is not in a trade slot, so it is a queued sale.
+  await page.getByRole('region', { name: 'Queued sales for stand' }).getByRole('button', { name: 'Edit sale price for ironore' }).click()
   await page.getByRole('textbox', { name: 'Stand price' }).fill('450')
   await page.getByRole('group', { name: 'Merchant stand listing' }).getByRole('button', { name: 'Mark for stand' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toMatchObject({ id: 'bank-1', bankPack: 'items1', slot: 7, price: 450, quantity: 4 })
 
-  await rows.nth(0).getByRole('button', { name: 'Remove' }).click()
-  await rows.nth(0).getByRole('button', { name: 'Really remove?' }).click()
+  const remove = page.getByRole('region', { name: 'Items for sale' }).getByRole('button', { name: 'Remove Iron Ore from stand' })
+  await remove.click()
+  await expect(remove).toContainText('Really remove?')
+  await remove.click()
   await expect.poll(() => bodies.length).toBe(2)
   expect(bodies[1]).toMatchObject({ id: 'live-1', remove: true })
   await expect.poll(() => server.standListings.map((l) => l.id)).toEqual(['bank-1'])

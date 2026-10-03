@@ -9,8 +9,8 @@
 - **Phase 3:** complete - M1 `8e292ef`, M2 + M3 + M9 (this commit).
 - **Phase 4:** complete - B1 `7215f0e`, B2 `a076dc5`, B3 `c825085`, B4 (this commit).
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
-- **Phase 6:** M7 `cb447c3`, M5 (this commit).
-- **Next:** Phase 6 (M4, M6, M8).
+- **Phase 6:** M7 `cb447c3`, M5 `c734242`, M4 (this commit).
+- **Next:** Phase 6 (M6, M8).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1271,6 +1271,11 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/account/StandScreen.tsx` (rewrite), `P/screens/character-detail/AccountMenu.tsx` (count).
 - **Endpoints:** `POST /merchant/stand`, `POST /merchant/bid {…editField, value, bidRevision}`; state `standListings[].state/tradeSlot`, `nativeStand.offers/problems`, `standBids`, `characters[merchant].slots/standOpen`, `standPriceHistory`.
 - **Dependencies:** P0-01, P0-14, F6, F7 #9/#10, M7.
+- **As built:**
+  - `stand-inspection.ts` and `standIsFull` are ported verbatim to `lib/standInspection.ts`. Every stand-full check (options list, bank options, item details) now uses `standIsFull`.
+  - The Stand screen keeps the PWA scaffold. Row tap inspects; a long press shows the suggested price (the dashboard's tooltip).
+  - The account menu shows "Inspect stand · N/16".
+  - `standOpen` comes from live vitals, falling back to diagnostics.
 
 #### M5 — Stand listing dialog presets and context (M)
 - **Rows:** A389, A390, A393–A395.
