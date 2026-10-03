@@ -4,11 +4,16 @@ import { useCharacters, useDomainInterest, useDynamicState, usePartyApi, useRefr
 import { inventoryCounts } from '@/lib/inventoryCounts'
 import { upgradeEstimate } from '@/lib/suggestedItemValue'
 import type { ApiResult } from '@/api/partyApi'
+import { automaticCommerceRuleKey } from '@/models'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
+import { Settings, X } from 'lucide-react'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
+import { ExchangeMarkControls, ExchangeRewardTile, type ExchangeMarkMode, type ExchangeRewardTileData } from '@/components/ExchangeReward'
 import type { CraftMaterial, MerchantBuyItem, MerchantCraftRecipe, MerchantExchangeItem } from '@/models'
 
 type Mode = 'buy' | 'craft' | 'exchange'
@@ -48,7 +53,6 @@ export function MerchantCommerceScreen() {
   const [buyCart, setBuyCart] = useState<Record<string, { quantity: number; level: number }>>({})
   const [craftCart, setCraftCart] = useState<Record<string, number>>({})
   const [exchangeCart, setExchangeCart] = useState<Record<string, number>>({})
-  const [choosing, setChoosing] = useState<GroupedExchangeItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -125,8 +129,6 @@ export function MerchantCommerceScreen() {
       bankbois={dynamicState.bankbois}
       cart={exchangeCart}
       setCart={setExchangeCart}
-      choosing={choosing}
-      setChoosing={setChoosing}
       onSubmit={async () => {
         setSubmitting(true)
         setError(null)
@@ -507,15 +509,9 @@ function CraftScreen({
 
 // ----------------------------------------------------------- Exchange ----
 
-/** The dashboard groups every exchangeable entry that has a `reward` (a
- *  straight "pay N of this currency, get Y back" exchange) under one
- *  synthetic "currency" tile keyed by the currency item's own id, so a
- *  currency with several possible rewards (shells, cx, anniversary
- *  tokens, ...) shows once with a "Choose" button instead of once per
- *  reward. Entries WITHOUT `reward` (box/table pulls with a `results`
- *  chance table) are never grouped - they're their own row. This grouping
- *  is UI-only, not part of the wire shape, hence the local type here
- *  rather than adding `choices` to the shared MerchantExchangeItem model. */
+/** merchant-commerce-dialog.tsx displayedItems: every exchange with a fixed
+ *  `reward` groups under one synthetic currency tile with `choices`; box
+ *  and table pulls stay their own tiles. UI-only, hence the local type. */
 type GroupedExchangeItem = MerchantExchangeItem & { choices?: MerchantExchangeItem[] }
 
 function groupExchangeItems(items: MerchantExchangeItem[]): GroupedExchangeItem[] {
@@ -543,6 +539,8 @@ function groupExchangeItems(items: MerchantExchangeItem[]): GroupedExchangeItem[
   return rows
 }
 
+type Inspecting = { id: string; level: number; exchangeAdd?: { enabled: boolean; onAdd: () => void } }
+
 function ExchangeScreen({
   search,
   setSearch,
@@ -553,8 +551,6 @@ function ExchangeScreen({
   bankbois,
   cart,
   setCart,
-  choosing,
-  setChoosing,
   onSubmit,
   submitting,
   error,
@@ -568,61 +564,130 @@ function ExchangeScreen({
   bankbois: ReturnType<typeof useDynamicState>['bankbois']
   cart: Record<string, number>
   setCart: (fn: (old: Record<string, number>) => Record<string, number>) => void
-  choosing: GroupedExchangeItem | null
-  setChoosing: (v: GroupedExchangeItem | null) => void
   onSubmit: () => void
   submitting: boolean
   error: string | null
 }) {
+  const api = usePartyApi()
+  const state = useDynamicState()
+  const refreshNow = useRefreshDynamicStateNow()
   // merchant-commerce-dialog.tsx exchangeOwned: merchant-class characters, the bank and bankbois.
   const exchangeOwned = useMemo(
-    () => inventoryCounts(inventories(characters, (state) => state.vitals?.ctype === 'merchant'), bank, bankbois, true),
+    () => inventoryCounts(inventories(characters, (entry) => entry.vitals?.ctype === 'merchant'), bank, bankbois, true),
     [characters, bank, bankbois],
   )
+  const [selectedExchange, setSelectedExchange] = useState<GroupedExchangeItem | null>(null)
+  const [marking, setMarking] = useState(false)
+  const [markMode, setMarkMode] = useState<ExchangeMarkMode | null>(null)
+  const [drafts, setDrafts] = useState<Record<string, { id: string; level: number; mode: ExchangeMarkMode }>>({})
+  const [savingMarks, setSavingMarks] = useState(false)
+  const [markError, setMarkError] = useState<string | null>(null)
+  const [inspecting, setInspecting] = useState<Inspecting | null>(null)
 
   const grouped = useMemo(() => groupExchangeItems(exchangeable), [exchangeable])
   const filtered = grouped.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()))
-  const byKey = useMemo(() => new Map(exchangeable.map((item) => [item.key, item])), [exchangeable])
-  const selected = Array.from(new Set(Object.keys(cart)))
-    .map((key) => byKey.get(key))
-    .filter((item): item is MerchantExchangeItem => !!item && (cart[item.key] ?? 0) > 0)
+  const selected = exchangeable.filter((item) => Number(cart[item.key]) > 0)
 
   const exchangeRequired = (id: string, level: number) =>
-    exchangeable.reduce((sum, item) => sum + (item.id === id && item.level === level ? item.required * (cart[item.key] ?? 0) : 0), 0)
+    exchangeable.reduce((sum, item) => sum + (item.id === id && item.level === level ? item.required * (cart[item.key] || 0) : 0), 0)
+  const add = (key: string) => setCart((old) => ({ ...old, [key]: (old[key] || 0) + 1 }))
+  const exchangesAvailable = selected.every((item) => exchangeRequired(item.id, item.level) <= (exchangeOwned[`${item.id}@${item.level || 0}`] || 0))
 
-  const add = (key: string) => setCart((old) => ({ ...old, [key]: (old[key] ?? 0) + 1 }))
-  // Same gap as Craft's materialsAvailable: the per-row `enabled` check only
-  // guards the incremental Add tap, and typing a quantity directly into the
-  // cart Input bypasses it - so the submit button needs its own aggregate
-  // check across every selected item's running total.
-  const exchangesAvailable = selected.every((item) => {
-    const ownedCount = exchangeOwned[`${item.id}@${item.level ?? 0}`] ?? 0
-    return ownedCount >= item.required * (cart[item.key] ?? 0)
-  })
+  function openRules(item: GroupedExchangeItem | null) {
+    setSelectedExchange(item)
+    setMarking(false)
+    setMarkMode(null)
+    setDrafts({})
+    setMarkError(null)
+  }
+  // party-merchant-commerce-dialog.tsx onSaveExchangeMarks.
+  async function saveDrafts(list: { id: string; level: number; mode: ExchangeMarkMode }[]) {
+    const character = state.merchantCharacter
+    if (!character) throw new Error('No merchant is assigned')
+    for (const draft of list) {
+      const item = { name: draft.id, level: draft.level }
+      let result
+      if (draft.mode.action === 'bank') result = await api.itemCommand('auto-item-mark', character, item, undefined, { mode: 'bank', action: 'set' })
+      else if (draft.mode.action === 'upgrade') result = await api.itemCommand('auto-upgrade-mark', character, item, -1, { tiers: Number(draft.mode.targetLevel) - draft.level })
+      else if (draft.mode.action === 'npc') result = await api.autoNpcSale(undefined, item)
+      else {
+        const meta = state.merchantCatalog?.allItems?.find((entry) => entry.id === draft.id)?.meta
+        const price = (state.autoStandMarks?.[automaticCommerceRuleKey(item)] as { price?: number } | undefined)?.price || Math.max(1, Number(meta?.definition.g) || 1)
+        result = await api.autoStand(item, price)
+      }
+      if (result.kind === 'failure') throw new Error(result.message)
+    }
+    await refreshNow()
+  }
+  async function toggleMarking() {
+    if (!marking) {
+      setMarking(true)
+      setMarkError(null)
+      return
+    }
+    setSavingMarks(true)
+    setMarkError(null)
+    try {
+      if (Object.keys(drafts).length) await saveDrafts(Object.values(drafts))
+      setDrafts({})
+      setMarking(false)
+      setMarkMode(null)
+    } catch (caught) {
+      setMarkError(caught instanceof Error ? caught.message : 'Could not save exchange rules')
+    } finally {
+      setSavingMarks(false)
+    }
+  }
+  const renderReward = (reward: ExchangeRewardTileData) => (
+    <ExchangeRewardTile
+      reward={{
+        ...reward,
+        marking,
+        markMode,
+        saving: savingMarks,
+        stagedMode: drafts[`${reward.id}@${reward.level}`]?.mode,
+        onStage: (item, mode) => setDrafts((current) => ({ ...current, [`${item.id}@${item.level}`]: { id: item.id, level: item.level, mode } })),
+      }}
+    />
+  )
+  const inspectCatalog = (id: string, level = 0) => {
+    if (state.merchantCatalog?.allItems?.some((entry) => entry.id === id)) setInspecting({ id, level })
+  }
 
   return (
-    <AccountScreenScaffold title="Merchant exchanges">
+    <AccountScreenScaffold title="Exchange">
       <ModeTabs mode="exchange" setMode={setMode} />
-      <p className="px-3 pb-1 text-xs text-muted-foreground">Backed by the merchant's own inventory and the latest bank snapshot.</p>
+      <p className="px-3 pb-1 text-xs text-muted-foreground">Choose exchange operations backed by the merchant inventory and latest bank snapshot.</p>
       <SearchBar value={search} onChange={setSearch} />
       {filtered.length === 0 ? (
         <EmptyState message="No exchange operations available." />
       ) : (
         <div className="flex flex-col gap-1.5 px-3">
           {filtered.map((item) => {
-            const isChoice = !!item.choices
-            const ownedCount = exchangeOwned[`${item.id}@${item.level ?? 0}`] ?? 0
-            const enabled = isChoice || ownedCount >= item.required * ((cart[item.key] ?? 0) + 1)
+            const ownedCount = exchangeOwned[`${item.id}@${item.level || 0}`] || 0
+            const enabled = item.choices ? true : ownedCount >= item.required * ((cart[item.key] || 0) + 1)
+            const addOrChoose = () => (item.choices ? openRules(item) : add(item.key))
             return (
-              <ItemRow
-                key={item.key}
-                name={item.name}
-                sprite={item.sprite}
-                subtitle={isChoice ? `${ownedCount} owned` : `${item.required} required · ${ownedCount} owned`}
-                disabled={!enabled}
-                addLabel={isChoice ? 'Choose' : 'Add'}
-                onAdd={() => (isChoice ? setChoosing(item) : add(item.key))}
-              />
+              <div key={item.key} className="flex items-center gap-2 rounded-md border border-border bg-card p-2.5">
+                <button
+                  type="button"
+                  aria-label={`Inspect ${item.name}`}
+                  onClick={() => setInspecting({ id: item.id, level: 0, exchangeAdd: { enabled, onAdd: addOrChoose } })}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <SpriteIcon sprite={item.sprite} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{item.name}</div>
+                    <div className="font-mono text-xs text-amber-300">{item.choices ? `${ownedCount} owned` : `${item.required} required · ${ownedCount} owned`}</div>
+                  </div>
+                </button>
+                <Button size="icon" variant="outline" className="size-8" aria-label={`Exchange rules for ${item.name}`} onClick={() => openRules(item)}>
+                  <Settings className="size-4" />
+                </Button>
+                <Button size="sm" disabled={!enabled} onClick={addOrChoose}>
+                  {item.choices ? 'Choose' : 'Add'}
+                </Button>
+              </div>
             )
           })}
         </div>
@@ -636,7 +701,7 @@ function ExchangeScreen({
               <SpriteIcon sprite={item.sprite} size={28} />
               <span className="min-w-0 flex-1 truncate text-xs">
                 {item.name}
-                {(item.rewardQuantity ?? 1) > 1 ? ` ×${item.rewardQuantity}` : ''} · uses {item.required} {item.currencyName || 'ea.'}
+                {` ${(item.rewardQuantity ?? 1) > 1 ? `× ${item.rewardQuantity}` : ''} · uses ${item.required} ${item.currencyName || 'ea.'}`}
               </span>
               <Input
                 aria-label={`${item.name} quantity`}
@@ -653,67 +718,103 @@ function ExchangeScreen({
       )}
       <SubmitBar label="Exchange all" disabled={!selected.length || !exchangesAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />
 
-      {choosing && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background">
-          <div className="flex items-center justify-between border-b border-border p-3">
-            <div className="flex items-center gap-2">
-              <SpriteIcon sprite={choosing.sprite} size={32} />
-              <span className="text-sm font-medium">{choosing.name}</span>
+      {selectedExchange && (
+        <div role="group" aria-label="Exchange details" className="fixed inset-0 z-50 flex flex-col bg-background p-3">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <SpriteIcon sprite={selectedExchange.sprite} size={44} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-cyan-100">{selectedExchange.name}</p>
+                <p className="font-mono text-[10px] uppercase text-cyan-300">{selectedExchange.choices ? 'Choose a reward' : `${selectedExchange.required} required per exchange`}</p>
+              </div>
             </div>
-            <Button variant="link" size="xs" className="text-muted-foreground" onClick={() => setChoosing(null)}>
-              Close
+            <Button size="icon" variant="outline" onClick={() => openRules(null)} disabled={savingMarks} aria-label="Close exchange details" className="border-rose-700 text-rose-300">
+              <X className="size-4" />
             </Button>
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <p className="mb-2 font-mono text-xs uppercase text-muted-foreground">Available rewards</p>
-            <div className="flex flex-col gap-1.5">
-              {choosing.choices?.map((choice) => {
-                const disabled = exchangeRequired(choice.id, choice.level) + choice.required > (exchangeOwned[`${choice.id}@${choice.level}`] ?? 0)
-                return (
-                  <div key={choice.key} className="flex items-center gap-3 rounded-md border border-border bg-card p-2.5">
-                    <SpriteIcon sprite={choice.sprite} size={32} />
-                    <span className="min-w-0 flex-1 truncate text-sm">
-                      {choice.name}
-                      {(choice.rewardQuantity ?? 1) > 1 ? ` ×${choice.rewardQuantity}` : ''}
-                    </span>
-                    <span className="flex items-center gap-1 text-xs text-primary">
-                      <SpriteIcon sprite={choice.currencySprite} size={20} />× {choice.required}
-                    </span>
-                    <Button
-                      size="sm"
-                      disabled={disabled}
-                      onClick={() => {
-                        add(choice.key)
-                        setChoosing(null)
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-            {!!choosing.results?.length && (
-              <>
-                <p className="mb-2 mt-4 font-mono text-xs uppercase text-muted-foreground">Potential results</p>
-                <div className="flex flex-col gap-1.5">
-                  {choosing.results.map((result, index) => (
-                    <div key={`${result.kind}-${result.id}-${index}`} className="flex items-center gap-3 rounded-md border border-border bg-card p-2.5">
-                      <SpriteIcon sprite={result.sprite} size={32} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs">
-                          {result.name}
-                          {result.quantity > 1 ? ` ×${result.quantity}` : ''}
-                        </p>
-                        <p className="font-mono text-[10px] text-primary">{(result.chance * 100).toFixed(result.chance * 100 < 0.01 ? 4 : 2)}%</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" disabled={savingMarks} onClick={() => void toggleMarking()} aria-busy={savingMarks} className="w-32 border-emerald-500">
+              {marking ? 'Done' : 'Mark multiple'}
+            </Button>
+            <ExchangeMarkControls enabled={marking} mode={markMode} saving={savingMarks} onMode={setMarkMode} />
+          </div>
+          {marking && (
+            <p className="mt-3 text-xs text-sky-200">
+              {Object.keys(drafts).length} pending changes. Done saves; closing discards.
+              {markMode?.action === 'stand' ? ' Existing prices are kept; new stand rules use the item gold value.' : ''}
+            </p>
+          )}
+          {markError && <p role="alert" className="mt-2 text-sm text-rose-300">{markError}</p>}
+          <p className="mt-4 font-mono text-xs uppercase text-emerald-300">{selectedExchange.choices ? 'Available rewards' : 'Potential results'}</p>
+          <div className={`mt-2 min-h-0 flex-1 content-start gap-2 overflow-y-auto ${selectedExchange.choices ? 'flex flex-col' : 'flex flex-wrap items-stretch'}`}>
+            {selectedExchange.choices?.map((choice) => (
+              <div key={choice.key} className="flex items-center gap-3 rounded border border-cyan-800 bg-card p-2">
+                {renderReward({
+                  id: choice.reward?.replace(/-\d+$/, '') || choice.id,
+                  level: Number(choice.reward?.match(/-(\d+)$/)?.[1]) || 0,
+                  name: choice.name,
+                  quantity: choice.rewardQuantity || 1,
+                  sprite: choice.sprite,
+                  detail: '100%',
+                  onInspect: () => inspectCatalog(choice.reward?.replace(/-\d+$/, '') || ''),
+                })}
+                <span className="flex items-center gap-1 text-sm text-amber-200" title={choice.currencyName}>
+                  <SpriteIcon sprite={choice.currencySprite} size={24} />× {choice.required}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={exchangeRequired(choice.id, choice.level) + choice.required > (exchangeOwned[`${choice.id}@${choice.level}`] || 0)}
+                  onClick={() => add(choice.key)}
+                  className="ml-auto border-cyan-700"
+                >
+                  Add
+                </Button>
+              </div>
+            ))}
+            {selectedExchange.results.map((result, index) => (
+              <div key={`${result.kind}-${result.id}-${index}`}>
+                {renderReward({
+                  id: result.id,
+                  level: 0,
+                  name: result.name,
+                  quantity: result.quantity,
+                  sprite: result.sprite,
+                  kind: result.kind,
+                  detail: `${Number((result.chance * 100).toFixed(6))}%`,
+                  onInspect: () => {
+                    // Nested exchange drill-down: a result that is itself a box/table pull opens its own rules.
+                    const nested = exchangeable.find((choice) => !choice.reward && choice.id === result.id && !choice.level)
+                    if (nested) setSelectedExchange(nested)
+                    else if (!['gold', 'shells', 'cx', 'empty', 'open'].includes(result.kind)) inspectCatalog(result.id)
+                  },
+                })}
+              </div>
+            ))}
           </div>
         </div>
+      )}
+
+      {inspecting && (
+        <Sheet open onOpenChange={(open) => !open && setInspecting(null)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <ItemDetailBrowser
+              rootItemId={inspecting.id}
+              rootLevel={inspecting.level}
+              catalog={state.merchantCatalog}
+              monsters={state.bestiaryCatalog}
+              exchangeAdd={
+                inspecting.exchangeAdd && {
+                  enabled: inspecting.exchangeAdd.enabled,
+                  onAdd: () => {
+                    inspecting.exchangeAdd!.onAdd()
+                    setInspecting(null)
+                  },
+                }
+              }
+            />
+          </SheetContent>
+        </Sheet>
       )}
     </AccountScreenScaffold>
   )

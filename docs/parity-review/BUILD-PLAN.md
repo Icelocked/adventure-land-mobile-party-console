@@ -11,8 +11,8 @@
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
-- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 (this commit).
-- **Next:** Phase 8 (M11).
+- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 (this commit).
+- **Next:** Phase 9 (C4, C5, C6).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1556,6 +1556,10 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **PWA files:** `P/screens/account/MerchantCommerceScreen.tsx:438-644`, `P/screens/itemdetail/ItemDetailBrowser.tsx:388-454`, `P/screens/itempanel/ItemActionPanel.tsx` (`exchangeReward` mode).
 - **Endpoints:** `/command auto-item-mark {mode:'bank', action:'set'}`, `/command auto-upgrade-mark {slot:-1, tiers}`, `/command auto-exchange {slot:-1}`, `/merchant/auto-npc-sale {item}`, `/merchant/auto-stand {item, price}`.
 - **Dependencies:** F5, I1 (banner port), F7 #30/#40, P0-01.
+- **As built:**
+  - `components/ExchangeReward.tsx`: `ExchangeMarkControls` and `ExchangeRewardTile` (banners, staged "Pending", passive kinds disabled, gold/no-reward images copied to `public/images/exchange`). Tapping a tile opens its options list — "Item details" first, then the `automatic-item-actions.tsx` rows for a slot -1 reward (bank, stand…, exchange, upgrade tiers, compound tiers, NPC…). While marking, a tap stages the bulk rule.
+  - Exchange screen: each tile opens item details with the dashboard's "Add" (or Choose); the gear opens the rules overlay ("N required per exchange" / "Choose a reward", Mark multiple/Done, Bank/Stand/Upgrade/NPC with target level, pending note, error, Available rewards / Potential results). A result that is itself an exchange drills into its own rules. Done saves via the `onSaveExchangeMarks` endpoints. Exchange owned counts use merchant-class characters.
+  - Item details always render exchange rewards as reward tiles (`party-item-details.tsx`): the fixed reward opens its target, "Rewards" for boxes, cosmo/sixcake notes, sections follow the preview level, passive results disabled.
 
 ---
 
