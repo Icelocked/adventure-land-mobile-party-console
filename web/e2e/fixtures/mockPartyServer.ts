@@ -61,6 +61,8 @@ export interface MockCatalogEntry {
   maxLevel?: number
   // Extra G.items fields (e.g. `e` for exchangeable).
   definition?: Record<string, unknown>
+  // meta.world (drop sources, recipes, ...).
+  world?: Record<string, unknown>
 }
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
@@ -253,7 +255,7 @@ export class MockPartyServer {
         allItems: Object.values(this.catalogEntries).map((entry) => ({
           ...entry,
           sprite: testSprite(),
-          meta: { definition: { ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0) },
+          meta: { definition: { ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}) },
         })),
         buyable: this.buyable,
         craftable: this.craftable,

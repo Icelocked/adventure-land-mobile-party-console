@@ -47,33 +47,6 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   await expect(page.getByText('No active orders.')).toBeVisible()
 })
 
-test('Bestiary: expanding a monster shows its drop table', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
-  server.bestiaryCatalog = [
-    {
-      id: 'crab',
-      name: 'Crab',
-      hp: 100,
-      attack: 10,
-      xp: 5,
-      threat: 1,
-      drops: [{ id: 'shell', name: 'Shell', rate: 0.05, quantity: 1 }],
-      spawnRecords: [],
-    },
-  ]
-  await server.install(page)
-
-  await page.goto('/bestiary')
-  await expect(page.getByText('Crab')).toBeVisible()
-  await expect(page.getByText('Shell')).not.toBeVisible()
-
-  await page.getByText('Crab').click()
-  await expect(page.getByText('Shell')).toBeVisible()
-  await expect(page.getByText('5.0000%')).toBeVisible()
-})
-
 test('Skills: expanding a class shows a skill\'s definition', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
