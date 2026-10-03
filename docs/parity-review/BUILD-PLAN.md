@@ -11,7 +11,8 @@
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
-- **Next:** Phase 8.
+- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 (this commit).
+- **Next:** Phase 8 (U1, M10, M11).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1496,6 +1497,7 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/upgrade-actions.tsx`, `automatic-item-actions.tsx:31-54`, `inventory-panel.tsx:875-1012`, `equip-slot.tsx:123-136`.
 - **PWA files:** `P/screens/itempanel/ItemActionPanel.tsx:240-278, 346-361, 372-410`.
 - **Dependencies:** P0-01, F1.
+- **As built:** delivered by I2. The options lists for inventory and equipped items carry these labels, the disabled current auto tier, compound gating and merchant gating.
 
 #### U3 — Lucky slot (S)
 - **Rows:** A305–A307.
@@ -1506,6 +1508,10 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/lucky-slot-tracker.tsx`, `lucky-slot-menu.tsx`, `lucky-upgrade-slot.tsx`, `connected-inventory.tsx:51-54`, `RT/lucky-slot-tracking.ts:48-62`.
 - **PWA files:** `P/screens/character-detail/sections/LuckySlotSection.tsx`, `InventorySection.tsx`, `P/lib/luckySlot.ts`.
 - **Dependencies:** F7 #37, I1.
+- **As built:**
+  - The outline and slot menu shipped with I1.
+  - The statistics sheet now matches `lucky-slot-tracker.tsx`: counts with percentages, the full explanatory text and column labels.
+  - `aggregateSlotTracking` merges the character's live local stream verbatim (`mergeSlotStream` / `normalizeSlotTracking`) when the record carries `luckySlotTracking`.
 
 #### M10 — Commerce dialog completion (M)
 - **Rows:** A310, A313, A328, A330, A333, A334.

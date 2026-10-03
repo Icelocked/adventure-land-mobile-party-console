@@ -155,6 +155,7 @@ export function CharacterDetailScreen() {
                 verified={dynamicState.luckyUpgradeSlots[name]}
                 open={luckySlotOpen}
                 onOpenChange={setLuckySlotOpen}
+                localLucky={vitals.luckySlotTracking}
               />
             )}
             <EquipmentSection
@@ -179,6 +180,7 @@ export function CharacterDetailScreen() {
                 setActionOnLucky(lucky)
               }}
               onLuckySlotData={() => setLuckySlotOpen(true)}
+              localLucky={vitals.luckySlotTracking}
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />

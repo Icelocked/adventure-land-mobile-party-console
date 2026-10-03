@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { aggregateSlotTracking, emptyRolls, luckySlotSearch } from '@/lib/luckySlot'
+import { aggregateSlotTracking, emptyRolls, luckySlotSearch, normalizeSlotTracking } from '@/lib/luckySlot'
 import { SectionCard } from '../SectionCard'
 import type { LuckySlotStreams } from '@/models'
 
@@ -17,6 +17,7 @@ export function LuckySlotSection({
   verified,
   open,
   onOpenChange: setOpen,
+  localLucky,
 }: {
   characterName: string
   streams: LuckySlotStreams
@@ -24,8 +25,9 @@ export function LuckySlotSection({
   // Controlled so the inventory's lucky slot can open it too (lucky-slot-menu.tsx "Show lucky slot data").
   open: boolean
   onOpenChange: (open: boolean) => void
+  localLucky?: unknown
 }) {
-  const tracking = aggregateSlotTracking(streams)
+  const tracking = aggregateSlotTracking(streams, (localLucky ? normalizeSlotTracking(localLucky) : undefined) as Parameters<typeof aggregateSlotTracking>[1])
   const search = luckySlotSearch(tracking)
   const nextSlot = verified != null ? verified : search.nextSlot
   const isVerified = verified != null
@@ -70,6 +72,7 @@ function LuckySlotStatistics({
   return (
     <div className="flex flex-col gap-2.5 text-sm">
       <h2 className="text-base font-semibold">Lucky slots · {characterName}</h2>
+      <p className="text-xs text-muted-foreground">Upgrade evidence saved per character in coordinator state, with a local copy for reconnects.</p>
       <p className="rounded-md border border-amber-600 bg-amber-950/40 p-2.5 text-amber-200">
         {verified != null ? `Verified slot: ${verified}.` : `Next upgrade will test for lucky upgrade · slot ${nextSlot} (inventory position ${nextSlot + 1}).`}
       </p>
@@ -81,14 +84,15 @@ function LuckySlotStatistics({
           ? 'No evidence yet. Testing starts at slot 0.'
           : `${search.inferred ? 'Statistically inferred' : 'Leading candidate'}: slot ${search.slot} · ${(search.confidence * 100).toFixed(2)}% model confidence · ${search.samples} rolls in that slot.`}
       </p>
-      <p className="text-xs text-muted-foreground">
-        Inference requires at least 100 rolls in the leading slot and 99.9% confidence. New evidence can change the selected slot. Slot numbers start at 0.
+      <p className="text-xs">
+        Normal upgrade jobs rotate through the least-sampled slots and restore inventory afterward. Once a slot is statistically inferred, upgrades use it while evidence continues to accumulate. No extra upgrades are queued. Slot numbers start at 0.
       </p>
+      <p className="text-xs text-muted-foreground">Inference requires at least 100 rolls in the leading slot and 99.9% confidence under the published server model. New evidence can change the selected slot.</p>
       <div className="max-h-[50vh] overflow-y-auto rounded-md border border-border">
         <table className="w-full text-right text-xs">
           <thead className="sticky top-0 bg-card">
             <tr>
-              {['Slot', 'Rolls', 'Avg', '>0.963', 'Zero', 'Status'].map((label) => (
+              {['Slot', 'Rolls', 'Average', '> 0.963', 'Zero rolls', 'Status'].map((label) => (
                 <th key={label} className="p-1.5 font-medium text-muted-foreground">
                   {label}
                 </th>
@@ -97,13 +101,17 @@ function LuckySlotStatistics({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.slot} className={`border-t border-border ${row.slot === nextSlot ? 'bg-amber-950/40' : ''}`}>
+              <tr key={row.slot} data-slot={row.slot} className={`border-t border-border ${row.slot === nextSlot ? 'bg-amber-950/40' : ''}`}>
                 <td className="p-1.5 text-left text-amber-400">{row.slot}</td>
                 <td className="p-1.5">{row.totalRolls}</td>
                 <td className="p-1.5">{row.average?.toFixed(4) ?? '—'}</td>
-                <td className="p-1.5">{row.totalRolls ? `${((100 * row.rollsAbove96_3) / row.totalRolls).toFixed(1)}%` : '—'}</td>
-                <td className="p-1.5">{row.totalRolls ? `${((100 * row.perfectRolls) / row.totalRolls).toFixed(2)}%` : '—'}</td>
-                <td className="p-1.5 text-muted-foreground">{row.slot === nextSlot ? 'Next' : row.totalRolls ? 'Sampled' : 'Untested'}</td>
+                <td className="p-1.5">
+                  {row.rollsAbove96_3} ({row.totalRolls ? ((100 * row.rollsAbove96_3) / row.totalRolls).toFixed(1) : '0.0'}%)
+                </td>
+                <td className="p-1.5">
+                  {row.perfectRolls} ({row.totalRolls ? ((100 * row.perfectRolls) / row.totalRolls).toFixed(2) : '0.00'}%)
+                </td>
+                <td className="p-1.5 text-muted-foreground">{row.slot === nextSlot ? 'Next upgrade' : row.totalRolls ? 'Sampled' : 'Untested'}</td>
               </tr>
             ))}
           </tbody>
