@@ -201,6 +201,8 @@ export class MockPartyServer {
    *  non-2xx CommandResult body, exactly like the coordinator), then
    *  reverts to normal success handling. */
   failOnce: Record<string, string> = {}
+  // merchant-bid.ts: entries the stand could bump when a buy order needs a slot.
+  standFullOccupants: { id: string; itemId: string; kind: string; price: number; quantity: number }[] = []
 
   lastOrder: Record<string, unknown> | null = null
   lastRoutineSave: Record<string, unknown> | null = null
@@ -846,14 +848,23 @@ export class MockPartyServer {
     }
     if (path === 'merchant/bid') {
       const itemId = String(body.itemId)
+      const existing = this.standBids[itemId] as Record<string, unknown> | undefined
+      // merchant-bid.ts: a single-field edit against an older revision is refused.
+      if (body.editField && existing && Number(body.bidRevision) !== Number(existing.revision || 0))
+        return { status: 409, json: { ok: false, error: 'WTB order changed; refresh and try again' } }
+      // A stand slot is needed but the stand is full: list who could be bumped.
+      if (body.useStandSlot && !body.replaceStandEntry && this.standFullOccupants.length)
+        return { status: 409, json: { ok: false, error: 'Merchant stand is full', occupants: this.standFullOccupants } }
       if (body.clear) delete this.standBids[itemId]
       else {
         // merchant-bid.ts priority(): absent keeps the previous override,
         // null/'' clears it.
-        const { itemId: _itemId, clear: _clear, replaceStandEntry: _replace, priorityOverride, ...rest } = body
-        const previous = this.standBids[itemId]?.priorityOverride
+        const { itemId: _itemId, clear: _clear, replaceStandEntry: _replace, priorityOverride, editField: _field, value: _value, bidRevision: _revision, preferencesOnly: _prefs, ...rest } = body
+        const previous = existing?.priorityOverride
         const nextPriority = priorityOverride === undefined ? previous : priorityOverride === null || priorityOverride === '' ? undefined : Number(priorityOverride)
-        this.standBids[itemId] = { ...rest, ...(nextPriority !== undefined ? { priorityOverride: nextPriority } : {}) }
+        const base = body.preferencesOnly && existing ? { ...existing } : {}
+        delete (base as Record<string, unknown>).priorityOverride
+        this.standBids[itemId] = { ...base, ...rest, revision: Number(existing?.revision || 0) + 1, ...(nextPriority !== undefined ? { priorityOverride: nextPriority } : {}) }
       }
       return { status: 200, json: { ok: true } }
     }

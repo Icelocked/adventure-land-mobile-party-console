@@ -107,12 +107,12 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByRole('button', { name: 'View Market' }).click()
   await page.getByRole('button', { name: /Manage WTB orders/ }).click()
   await expect(page).toHaveURL(/\/wtb/)
-  await page.getByRole('button', { name: 'Add WTB order' }).click()
+  await page.getByRole('button', { name: 'New WTB order' }).click()
   await page.getByPlaceholder('Search items...').fill('Iron Ore')
   await page.getByText('Iron Ore').click()
   await page.getByLabel('Maximum price').fill('50')
   await page.getByRole('button', { name: 'Place WTB' }).click()
-  await expect(page.getByText('50g')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Edit price for Iron Ore' })).toHaveText('50g')
 
   // 6. Back to the party overview - confirm the WHOLE session's worth of
   // changes actually stuck (nothing silently reverted or went stale),

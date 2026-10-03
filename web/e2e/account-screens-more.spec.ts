@@ -38,9 +38,9 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   await server.install(page)
 
   await page.goto('/wtb')
-  await expect(page.getByText('No standing buy orders.')).toBeVisible()
+  await expect(page.getByText('No active orders.')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Add WTB order' }).click()
+  await page.getByRole('button', { name: 'New WTB order' }).click()
   await page.getByPlaceholder('Search items...').fill('Iron Ore')
   await page.getByText('Iron Ore').click()
   await page.getByLabel('Maximum price').fill('500')
@@ -52,12 +52,13 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   await expect(page.getByRole('button', { name: 'Place WTB' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Place WTB' }).click()
-  await expect(page.getByPlaceholder('Search items...')).not.toBeVisible()
-  await expect(page.getByText('500g')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Place WTB' })).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Edit price for Iron Ore' })).toHaveText('500g')
 
-  await page.getByRole('button', { name: /Iron Ore/ }).click()
-  await page.getByRole('button', { name: 'Cancel WTB order' }).click()
-  await expect(page.getByText('No standing buy orders.')).toBeVisible()
+  // stand-sheet.tsx: cancel asks "Really cancel?" first.
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Really cancel?' }).click()
+  await expect(page.getByText('No active orders.')).toBeVisible()
 })
 
 test('Bestiary: expanding a monster shows its drop table', async ({ page }) => {
