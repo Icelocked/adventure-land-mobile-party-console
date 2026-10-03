@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Maximize2, X } from 'lucide-react'
 import { MapCanvas } from '@/components/map/MapCanvas'
+import { FreshnessBadge } from '@/components/FreshnessBadge'
 import { receiveMapFrame, type MapRenderBuffer } from '@/components/map/mapRendering'
 import type { MapDefinition } from '@/components/map/mapTypes'
 import { useMapDefinition, useMapFrames, useVisible } from '@/data/useMapFrames'
@@ -19,6 +20,7 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
   const visible = useVisible()
   const buffer = useRef<MapRenderBuffer>({ frame: null, previous: null, receivedAt: 0 })
   const [streamState, setStreamState] = useState('loading')
+  const [lastFrameAt, setLastFrameAt] = useState(0)
   const mapRef = useRef(map)
   useEffect(() => {
     mapRef.current = map
@@ -32,6 +34,9 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
         setStreamDefinition((previous) => (previous?.name === supplied.name ? previous : supplied))
       }
       receiveMapFrame(buffer.current, next, performance.now(), Date.now())
+      // Re-render for the age badge at most once per second of frame time.
+      const at = Number(next.at) || 0
+      setLastFrameAt((previous) => (Math.floor(previous / 1000) === Math.floor(at / 1000) ? previous : at))
     },
   }))
   useMapFrames(name, open && visible, listener)
@@ -42,7 +47,10 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
         <button
           type="button"
           onClick={() => {
-            if (!open) Object.assign(buffer.current, { frame: null, previous: null, receivedAt: 0 })
+            if (!open) {
+              Object.assign(buffer.current, { frame: null, previous: null, receivedAt: 0 })
+              setLastFrameAt(0)
+            }
             setOpen((value) => !value)
           }}
           className="rounded p-0.5"
@@ -66,6 +74,12 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
             <Maximize2 className="size-4" />
           </button>
           {streamState !== 'live' ? <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 font-mono text-[10px] text-amber-200">{streamState}</span> : null}
+          {/* Not on the dashboard: the console replays its last frame and keeps the stream open, so a hung character looks live without this. */}
+          {streamState === 'live' && (
+            <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-1">
+              {lastFrameAt > 0 ? <FreshnessBadge at={lastFrameAt} subject="frame" /> : <span className="text-xs text-slate-300">Waiting for the first frame…</span>}
+            </span>
+          )}
         </div>
       ) : null}
       {large && (
@@ -74,6 +88,7 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
             <span className="font-medium text-emerald-50">
               {name} — {mapLabel}
             </span>
+            {lastFrameAt > 0 && <FreshnessBadge at={lastFrameAt} subject="frame" className="ml-auto mr-3" />}
             <button type="button" aria-label="Close native-size map" onClick={() => setLarge(false)} className="rounded p-1 text-emerald-100">
               <X className="size-5" />
             </button>
