@@ -126,6 +126,7 @@ export class MockPartyServer {
   characters: MockCharacter[] = []
   catalogEntries: Record<string, MockCatalogEntry> = {}
   craftable: Record<string, unknown>[] = []
+  buyable: Record<string, unknown>[] = []
   exchangeable: Record<string, unknown>[] = []
   bankPacks: Record<string, (Record<string, unknown> | null)[]> = {}
   bankGold = 0
@@ -203,6 +204,8 @@ export class MockPartyServer {
    *  non-2xx CommandResult body, exactly like the coordinator), then
    *  reverts to normal success handling. */
   failOnce: Record<string, string> = {}
+  // Extra response fields for a failOnce (e.g. a 409's `missing` list).
+  failOnceBody: Record<string, Record<string, unknown>> = {}
   // merchant-bid.ts: entries the stand could bump when a buy order needs a slot.
   standFullOccupants: { id: string; itemId: string; kind: string; price: number; quantity: number }[] = []
 
@@ -247,7 +250,7 @@ export class MockPartyServer {
           sprite: testSprite(),
           meta: { definition: { ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0) },
         })),
-        buyable: [],
+        buyable: this.buyable,
         craftable: this.craftable,
         exchangeable: this.exchangeable,
       },
@@ -513,7 +516,9 @@ export class MockPartyServer {
     if (this.failOnce[path] !== undefined) {
       const error = this.failOnce[path]
       delete this.failOnce[path]
-      return { status: 409, json: { ok: false, error } }
+      const extra = this.failOnceBody[path] ?? {}
+      delete this.failOnceBody[path]
+      return { status: 409, json: { ok: false, error, ...extra } }
     }
     if (path === 'formation') {
       // Mirrors http/formation.ts: `leader` is only touched when the key is
