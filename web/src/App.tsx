@@ -26,6 +26,7 @@ import { RoutinesScreen } from '@/screens/account/RoutinesScreen'
 import { HuntSettingsScreen } from '@/screens/account/HuntSettingsScreen'
 import { WtbScreen } from '@/screens/account/WtbScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
+import { AnniversaryScreen } from '@/screens/account/AnniversaryScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
 const queryClient = new QueryClient()
@@ -73,6 +74,7 @@ export default function App() {
                 <Route path="/wtb" element={<WtbScreen />} />
                 <Route path="/logs" element={<LogsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/anniversary" element={<AnniversaryScreen />} />
               </Routes>
               </ErrorBoundary>
             </BrowserRouter>

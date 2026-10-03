@@ -736,7 +736,7 @@ export interface PartyStateDynamic {
   gatheringNoTool?: Record<string, boolean>
   purchases?: Record<string, { name: string }[]>
   // Events, hunting, location
-  eventSchedules?: unknown[]
+  eventSchedules?: import('@/lib/eventPolicy').EventSchedule[]
   eventSelectionsByCharacter?: Record<string, string[]>
   eventsByCharacter?: Record<string, boolean>
   monsterPrioritiesByCharacter?: Record<string, Record<string, number>>

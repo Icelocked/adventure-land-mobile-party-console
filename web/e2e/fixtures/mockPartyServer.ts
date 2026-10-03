@@ -528,6 +528,14 @@ export class MockPartyServer {
         if (typeof body.follow !== 'boolean') return { status: 400, json: { error: 'invalid follower' } }
         this.followers = { ...this.followers, [String(body.character)]: body.follow }
       }
+      if (body.character !== undefined && body.eventSelections !== undefined) {
+        // http/formation.ts: followers of a leader use the leader's events.
+        const name = String(body.character)
+        const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        if (this.leader && name !== this.leader && name !== merchant && this.followers[name]) return { status: 409, json: { ok: false, error: 'using leader events' } }
+        const current = (this.extraState.eventSelectionsByCharacter as Record<string, string[]> | undefined) ?? {}
+        this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
+      }
       return { status: 200, json: { ok: true, leader: this.leader, followers: this.followers } }
     }
     if (path === 'merchant/auto-npc-sale') {

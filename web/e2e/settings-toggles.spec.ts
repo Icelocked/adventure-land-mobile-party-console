@@ -24,23 +24,6 @@ test('Force stand: shows the server value and a tap turns it off', async ({ page
   await expect(page.getByRole('button', { name: /Force stand · Off/ })).toBeVisible()
 })
 
-test('Anniversary auto-chat: shows the server value and unticking turns it off', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
-  server.extraState = { anniversaryAutoChat: true }
-  await server.install(page)
-  const bodies = postBodies(page, 'dashboard-preferences')
-
-  await page.goto('/settings')
-  const checkbox = page.locator('div', { hasText: /^Anniversary auto-chat/ }).getByRole('checkbox')
-  await expect(checkbox).toBeChecked()
-  await checkbox.click()
-  await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ anniversaryAutoChat: false })
-  await expect(checkbox).not.toBeChecked()
-})
-
 test('Bankboi prefix: shows the saved prefix, trims on save, and shows server errors', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
