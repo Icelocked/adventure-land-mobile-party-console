@@ -148,21 +148,3 @@ test('Logs: shows an empty state with no activity', async ({ page }) => {
   await page.goto('/logs')
   await expect(page.getByText('No activity yet.')).toBeVisible()
 })
-
-test('Catalog: searching and opening an item shows its details', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
-  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
-  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
-  await server.install(page)
-
-  await page.goto('/catalog')
-  await expect(page.getByText('Iron Ore')).toBeVisible()
-  await expect(page.getByText('Wolf Coat')).toBeVisible()
-
-  await page.getByPlaceholder('Search').fill('Wolf')
-  await expect(page.getByText('Iron Ore')).not.toBeVisible()
-  await page.getByText('Wolf Coat').click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-})

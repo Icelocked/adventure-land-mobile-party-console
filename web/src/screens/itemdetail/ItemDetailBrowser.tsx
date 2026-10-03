@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, DollarSign, HandCoins, SlidersHorizontal } from 'lucide-react'
 import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/data/PartyDataProvider'
 import { WtbDialog } from '@/components/Wtb'
@@ -17,6 +18,7 @@ import {
   comparisonSlotsFor,
   definitionNumber,
   detailMeta,
+  propertiesAtLevel,
   isEquipment,
   definitionString,
   effectiveDropRate,
@@ -174,6 +176,7 @@ function ItemDetailContent({
   const [addingWtb, setAddingWtb] = useState(false)
   const [comparePicker, setComparePicker] = useState<string | null | false>(false)
   const [comparing, setComparing] = useState<{ character: string; slot?: string } | null>(null)
+  const navigate = useNavigate()
   // stand-capacity.tsx standIsFull.
   const standFull = standIsFull(state.standListings, state.standBids)
   const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
@@ -261,6 +264,20 @@ function ItemDetailContent({
                       <span className="font-mono text-[10px] uppercase text-muted-foreground">{characters[name]?.vitals?.ctype}</span>
                     </button>
                   ))}
+                  {/* item-details.tsx "From catalog": this item at the preview level becomes A. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComparePicker(false)
+                      const item = { name: target.id, level: previewLevel, ...(isRoot && rootStatType ? { stat_type: rootStatType } : {}) }
+                      navigate('/catalog', {
+                        state: { comparison: { slot: context?.slot ?? -1, item, meta: meta ? { ...meta, properties: propertiesAtLevel(meta, item, previewLevel, item.stat_type) } : meta } },
+                      })
+                    }}
+                    className="mt-1 rounded border border-cyan-700 px-3 py-2 text-left text-sm text-cyan-100"
+                  >
+                    From catalog
+                  </button>
                 </>
               ) : (
                 <>
