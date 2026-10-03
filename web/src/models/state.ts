@@ -157,6 +157,8 @@ export interface ActivityEntry {
   at: number
   message: string
   level?: string
+  // combat-log-entry.ts: skill | kill | loot | death | item.
+  type?: string
   details?: unknown
 }
 

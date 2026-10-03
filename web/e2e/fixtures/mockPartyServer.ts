@@ -849,6 +849,11 @@ export class MockPartyServer {
       }
       return { status: 200, json: { ok: true, priorities: this.merchantRoutinePriorities, enabled: this.merchantAutomations } }
     }
+    const combatClear = /^combat-log\/([^/]+)\/clear$/.exec(path)
+    if (combatClear) {
+      delete this.combatLogs[decodeURIComponent(combatClear[1])]
+      return { status: 200, json: { ok: true } }
+    }
     if (path === 'merchant/blacklist') {
       // merchant-blacklist.ts createMerchantBlacklistRoute.
       const blacklist = { ...((this.extraState.merchantBlacklist as Record<string, Record<string, unknown>> | undefined) ?? {}) }

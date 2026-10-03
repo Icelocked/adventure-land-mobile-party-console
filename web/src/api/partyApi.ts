@@ -899,6 +899,11 @@ export class PartyApiClient {
     return this.post('merchant/aldata-order', { listing: wire, buyQuantity })
   }
 
+  /** POST /party-api/combat-log/:character/clear - combat-log.tsx Clear history. */
+  async clearCombatLog(character: string): Promise<ApiResult<CommandResult>> {
+    return this.post(`combat-log/${encodeURIComponent(character)}/clear`, {})
+  }
+
   /** POST /party-api/merchant/aldata-sale - use-party-console.tsx
    *  sellALDataOrder: sell owned copies into a live ALData buy order. */
   async sellAlData(order: Record<string, unknown>, sellQuantity: number): Promise<ApiResult<CommandResult>> {

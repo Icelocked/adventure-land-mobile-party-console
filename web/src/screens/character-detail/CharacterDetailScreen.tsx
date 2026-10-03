@@ -19,6 +19,7 @@ import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
 import { GoldTargetSection } from './sections/GoldTargetSection'
 import { AutoMarksSection } from './sections/AutoMarksSection'
+import { CombatLogSection } from './sections/CombatLogSection'
 import { LuckySlotSection } from './sections/LuckySlotSection'
 import { AccountMenu } from './AccountMenu'
 import { SessionControls } from '@/components/SessionControls'
@@ -177,6 +178,7 @@ export function CharacterDetailScreen() {
             <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
             {isMerchant && <RuleConflictsSection />}
             <AutoMarksSection characterName={name} isMerchant={isMerchant} dynamicState={dynamicState} catalogFor={catalogFor} />
+            <CombatLogSection characterName={name} />
           </div>
         </>
       )}
