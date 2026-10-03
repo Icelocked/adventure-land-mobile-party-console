@@ -1,7 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useMerchantCharacter } from '@/data/PartyDataProvider'
+import { useCharacters, useDomainInterest, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { inventoryCounts } from '@/lib/inventoryCounts'
+import { upgradeEstimate } from '@/lib/suggestedItemValue'
+import type { ApiResult } from '@/api/partyApi'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Chip } from '@/components/Chip'
 import { Input } from '@/components/ui/input'
@@ -13,16 +15,23 @@ type Mode = 'buy' | 'craft' | 'exchange'
 const MODES: Mode[] = ['buy', 'craft', 'exchange']
 
 /** merchant-commerce-dialog.tsx ported as its own screen (a dialog with a
- *  cart doesn't fit a phone the way it fits a desktop popup) - Buy/Craft/
- *  Exchange were entirely unbuilt before this (Android's Merchant Activity
- *  screen literally said "coming soon" where this belongs). One deliberate
- *  scope cut from the dashboard version: the per-item "90% budget" upgrade-
- *  scroll cost estimate is a 3000-iteration Monte Carlo simulation the
- *  server re-runs and OVERWRITES anyway before queuing an upgradeable buy
- *  (runtime/coordinator/http/merchant-order.ts's estimate()) - so it's
- *  display-only on the dashboard, and skipping it here costs no real
- *  functionality, just a preview number. Buy-mode cost below is a simple
- *  cost×quantity total instead. */
+ *  cart doesn't fit a phone the way it fits a desktop popup). */
+
+// merchant-commerce-dialog.tsx: quantities are capped at 9999.
+const capQuantity = (value: string) => Math.min(9999, Math.max(0, Number(value.replace(/[^0-9]/g, '')) || 0))
+
+type Inventories = { name: string; items?: ({ item?: { name?: string; level?: number; q?: number } | null } | null)[] }[]
+function inventories(characters: ReturnType<typeof useCharacters>, filter: (state: ReturnType<typeof useCharacters>[string]) => boolean = () => true): Inventories {
+  return Object.entries(characters)
+    .filter(([, state]) => filter(state))
+    .map(([name, state]) => ({ name, items: state.inventory?.items ?? [] }))
+}
+
+/** merchant-commerce-dialog.tsx submit's catch: the message plus each 409 `missing` entry. */
+function orderError(result: Extract<ApiResult<unknown>, { kind: 'failure' }>) {
+  const missing = Array.isArray(result.body?.missing) ? (result.body.missing as { id: string; level?: number; required: number; available: number }[]) : []
+  return (result.message || 'Could not queue order') + missing.map((item) => ` · ${item.id} +${item.level || 0}: ${item.required} required, ${item.available} available`).join('')
+}
 export function MerchantCommerceScreen() {
   const { mode: modeParam } = useParams<{ mode: string }>()
   const mode: Mode = MODES.includes(modeParam as Mode) ? (modeParam as Mode) : 'buy'
@@ -32,6 +41,8 @@ export function MerchantCommerceScreen() {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const catalog = dynamicState.merchantCatalog
+  // party-merchant-commerce-dialog.tsx: usePanelModel(base, { inventory: true, bank: true }).
+  useDomainInterest('bank')
 
   const [search, setSearch] = useState('')
   const [buyCart, setBuyCart] = useState<Record<string, { quantity: number; level: number }>>({})
@@ -41,7 +52,7 @@ export function MerchantCommerceScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const owned = useMemo(() => inventoryCounts(characters, dynamicState.bank, true), [characters, dynamicState.bank])
+  const owned = useMemo(() => inventoryCounts(inventories(characters), dynamicState.bank, dynamicState.bankbois, true), [characters, dynamicState.bank, dynamicState.bankbois])
   const buyableById = useMemo(() => Object.fromEntries((catalog?.buyable ?? []).map((item) => [item.id, item])), [catalog])
 
   const setModeParam = (next: Mode) => navigate(`/merchant/${next}`, { replace: true })
@@ -55,15 +66,12 @@ export function MerchantCommerceScreen() {
         catalog={catalog?.buyable ?? []}
         cart={buyCart}
         setCart={setBuyCart}
-        onSubmit={async () => {
+        onSubmit={async (lines) => {
           setSubmitting(true)
           setError(null)
-          const lines = Object.entries(buyCart)
-            .filter(([, line]) => line.quantity > 0)
-            .map(([id, line]) => ({ id, quantity: line.quantity, ...(line.level > 0 ? { level: line.level } : {}) }))
           const result = await api.submitMerchantOrder(lines, [])
           setSubmitting(false)
-          if (result.kind === 'failure') setError(result.message)
+          if (result.kind === 'failure') setError(orderError(result))
           else {
             setBuyCart({})
             await refreshNow()
@@ -94,7 +102,7 @@ export function MerchantCommerceScreen() {
             .map(([id, quantity]) => ({ id, quantity }))
           const result = await api.submitMerchantOrder([], lines)
           setSubmitting(false)
-          if (result.kind === 'failure') setError(result.message)
+          if (result.kind === 'failure') setError(orderError(result))
           else {
             setCraftCart({})
             await refreshNow()
@@ -114,6 +122,7 @@ export function MerchantCommerceScreen() {
       exchangeable={catalog?.exchangeable ?? []}
       characters={characters}
       bank={dynamicState.bank}
+      bankbois={dynamicState.bankbois}
       cart={exchangeCart}
       setCart={setExchangeCart}
       choosing={choosing}
@@ -130,7 +139,7 @@ export function MerchantCommerceScreen() {
           })
         const result = await api.submitExchangeOrder(lines)
         setSubmitting(false)
-        if (result.kind === 'failure') setError(result.message)
+        if (result.kind === 'failure') setError(orderError(result))
         else {
           setExchangeCart({})
           await refreshNow()
@@ -193,13 +202,13 @@ function ItemRow({
 }
 
 function CartRow({ children }: { children: ReactNode }) {
-  return <div className="flex items-center gap-2 border-t border-border py-2 first:border-t-0">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 border-t border-border py-2 first:border-t-0">{children}</div>
 }
 
 function SubmitBar({ label, disabled, submitting, error, onSubmit }: { label: string; disabled: boolean; submitting: boolean; error: string | null; onSubmit: () => void }) {
   return (
     <div className="sticky bottom-0 border-t border-border bg-background p-3">
-      {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
       <Button className="w-full" disabled={disabled || submitting} onClick={onSubmit}>
         {submitting ? 'Queuing...' : label}
       </Button>
@@ -226,13 +235,23 @@ function BuyScreen({
   catalog: MerchantBuyItem[]
   cart: Record<string, { quantity: number; level: number }>
   setCart: (fn: (old: Record<string, { quantity: number; level: number }>) => Record<string, { quantity: number; level: number }>) => void
-  onSubmit: () => void
+  onSubmit: (lines: { id: string; quantity: number; level?: number; budget?: number; maxAttempts?: number }[]) => void
   submitting: boolean
   error: string | null
 }) {
   const filtered = catalog.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()))
   const selected = catalog.filter((item) => (cart[item.id]?.quantity ?? 0) > 0)
-  const goldTotal = selected.reduce((sum, item) => sum + item.cost * (cart[item.id]?.quantity ?? 0), 0)
+  // merchant-commerce-dialog.tsx: estimates, hasEstimatedGold, goldTotal and the submitted lines.
+  const estimates = Object.fromEntries(selected.map((item) => [item.id, upgradeEstimate(item, cart[item.id].quantity, cart[item.id]?.level || 0)]))
+  const hasEstimatedGold = selected.some((item) => (cart[item.id]?.level || 0) > 0 && item.upgradeable)
+  const goldTotal = selected.reduce((sum, item) => sum + estimates[item.id].gold, 0)
+  const lines = () =>
+    selected.map((item) => ({
+      id: item.id,
+      quantity: cart[item.id].quantity,
+      ...(cart[item.id]?.level ? { level: cart[item.id].level } : {}),
+      ...(item.upgradeable ? { budget: estimates[item.id].gold, maxAttempts: estimates[item.id].attempts } : {}),
+    }))
 
   return (
     <AccountScreenScaffold title="Merchant shopping">
@@ -266,7 +285,7 @@ function BuyScreen({
                 <Input
                   aria-label={`${item.name} quantity`}
                   value={String(line.quantity)}
-                  onChange={(e) => setCart((old) => ({ ...old, [item.id]: { ...old[item.id], quantity: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) } }))}
+                  onChange={(e) => setCart((old) => ({ ...old, [item.id]: { ...old[item.id], quantity: capQuantity(e.target.value) } }))}
                   className="h-8 w-14 px-1.5 text-center text-xs"
                 />
                 {item.upgradeable && (
@@ -283,13 +302,24 @@ function BuyScreen({
                 <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
                   Remove
                 </Button>
+                {line.level > 0 && item.upgradeable ? (
+                  <p className="ml-9 w-full font-mono text-[10px] text-violet-300">
+                    90% budget: {estimates[item.id].attempts} base items ·{' '}
+                    {estimates[item.id].scrolls
+                      .map((count, grade) => (count ? `${count} scroll${grade}` : ''))
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                ) : null}
               </CartRow>
             )
           })}
-          <p className="mt-2 font-mono text-sm text-primary">Gold: {goldTotal.toLocaleString()}g</p>
+          <p className="mt-2 font-mono text-sm text-primary">
+            Gold{hasEstimatedGold ? ' (est)' : ''}: {goldTotal.toLocaleString()}g
+          </p>
         </div>
       )}
-      <SubmitBar label="Buy all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={onSubmit} />
+      <SubmitBar label="Buy all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />
     </AccountScreenScaffold>
   )
 }
@@ -345,7 +375,23 @@ function CraftScreen({
       return needed <= (owned[key] ?? 0) || canPurchaseMaterial(material)
     })
 
+  // merchant-commerce-dialog.tsx: ingredientPurchaseCost and additionalRecipeCost.
+  const ingredientPurchaseCost = Object.entries(requirements).reduce((sum, [key, requirement]) => {
+    const missing = Math.max(0, requirement.quantity - (owned[key] || 0))
+    return sum + missing * (buyableById[requirement.material.id]?.cost || 0)
+  }, 0)
+  const additionalRecipeCost = (recipe: MerchantCraftRecipe) =>
+    recipe.cost +
+    recipe.materials.reduce((sum, material) => {
+      const key = `${material.id}@${material.level || 0}`
+      const before = Math.max(0, (requirements[key]?.quantity || 0) - (owned[key] || 0))
+      const after = Math.max(0, (requirements[key]?.quantity || 0) + material.quantity - (owned[key] || 0))
+      return sum + (after - before) * (buyableById[material.id]?.cost || 0)
+    }, 0)
+  const [previewing, setPreviewing] = useState<string | null>(null)
+
   const selected = recipes.filter((item) => (cart[item.id] ?? 0) > 0)
+  const goldTotal = selected.reduce((sum, item) => sum + item.cost * cart[item.id], 0) + ingredientPurchaseCost
   // Per-recipe canAddRecipe only guards the incremental +1 tap - typing a
   // quantity directly into the cart Input bypasses it entirely, so the
   // submit button needs its own aggregate check across every material's
@@ -365,15 +411,49 @@ function CraftScreen({
         <div className="flex flex-col gap-1.5 px-3">
           {filtered.map((recipe) => {
             const enabled = canAddRecipe(recipe)
+            const open = previewing === recipe.id
             return (
-              <ItemRow
-                key={recipe.id}
-                name={recipe.name}
-                sprite={recipe.sprite}
-                subtitle={`${recipe.cost.toLocaleString()}g + materials`}
-                disabled={!enabled}
-                onAdd={() => setCart((old) => ({ ...old, [recipe.id]: (old[recipe.id] ?? 0) + 1 }))}
-              />
+              <div key={recipe.id} className="flex flex-col gap-1">
+                <ItemRow
+                  name={recipe.name}
+                  sprite={recipe.sprite}
+                  subtitle={`${recipe.cost.toLocaleString()}g + materials`}
+                  disabled={!enabled}
+                  onAdd={() => setCart((old) => ({ ...old, [recipe.id]: (old[recipe.id] ?? 0) + 1 }))}
+                />
+                {/* The dashboard's hover preview; a phone has no hover, so it toggles inline. */}
+                <Button variant="link" size="xs" className="self-start text-violet-300" aria-expanded={open} onClick={() => setPreviewing(open ? null : recipe.id)}>
+                  {open ? 'Hide recipe' : 'Complete recipe'}
+                </Button>
+                {open && (
+                  <div role="group" aria-label={`${recipe.name} recipe`} className="rounded-md border border-violet-600 bg-card p-2.5">
+                    <p className="text-sm font-semibold text-violet-200">{recipe.name}</p>
+                    <p className="mb-2 font-mono text-[10px] uppercase text-violet-300">Complete recipe</p>
+                    {recipe.materials.map((material) => {
+                      const available = owned[`${material.id}@${material.level || 0}`] || 0
+                      return (
+                        <div key={`${material.id}-${material.level}`} className="flex items-center gap-2 py-1">
+                          <SpriteIcon sprite={material.sprite} size={28} />
+                          <span className="min-w-0 flex-1 text-xs">
+                            {material.quantity} × {material.name}
+                            {material.level ? ` +${material.level}` : ''}
+                          </span>
+                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                            {available >= material.quantity
+                              ? `${available} owned`
+                              : canPurchaseMaterial(material)
+                                ? `${available} owned · buy ${material.quantity - available}`
+                                : `${available} owned · missing`}
+                          </span>
+                        </div>
+                      )
+                    })}
+                    <p className="mt-2 border-t border-violet-800 pt-2 text-right font-mono text-xs text-amber-300">
+                      Next craft: {additionalRecipeCost(recipe).toLocaleString()}g total
+                    </p>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
@@ -389,7 +469,7 @@ function CraftScreen({
               <Input
                 aria-label={`${item.name} quantity`}
                 value={String(cart[item.id])}
-                onChange={(e) => setCart((old) => ({ ...old, [item.id]: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) }))}
+                onChange={(e) => setCart((old) => ({ ...old, [item.id]: capQuantity(e.target.value) }))}
                 className="h-8 w-14 px-1.5 text-center text-xs"
               />
               <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: 0 }))}>
@@ -417,6 +497,7 @@ function CraftScreen({
               )
             })}
           </div>
+          <p className="mt-2 font-mono text-sm text-primary">Gold: {goldTotal.toLocaleString()}g</p>
         </div>
       )}
       <SubmitBar label="Craft" disabled={!selected.length || !materialsAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />
@@ -469,6 +550,7 @@ function ExchangeScreen({
   exchangeable,
   characters,
   bank,
+  bankbois,
   cart,
   setCart,
   choosing,
@@ -483,6 +565,7 @@ function ExchangeScreen({
   exchangeable: MerchantExchangeItem[]
   characters: ReturnType<typeof useCharacters>
   bank: ReturnType<typeof useDynamicState>['bank']
+  bankbois: ReturnType<typeof useDynamicState>['bankbois']
   cart: Record<string, number>
   setCart: (fn: (old: Record<string, number>) => Record<string, number>) => void
   choosing: GroupedExchangeItem | null
@@ -491,17 +574,11 @@ function ExchangeScreen({
   submitting: boolean
   error: string | null
 }) {
-  const merchantCharacter = useMerchantCharacter()
-  // Only the merchant's own carried items count toward exchange
-  // requirements (exchanges run through the merchant), matching
-  // use-party-console.tsx's `exchangeOwned` scoping - distinct from the
-  // full-account `owned` totals Buy/Craft use.
-  const merchantOnly = useMemo(() => {
-    const filtered: typeof characters = {}
-    if (merchantCharacter && characters[merchantCharacter]) filtered[merchantCharacter] = characters[merchantCharacter]
-    return filtered
-  }, [characters, merchantCharacter])
-  const exchangeOwned = useMemo(() => inventoryCounts(merchantOnly, bank, true), [merchantOnly, bank])
+  // merchant-commerce-dialog.tsx exchangeOwned: merchant-class characters, the bank and bankbois.
+  const exchangeOwned = useMemo(
+    () => inventoryCounts(inventories(characters, (state) => state.vitals?.ctype === 'merchant'), bank, bankbois, true),
+    [characters, bank, bankbois],
+  )
 
   const grouped = useMemo(() => groupExchangeItems(exchangeable), [exchangeable])
   const filtered = grouped.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()))
@@ -564,7 +641,7 @@ function ExchangeScreen({
               <Input
                 aria-label={`${item.name} quantity`}
                 value={String(cart[item.key])}
-                onChange={(e) => setCart((old) => ({ ...old, [item.key]: Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0) }))}
+                onChange={(e) => setCart((old) => ({ ...old, [item.key]: capQuantity(e.target.value) }))}
                 className="h-8 w-14 px-1.5 text-center text-xs"
               />
               <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.key]: 0 }))}>

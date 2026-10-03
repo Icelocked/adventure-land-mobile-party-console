@@ -538,7 +538,7 @@ export class PartyApiClient {
    *  upgradeable buy) is the only field worth sending from here; any
    *  client-side cost estimate is display-only. */
   async submitMerchantOrder(
-    buys: { id: string; quantity: number; level?: number }[],
+    buys: { id: string; quantity: number; level?: number; budget?: number; maxAttempts?: number }[],
     crafts: { id: string; quantity: number }[],
     removeAutoBankMark = false,
   ): Promise<ApiResult<CommandResult>> {

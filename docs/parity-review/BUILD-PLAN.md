@@ -11,8 +11,8 @@
 - **Phase 5:** complete - I1 + I5 `eba3e29`, I2 `cd48303`, I3 + I4 `b11e16c`, I8 `6918aab`, I7 `74e1ec6`, I6 (this commit).
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
-- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 (this commit).
-- **Next:** Phase 8 (M10, M11).
+- **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 (this commit).
+- **Next:** Phase 8 (M11).
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1531,6 +1531,12 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/merchant-commerce-dialog.tsx:126-601`, `upgrade-estimate.tsx`, `DL/account-inventory.ts`.
 - **PWA files:** `P/screens/account/MerchantCommerceScreen.tsx`, `P/lib/inventoryCounts.ts`.
 - **Dependencies:** P0-01, F3, F7 #31/#36.
+- **As built:**
+  - `lib/inventoryCounts.ts` is the verbatim port (characters, bank, bankbois, byLevel). Buy/craft count every character; exchange counts merchant-class characters, as `exchangeOwned` does. The screen declares bank-domain interest, matching the panel model's `bank: true`.
+  - Cart quantity inputs cap at 9999 in all three modes.
+  - Buy: `upgradeEstimate` per line, the "90% budget" line for upgradeable targets, "Gold (est)", and `budget`/`maxAttempts` in each upgradeable buy line.
+  - Craft: gold total includes `ingredientPurchaseCost`. The hover recipe preview is an inline "Complete recipe" toggle per row (a phone has no hover), with owned/buy/missing per material and "Next craft: Xg total".
+  - Order and exchange failures append each 409 `missing` entry.
 
 #### M11 — Exchange workflow (L)
 - **Rows:** A314–A319, A321, A324, A325.
