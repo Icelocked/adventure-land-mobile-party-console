@@ -12,8 +12,8 @@
 - **Phase 6:** complete - M7 `cb447c3`, M5 `c734242`, M4 `6d509c7`, M6 `d591e84`, M8 (this commit).
 - **Phase 7:** complete - C8 `ee9986c`, C7 `a129ee1`, C1 `39a650f`, C3 `5d2f4b2`, C2 (this commit).
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
-- **Phase 9:** C4 `af3e32a`, C6 (this commit; done before C5 because the cave map builds on it).
-- **Next:** Phase 9 (C5).
+- **Phase 9:** C4 `af3e32a`, C6 `8b86631` (done before C5 because the cave map builds on it), C5 (this commit).
+- **Next:** Phase 10.
 
 ## Ground rules (set by the owner, binding on every package)
 1. **No drifting or diverting.** Ryan's party-console is the base. Its behaviour, request bodies and semantics are the spec, even where they look like bugs. The PWA adapts to each of his releases and never proposes server-side changes as the fix.
@@ -1613,6 +1613,12 @@ Size key: S ≈ ≤1 day, M ≈ 2–4 days, L ≈ 1–2 weeks.
 - **Dashboard sources:** `D/dungeon-query.ts`, `dungeon-settings.tsx`, `dungeon-panel.tsx`, `cave-map.tsx`, `escape-control.tsx:10-64`, `RT/dungeons/service.ts`, `RT/dungeons/contracts.ts`.
 - **PWA files:** new `P/screens/dungeon/DungeonScreen.tsx`, `DungeonSettingsSheet.tsx`, `EncounterSheet.tsx`, `CaveShopSheet.tsx`, `CaveMap.tsx`, `P/data/useDailyDungeon.ts`, `P/api/partyApi.ts` (`dailyDungeon(action, body)`), `P/screens/CharacterListScreen.tsx` (Escape label).
 - **Dependencies:** F5, F7 #15/#19, C6 (map rendering for the cave map), C4 (Cave row host).
+- **As built:**
+  - `models/dungeon.ts` copies the `contracts.ts` wire shapes. `data/useDailyDungeon.ts` is `dungeon-query.ts`: a TanStack query polled every second while visible, actions with a fresh `operationId` whose response (`CommandResult.data`) replaces the view, plus `dungeonCountdown`/`dungeonEntryLabel`.
+  - `CaveEventRow` heads the Events list; its settings dialog is a sheet (`role="group"` "Cave of Many Dreams").
+  - `DungeonPanel` heads the party screen while a visit runs, as in `party-workspace.tsx`. The exit confirmation is an inline group; the encounter is a full-screen group that cannot be closed until resolved (paid-vote and purchase confirmations inline); the shop item opens item details in a sheet.
+  - `CaveMap` is a full-screen view over `MapCanvas`, subscribing to every participant's map stream through the shared subscription.
+  - Party controls: Escape reads "Escape — exit dungeon" and sends the dungeon exit during a visit, with the dungeon's action error.
 
 #### C6 — Live map (L)
 - **Rows:** A158.

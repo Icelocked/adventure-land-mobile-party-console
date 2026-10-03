@@ -210,6 +210,11 @@ export class MockPartyServer {
   standFullOccupants: { id: string; itemId: string; kind: string; price: number; quantity: number }[] = []
 
   lastOrder: Record<string, unknown> | null = null
+  // GET/POST /daily-dungeons (dungeons/contracts.ts DungeonView). POSTs are
+  // recorded; onDungeonAction may change the view before it is returned.
+  dailyDungeon: Record<string, unknown> = { state: { phase: 'idle', participants: [], protectFromEvents: true, commands: {} }, members: [] }
+  dungeonActions: Record<string, unknown>[] = []
+  onDungeonAction: ((body: Record<string, unknown>) => void) | null = null
   lastRoutineSave: Record<string, unknown> | null = null
 
   paired = false
@@ -1066,6 +1071,19 @@ export class MockPartyServer {
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
     )
     await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
+    await page.route('**/party-api/daily-dungeons', async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fulfill({ json: this.dailyDungeon })
+      const body = (request.postDataJSON() as Record<string, unknown>) ?? {}
+      this.dungeonActions.push(body)
+      if (this.failOnce['daily-dungeons'] !== undefined) {
+        const error = this.failOnce['daily-dungeons']
+        delete this.failOnce['daily-dungeons']
+        return route.fulfill({ status: 409, json: { ok: false, error } })
+      }
+      this.onDungeonAction?.(body)
+      return route.fulfill({ json: this.dailyDungeon })
+    })
     // upgrade-preview.ts: the stored server preview for the merchant's item.
     await page.route('**/party-api/upgrade-preview', async (route) => {
       const body = route.request().postDataJSON() as Record<string, unknown>

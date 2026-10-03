@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { eventPolicy, eventTimeLabel, selectedEvents, supportedEvents, type EventSchedule } from '@/lib/eventPolicy'
 import { useClock } from '@/lib/duration'
+import { CaveEventRow } from '@/screens/dungeon/CaveEventRow'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Chip } from '@/components/Chip'
 import { SectionCard } from '../SectionCard'
@@ -78,6 +79,7 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
       {open && (
         <div role="group" aria-label="Events" className="basis-full rounded border border-border bg-card p-3 text-xs">
           {policy.inherited && <p className="mb-2 text-amber-200">Using {policy.source}’s events</p>}
+          <CaveEventRow />
           {[...catalog]
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((event) => {

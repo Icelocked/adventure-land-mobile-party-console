@@ -40,7 +40,8 @@ test('Events: sorted schedule labels, a toggle saves the selection, followers us
   await expect(events.getByText('Giant Crab — Time not announced · timing stale')).toBeVisible()
   await expect(events.getByText('Halloween — Unsupported')).toBeVisible()
   await expect(events.getByRole('checkbox', { name: 'Halloween' })).toBeDisabled()
-  await expect(events.locator('span').first()).toHaveText(/^Anniversary/)
+  await expect(events.getByText(/^Cave of Many Dreams — /)).toBeVisible()
+  await expect(events.getByRole('checkbox').first()).toHaveAccessibleName('Anniversary')
 
   await events.getByRole('checkbox', { name: 'Goo Brawl' }).click()
   await expect.poll(() => bodies[0]).toEqual({ character: 'Leada', eventSelections: ['anniversary', 'goobrawl'] })
