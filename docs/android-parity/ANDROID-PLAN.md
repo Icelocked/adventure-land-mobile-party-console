@@ -181,7 +181,8 @@ and a 411x891dp phone.
   bank pack and each bankboi, quantity, postage, two-step send.
 - Fixed on the way: auto-stand sent `character` (the rule is the
   merchant's).
-- Not yet: offering rows in the bank upgrade options (U1).
+- Offering rows in the bank upgrade options landed with A8 (disabled, as on
+  the dashboard).
 
 ### A5 status: done
 
@@ -277,7 +278,34 @@ and a 411x891dp phone.
   character map / farming-area preview need the map stream (A11); the
   Events chip in Formation (C4, A9); the lucky slot section (U3, A8).
 
-Next: A8 (U1, U2, U3, M10, M11 upgrades and exchange).
+### A8 status: done
+
+- U1: offerings (`ui/components/Offerings.kt`, Offerings.tsx): under Mark
+  for upgrade, "Upgrade with Primling / Primordial Essence / Primordial X"
+  (needs stock and a source) confirming a one-tier mark, and the server
+  upgrade preview (polled every 2 s, Refresh chances); under Auto mark for
+  upgrade, "Add upgrade rule" (range, offering, Required / Only if
+  available, overlap and destination checks). Equipped items get the same;
+  the bank's stay disabled as on the dashboard. Rule Edit in Automatic
+  rules uses the same dialog. The separate Offerings screen and its menu
+  entry are gone (the PWA has none).
+- U2: the option labels (tier counts, "to +N", stat scroll trigger,
+  grouped compounding) landed with the A5 options panel.
+- U3: the lucky upgrade slot card (merchant) and its 42-slot evidence
+  sheet, also opened from the inventory's lucky slot and its options.
+- M10: commerce carts - Buy with target level and the 90%-confidence
+  budget / max attempts sent with the order, Craft with owned / to-buy
+  materials, the recipe preview, next-craft cost and the aggregate
+  availability gate, Exchange; missing-material errors listed;
+  inventory counts include bankbois.
+- M11: exchange workflow - fixed-reward exchanges grouped under their
+  currency ("Choose"), box/table results as reward tiles with automatic
+  rule banners and their options (Item details, auto bank / stand /
+  exchange / upgrade + rule / compound / NPC sale), "Mark multiple" bulk
+  rules saved on Done, nested box drill-down, exchange "Add" from item
+  details.
+
+Next: A9 (C4, C5, C6 events, dungeons and map).
 
 ### Packages
 

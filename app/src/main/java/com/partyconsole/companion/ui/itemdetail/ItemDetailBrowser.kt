@@ -66,6 +66,9 @@ private sealed interface DetailTarget {
     data class MonsterTarget(val id: String) : DetailTarget
 }
 
+/** item-details.tsx's exchange "Add" (enabled when the merchant has enough). */
+data class ExchangeAdd(val enabled: Boolean, val onAdd: () -> Unit)
+
 /** item-details.tsx header: whose item and where ("Ranger1 · slot 3"). */
 data class ItemDetailContext(val character: String, val slot: Int)
 
@@ -86,6 +89,8 @@ fun ItemDetailBrowser(
     onAddStand: (() -> Unit)? = null,
     // Party state for Compare, the stand capacity and Tracktrix bonuses.
     viewModel: PartyViewModel? = null,
+    // item-details.tsx: the exchange catalog's "Add" for the inspected exchange.
+    exchangeAdd: ExchangeAdd? = null,
 ) {
     var trail by remember(rootItemId, rootLevel) {
         mutableStateOf(listOf<DetailTarget>(DetailTarget.ItemTarget(rootItemId, rootLevel)))
@@ -118,6 +123,13 @@ fun ItemDetailBrowser(
                 monster = monsters.find { it.id == target.id },
                 onNavigateItem = { id, level -> trail = trail + DetailTarget.ItemTarget(id, level) },
             )
+        }
+        if (exchangeAdd != null && trail.size == 1) {
+            androidx.compose.material3.Button(
+                enabled = exchangeAdd.enabled,
+                onClick = exchangeAdd.onAdd,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) { Text("Add") }
         }
     }
 }

@@ -40,7 +40,10 @@ import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.network.CommandResult
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.characterdetail.sections.slotInt
+import com.partyconsole.companion.ui.components.AddUpgradeRule
 import com.partyconsole.companion.ui.components.AutoNpcSaleConfirmation
+import com.partyconsole.companion.ui.components.OfferingRows
+import com.partyconsole.companion.ui.components.OfferingSource
 import com.partyconsole.companion.ui.components.DeconstructionConfirmation
 import com.partyconsole.companion.ui.components.NpcSaleSheet
 import com.partyconsole.companion.ui.components.StandListingForm
@@ -332,9 +335,15 @@ private fun InventoryActions(
         // upgrade-actions.tsx (offerings are U1).
         if (merchant != null && meta?.upgradeable == true && upgradeMax > 0) {
             TapRow("Mark for upgrade" + (upgradeMark?.let { " · ${tiers(it.tiers ?: 1)}" } ?: "")) { toggle("upgrade") }
-            if (expanded == "upgrade") UpgradeTierPicker(meta, level) { t -> command("upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
+            if (expanded == "upgrade") {
+                UpgradeTierPicker(meta, level) { t -> command("upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
+                OfferingRows(viewModel, characterName, item, meta, OfferingSource(JsonPrimitive(slot)))
+            }
             TapRow("Auto mark for upgrade" + (if (autoUpgradeTiers > 0) " · ${tiers(autoUpgradeTiers)}" else "")) { toggle("autoupgrade") }
-            if (expanded == "autoupgrade") UpgradeTierPicker(meta, level, current = autoUpgradeTiers) { t -> command("auto-upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
+            if (expanded == "autoupgrade") {
+                UpgradeTierPicker(meta, level, current = autoUpgradeTiers) { t -> command("auto-upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
+                AddUpgradeRule(viewModel, characterName, item, meta)
+            }
         }
         if (merchant != null && !isMerchant && meta?.buyable == true) TapRow("Buy another level 0") { command("buy-copy", null) }
 
@@ -428,10 +437,12 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
             TapRow("Mark for upgrade" + (mark?.let { " · ${tiers(it.tiers ?: 1)}" } ?: "")) { toggle("upgrade") }
             if (expanded == "upgrade") {
                 UpgradeTierPicker(meta, level) { t -> run { api.itemCommand("upgrade-mark", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(t))) } }
+                OfferingRows(viewModel, characterName, item, meta, OfferingSource(slotArg, equipped = true))
             }
             TapRow("Auto mark for upgrade" + (if (autoTiers > 0) " · ${tiers(autoTiers)}" else "")) { toggle("autoupgrade") }
             if (expanded == "autoupgrade") {
                 UpgradeTierPicker(meta, level, current = autoTiers) { t -> run { api.itemCommand("auto-upgrade-mark", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(t))) } }
+                AddUpgradeRule(viewModel, characterName, item, meta)
             }
         }
         if (hasAutomaticMarks || mark != null || statScrollMark != null) {

@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
  *  budget itself (runtime/coordinator/http/merchant-order.ts's estimate())
  *  before queuing, so nothing else needs to be sent from here. */
 @Serializable
-data class MerchantOrderBuyLine(val id: String, val quantity: Int, val level: Int? = null)
+data class MerchantOrderBuyLine(val id: String, val quantity: Int, val level: Int? = null, val budget: Double? = null, val maxAttempts: Long? = null)
 
 @Serializable
 data class MerchantOrderCraftLine(val id: String, val quantity: Int)
