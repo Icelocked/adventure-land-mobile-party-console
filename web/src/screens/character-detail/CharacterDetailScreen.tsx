@@ -115,8 +115,10 @@ export function CharacterDetailScreen() {
               travelPlaces={dynamicState.travelPlaces}
             />
             {/* Merchant-class characters can't run hunts (farming-scope.ts) - a class capability, not the merchant role. */}
-            {vitals.ctype !== 'merchant' && (
+            {(vitals.ctype !== 'merchant' || name !== dynamicState.merchantCharacter) && (
               <FarmingSection
+                showModes={vitals.ctype !== 'merchant'}
+                showFocus={name !== dynamicState.merchantCharacter}
                 characterName={name}
                 farmingPolicy={farming.savedMode}
                 effectiveMode={farming.effectiveMode}

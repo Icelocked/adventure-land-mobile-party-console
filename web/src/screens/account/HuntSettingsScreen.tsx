@@ -32,6 +32,7 @@ export function HuntSettingsScreen() {
   const dynamicState = useDynamicState()
   const [inspecting, setInspecting] = useState<BestiaryMonster | null>(null)
   const [inspectError, setInspectError] = useState<string | null>(null)
+  const [clearAllError, setClearAllError] = useState<string | null>(null)
   const [drop, setDrop] = useState<string | null>(null)
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -91,15 +92,31 @@ export function HuntSettingsScreen() {
   const clearBlacklist = async (monsterId?: string) => {
     setBlacklistBusy(true)
     setError(null)
+    setClearAllError(null)
     const result = await api.updateHuntBlacklist(name, monsterId ? 'remove' : 'clear', monsterId)
     setBlacklistBusy(false)
-    if (result.kind === 'failure') setError(result.message)
-    else await refreshNow()
+    if (result.kind === 'failure') {
+      // farming-mode-control.tsx: Clear all keeps its confirmation open with the error.
+      if (monsterId) setError(result.message)
+      else setClearAllError(result.message)
+      return
+    }
+    if (!monsterId) setConfirmingClearAll(false)
+    await refreshNow()
+  }
+  // connected-character-card.tsx onInspectMonster: details, or why they are unavailable.
+  const inspectMonster = (id: string) => {
+    const monster = dynamicState.bestiaryCatalog.find((entry) => entry.id === id)
+    if (monster) {
+      setInspectError(null)
+      setInspecting(monster)
+    } else setInspectError(`Monster details are not available for ${id} yet.`)
   }
 
   return (
     <AccountScreenScaffold title={`Hunt settings · ${context.owner}`} onRefresh={() => void refreshNow()}>
       <fieldset disabled={!editable || busy} className="flex flex-col gap-3 p-3">
+        <p className="text-xs text-muted-foreground">Configure Hunt relocation and automatic blacklisting. Blacklisted quests are skipped until you clear the entry. Normal farming selections are unaffected.</p>
         {inherited && <p className="text-xs text-muted-foreground">Settings inherited from the leader ({context.owner}).</p>}
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -155,7 +172,7 @@ export function HuntSettingsScreen() {
           disabled={!editable}
           onSave={async (patch) => afterwards(await api.saveHuntSettings(name, patch))}
         />
-        <PassiveHuntingMenu settings={passive} catalog={monsterChoices} disabled={!editable} onSave={async (patch) => afterwards(await api.setRareHunting(patch))} />
+        <PassiveHuntingMenu settings={passive} catalog={monsterChoices} disabled={!editable} onSave={async (patch) => afterwards(await api.setRareHunting(patch))} onInspect={inspectMonster} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2">
@@ -165,26 +182,32 @@ export function HuntSettingsScreen() {
           blacklist={context.blacklist}
           disabled={!editable || blacklistBusy}
           onAdd={async (id) => afterwards(await api.updateHuntBlacklist(name, 'add', id))}
+          onInspect={inspectMonster}
         />
         {confirmingClearAll ? (
-          <div className="flex items-center gap-2">
+          <div role="group" aria-label="Clear Hunt blacklist?" className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-destructive">
               Remove all {blacklist.length} blacklisted monsters for {context.owner}? Hunt can accept quests for these monsters again.
             </span>
+            <Button size="sm" variant="destructive" disabled={!editable || blacklistBusy} onClick={() => void clearBlacklist()}>
+              {blacklistBusy ? 'Clearing...' : 'Clear all'}
+            </Button>
             <Button
               size="sm"
-              variant="destructive"
-              disabled={!editable || blacklistBusy}
+              variant="outline"
+              disabled={blacklistBusy}
               onClick={() => {
                 setConfirmingClearAll(false)
-                void clearBlacklist()
+                setClearAllError(null)
               }}
             >
-              Clear all
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setConfirmingClearAll(false)}>
               Cancel
             </Button>
+            {clearAllError && (
+              <p role="alert" className="basis-full text-sm text-destructive">
+                {clearAllError}
+              </p>
+            )}
           </div>
         ) : (
           <Button size="sm" variant="destructive" disabled={!editable || blacklistBusy || blacklist.length === 0} onClick={() => setConfirmingClearAll(true)}>
@@ -202,13 +225,7 @@ export function HuntSettingsScreen() {
               <button
                 type="button"
                 aria-label={`Inspect ${monsterFor(id)?.name || id}`}
-                onClick={() => {
-                  const monster = dynamicState.bestiaryCatalog.find((entry) => entry.id === id)
-                  if (monster) {
-                    setInspectError(null)
-                    setInspecting(monster)
-                  } else setInspectError(`Monster details are not available for ${id} yet.`)
-                }}
+                onClick={() => inspectMonster(id)}
                 className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
               >
                 <SpriteIcon sprite={monsterFor(id)?.sprite} size={28} />

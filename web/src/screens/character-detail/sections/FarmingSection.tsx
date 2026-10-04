@@ -64,7 +64,13 @@ export function FarmingSection({
   monsterHunt,
   characterHunt,
   huntBlacklist,
+  showModes = true,
+  showFocus: showFocusPicker = true,
 }: {
+  /** connected-character-card.tsx: the mode control is for non-merchant classes,
+   *  the monster focus picker for everyone but the configured merchant. */
+  showModes?: boolean
+  showFocus?: boolean
   characterName: string
   farmingPolicy: string
   effectiveMode: string
@@ -111,6 +117,9 @@ export function FarmingSection({
   // connected-character-card.tsx: the focus header shows the leader's (effective) radius.
   const effectiveRadius = state.monsterSearchRadiusByCharacter[state.leader || characterName] || 400
   const [showFocus, setShowFocus] = useState(false)
+  // monster-focus-picker.tsx: the route button routes the picker's current (unsaved) selection.
+  const [focusDraft, setFocusDraft] = useState<string[] | null>(null)
+  const routeFocus = showFocus && focusDraft ? focusDraft : monsterFocus
   const [pickingBackup, setPickingBackup] = useState(false)
   const [backupFocus, setBackupFocus] = useState<string[]>([])
   const [pickingArea, setPickingArea] = useState(false)
@@ -131,6 +140,7 @@ export function FarmingSection({
   // next time it's reopened.
   useEffect(() => {
     setShowFocus(false)
+    setFocusDraft(null)
     setPickingBackup(false)
     setPickingArea(false)
   }, [characterName])
@@ -139,15 +149,29 @@ export function FarmingSection({
   // first (the common case once a backup is already configured - no picker
   // shown at all), and only open it when the server actually rejects for
   // missing/invalid backup, not unconditionally on every click.
+  // use-party-console.tsx setFarmingPolicy, verbatim: Hunt needs a backup focus and
+  // location; without both the setup picker opens before anything is posted.
   const selectMode = async (mode: (typeof MODES)[number]['id']) => {
     setError(null)
+    const profile = (state.farmingProfiles as Record<string, { monsterFocus?: string[]; farmingPolicy?: string; location?: unknown; monsterHunt?: { returnLocation?: unknown } }> | undefined)?.[characterName]
+    const selected = profile?.monsterFocus || state.monsterFocusByCharacter?.[characterName] || (characterName === state.leader ? state.monsterFocus : [])
+    const focus = (Array.isArray(selected) ? selected : []).filter((id) => id !== 'all')
+    const backup =
+      profile?.farmingPolicy === 'hunt'
+        ? profile.monsterHunt?.returnLocation || profile.location
+        : state.characterLocations?.[characterName] || profile?.location || (characterName === state.leader ? state.partyLocation : null)
+    if (mode === 'hunt' && (!backup || !focus.length)) {
+      setBackupFocus(focus)
+      setPickingBackup(true)
+      return
+    }
     const result = await api.setFarmingMode(mode, characterName)
     if (result.kind === 'success') {
       await refreshNow()
       return
     }
     if (mode === 'hunt' && /backup farming/i.test(result.message)) {
-      setBackupFocus(monsterFocus.filter((id) => id !== 'all'))
+      setBackupFocus(focus)
       setPickingBackup(true)
       return
     }
@@ -157,6 +181,8 @@ export function FarmingSection({
   return (
     <SectionCard title="Farming">
       <LiveCombatStatus target={target} resolvedTargetType={resolvedTargetType} bestiaryCatalog={bestiaryCatalog} />
+      {showModes && (
+      <>
       {/* farming-mode-control.tsx badge: "Copy leader" or the saved policy, with the live mode. */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase text-muted-foreground">Farming settings</span>
@@ -182,6 +208,8 @@ export function FarmingSection({
       )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
       <HuntStatusBlock effectivePolicy={effectiveMode} hunt={monsterHunt} characterHunt={characterHunt} blacklist={huntBlacklist} />
+      </>
+      )}
 
       {pickingBackup && (
         <FarmingAreaPicker
@@ -213,7 +241,7 @@ export function FarmingSection({
         <FarmingAreaPicker
           catalog={monsterChoices}
           bestiaryCatalog={bestiaryCatalog}
-          ids={monsterFocus.filter((id) => id !== 'all')}
+          ids={routeFocus.filter((id) => id !== 'all')}
           character={position}
           // party-workspace.tsx: prefer the character's saved waypoint, else the party's.
           waypoint={state.characterLocations?.[characterName] || state.partyLocation}
@@ -226,7 +254,7 @@ export function FarmingSection({
             try {
               const result = phoenixRouteOrder
                 ? await api.navigateToMonster('phoenix', { map: area.map, x: area.x, y: area.y }, phoenixRouteOrder)
-                : await api.routeToFarmingArea(characterName, isLeader, { map: area.map, x: area.x, y: area.y }, [...new Set(monsterFocus.filter((id) => id !== 'all'))], `the selected farming area in ${area.mapName || area.map}`)
+                : await api.routeToFarmingArea(characterName, isLeader, { map: area.map, x: area.x, y: area.y }, [...new Set(routeFocus.filter((id) => id !== 'all'))], `the selected farming area in ${area.mapName || area.map}`)
               if (result.kind === 'failure') setError(result.message)
               else {
                 setPickingArea(false)
@@ -239,6 +267,8 @@ export function FarmingSection({
         />
       )}
 
+      {showFocusPicker && (
+      <>
       <p className="mb-1 mt-2 font-mono text-[10px] uppercase text-muted-foreground">Monster focus - {effectiveRadius}</p>
       <div className="flex items-center gap-2">
         <Button
@@ -246,9 +276,16 @@ export function FarmingSection({
           size="sm"
           className="min-w-0 flex-1 justify-start overflow-hidden"
           disabled={!configLoaded}
-          onClick={() => setShowFocus((v) => !v)}
+          aria-label={focusSummary(routeFocus, bestiaryCatalog)}
+          onClick={() => {
+            if (showFocus) setFocusDraft(null)
+            setShowFocus((v) => !v)
+          }}
         >
-          <span className="truncate">{focusSummary(monsterFocus, bestiaryCatalog)}</span>
+          <span className="truncate">{focusSummary(routeFocus, bestiaryCatalog)}</span>
+          <span aria-label="Selected monster count" className="ml-auto shrink-0 rounded border border-border px-1.5 font-mono text-[10px]">
+            {routeFocus.includes('all') ? 'ALL' : routeFocus.length}
+          </span>
         </Button>
         <Button
           variant="outline"
@@ -278,8 +315,14 @@ export function FarmingSection({
               ? `Following ${state.leader}: effective radius ${state.monsterSearchRadiusByCharacter[state.leader] || 400}. This input saves ${characterName}'s own radius.`
               : 'Radius for Leader'
           }
-          onClose={() => setShowFocus(false)}
+          onDraftChange={setFocusDraft}
+          onClose={() => {
+            setShowFocus(false)
+            setFocusDraft(null)
+          }}
         />
+      )}
+      </>
       )}
     </SectionCard>
   )
@@ -315,6 +358,7 @@ function MonsterFocusForm({
   monsterChoices,
   priorities,
   radiusContext,
+  onDraftChange,
   onClose,
 }: {
   characterName: string
@@ -323,11 +367,25 @@ function MonsterFocusForm({
   monsterChoices: MonsterChoice[]
   priorities: Record<string, number>
   radiusContext: string
+  onDraftChange?: (selected: string[]) => void
   onClose: () => void
 }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
-  const [selected, setSelected] = useState<string[]>(monsterFocus)
+  const [selected, setSelectedState] = useState<string[]>(monsterFocus)
+  const [dirty, setDirty] = useState(false)
+  const setSelected = (next: string[]) => {
+    setDirty(true)
+    setSelectedState(next)
+    onDraftChange?.(next)
+  }
+  // monster-focus-picker.tsx: an untouched draft follows the server's saved focus.
+  const focusKey = monsterFocus.join(',')
+  const [seenFocusKey, setSeenFocusKey] = useState(focusKey)
+  if (focusKey !== seenFocusKey) {
+    setSeenFocusKey(focusKey)
+    if (!dirty) setSelectedState(monsterFocus)
+  }
   const [radius, setRadius] = useState(String(monsterSearchRadius))
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
