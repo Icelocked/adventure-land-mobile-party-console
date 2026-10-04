@@ -6,14 +6,34 @@ import { createServer } from 'node:http'
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import webpush from 'web-push'
-import { characterProblems, merchantNotice, newEntries, newMail, problemTransitions } from './detect.mjs'
+import {
+  ALERTS,
+  DEFAULT_SETTINGS,
+  activityTimes,
+  bursts,
+  characterProblems,
+  completedRules,
+  deathTimes,
+  endedEvents,
+  errorTimes,
+  finishedUpgradeOrders,
+  idleCharacters,
+  isRareDrop,
+  liveCharacters,
+  mergeSettings,
+  newEntries,
+  newMail,
+  problemTransitions,
+  rareIndex,
+  recipients,
+  selectedEventIds,
+  tradeNotice,
+} from './detect.mjs'
 
 const PORT = Number(process.env.NOTIFIER_PORT || 3090)
 const CONSOLE_URL = (process.env.CONSOLE_URL || 'http://party-console:3010').replace(/\/+$/, '')
 const DATA_DIR = process.env.NOTIFIER_DATA || '/data/notifier'
-const STUCK_AFTER_MS = Number(process.env.STUCK_AFTER_MS || 120_000)
 const POLL_MS = Number(process.env.POLL_MS || 15_000)
-const CATEGORIES = ['characters', 'merchant']
 
 mkdirSync(DATA_DIR, { recursive: true })
 const file = (name) => join(DATA_DIR, name)
@@ -38,76 +58,172 @@ if (!vapid) {
   log('generated VAPID keys')
 }
 
-/** { endpoint: { subscription, categories, cookie, subject, createdAt } } */
-let subscriptions = load('subscriptions.json', {})
-const watch = load('watch.json', { problems: {}, merchantSince: null, mailSeen: null, credentialFailed: false })
+/** Older records chose two categories; map them onto the per-alert switches. */
+function migrate(device) {
+  if (device.alerts) return device
+  const alerts = []
+  if ((device.categories || []).includes('characters')) alerts.push('stuck')
+  if ((device.categories || []).includes('merchant')) alerts.push('trading', 'mail')
+  const { categories: _categories, ...rest } = device
+  return { ...rest, alerts, quiet: null, muted: [] }
+}
+/** { endpoint: { subscription, alerts, quiet, muted, cookie, subject, createdAt } } */
+const devices = Object.fromEntries(Object.entries(load('subscriptions.json', {})).map(([endpoint, device]) => [endpoint, migrate(device)]))
+let settings = mergeSettings(load('settings.json', DEFAULT_SETTINGS))
+const watch = {
+  problems: {},
+  merchantSince: null,
+  combatSince: null,
+  mailSeen: null,
+  credentialFailed: false,
+  activity: {},
+  positions: {},
+  idleAlerted: [],
+  deathAlertAt: {},
+  errorAlertAt: {},
+  rules: null,
+  queue: null,
+  schedules: null,
+  ...load('watch.json', {}),
+}
+let catalog = { revision: null, index: null }
 const persist = () => {
-  save('subscriptions.json', subscriptions)
+  save('subscriptions.json', devices)
   save('watch.json', watch)
+  save('settings.json', settings)
 }
 
-async function push(categories, notice) {
-  const targets = Object.values(subscriptions).filter((entry) => categories.some((category) => entry.categories.includes(category)))
-  for (const entry of targets) {
-    try {
-      webpush.setVapidDetails(entry.subject, vapid.publicKey, vapid.privateKey)
-      await webpush.sendNotification(entry.subscription, JSON.stringify(notice), { TTL: 3600 })
-    } catch (error) {
-      // 404/410: the browser dropped this subscription.
-      if (error?.statusCode === 404 || error?.statusCode === 410) {
-        delete subscriptions[entry.subscription.endpoint]
-        persist()
-        log('removed expired subscription')
-      } else log('push failed', error?.statusCode || '', error?.body || error?.message || error)
-    }
+async function sendTo(device, notice) {
+  try {
+    webpush.setVapidDetails(device.subject, vapid.publicKey, vapid.privateKey)
+    await webpush.sendNotification(device.subscription, JSON.stringify(notice), { TTL: 3600 })
+  } catch (error) {
+    // 404/410: the browser dropped this subscription.
+    if (error?.statusCode === 404 || error?.statusCode === 410) {
+      delete devices[device.subscription.endpoint]
+      persist()
+      log('removed expired subscription')
+    } else log('push failed', error?.statusCode || '', error?.body || error?.message || error)
   }
+}
+/** Push one alert to every device that wants it now. */
+async function push(alert, notice, character) {
+  const targets = recipients(Object.values(devices), alert, character, new Date())
+  if (targets.length) log(`push ${alert} to ${targets.length}: ${notice.title}`)
+  for (const device of targets) await sendTo(device, notice)
 }
 
 /** The newest stored browser credential; the watcher reads the console with it. */
 function credential() {
-  const entries = Object.values(subscriptions).filter((entry) => entry.cookie !== undefined)
-  entries.sort((a, b) => b.createdAt - a.createdAt)
+  const entries = Object.values(devices).sort((a, b) => b.createdAt - a.createdAt)
   return entries[0]?.cookie
 }
 
 async function consoleGet(path, cookie) {
-  const response = await fetch(CONSOLE_URL + path, { headers: cookie ? { cookie } : {}, redirect: 'manual', signal: AbortSignal.timeout(20_000) })
-  if (response.status >= 300 && response.status < 400) throw Object.assign(new Error('not paired'), { auth: true })
-  if (response.status === 401 || response.status === 403) throw Object.assign(new Error('not paired'), { auth: true })
+  const response = await fetch(CONSOLE_URL + path, { headers: cookie ? { cookie } : {}, redirect: 'manual', signal: AbortSignal.timeout(30_000) })
+  if ((response.status >= 300 && response.status < 400) || response.status === 401 || response.status === 403) throw Object.assign(new Error('not paired'), { auth: true })
   if (!response.ok) throw new Error('HTTP ' + response.status)
   return response.json()
 }
+const section = (name, cookie) => consoleGet(`/party-api/state?catalog=0&dashboard=1&section=${name}`, cookie)
 
 async function credentialProblem() {
   if (watch.credentialFailed) return
   watch.credentialFailed = true
   persist()
-  await push(CATEGORIES, { title: 'Notifications paused', body: 'Open Party Console and enable notifications again to reconnect.', tag: 'notifier-credential', url: '/settings' })
+  for (const device of Object.values(devices)) await sendTo(device, { title: 'Notifications paused', body: 'Open Party Console and enable notifications again to reconnect.', tag: 'notifier-credential', url: '/settings' })
 }
+const characterUrl = (name) => `/characters/${encodeURIComponent(name)}`
+const wants = (alert) => Object.values(devices).some((device) => (device.alerts || []).includes(alert))
 
-async function checkCharacters(cookie) {
-  const core = await consoleGet('/party-api/state?catalog=0&dashboard=1&section=core', cookie)
+async function checkCore(cookie, positions) {
+  const core = await section('core', cookie)
   const now = Number(core.serverNow) || Date.now()
-  const problems = characterProblems(core, now, STUCK_AFTER_MS)
-  for (const event of problemTransitions(watch.problems, problems)) {
-    await push(['characters'], event.problem
-      ? { title: `${event.name}: ${event.problem.startsWith('No update') ? 'not reporting' : event.problem}`, body: event.problem, tag: `character-${event.name}`, url: `/characters/${encodeURIComponent(event.name)}` }
-      : { title: `${event.name} is reporting again`, body: 'Back to normal.', tag: `character-${event.name}`, url: `/characters/${encodeURIComponent(event.name)}` })
-  }
+  const names = liveCharacters(core)
+  // Stuck or offline.
+  const problems = characterProblems(core, now, settings.stuckMinutes * 60_000)
+  for (const event of problemTransitions(watch.problems, problems))
+    await push(
+      'stuck',
+      event.problem
+        ? { title: `${event.name}: ${event.problem.startsWith('No update') ? 'not reporting' : event.problem}`, body: event.problem, tag: `character-${event.name}`, url: characterUrl(event.name) }
+        : { title: `${event.name} is reporting again`, body: 'Back to normal.', tag: `character-${event.name}`, url: characterUrl(event.name) },
+      event.name,
+    )
   watch.problems = problems
+  // Buy-and-upgrade orders that left the merchant queue.
+  const queue = (core.merchantQueue || []).map((job) => ({ id: job.id, order: job.order ? { buys: job.order.buys || [] } : undefined }))
+  if (watch.queue) for (const order of finishedUpgradeOrders(watch.queue, queue)) await push('orders', { ...order, tag: `order-${order.body}`, url: '/' })
+  watch.queue = queue
+  // Events that ended.
+  if (watch.schedules && watch.selectedEvents)
+    for (const event of endedEvents(watch.schedules, core.eventSchedules || [], new Set(watch.selectedEvents))) await push('events', { title: `${event.name || event.id} ended`, body: 'The event is over.', tag: `event-${event.id}`, url: '/' })
+  watch.schedules = (core.eventSchedules || []).map((event) => ({ id: event.id, name: event.name, live: !!event.live }))
+  // No actions (activity is refreshed from logs and positions).
+  watch.activity = activityTimes(watch.activity, null, null, positions, watch.positions, now)
+  watch.positions = positions
+  const idle = idleCharacters(watch.activity, names.filter((name) => !problems[name]), watch.merchant, now, settings.idleMinutes * 60_000)
+  for (const name of idle)
+    if (!watch.idleAlerted.includes(name)) await push('idle', { title: `${name}: no actions`, body: `Nothing done for ${settings.idleMinutes}+ minutes.`, tag: `idle-${name}`, url: characterUrl(name) }, name)
+  watch.idleAlerted = idle
+  if (core.referenceRevision && core.referenceRevision !== catalog.revision && wants('rare')) await loadCatalog(cookie, core.referenceRevision)
+  return now
 }
 
-async function checkMerchant(cookie) {
-  const logs = await consoleGet('/party-api/state?catalog=0&dashboard=1&section=logs', cookie)
-  const entries = logs.merchantActivity || []
-  const latest = Math.max(0, ...entries.map((entry) => Number(entry.at) || 0))
-  // The first read only records where history ends; old entries are never pushed.
+async function loadCatalog(cookie, revision) {
+  const result = await section('catalog', cookie)
+  catalog = { revision, index: rareIndex(result.merchantCatalog?.allItems || []) }
+  log('catalog loaded for rare drops')
+}
+
+async function checkLogs(cookie, now) {
+  const logs = await section('logs', cookie)
+  const combatLogs = logs.combatLogs || {}
+  const gameLogs = logs.gameLogs || {}
+  const activity = logs.merchantActivity || []
+  watch.activity = activityTimes(watch.activity, combatLogs, gameLogs, null, null, now)
+  // Trading notices from the merchant activity log; the first read only marks where history ends.
+  const latest = Math.max(0, ...activity.map((entry) => Number(entry.at) || 0))
   if (watch.merchantSince === null) watch.merchantSince = latest
-  for (const entry of newEntries(entries, watch.merchantSince)) {
-    const notice = merchantNotice(entry)
-    if (notice) await push(['merchant'], { ...notice, tag: `merchant-${entry.at}`, url: '/' })
+  for (const entry of newEntries(activity, watch.merchantSince)) {
+    const notice = tradeNotice(entry)
+    if (notice) await push('trading', { ...notice, tag: `trade-${entry.at}`, url: '/' })
   }
   watch.merchantSince = Math.max(watch.merchantSince, latest)
+  // Rare drops from new loot entries.
+  const combatEntries = Object.entries(combatLogs).flatMap(([name, entries]) => (entries || []).map((entry) => ({ ...entry, name })))
+  const latestCombat = Math.max(0, ...combatEntries.map((entry) => Number(entry.at) || 0))
+  if (watch.combatSince === null) watch.combatSince = latestCombat
+  if (catalog.index)
+    for (const entry of newEntries(combatEntries, watch.combatSince)) {
+      if (entry.type !== 'loot') continue
+      const item = entry.details?.item
+      const info = catalog.index[item]
+      if (isRareDrop(info, settings.rare))
+        await push('rare', { title: `Rare drop: ${info.name}`, body: `${entry.name} looted ${entry.details?.quantity || 1} × ${info.name}`, tag: `rare-${entry.name}-${entry.at}`, url: characterUrl(entry.name) }, entry.name)
+    }
+  watch.combatSince = Math.max(watch.combatSince, latestCombat)
+  // Repeated deaths.
+  const deaths = bursts(deathTimes(combatLogs), now, settings.deaths.count, settings.deaths.minutes * 60_000, watch.deathAlertAt)
+  for (const [name, count] of Object.entries(deaths)) {
+    watch.deathAlertAt[name] = now
+    await push('deaths', { title: `${name} keeps dying`, body: `${count} deaths in the last ${settings.deaths.minutes} minutes.`, tag: `deaths-${name}`, url: characterUrl(name) }, name)
+  }
+  // Error bursts.
+  const errors = bursts(errorTimes(gameLogs, activity, watch.merchant), now, settings.errors.count, settings.errors.minutes * 60_000, watch.errorAlertAt)
+  for (const [name, count] of Object.entries(errors)) {
+    watch.errorAlertAt[name] = now
+    await push('errors', { title: `${name}: repeated errors`, body: `${count} errors in the last ${settings.errors.minutes} minutes.`, tag: `errors-${name}`, url: name === watch.merchant ? '/' : characterUrl(name) }, name)
+  }
+}
+
+async function checkConfig(cookie) {
+  const config = await section('config', cookie)
+  watch.merchant = config.merchantCharacter || null
+  const rules = { autoUpgradeMarks: config.autoUpgradeMarks || {}, autoCompounds: config.autoCompounds || {} }
+  if (watch.rules) for (const done of completedRules(watch.rules, rules)) await push('rules', { title: done.title, body: done.body, tag: `rule-${done.body}`, url: '/' })
+  watch.rules = rules
+  watch.selectedEvents = [...selectedEventIds(config)]
 }
 
 async function checkMail(cookie) {
@@ -115,20 +231,21 @@ async function checkMail(cookie) {
   const messages = mail.messages || []
   if (watch.mailSeen === null) watch.mailSeen = messages.map((message) => String(message.id))
   const seen = new Set(watch.mailSeen)
-  for (const message of newMail(messages, seen)) {
-    await push(['merchant'], { title: `Mail from ${message.from || 'someone'}`, body: message.subject || '(No subject)', tag: `mail-${message.id}`, url: '/mail' })
-  }
+  for (const message of newMail(messages, seen)) await push('mail', { title: `Mail from ${message.from || 'someone'}`, body: message.subject || '(No subject)', tag: `mail-${message.id}`, url: '/mail' })
   watch.mailSeen = messages.map((message) => String(message.id))
 }
 
 let tick = 0
 async function poll() {
   tick++
-  if (!Object.keys(subscriptions).length) return
+  if (!Object.keys(devices).length) return
   const cookie = credential()
   try {
-    await checkCharacters(cookie)
-    if (tick % 2 === 0) await checkMerchant(cookie)
+    if (tick === 1 || tick % 4 === 0) await checkConfig(cookie)
+    const fast = await section('fast', cookie)
+    const positions = Object.fromEntries(Object.entries(fast.characters || {}).map(([name, value]) => [name, { map: value.map, x: value.x, y: value.y }]))
+    const now = await checkCore(cookie, positions)
+    if (tick % 2 === 0) await checkLogs(cookie, now)
     if (tick % 4 === 0) await checkMail(cookie)
     if (watch.credentialFailed) watch.credentialFailed = false
     persist()
@@ -171,51 +288,64 @@ async function authorized(req) {
     return false
   }
 }
+const cleanAlerts = (value) => (Array.isArray(value) ? value.filter((alert) => ALERTS.includes(alert)) : null)
+const cleanQuiet = (value) =>
+  value && /^\d{1,2}:\d{2}$/.test(String(value.start)) && /^\d{1,2}:\d{2}$/.test(String(value.end))
+    ? { start: String(value.start), end: String(value.end), offsetMinutes: Math.max(-900, Math.min(900, Number(value.offsetMinutes) || 0)) }
+    : null
+const cleanMuted = (value) => (Array.isArray(value) ? value.map(String).slice(0, 50) : [])
+const status = (device) => (device ? { subscribed: true, alerts: device.alerts, quiet: device.quiet, muted: device.muted, paused: watch.credentialFailed } : { subscribed: false })
 
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://notifier')
     const path = url.pathname.replace(/^\/notify/, '')
-    if (req.method === 'GET' && path === '/config') return send(res, 200, { publicKey: vapid.publicKey, categories: CATEGORIES })
+    if (req.method === 'GET' && path === '/config') return send(res, 200, { publicKey: vapid.publicKey, alerts: ALERTS })
     if (!(await authorized(req))) return send(res, 401, { error: 'Pair this browser with Party Console first.' })
     const body = req.method === 'POST' ? await readBody(req) : {}
     const endpoint = String(body.subscription?.endpoint || body.endpoint || url.searchParams.get('endpoint') || '')
-    if (req.method === 'GET' && path === '/status') {
-      const entry = subscriptions[endpoint]
-      return send(res, 200, entry ? { subscribed: true, categories: entry.categories, paused: watch.credentialFailed } : { subscribed: false })
+    if (req.method === 'GET' && path === '/status') return send(res, 200, status(devices[endpoint]))
+    if (req.method === 'GET' && path === '/settings') return send(res, 200, settings)
+    if (req.method === 'POST' && path === '/settings') {
+      settings = mergeSettings(settings, body)
+      persist()
+      return send(res, 200, settings)
     }
     if (req.method === 'POST' && path === '/subscribe') {
       if (!body.subscription?.endpoint || !body.subscription?.keys) return send(res, 400, { error: 'Invalid subscription' })
-      const categories = (Array.isArray(body.categories) ? body.categories : CATEGORIES).filter((category) => CATEGORIES.includes(category))
       const origin = String(req.headers.origin || '')
-      subscriptions[endpoint] = {
+      devices[endpoint] = {
         subscription: body.subscription,
-        categories,
+        alerts: cleanAlerts(body.alerts) ?? [...ALERTS],
+        quiet: cleanQuiet(body.quiet),
+        muted: cleanMuted(body.muted),
         cookie: req.headers.cookie || '',
         subject: /^https:\/\//.test(origin) ? origin : 'mailto:party-console@localhost',
         createdAt: Date.now(),
       }
       watch.credentialFailed = false
       persist()
-      return send(res, 200, { subscribed: true, categories })
+      return send(res, 200, status(devices[endpoint]))
     }
-    if (req.method === 'POST' && path === '/categories') {
-      const entry = subscriptions[endpoint]
-      if (!entry) return send(res, 404, { error: 'Not subscribed' })
-      entry.categories = (Array.isArray(body.categories) ? body.categories : []).filter((category) => CATEGORIES.includes(category))
+    if (req.method === 'POST' && path === '/prefs') {
+      const device = devices[endpoint]
+      if (!device) return send(res, 404, { error: 'Not subscribed' })
+      if ('alerts' in body) device.alerts = cleanAlerts(body.alerts) ?? device.alerts
+      if ('quiet' in body) device.quiet = cleanQuiet(body.quiet)
+      if ('muted' in body) device.muted = cleanMuted(body.muted)
       persist()
-      return send(res, 200, { subscribed: true, categories: entry.categories })
+      return send(res, 200, status(device))
     }
     if (req.method === 'POST' && path === '/unsubscribe') {
-      delete subscriptions[endpoint]
+      delete devices[endpoint]
       persist()
       return send(res, 200, { subscribed: false })
     }
     if (req.method === 'POST' && path === '/test') {
-      const entry = subscriptions[endpoint]
-      if (!entry) return send(res, 404, { error: 'Not subscribed' })
-      webpush.setVapidDetails(entry.subject, vapid.publicKey, vapid.privateKey)
-      await webpush.sendNotification(entry.subscription, JSON.stringify({ title: 'Party Console', body: 'Notifications are working.', tag: 'notifier-test', url: '/settings' }), { TTL: 600 })
+      const device = devices[endpoint]
+      if (!device) return send(res, 404, { error: 'Not subscribed' })
+      webpush.setVapidDetails(device.subject, vapid.publicKey, vapid.privateKey)
+      await webpush.sendNotification(device.subscription, JSON.stringify({ title: 'Party Console', body: 'Notifications are working.', tag: 'notifier-test', url: '/settings' }), { TTL: 600 })
       return send(res, 200, { sent: true })
     }
     return send(res, 404, { error: 'Not found' })
