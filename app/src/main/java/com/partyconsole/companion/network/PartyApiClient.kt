@@ -464,6 +464,29 @@ class PartyApiClient(
         return post("deconstruction/mark", body)
     }
 
+    /** POST /party-api/deconstruction/mark with remove: a manual
+     *  deconstruction mark by id. */
+    suspend fun removeDeconstructionMark(character: String, id: String, slot: Int, item: Item): ApiResult<CommandResult> = post(
+        "deconstruction/mark",
+        JsonObject(
+            mapOf(
+                "character" to JsonPrimitive(character),
+                "slot" to JsonPrimitive(slot),
+                "item" to json.encodeToJsonElement(Item.serializer(), item),
+                "remove" to JsonPrimitive(true),
+                "id" to JsonPrimitive(id),
+            ),
+        ),
+    )
+
+    /** POST /party-api/deconstruction/mark with retry: a blocked mark again. */
+    suspend fun retryDeconstructionMark(character: String, id: String): ApiResult<CommandResult> =
+        post("deconstruction/mark", JsonObject(mapOf("character" to JsonPrimitive(character), "id" to JsonPrimitive(id), "retry" to JsonPrimitive(true))))
+
+    /** connected-inventory.tsx onRemoveNpcSale: a manual NPC-sale mark by id. */
+    suspend fun removeNpcSaleMark(character: String, id: String): ApiResult<CommandResult> =
+        post("merchant/npc-sale", JsonObject(mapOf("character" to JsonPrimitive(character), "id" to JsonPrimitive(id), "remove" to JsonPrimitive(true))))
+
     /** POST /party-api/deconstruction/auto (merchant/deconstruction.ts) -
      *  a standing "always deconstruct this item type" rule, separate from
      *  marking one instance (markForDeconstruction). */

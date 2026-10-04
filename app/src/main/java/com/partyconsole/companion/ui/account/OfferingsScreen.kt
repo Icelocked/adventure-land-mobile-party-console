@@ -111,7 +111,7 @@ fun OfferingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun RuleFormOverlay(rule: UpgradeOfferingRule?, catalog: List<CatalogItem>, merchant: String, viewModel: PartyViewModel, onClose: () -> Unit) {
+internal fun RuleFormOverlay(rule: UpgradeOfferingRule?, catalog: List<CatalogItem>, merchant: String, viewModel: PartyViewModel, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     var itemId by remember { mutableStateOf(rule?.name ?: "") }
     var search by remember { mutableStateOf("") }
