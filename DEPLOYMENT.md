@@ -213,6 +213,47 @@ stays pinned to whatever version it last updated to):
   (`bash.exe` from Git for Windows or WSL - whichever you already have;
   Docker Desktop itself doesn't ship one)
 
+## 3e. Phone notifications (Android and iOS)
+
+The PWA container also runs a small push notifier (`web/notifier`). It
+watches your party-console the same way a paired browser does and sends
+Web Push to phones that enabled notifications. It covers two kinds of
+alert: a character that is stuck or offline (no status for 2 minutes, a
+lost connection or stopped CODE, plus a note when it recovers), and
+merchant and mail events (stand sales, WTB fills, purchases, merchant
+errors, new mail).
+
+Requirements:
+
+- **HTTPS.** Push only works over HTTPS: Tailscale Funnel/Serve or the
+  Tailscale certificate from 3c.
+- **A volume for the notifier's data.** Mount one at `/data/notifier` so
+  its keys and subscriptions survive rebuilds:
+
+  ```yaml
+  party-console-pwa:
+    volumes:
+      - pwa-notifier:/data/notifier
+  volumes:
+    pwa-notifier:
+  ```
+- **iOS 16.4 or later.** Add the app to the Home Screen
+  (Share → Add to Home Screen) and open it from there before enabling.
+- **Android.** Chrome works installed or not.
+
+To turn notifications on, open Settings → Notifications on each phone,
+choose the categories and tap "Enable notifications on this device".
+The notifier uses that browser's pairing to read the console. If the
+pairing stops working, it sends one "Notifications paused" message; enable
+notifications again to reconnect.
+
+Optional environment variables:
+
+- `STUCK_AFTER_MS`: how long without a status report before a character
+  counts as stuck. Default 120000.
+- `CONSOLE_URL`: where to reach party-console. Default
+  `http://party-console:3010`.
+
 ## Why not a domain or a public IP?
 
 Those are real options in general (any self-hosted app can be put behind

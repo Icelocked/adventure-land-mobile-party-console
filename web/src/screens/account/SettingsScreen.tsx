@@ -5,6 +5,7 @@ import { QK } from '@/data/queryKeys'
 import { DashboardStateImport } from './settings/DashboardStateImport'
 import { ConsoleUpdateSettings, HostingSettings } from './settings/ConsoleSettings'
 import { AccountMembers } from './settings/AccountMembers'
+import { NotificationsSection } from './settings/NotificationsSection'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { Copy, Eye, EyeOff } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending, useAlDataAuthStatus } from '@/data/PartyDataProvider'
@@ -106,6 +107,8 @@ export function SettingsScreen() {
         <ALDataSection />
         <HostingSettings />
         <ConsoleUpdateSettings />
+
+        <NotificationsSection />
 
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-1 text-sm font-medium">PWA connection</div>

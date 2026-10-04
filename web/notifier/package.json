@@ -1,0 +1,12 @@
+{
+  "name": "party-console-notifier",
+  "private": true,
+  "type": "module",
+  "description": "Web Push notifier for the Party Console PWA (runs inside the PWA container).",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

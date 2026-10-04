@@ -44,8 +44,10 @@ export default defineConfig(({ mode }) => {
           // icons) is cache-first; API calls to the user's own
           // party-console server are never intercepted by the service
           // worker at all.
-          navigateFallbackDenylist: [/^\/party-api\//],
+          navigateFallbackDenylist: [/^\/party-api\//, /^\/notify\//],
           runtimeCaching: [],
+          // Push notifications (web/notifier): the push and notification-click handlers.
+          importScripts: ['push-sw.js'],
         },
       }),
     ],
