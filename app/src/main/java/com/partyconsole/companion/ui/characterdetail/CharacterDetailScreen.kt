@@ -142,19 +142,23 @@ fun CharacterDetailScreen(
                 }
                 EquipmentSection(
                     slots = state.inventory?.slots.orEmpty(),
+                    upgradeMarks = dynamicState.upgrades[characterName].orEmpty().filter { it.equipped },
+                    statScrollMarks = dynamicState.statScrolls[characterName].orEmpty(),
+                    // equipment.tsx: the class, not the configured merchant role.
+                    isMerchant = vitals.ctype == "merchant",
                     catalogFor = catalogFor,
-                    onSlotTap = { slotName, entry ->
-                        entry?.let { actionTarget = ItemActionTarget.EquipmentSlot(it.item, slotName) }
-                    },
+                    onSlotTap = { slotName, entry -> actionTarget = ItemActionTarget.EquipmentSlot(entry.item, slotName) },
                 )
                 InventorySection(
+                    characterName = characterName,
+                    isMerchant = isMerchant,
                     items = state.inventory?.items.orEmpty(),
-                    merchantMarks = dynamicState.merchantMarked[characterName].orEmpty(),
-                    bankMarks = dynamicState.marked[characterName].orEmpty(),
+                    inventorySize = vitals.inventorySize,
+                    loaded = state.inventory != null,
+                    state = dynamicState,
                     catalogFor = catalogFor,
-                    onItemTap = { index, entry ->
-                        entry?.let { actionTarget = ItemActionTarget.InventorySlot(it.item, index) }
-                    },
+                    onItemTap = { entry, _ -> actionTarget = ItemActionTarget.InventorySlot(entry.item, entry.slot) },
+                    localLucky = vitals.luckySlotTracking,
                 )
                 RestockSection(
                     characterName,
@@ -173,8 +177,6 @@ fun CharacterDetailScreen(
                 onNavigate = onNavigate,
                 onDismiss = { menuOpen = false },
                 characterItems = listOfNotNull(
-                    "Inventory" to Routes.inventory(characterName),
-                    "Equipment" to Routes.equipment(characterName),
                     "Upgrade offerings" to Routes.ACCOUNT_OFFERINGS,
                 ),
             )

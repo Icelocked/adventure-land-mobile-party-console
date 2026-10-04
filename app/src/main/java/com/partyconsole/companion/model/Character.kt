@@ -42,6 +42,8 @@ data class CharacterVitals(
     val server: String? = null,
     // character.ping is a fractional millisecond count.
     val ping: Double? = null,
+    // The character's own live lucky-slot stream (connected-inventory.tsx).
+    val luckySlotTracking: kotlinx.serialization.json.JsonElement? = null,
     // The merchant's stand is open (stand-inspection.ts).
     val standOpen: Boolean? = null,
     val primaryStat: String? = null,
