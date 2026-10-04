@@ -183,7 +183,24 @@ and a 411x891dp phone.
   merchant's).
 - Not yet: offering rows in the bank upgrade options (U1).
 
-Next: A5 (I1-I8 inventory and items).
+### A5 status: in progress
+
+- I1: inventory tiles (item-action-banner.ts priority, stat badges, +level,
+  operation overlay, lucky-slot outline, merchant suggested-price details)
+  and equipment tiles (15 fixed slots, set progress, mluck clover).
+  `domain/ItemValue.kt` (upgradeEstimate reproduces the dashboard's seeded
+  JS numbers exactly), `LuckySlot.kt`, `ItemBanner.kt`.
+- I2-I5: the item options panel in inventory-panel.tsx's order: Item
+  details (opens the browser in its own sheet), Show lucky slot data,
+  Equip / Use / Use elixir, Compare with equipped (ring/earring/1-handed
+  slot picker), Deliver to (online members, no bankbois; the merchant
+  picks Equip / Don't equip), stat scroll, Auto exchange, bank / merchant
+  marks and autos, stand (mark / edit / auto), upgrade and auto upgrade
+  (tier costs), Buy another level 0, compounding and auto compound (+7
+  cap), deconstruction and NPC sale with their confirmations, Clear all
+  marks. Equipment: Unequip, Active elixir effect, upgrade marks, Clear all
+  marks (equipped).
+- Next: I6 item details, I7 gear comparison per slot, I8 auto-rule lists.
 
 ### Packages
 
