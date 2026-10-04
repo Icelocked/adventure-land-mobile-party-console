@@ -64,3 +64,16 @@ test('Notifications: iPhone outside the Home Screen explains how to enable push'
   await page.goto('/settings')
   await expect(page.getByRole('region', { name: 'Notifications' }).getByText(/add this app to your Home Screen/)).toBeVisible()
 })
+
+test('Notifications: over plain HTTP the app explains that push needs HTTPS and links the setup guide', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Leada', ctype: 'warrior', level: 60 })
+  await server.install(page)
+  await page.addInitScript(() => Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true }))
+  await page.goto('/settings')
+  const section = page.getByRole('region', { name: 'Notifications' })
+  await expect(section.getByText(/this address is plain HTTP/)).toBeVisible()
+  await expect(section.getByRole('link', { name: 'How to set up HTTPS' })).toHaveAttribute('href', /DEPLOYMENT\.md#3e-phone-notifications-android-and-ios$/)
+  await expect(section.getByRole('button', { name: /Enable notifications/ })).toHaveCount(0)
+})
