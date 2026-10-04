@@ -266,6 +266,9 @@ data class UpgradeMark(
     val tiers: Int? = null,
     val auto: Boolean = false,
     val equipped: Boolean = false,
+    // shared-rules.ts offeringUpgradePending inputs.
+    val passId: String? = null,
+    val waitingOffering: JsonElement? = null,
 )
 
 @Serializable

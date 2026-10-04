@@ -147,7 +147,21 @@ and a 411x891dp phone.
 - Not yet: the debug-instance browser link (S2), daily-dungeon panel and
   in-dungeon Escape (C5).
 
-Next: A3 (M1 merchant card, M2 merchant settings, M3 routines, M9 rule conflicts).
+### A3 status: done
+
+- M1: merchant logistics (stuck warning, priority/label/target/status per
+  job, retry, Merchant's Luck upkeep, cancel rules) with the activity log
+  inline (the separate activity screen is gone); merchant controls with
+  gathering readiness / No tool, Send to party group picker, donation XP
+  preview, giveaway realm + online-player picker. `domain/Merchant.kt`:
+  merchant-job-label.ts, duration, party-groups.ts verbatim.
+- M2: merchant settings (bank sorting, upgrade buy batch, stand location,
+  delivery/withdrawal trips, thresholds).
+- M3: routines (done in A0).
+- M9: shared-rule conflicts card (shared-rules.ts itemRuleConflicts and
+  automatic-commerce-rule-key.tsx verbatim).
+
+Next: A4 (B1 bank item actions, B2 floors and vaults, B3 bankbois, B4 mail).
 
 ### Packages
 
