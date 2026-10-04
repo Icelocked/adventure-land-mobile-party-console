@@ -27,7 +27,6 @@ import com.partyconsole.companion.ui.account.SkillsScreen
 import com.partyconsole.companion.ui.account.StandScreen
 import com.partyconsole.companion.ui.account.WtbScreen
 import com.partyconsole.companion.ui.characterdetail.CharacterDetailScreen
-import com.partyconsole.companion.ui.characterdetail.CharacterMenuScreen
 import com.partyconsole.companion.ui.characterdetail.EquipmentScreen
 import com.partyconsole.companion.ui.characterdetail.InventoryScreen
 import com.partyconsole.companion.ui.characterdetail.MerchantActivityScreen
@@ -39,12 +38,11 @@ import com.partyconsole.companion.ui.connection.PairingViewModel
 /** Every screen shares one PartyViewModel (one live SSE connection) via
  *  getBackStackEntry(CHARACTER_LIST) scoping - see the comment on the
  *  detail route below, which explains why this matters. */
-private object Routes {
+internal object Routes {
     const val CONNECTION = "connection"
     const val PAIRING = "pairing"
     const val CHARACTER_LIST = "characters"
     const val CHARACTER_DETAIL = "characters/{name}"
-    const val CHARACTER_MENU = "characters/{name}/menu"
     const val INVENTORY = "characters/{name}/inventory"
     const val EQUIPMENT = "characters/{name}/equipment"
     const val ACTIVITY = "characters/{name}/activity"
@@ -65,7 +63,6 @@ private object Routes {
 
     fun characterDetail(name: String) = "characters/$name"
     fun merchantCommerce(mode: String) = "merchant/$mode"
-    fun characterMenu(name: String) = "characters/$name/menu"
     fun huntSettings(name: String) = "characters/$name/hunt-settings"
     fun inventory(name: String) = "characters/$name/inventory"
     fun equipment(name: String) = "characters/$name/equipment"
@@ -140,6 +137,7 @@ fun AppNavigation(store: ServerConfigStore) {
                 viewModel = viewModel,
                 onSelectCharacter = { name -> navController.navigate(Routes.characterDetail(name)) },
                 onReconnect = { navController.navigate(Routes.PAIRING) { popUpTo(0) } },
+                onNavigate = { route -> navController.navigate(route) },
             )
         }
         composable(
@@ -166,33 +164,10 @@ fun AppNavigation(store: ServerConfigStore) {
                         popUpTo(Routes.CHARACTER_DETAIL) { inclusive = true }
                     }
                 },
-                onOpenMenu = { navController.navigate(Routes.characterMenu(name)) },
+                onNavigate = { route -> navController.navigate(route) },
                 onOpenMerchantCommerce = { commerceMode -> navController.navigate(Routes.merchantCommerce(commerceMode)) },
                 onOpenRoutines = { navController.navigate(Routes.ROUTINES) },
                 onOpenHuntSettings = { navController.navigate(Routes.huntSettings(name)) },
-            )
-        }
-        composable(
-            Routes.CHARACTER_MENU,
-            arguments = listOf(navArgument("name") { type = NavType.StringType }),
-        ) { backStackEntry ->
-            val name = backStackEntry.arguments?.getString("name") ?: return@composable
-            CharacterMenuScreen(
-                characterName = name,
-                onBack = { navController.popBackStack() },
-                onInventory = { navController.navigate(Routes.inventory(name)) },
-                onEquipment = { navController.navigate(Routes.equipment(name)) },
-                onActivity = { navController.navigate(Routes.activity(name)) },
-                onMail = { navController.navigate(Routes.ACCOUNT_MAIL) },
-                onCatalog = { navController.navigate(Routes.ACCOUNT_CATALOG) },
-                onBestiary = { navController.navigate(Routes.ACCOUNT_BESTIARY) },
-                onSkills = { navController.navigate(Routes.ACCOUNT_SKILLS) },
-                onStand = { navController.navigate(Routes.ACCOUNT_STAND) },
-                onMarket = { navController.navigate(Routes.ACCOUNT_MARKET) },
-                onBank = { navController.navigate(Routes.ACCOUNT_BANK) },
-                onOfferings = { navController.navigate(Routes.ACCOUNT_OFFERINGS) },
-                onLogs = { navController.navigate(Routes.ACCOUNT_LOGS) },
-                onSettings = { navController.navigate(Routes.ACCOUNT_SETTINGS) },
             )
         }
         composable(

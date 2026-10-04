@@ -17,12 +17,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 /** e2e/formation.spec.ts on the native screen: Follow sends exactly
  *  {character, follow}, Leader exactly {leader}. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 class FormationScreenTest {
     @get:Rule val compose = createComposeRule()
     private val console = FakeConsole()

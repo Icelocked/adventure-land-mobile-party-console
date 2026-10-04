@@ -181,6 +181,9 @@ data class StandListing(
     val item: Item,
     val price: Long = 0,
     val quantity: Int = 1,
+    // Which stand slot (trade1..16) it occupies, and live | paused | queued.
+    val tradeSlot: String? = null,
+    val state: String? = null,
 )
 
 /** One public market listing from ALData or Ponty (stand-sheet.tsx's

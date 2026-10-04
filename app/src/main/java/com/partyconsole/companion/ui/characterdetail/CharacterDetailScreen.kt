@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.farmingContext
 import com.partyconsole.companion.model.focusFor
+import com.partyconsole.companion.ui.AccountMenuSheet
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.Routes
 import kotlinx.coroutines.launch
 import com.partyconsole.companion.ui.characterdetail.sections.AutoMarksSection
 import com.partyconsole.companion.ui.characterdetail.sections.EquipmentSection
@@ -57,7 +59,7 @@ fun CharacterDetailScreen(
     characterName: String,
     onBack: () -> Unit,
     onSwitchCharacter: (String) -> Unit,
-    onOpenMenu: () -> Unit,
+    onNavigate: (String) -> Unit,
     onOpenMerchantCommerce: (String) -> Unit,
     onOpenRoutines: () -> Unit,
     onOpenHuntSettings: () -> Unit,
@@ -70,6 +72,7 @@ fun CharacterDetailScreen(
     val sheetState = rememberModalBottomSheetState()
     val catalogFor = rememberCatalogLookup(dynamicState.merchantCatalog)
     val scope = rememberCoroutineScope()
+    var menuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -84,7 +87,7 @@ fun CharacterDetailScreen(
                     IconButton(onClick = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
-                    IconButton(onClick = onOpenMenu) {
+                    IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Filled.Menu, contentDescription = "Menu")
                     }
                 },
@@ -164,6 +167,20 @@ fun CharacterDetailScreen(
                 if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
                 AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)
             }
+        }
+
+        if (menuOpen) {
+            AccountMenuSheet(
+                viewModel = viewModel,
+                onNavigate = onNavigate,
+                onDismiss = { menuOpen = false },
+                characterItems = listOfNotNull(
+                    "Inventory" to Routes.inventory(characterName),
+                    "Equipment" to Routes.equipment(characterName),
+                    ("Merchant activity" to Routes.activity(characterName)).takeIf { characterName == dynamicState.merchantCharacter },
+                    "Upgrade offerings" to Routes.ACCOUNT_OFFERINGS,
+                ),
+            )
         }
 
         actionTarget?.let { target ->

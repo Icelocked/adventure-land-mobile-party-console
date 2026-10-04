@@ -14,6 +14,6 @@ fun activityLine(vitals: CharacterVitals): String = when {
     vitals.stocking -> "stocking up"
     vitals.upgrading -> "upgrading"
     vitals.farmingMode != null -> "farming (${vitals.farmingMode})"
-    !vitals.target.isNullOrBlank() -> "fighting ${vitals.target}"
+    !vitals.targetId.isNullOrBlank() -> "fighting ${vitals.targetId}"
     else -> "at ${vitals.map} ${vitals.x.toInt()},${vitals.y.toInt()}"
 }

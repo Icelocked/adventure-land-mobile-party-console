@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,7 +46,8 @@ import com.partyconsole.companion.ui.characterdetail.sections.classLook
 import kotlinx.coroutines.launch
 
 @Composable
-fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -> Unit, onReconnect: () -> Unit = {}) {
+fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -> Unit, onReconnect: () -> Unit = {}, onNavigate: (String) -> Unit = {}) {
+    var menuOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val characters by viewModel.characters.collectAsState()
     val connected by viewModel.connected.collectAsState()
     val lastConnectionError by viewModel.lastConnectionError.collectAsState()
@@ -68,12 +70,16 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                     IconButton(onClick = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Account menu")
+                    }
                 },
             )
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (!connected) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            if (menuOpen) com.partyconsole.companion.ui.AccountMenuSheet(viewModel, onNavigate, onDismiss = { menuOpen = false })
             if (sessionLost) {
                 androidx.compose.material3.Card(
                     modifier = Modifier.fillMaxWidth().padding(12.dp),
