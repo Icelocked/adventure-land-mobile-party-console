@@ -48,6 +48,29 @@ data class ItemWorldInfo(
     val set: ItemSetInfo? = null,
     val drops: List<ItemDropSource> = emptyList(),
     val usedIn: List<ItemCraftUse> = emptyList(),
+    // suggested-item-value.tsx's precomputed per-source prices.
+    val suggestedPrices: List<ItemSuggestedPrice> = emptyList(),
+)
+
+/** item-suggested-price.tsx. */
+@Serializable
+data class ItemSuggestedPrice(
+    val monsterId: String = "",
+    val monsterName: String = "",
+    val sprite: Sprite? = null,
+    val mapId: String? = null,
+    val mapName: String? = null,
+    val rate: Double = 0.0,
+    val quantity: Double = 1.0,
+    val kills: Double = 0.0,
+    val goldPerKill: Double = 0.0,
+    val suggested: Double = 0.0,
+    val paths: List<String> = emptyList(),
+    val worldDrop: Boolean = false,
+    val purchase: Boolean = false,
+    val attempts: Long? = null,
+    val scrolls: List<Long> = emptyList(),
+    val luckMultiplier: Double? = null,
 )
 
 @Serializable

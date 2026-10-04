@@ -31,11 +31,26 @@ data class Item(
 data class InventoryEntry(
     val slot: Int,
     val item: Item,
+    // Live item meta, when the server attaches it (inventory-entry.tsx).
+    val meta: ItemMeta? = null,
+    // An upgrade/compound in progress on this slot.
+    val operation: ItemOperation? = null,
 )
 
 @Serializable
 data class EquippedEntry(
     val item: Item,
+    val meta: ItemMeta? = null,
+)
+
+/** inventory-entry.tsx ItemOperation. */
+@Serializable
+data class ItemOperation(
+    val type: String = "",
+    val fromLevel: Int = 0,
+    val toLevel: Int = 0,
+    val chance: Double? = null,
+    val sprite: Sprite? = null,
 )
 
 /**

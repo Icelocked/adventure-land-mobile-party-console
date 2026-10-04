@@ -33,8 +33,10 @@ data class PartyStateDynamic(
     val ponty: PontyState? = null,
     val merchantCatalog: MerchantCatalog? = null,
     val standSearch: StandSearchState = StandSearchState(),
-    val marked: Map<String, List<BankMark>> = emptyMap(),
-    val merchantMarked: Map<String, List<BankMark>> = emptyMap(),
+    // Bank / merchant hold marks: {slot, item} entries, or plain items for
+    // older auto marks - raw, see markedIn.
+    val marked: Map<String, List<JsonElement>> = emptyMap(),
+    val merchantMarked: Map<String, List<JsonElement>> = emptyMap(),
     // Both keyed by character, then by autoMarkRuleKey(item).
     val autoItemMarks: Map<String, Map<String, String>> = emptyMap(),
     val autoUpgradeMarks: Map<String, Map<String, JsonElement>> = emptyMap(),
@@ -579,3 +581,20 @@ data class StandPriceHistory(
     val highestPublicWTB: Double? = null,
     val highestPublicWTBLevel: Int? = null,
 )
+
+/** inventory-panel.tsx markedIn: a {slot, item} mark at this slot for this
+ *  item, or a plain item mark for this item. */
+fun markedIn(list: List<JsonElement>, entry: InventoryEntry, json: kotlinx.serialization.json.Json = MARK_JSON): Boolean = list.any { raw ->
+    val obj = raw as? kotlinx.serialization.json.JsonObject ?: return@any false
+    val nested = obj["item"] as? kotlinx.serialization.json.JsonObject
+    if (nested != null) {
+        val slot = (obj["slot"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull()
+        val item = runCatching { json.decodeFromJsonElement(Item.serializer(), nested) }.getOrNull() ?: return@any false
+        slot == entry.slot && sameMarkedItem(item, entry.item)
+    } else {
+        val item = runCatching { json.decodeFromJsonElement(Item.serializer(), obj) }.getOrNull() ?: return@any false
+        sameMarkedItem(item, entry.item)
+    }
+}
+
+private val MARK_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
