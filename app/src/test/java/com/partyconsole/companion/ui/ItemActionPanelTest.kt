@@ -117,4 +117,31 @@ class ItemActionPanelTest {
         assertEquals("unequip", (posts("command")[0]["type"] as JsonPrimitive).content)
         assertEquals("ring1", (posts("command")[0]["slot"] as JsonPrimitive).content)
     }
+
+    @Test
+    fun compareProjectsTheCharacterTotalsForThePickedSlot() {
+        fun ring(id: String, stats: String) = Json.parseToJsonElement(
+            """{"id":"$id","name":"Ring ${id.last().uppercase()}","meta":{"definition":{"name":"Ring ${id.last().uppercase()}","type":"ring",$stats},"compoundable":true,"maxLevel":7}}""",
+        )
+        val catalog = console.sections.getValue("catalog")["merchantCatalog"]!!.jsonObject
+        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + ("allItems" to JsonArray(listOf(ring("ringa", "\"dex\":5"), ring("ringb", "\"dex\":10,\"vit\":2")))))))
+        val inventory = console.sections.getValue("inventory")["characters"]!!.jsonObject
+        val leada = inventory.getValue("Leada").jsonObject
+        console.override("inventory", mapOf("characters" to JsonObject(inventory + ("Leada" to JsonObject(leada + ("slots" to Json.parseToJsonElement("""{"ring1":{"item":{"name":"ringa","level":0}}}""")))))))
+        val details = console.sections.getValue("core")["characterDetails"]!!.jsonObject
+        val stats = Json.parseToJsonElement("""{"primaryStat":"dex","str":20,"int":10,"dex":100,"vit":30,"attack":250,"armor":80,"speed":55}""").jsonObject
+        console.override("core", mapOf("characterDetails" to JsonObject(details + ("Leada" to JsonObject(details.getValue("Leada").jsonObject + stats)))))
+
+        val viewModel = open(ItemActionTarget.InventorySlot(Item(name = "ringb", level = 0), 0))
+        eventually { viewModel.characters.value["Leada"]?.inventory?.slots?.get("ring1") != null && viewModel.characterDetails.value["Leada"]?.dex == 100.0 }
+        compose.waitForIdle()
+        compose.onNodeWithText("Compare with equipped").performScrollTo().performClick()
+        compose.onNodeWithText("Ring 1").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Ring A +0").assertExists()
+        compose.onNodeWithText("Replaces ring1 · Ring A").assertExists()
+        // project(): DEX moves with the ring.
+        compose.onNodeWithText("105").assertExists()
+        compose.onNodeWithText("110 (+5 · +4.8%)").performScrollTo().assertExists()
+    }
 }
