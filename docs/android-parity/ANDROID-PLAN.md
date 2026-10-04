@@ -110,8 +110,13 @@ BOM on the androidTest classpath) - pre-existing, CI only runs assembleDebug.
   PWA mock's section payloads to `app/src/test/resources/fixtures`;
   `FakeConsole` (MockWebServer) serves them; Robolectric runs Compose
   screens on the JVM (`FormationScreenTest` ports formation.spec.ts).
-- [ ] `model/State.kt` full typing (F6)
-- [ ] API results carry data/status/code/body (F3)
+- [x] `model/State.kt`: PartyStateDynamic moved here with all 105 fields of
+  models/state.ts (55 were missing) and their types; shapes no ported
+  feature reads yet stay raw JSON. A field whose shape changes is rejected
+  alone at merge time and keeps its last good value (F6).
+- [x] Typed `CharacterDiagnostics` from core's characterDetails, with the raw
+  object kept and presence (`online()`, 10s) (F2).
+- [x] API results: `CommandResult.data` (whole body), `Failure.status/body/code` (F3).
 - [ ] Shared UI primitives: action toast, confirm, sheet, item tile (F5)
 - [ ] Navigation shell matching the PWA routes; error boundary (F4)
 

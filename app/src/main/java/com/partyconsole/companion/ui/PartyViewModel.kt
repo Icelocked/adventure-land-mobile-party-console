@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.partyconsole.companion.data.Domain
 import com.partyconsole.companion.data.PartyRepository
+import com.partyconsole.companion.model.CharacterDiagnostics
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.EscapeStatus
 import com.partyconsole.companion.model.GameLogEntry
@@ -22,7 +23,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.serialization.json.JsonObject
 
 /** Whether the app is in the foreground - polling pauses in the background
  *  like the dashboard's queries (the PWA's document.hidden). */
@@ -58,7 +58,7 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     val escape: StateFlow<EscapeStatus?> = repository.escape
     val escapeError: StateFlow<String?> = repository.escapeError
     val latencyMs: StateFlow<Long?> = repository.latencyMs
-    val characterDetails: StateFlow<Map<String, JsonObject>> = repository.characterDetails
+    val characterDetails: StateFlow<Map<String, CharacterDiagnostics>> = repository.characterDetails
     val serverOffset: StateFlow<Long> = repository.serverOffset
     val api get() = repository.api
 
