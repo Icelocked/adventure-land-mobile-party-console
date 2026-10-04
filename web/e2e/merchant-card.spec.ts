@@ -125,3 +125,37 @@ test('Shared rule conflicts: a paused choice can be resolved by owner', async ({
   await page.getByRole('button', { name: 'Use Ranger1: 3 upgrade levels · Unlimited' }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'merchant/rule-conflict')?.body).toEqual({ id: 'upgrade:bow@+0', owner: 'Ranger1' })
 })
+
+test('Join giveaway preselects the merchant’s current realm and shows its players straight away', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchy', ctype: 'merchant', level: 40, server: 'USII' })
+  server.extraState = { giveawayRealms: [{ key: 'SR_EUI', label: 'EU I' }, { key: 'SR_USII', label: 'US II' }], giveawayPlayers: { SR_USII: ['Kind', 'Other', 'Third'] } }
+  await server.install(page)
+  await page.goto('/characters/Merchy')
+  await page.getByRole('button', { name: 'Join giveaway' }).click()
+  await expect(page.getByRole('combobox', { name: 'Server realm' })).toHaveValue('SR_USII')
+  await expect(page.getByText('3 online players loaded')).toBeVisible()
+})
+
+test('Send to party and Send merchant to… block repeat taps while a request is in flight', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchy', ctype: 'merchant', level: 40 })
+  server.addCharacter({ name: 'Leada', ctype: 'warrior', level: 60 })
+  server.leader = 'Leada'
+  await server.install(page)
+  let partyPosts = 0
+  let release: () => void = () => {}
+  await page.route('**/party-api/bank-party', async (route) => {
+    partyPosts++
+    await new Promise<void>((resolve) => (release = resolve))
+    return route.fulfill({ json: { ok: true } })
+  })
+  await page.goto('/characters/Merchy')
+  await page.getByRole('button', { name: 'Send to party' }).click()
+  await expect(page.getByRole('button', { name: 'Sending…' })).toBeDisabled()
+  release()
+  await expect(page.getByRole('button', { name: 'Send to party' })).toBeEnabled()
+  expect(partyPosts).toBe(1)
+})

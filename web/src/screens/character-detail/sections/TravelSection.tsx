@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { usePartyApi, useCharacterDiagnosticsMap, useDynamicState } from '@/data/PartyDataProvider'
 import { useClock } from '@/lib/duration'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,9 @@ export function TravelSection({
   const [showPlaces, setShowPlaces] = useState(false)
   const [showVisits, setShowVisits] = useState(false)
   const [visitMessage, setVisitMessage] = useState<string | null>(null)
+  // merchant-visit-control.tsx: "Queuing visit…" and no repeat sends while one is in flight.
+  const [queuingVisit, setQueuingVisit] = useState(false)
+  const visitRef = useRef(false)
   // merchant-visit-control.tsx: online (seen in the last 10s) non-merchant characters.
   const eligible = Object.entries(diagnostics)
     .filter(([name, detail]) => name !== state.merchantCharacter && detail.ctype !== 'merchant' && Number(detail.seenAt) > 0 && now - Number(detail.seenAt) < 10_000)
@@ -71,19 +74,29 @@ export function TravelSection({
                   variant="outline"
                   size="sm"
                   className="justify-start"
+                  disabled={queuingVisit}
                   onClick={async () => {
+                    if (visitRef.current) return
+                    visitRef.current = true
+                    setQueuingVisit(true)
                     setError(null)
                     setVisitMessage(null)
-                    // merchant-visit-control.tsx: queue a merchant visit to that character.
-                    const result = await api.sendCommand(name, { type: 'bank' })
-                    if (result.kind === 'failure') return setError(result.message)
-                    setVisitMessage(`Merchant visit queued for ${name}`)
-                    setShowVisits(false)
+                    try {
+                      // merchant-visit-control.tsx: queue a merchant visit to that character.
+                      const result = await api.sendCommand(name, { type: 'bank' })
+                      if (result.kind === 'failure') return setError(result.message)
+                      setVisitMessage(`Merchant visit queued for ${name}`)
+                      setShowVisits(false)
+                    } finally {
+                      visitRef.current = false
+                      setQueuingVisit(false)
+                    }
                   }}
                 >
                   {name}
                 </Button>
               ))}
+              {queuingVisit && <p role="status" className="text-xs text-muted-foreground">Queuing visit…</p>}
               {!eligible.length && <p className="text-xs text-muted-foreground">No other characters are online.</p>}
             </div>
           )}

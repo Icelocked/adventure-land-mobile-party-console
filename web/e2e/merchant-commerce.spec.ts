@@ -128,3 +128,29 @@ test('Craft: owned counts include bankbois, gold adds ingredient purchases, reci
   await expect(page.getByText('Gold: 150g')).toBeVisible()
   await expect(recipe.getByText('Next craft: 250g total')).toBeVisible()
 })
+
+test('Commerce parity: Buy description, always-visible empty cart, catalog rows open item details, search clears on mode switch', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [] })
+  server.addCatalogEntry({ id: 'hpot0', name: 'Health Potion' })
+  server.addCatalogEntry({ id: 'ironsword', name: 'Iron Sword' })
+  server.buyable = [{ id: 'hpot0', name: 'Health Potion', cost: 20 }]
+  server.craftable = [{ id: 'ironsword', name: 'Iron Sword', cost: 100, materials: [{ id: 'ironore', name: 'Iron Ore', quantity: 3, level: 0 }] }]
+  await server.install(page)
+
+  await page.goto('/merchant/buy')
+  await expect(page.getByText('Choose anything sold for gold.')).toBeVisible()
+  await expect(page.getByText('Nothing selected.')).toBeVisible()
+  await expect(page.getByText('Gold: 0g')).toBeVisible()
+  await page.getByRole('button', { name: 'Inspect Health Potion' }).click()
+  await expect(page.getByRole('button', { name: 'Add to WTB' })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByPlaceholder('Search items...').fill('potion')
+  await page.getByRole('button', { name: 'Craft', exact: true }).first().click()
+  await expect(page.getByPlaceholder('Search items...')).toHaveValue('')
+  // A recipe whose materials are missing stays inspectable.
+  await page.getByRole('button', { name: 'Inspect Iron Sword' }).click()
+  await expect(page.getByRole('button', { name: 'Add to WTB' })).toBeVisible()
+})
