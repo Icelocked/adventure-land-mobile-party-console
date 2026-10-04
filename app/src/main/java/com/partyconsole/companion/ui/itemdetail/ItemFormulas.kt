@@ -28,6 +28,28 @@ private fun JsonElement.asStringOrNull(): String? = (this as? JsonPrimitive)?.co
 private val equipmentTypes = setOf("helmet", "pants", "chest", "weapon", "amulet", "earring", "shoes", "gloves", "ring", "shield", "belt", "source", "orb", "quiver", "cape", "misc_offhand", "tool")
 fun isEquipment(definition: Map<String, JsonElement>?): Boolean = equipmentTypes.contains(definition?.get("type")?.asStringOrNull() ?: "")
 
+/** item-actions.ts isUsable, verbatim. */
+fun isUsable(definition: Map<String, JsonElement>?): Boolean =
+    (definition?.get("type") as? kotlinx.serialization.json.JsonPrimitive)?.content in setOf("elixir", "licence", "spawner") || definition?.get("gives") is kotlinx.serialization.json.JsonArray
+
+/** upgrade-rule-tiers.tsx, verbatim: a rule is its tier count or {tiers}. */
+fun upgradeRuleTiers(rule: JsonElement?): Int = when (rule) {
+    is kotlinx.serialization.json.JsonObject -> (rule["tiers"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.toInt() ?: 0
+    is kotlinx.serialization.json.JsonPrimitive -> rule.content.toDoubleOrNull()?.toInt() ?: 0
+    else -> 0
+}
+
+/** comparisonSlotLabel (itemFormulas.ts). */
+fun comparisonSlotLabel(slot: String): String = when (slot) {
+    "mainhand" -> "Main hand"
+    "offhand" -> "Off hand"
+    "ring1" -> "Ring 1"
+    "ring2" -> "Ring 2"
+    "earring1" -> "Earring 1"
+    "earring2" -> "Earring 2"
+    else -> slot
+}
+
 // comparison-slots.tsx ported verbatim - which equip slot(s) a given item type could
 // replace, for gear-comparison-dialog.tsx's "Compare with equipped".
 private val comparisonSlots = mapOf(
