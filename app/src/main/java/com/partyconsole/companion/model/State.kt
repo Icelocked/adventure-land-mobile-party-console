@@ -138,6 +138,8 @@ data class PartyStateDynamic(
     val huntFailures: Map<String, HuntFailures> = emptyMap(),
     val characterLocations: Map<String, MapLocation> = emptyMap(),
     val partyLocation: MapLocation? = null,
+    // connected-character-card.tsx: the party's live farming mode, the last fallback.
+    val partyFarmingMode: String? = null,
     val combatRecovery: CombatRecovery? = null,
     val activeConvoy: JsonElement? = null,
     // Events
@@ -208,6 +210,10 @@ data class MonsterChoice(
     val id: String,
     val name: String? = null,
     val sprite: Sprite? = null,
+    // farming-zones.ts Catalog: the spawn geometry farming areas are built from.
+    val locations: List<com.partyconsole.companion.domain.Area> = emptyList(),
+    // monster-choice.tsx SpawnRecord: every recorded spawn and why routing can't use it.
+    val spawnRecords: List<MonsterSpawnRecord>? = null,
 )
 
 /** farming-context.ts's per-character profile. */
@@ -217,6 +223,9 @@ data class FarmingProfile(
     val huntSettings: HuntSettings? = null,
     val huntBlacklist: Map<String, HuntBlacklistEntry>? = null,
     val monsterFocus: JsonElement? = null,
+    val location: MapLocation? = null,
+    val monsterHunt: MonsterHuntCycle? = null,
+    val farmAreaState: FarmAreaState? = null,
 )
 
 /** farming-context.ts (via the PWA's resolveFarmingContext): whose farming
@@ -229,6 +238,8 @@ data class FarmingContext(
     val effectiveMode: String,
     val blacklist: Map<String, HuntBlacklistEntry>,
     val settings: HuntSettings?,
+    val farmArea: FarmAreaState? = null,
+    val hunt: MonsterHuntCycle? = null,
 )
 
 fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
@@ -244,6 +255,8 @@ fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
         effectiveMode = effective?.farmingPolicy ?: (if (legacy) farmingPolicy else null) ?: "auto",
         blacklist = effective?.huntBlacklist ?: (if (legacy) huntBlacklist else null) ?: emptyMap(),
         settings = effective?.huntSettings ?: if (legacy) huntSettings else null,
+        farmArea = effective?.farmAreaState ?: if (legacy) farmAreaState else null,
+        hunt = effective?.monsterHunt ?: if (legacy) monsterHunt else null,
     )
 }
 
@@ -366,6 +379,8 @@ data class MonsterHuntCycle(
     val message: String? = null,
     val stage: String = "",
     val owner: String? = null,
+    // farming-context.ts: where Hunt returns between quests.
+    val returnLocation: MapLocation? = null,
     val currentIndex: Int = 0,
     val missions: List<HuntMission> = emptyList(),
     val backup: HuntBackup? = null,

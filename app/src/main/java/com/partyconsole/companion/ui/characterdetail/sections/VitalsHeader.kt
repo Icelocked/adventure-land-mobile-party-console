@@ -1,6 +1,15 @@
 package com.partyconsole.companion.ui.characterdetail.sections
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,37 +55,75 @@ fun classLook(ctype: String): Pair<ImageVector, Color> = when (ctype.lowercase()
     else -> Icons.Filled.Person to Color(0xFFAAAAAA)
 }
 
-/** The sticky, always-visible top of the character detail screen - kept
- *  out of the scrollable body per the mobile-redesign plan so vitals never
- *  scroll out of view while browsing equipment/inventory below. */
+private val zoneMap = Regex("^zone_[a-f0-9]+_\\d+$")
+private val portraitJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+/** The sticky, always-visible top of the character detail screen (the
+ *  PWA's VitalsHeader.tsx): the portrait (opens the character's stats, with
+ *  the Tracktrix badge), online dot, level / class / primary stat / realm /
+ *  ping, the banking flag, XP, map, HP/MP, gold, and the activity line. */
 @Composable
-fun VitalsHeader(name: String, vitals: CharacterVitals, accountGold: Long? = null, bestiaryCatalog: List<com.partyconsole.companion.model.BestiaryMonster> = emptyList()) {
-    val (icon, color) = classLook(vitals.ctype)
+fun VitalsHeader(
+    name: String,
+    vitals: CharacterVitals,
+    accountGold: Long? = null,
+    bestiaryCatalog: List<com.partyconsole.companion.model.BestiaryMonster> = emptyList(),
+    resolvedTargetType: String? = null,
+    diagnostics: com.partyconsole.companion.model.CharacterDiagnostics? = null,
+    slots: Map<String, com.partyconsole.companion.model.EquippedEntry?> = emptyMap(),
+    online: Boolean = true,
+) {
+    var statsOpen by remember { mutableStateOf(false) }
+    val tracktrix = diagnostics?.tracktrix as? kotlinx.serialization.json.JsonObject
+    val tracktrixSprite = tracktrix?.get("sprite")?.let { runCatching { portraitJson.decodeFromJsonElement(com.partyconsole.companion.model.Sprite.serializer(), it) }.getOrNull() }
+    val tracktrixActive = (tracktrix?.get("active") as? kotlinx.serialization.json.JsonPrimitive)?.content == "true" && tracktrixSprite != null &&
+        (tracktrix["bonuses"] as? kotlinx.serialization.json.JsonObject)?.values?.any { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.let { v -> v != 0.0 } == true } == true
+    val ping = vitals.ping ?: diagnostics?.ping
+    // character-map-section.tsx: instanced caves get a readable name.
+    val mapLabel = if (zoneMap.matches(vitals.map)) "Cave of Many Dreams" else vitals.map
+    val portraitSprite = diagnostics?.characterSprite?.let { runCatching { portraitJson.decodeFromJsonElement(com.partyconsole.companion.model.Sprite.serializer(), it) }.getOrNull() }
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // character-stats-trigger.tsx: the portrait opens the character's stats.
             Box(
-                modifier = Modifier.size(48.dp).background(color.copy(alpha = 0.2f), CircleShape),
-                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(width = 56.dp, height = 80.dp)
+                    .border(1.dp, Color(0xCC065F46), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .background(Color(0xFF07100F), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clickable { statsOpen = true }
+                    .semantics { contentDescription = "View $name stats" },
             ) {
-                Icon(icon, contentDescription = vitals.ctype, tint = color)
+                com.partyconsole.companion.ui.components.CharacterPortrait(diagnostics?.characterDollHtml, portraitSprite, diagnostics?.skin, modifier = Modifier.fillMaxSize())
+                if (tracktrixActive) {
+                    Box(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(20.dp)
+                            .border(1.dp, Color(0xFF7C3AED), androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                            .background(Color(0xFF101724))
+                            .semantics { contentDescription = "Tracktrix bonuses active" },
+                    ) { com.partyconsole.companion.ui.itemicon.SpriteIcon(tracktrixSprite, size = 18.dp) }
+                }
             }
             Column {
-                Text(name, style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(8.dp).background(if (online) Color(0xFF34D399) else Color(0xFF52525B), CircleShape)
+                            .semantics { contentDescription = if (online) "Online" else "Offline" },
+                    )
+                    Text(name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
+                }
                 Text(
-                    buildString {
-                        append("Lv ${vitals.level} ${vitals.ctype}")
-                        vitals.primaryStat?.let { append(" $it") }
-                        // server is real (merged from the roster - see
-                        // PartyRepository); ping/latency has no confirmed
-                        // source anywhere on the wire, so it's omitted
-                        // entirely rather than shown as a fake "-ms".
-                        append(" · ${vitals.server ?: "realm unknown"}")
-                    },
+                    "Lv ${vitals.level} ${vitals.ctype}" + (vitals.primaryStat?.let { " $it" } ?: "") + " · ${vitals.server ?: "realm unknown"} · " +
+                        if (online && ping != null && ping.isFinite() && ping >= 0) "${Math.round(ping)}ms" else "—ms",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                when {
+                    vitals.banking -> Flag("BANKING", Color(0xFFFBBF24))
+                    vitals.bankQueued -> Flag("BANK QUEUED", Color(0xFF22D3EE))
+                    vitals.stocking -> Flag("STOCKING UP", Color(0xFFA78BFA))
+                }
             }
         }
+        if (statsOpen) com.partyconsole.companion.ui.characterdetail.CharacterStatsSheet(name, vitals, diagnostics, slots) { statsOpen = false }
         if (vitals.maxXp != null && vitals.maxXp > 0) {
             val xp = vitals.xp ?: 0L
             val xpFraction = (xp.toFloat() / vitals.maxXp.toFloat()).coerceIn(0f, 1f)
@@ -94,7 +141,7 @@ fun VitalsHeader(name: String, vitals: CharacterVitals, accountGold: Long? = nul
             )
         }
         Text(
-            "${vitals.map} (${vitals.x.toInt()}, ${vitals.y.toInt()})",
+            "$mapLabel (${vitals.x.toInt()}, ${vitals.y.toInt()})",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -105,11 +152,22 @@ fun VitalsHeader(name: String, vitals: CharacterVitals, accountGold: Long? = nul
             accountGold?.let { Text("Account total ${"%,d".format(it)}g", style = MaterialTheme.typography.labelSmall) }
         }
         Text(
-            activityLine(vitals, bestiaryCatalog),
+            activityLine(vitals, bestiaryCatalog, resolvedTargetType),
             style = MaterialTheme.typography.bodyMedium,
             color = if (vitals.rip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+@Composable
+private fun Flag(text: String, color: Color) {
+    Text(
+        text,
+        color = color,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier.background(color.copy(alpha = 0.1f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
