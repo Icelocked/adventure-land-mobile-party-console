@@ -35,7 +35,11 @@ android {
         // project-wide opt-in here instead of annotating every composable
         // individually, matching how most Compose Material3 apps handle
         // this until those APIs stabilize.
-        freeCompilerArgs += listOf("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            // FlowRow (wrapping chip rows, like the PWA's flex-wrap).
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
+        )
     }
 
     buildFeatures {

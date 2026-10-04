@@ -1,61 +1,81 @@
 package com.partyconsole.companion.ui.characterdetail.sections
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.partyconsole.companion.domain.abbreviatedGold
+import com.partyconsole.companion.domain.merchantPartyGroups
+import com.partyconsole.companion.model.GiveawayRealm
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.components.rememberClock
+import com.partyconsole.companion.ui.merchant.MerchantSettings
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
-/** Ports merchant-card-controls.tsx's Buy/Craft/Exchange navigation,
- *  Force stand, Mining/Fishing, Send to party, Donate, Join giveaway,
- *  Clear job queue, Clear stale orders, Clear activity history, and the
- *  Merchant collection settings (bank-sort mode, collect thresholds) -
- *  the rest of the merchant character's card that wasn't just the job
- *  queue widget (MerchantQueueSection) or Routines (its own screen, too
- *  big for an inline form). Only ever rendered for the merchant
- *  character. */
+private val Amber = Color(0xFFF59E0B)
+private val Emerald = Color(0xFF10B981)
+private val Violet = Color(0xFFA78BFA)
+
+/** merchant-card-controls.tsx (the PWA's MerchantControlsSection.tsx):
+ *  Buy/Craft/Exchange, Force stand, Mining/Fishing with readiness, Routines,
+ *  Send to party (group picker), Donate (XP preview), Join giveaway (realm
+ *  then player), Merchant settings and Clear job queue. Merchant only. */
 @Composable
-fun MerchantControlsSection(
-    forceStand: Boolean,
-    gatheringModes: List<String>,
-    threshold: Long,
-    itemCollectionThreshold: Int,
-    bankSortMode: String?,
-    viewModel: PartyViewModel,
-    onOpenCommerce: (String) -> Unit,
-    onOpenRoutines: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    // Force stand and gathering are toggles read from the server; until it
-    // has answered they'd flip a value we haven't seen.
+fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) -> Unit, onOpenRoutines: () -> Unit) {
+    val state by viewModel.dynamicState.collectAsState()
+    val characters by viewModel.characters.collectAsState()
+    val diagnostics by viewModel.characterDetails.collectAsState()
     val loaded by viewModel.stateLoaded.collectAsState()
+    val scope = rememberCoroutineScope()
+    val now = rememberClock()
+    val merchant = state.merchantCharacter
+    val merchantRaw = merchant?.let { diagnostics[it]?.raw }
+    val groups = merchantPartyGroups(state, characters.keys.toList())
+    // party-reference-panels.tsx: the merchant's own XP-per-gold rate, 3.2 until known.
+    val xpPerGold = (merchantRaw?.get("donationXpPerGold") as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it > 0 } ?: 3.2
     var expanded by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmingClear by remember { mutableStateOf(false) }
+    var sendingToParty by remember { mutableStateOf(false) }
     fun toggle(key: String) { expanded = if (expanded == key) null else key }
     fun run(action: suspend () -> ApiResult<*>) {
         scope.launch {
             error = null
             when (val result = action()) {
-                is ApiResult.Failure -> error = result.message
+                is ApiResult.Failure -> error = result.message.ifBlank { "Request failed" }
                 is ApiResult.Success -> {
                     viewModel.refreshDynamicStateNow()
                     expanded = null
@@ -63,64 +83,91 @@ fun MerchantControlsSection(
             }
         }
     }
+    // send-to-party-control.tsx: one request at a time, controls disabled while it runs.
+    fun sendToParty(group: String?) {
+        if (sendingToParty) return
+        sendingToParty = true
+        scope.launch {
+            error = null
+            when (val result = viewModel.api.sendMerchantToParty(group)) {
+                is ApiResult.Failure -> error = result.message.ifBlank { "Request failed" }
+                is ApiResult.Success -> {
+                    viewModel.refreshDynamicStateNow()
+                    expanded = null
+                }
+            }
+            sendingToParty = false
+        }
+    }
+    // merchant-card-controls.tsx readiness: the later of the merchant's and the party's cooldowns.
+    fun readiness(mode: String): Pair<String, Color?> {
+        val own = ((merchantRaw?.get("gatheringCooldowns") as? JsonObject)?.get(mode) as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() ?: 0L
+        val party = (if (mode == "fishing") state.gatheringCooldowns?.fishing else state.gatheringCooldowns?.mining) ?: 0L
+        val remaining = maxOf(0L, maxOf(own, party) - now)
+        if (remaining == 0L) return "✓ Ready" to Emerald
+        val seconds = (remaining + 999) / 1000
+        return "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}" to null
+    }
 
     SectionCard(title = "Merchant controls") {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button(onClick = { onOpenCommerce("buy") }) { Text("Buy") }
-            Button(onClick = { onOpenCommerce("craft") }) { Text("Craft") }
-            Button(onClick = { onOpenCommerce("exchange") }) { Text("Exchange") }
+            OutlinedButton(onClick = { onOpenCommerce("buy") }) { Text("Buy") }
+            OutlinedButton(onClick = { onOpenCommerce("craft") }) { Text("Craft") }
+            OutlinedButton(onClick = { onOpenCommerce("exchange") }) { Text("Exchange") }
         }
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = forceStand, enabled = loaded, onClick = { run { viewModel.api.setForceStand(!forceStand) } }, label = { Text("Force stand · ${if (forceStand) "On" else "Off"}") })
-            FilterChip(
-                selected = gatheringModes.contains("mining"),
-                enabled = loaded,
-                onClick = { run { viewModel.api.setGathering("mining", !gatheringModes.contains("mining")) } },
-                label = { Text("Mining · ${if (gatheringModes.contains("mining")) "On" else "Off"}") },
-            )
-        }
-        FilterChip(
-            selected = gatheringModes.contains("fishing"),
-            enabled = loaded,
-            onClick = { run { viewModel.api.setGathering("fishing", !gatheringModes.contains("fishing")) } },
-            label = { Text("Fishing · ${if (gatheringModes.contains("fishing")) "On" else "Off"}") },
-        )
-
-        ConfigLoadingNote(loaded)
-        Column {
-            TextButton(onClick = onOpenRoutines) { Text("Routines") }
-            TextButton(onClick = { run { viewModel.api.sendMerchantToParty() } }) { Text("Send to party") }
-
-            TextButton(onClick = { toggle("donate") }) { Text("Donate gold") }
-            if (expanded == "donate") {
-                DonateForm(onDonate = { amount -> run { viewModel.api.donateGold(amount) } })
-            }
-
-            TextButton(onClick = { toggle("giveaway") }) { Text("Join giveaway") }
-            if (expanded == "giveaway") {
-                GiveawayForm(onJoin = { realm, seller -> run { viewModel.api.joinGiveaway(seller, realm) } })
-            }
-
-            TextButton(onClick = { toggle("settings") }) { Text("Collection settings") }
-            if (expanded == "settings") {
-                CollectionSettingsForm(
-                    loaded = loaded,
-                    threshold = threshold,
-                    itemCollectionThreshold = itemCollectionThreshold,
-                    bankSortMode = bankSortMode,
-                    onSetBankSortMode = { mode -> run { viewModel.api.setBankSortMode(mode) } },
-                    onSetThresholds = { t, i -> run { viewModel.api.setThresholds(t, i) } },
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
+            FilterChip(selected = state.merchantForceStand, enabled = loaded, onClick = { run { viewModel.api.setForceStand(!state.merchantForceStand) } }, label = { Text("Force stand · ${if (state.merchantForceStand) "On" else "Off"}") })
+            for (mode in listOf("mining", "fishing")) {
+                val on = state.gatheringModes.contains(mode)
+                val (ready, readyColor) = if (state.gatheringNoTool[mode] == true && !on) "No tool" to Amber else readiness(mode)
+                FilterChip(
+                    selected = on,
+                    enabled = loaded,
+                    onClick = { run { viewModel.api.setGathering(mode, !on) } },
+                    label = {
+                        Row {
+                            Text("${mode.replaceFirstChar { it.uppercase() }} · ${if (on) "On" else "Off"} · ")
+                            Text(ready, color = readyColor ?: MaterialTheme.colorScheme.onSurface, fontFamily = if (readyColor == null) FontFamily.Monospace else null)
+                        }
+                    },
                 )
             }
-
-            TextButton(onClick = { run { viewModel.api.clearStaleOrders() } }) { Text("Clear stale orders") }
-            TextButton(onClick = { run { viewModel.api.clearMerchantActivity() } }) { Text("Clear activity history") }
-
+        }
+        ConfigLoadingNote(loaded)
+        Column(modifier = Modifier.padding(top = 6.dp)) {
+            TextButton(onClick = onOpenRoutines) { Text("Routines") }
+            TextButton(enabled = !sendingToParty, onClick = { if (groups.size <= 1) sendToParty(groups.firstOrNull()?.id) else toggle("party") }) {
+                Text(if (sendingToParty) "Sending…" else "Send to party")
+            }
+            if (expanded == "party") {
+                // send-to-party-control.tsx: pick a party group when there's more than one.
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text("Select party group", style = MaterialTheme.typography.labelSmall)
+                    for (group in groups) {
+                        OutlinedButton(enabled = !sendingToParty, onClick = { sendToParty(group.id) }, modifier = Modifier.fillMaxWidth()) { Text(group.members.joinToString(" · ")) }
+                    }
+                }
+            }
+            TextButton(onClick = { toggle("donate") }) { Text("Donate gold") }
+            if (expanded == "donate") DonateForm(merchant, xpPerGold) { amount -> run { viewModel.api.donateGold(amount) } }
+            TextButton(onClick = { toggle("giveaway") }) { Text("Join giveaway") }
+            if (expanded == "giveaway") {
+                // connected-character-card.tsx onGiveaway: the merchant's current realm, else the first.
+                val currentRealm = merchant?.let { characters[it]?.vitals?.server }
+                GiveawayForm(
+                    initialRealm = currentRealm?.let { "SR_$it" } ?: state.giveawayRealms.firstOrNull()?.key.orEmpty(),
+                    realms = state.giveawayRealms,
+                    players = state.giveawayPlayers,
+                ) { realm, seller -> run { viewModel.api.joinGiveaway(seller, realm) } }
+            }
+            TextButton(onClick = { toggle("settings") }) { Text("Merchant settings") }
+            if (expanded == "settings") {
+                if (loaded) MerchantSettings(viewModel) else ConfigLoadingNote(false)
+            }
             if (confirmingClear) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Really clear the entire job queue?", color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-                    Button(onClick = { confirmingClear = false; run { viewModel.api.clearMerchantQueue() } }) { Text("Clear") }
+                    Button(onClick = { confirmingClear = false; run { viewModel.api.clearMerchantQueue() } }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Clear") }
                     TextButton(onClick = { confirmingClear = false }) { Text("Cancel") }
                 }
             } else {
@@ -132,95 +179,75 @@ fun MerchantControlsSection(
 }
 
 @Composable
-private fun DonateForm(onDonate: (Long) -> Unit) {
+private fun DonateForm(merchant: String?, xpPerGold: Double, onDonate: (Long) -> Unit) {
     var amount by remember { mutableStateOf("") }
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
-        OutlinedTextField(
-            value = amount,
-            onValueChange = { new -> if (new.all { it.isDigit() }) amount = new },
-            label = { Text("Gold amount") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-        Button(onClick = { amount.toLongOrNull()?.let(onDonate) }, enabled = amount.toLongOrNull() != null) { Text("Donate") }
-    }
-}
-
-/** merchant-collection-settings.tsx: both thresholds seed from the server
- *  (and follow it while untouched), are validated rather than coerced, and
- *  only Apply when changed. */
-@Composable
-private fun CollectionSettingsForm(
-    loaded: Boolean,
-    threshold: Long,
-    itemCollectionThreshold: Int,
-    bankSortMode: String?,
-    onSetBankSortMode: (String) -> Unit,
-    onSetThresholds: (Long?, Int?) -> Unit,
-) {
-    var thresholdInput by remember { mutableStateOf(threshold.toString()) }
-    var slotsInput by remember { mutableStateOf(itemCollectionThreshold.toString()) }
-    var goldDirty by remember { mutableStateOf(false) }
-    var slotsDirty by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(threshold, goldDirty) { if (!goldDirty) thresholdInput = threshold.toString() }
-    LaunchedEffect(itemCollectionThreshold, slotsDirty) { if (!slotsDirty) slotsInput = itemCollectionThreshold.toString() }
-    Column {
-        Text("Bank sort", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = (bankSortMode ?: "automatic") == "automatic", enabled = loaded, onClick = { onSetBankSortMode("automatic") }, label = { Text("Sort every visit") })
-            FilterChip(selected = bankSortMode == "request", enabled = loaded, onClick = { onSetBankSortMode("request") }, label = { Text("Request sorting") })
+    Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("${merchant ?: "The merchant"} will withdraw any shortage, travel to the XP frog, and donate this amount.", style = MaterialTheme.typography.labelSmall)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = amount, onValueChange = { amount = it.filter(Char::isDigit) }, label = { Text("Donation amount") }, singleLine = true, modifier = Modifier.weight(1f))
+            Button(onClick = {
+                // use-party-console.tsx donateGold
+                val value = amount.toLongOrNull()
+                if (value == null || value < 1) error = "Enter a positive whole-number donation" else { error = null; onDonate(value) }
+            }) { Text("Donate") }
         }
-        Text("Send the merchant when any active character carries more than this amount.", style = MaterialTheme.typography.labelSmall)
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
-            OutlinedTextField(
-                value = thresholdInput,
-                onValueChange = { new -> if (new.all { it.isDigit() }) { thresholdInput = new; goldDirty = true } },
-                label = { Text("Collect above (gold)") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Button(enabled = loaded && goldDirty, onClick = {
-                val n = thresholdInput.toLongOrNull()
-                if (n == null || n < 0) {
-                    error = "Enter a non-negative whole number"
-                } else {
-                    error = null
-                    goldDirty = false
-                    onSetThresholds(n, null)
-                }
-            }) { Text("Apply") }
-        }
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
-            OutlinedTextField(
-                value = slotsInput,
-                onValueChange = { new -> if (new.all { it.isDigit() }) { slotsInput = new; slotsDirty = true } },
-                label = { Text("Marked slots required (1-42)") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Button(enabled = loaded && slotsDirty, onClick = {
-                val value = slotsInput.toIntOrNull()
-                if (value == null || value < 1 || value > 42) {
-                    error = "Use an item-slot threshold from 1 to 42"
-                } else {
-                    error = null
-                    slotsDirty = false
-                    onSetThresholds(null, value)
-                }
-            }) { Text("Apply") }
-        }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        Text(
+            "Preview: ${abbreviatedGold(((amount.toLongOrNull() ?: 0L) * xpPerGold).toLong())} XP ($xpPerGold XP/gold)",
+            color = Violet,
+            fontFamily = FontFamily.Monospace,
+            style = MaterialTheme.typography.labelSmall,
+        )
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
     }
 }
 
+/** party-management-panels.tsx "Join giveaway": pick a realm, then a
+ *  player online there (searchable). */
 @Composable
-private fun GiveawayForm(onJoin: (String, String) -> Unit) {
-    var realm by remember { mutableStateOf("") }
+private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, players: Map<String, List<String>>, onJoin: (String, String) -> Unit) {
+    var realm by remember { mutableStateOf(initialRealm) }
     var seller by remember { mutableStateOf("") }
-    Column {
-        OutlinedTextField(value = realm, onValueChange = { realm = it }, label = { Text("Server realm (e.g. US I)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = seller, onValueChange = { seller = it }, label = { Text("Merchant name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onJoin(realm.trim(), seller.trim()) }, enabled = realm.isNotBlank() && seller.isNotBlank()) { Text("Join") }
+    var search by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var realmMenu by remember { mutableStateOf(false) }
+    val online = players[realm].orEmpty()
+    val matches = online.filter { it.lowercase().contains(search.trim().lowercase()) }
+    Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("The merchant will switch realms, travel to the main market, find this player, and enter every active giveaway they are hosting.", style = MaterialTheme.typography.labelSmall)
+        ExposedDropdownMenuBox(expanded = realmMenu, onExpandedChange = { realmMenu = it }) {
+            OutlinedTextField(
+                value = realms.find { it.key == realm }?.label ?: if (realm.isEmpty()) "Select a realm" else realm,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Server realm") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = realmMenu) },
+                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            )
+            ExposedDropdownMenu(expanded = realmMenu, onDismissRequest = { realmMenu = false }) {
+                for (option in realms) DropdownMenuItem(text = { Text(option.label) }, onClick = { realm = option.key; seller = ""; realmMenu = false })
+            }
+        }
+        OutlinedTextField(
+            value = seller.ifEmpty { search },
+            enabled = realm.isNotEmpty(),
+            onValueChange = { seller = ""; search = it },
+            label = { Text("Merchant name") },
+            placeholder = { Text(if (realm.isNotEmpty()) "Search player name…" else "Select a realm first") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (realm.isNotEmpty() && seller.isEmpty()) {
+            Column(modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
+                for (name in matches) Text(name, modifier = Modifier.fillMaxWidth().clickable { seller = name }.padding(8.dp))
+                if (matches.isEmpty()) Text("No online players loaded for this realm.", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Text("${online.size} online players loaded", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+        Button(onClick = {
+            // use-party-console.tsx joinGiveaway
+            if (realm.isBlank() || seller.isBlank()) error = "Enter both a server realm and merchant name" else { error = null; onJoin(realm.trim(), seller.trim()) }
+        }) { Text("Join") }
     }
 }

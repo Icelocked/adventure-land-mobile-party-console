@@ -137,12 +137,8 @@ fun CharacterDetailScreen(
                     )
                 }
                 if (isMerchant) {
-                    MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
-                    MerchantControlsSection(
-                        dynamicState.merchantForceStand, dynamicState.gatheringModes,
-                        dynamicState.threshold, dynamicState.itemCollectionThreshold, dynamicState.bankSortMode,
-                        viewModel, onOpenMerchantCommerce, onOpenRoutines,
-                    )
+                    MerchantQueueSection(viewModel)
+                    MerchantControlsSection(viewModel, onOpenMerchantCommerce, onOpenRoutines)
                 }
                 EquipmentSection(
                     slots = state.inventory?.slots.orEmpty(),
@@ -166,6 +162,7 @@ fun CharacterDetailScreen(
                     viewModel,
                 )
                 if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
+                if (isMerchant) com.partyconsole.companion.ui.characterdetail.sections.RuleConflictsSection(viewModel)
                 AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)
             }
         }
@@ -178,7 +175,6 @@ fun CharacterDetailScreen(
                 characterItems = listOfNotNull(
                     "Inventory" to Routes.inventory(characterName),
                     "Equipment" to Routes.equipment(characterName),
-                    ("Merchant activity" to Routes.activity(characterName)).takeIf { characterName == dynamicState.merchantCharacter },
                     "Upgrade offerings" to Routes.ACCOUNT_OFFERINGS,
                 ),
             )
