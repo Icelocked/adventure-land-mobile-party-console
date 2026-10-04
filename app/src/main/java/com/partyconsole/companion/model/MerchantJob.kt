@@ -216,6 +216,10 @@ data class MarketListing(
     val price: Long = 0,
     val unitPrice: Long? = null,
     val quantity: Int = 1,
+    // use-panel-model.ts standMarketCount: fresh, non-PVP listings only.
+    val seenAt: Long? = null,
+    val serverIdentifier: String? = null,
+    val serverRegion: String? = null,
 )
 
 /** One live "someone's stand is open nearby" result from a stand search -

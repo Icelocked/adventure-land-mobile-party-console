@@ -13,6 +13,7 @@ data class MailSnapshot(
     val count: Int = 0,
     // mail-query.ts: why the last refresh failed (the inbox is kept).
     val error: String? = null,
+    val updatedAt: Long? = null,
 )
 
 @Serializable
@@ -28,6 +29,9 @@ data class ReceivedMail(
     // never fails the whole message's parse, matching this app's established
     // safe-default pattern for fields with more than one possible shape.
     val taken: JsonElement? = null,
+    // mail-inbox: a queued collection and why it failed, if it did.
+    val collection: JsonElement? = null,
+    val collectionError: String? = null,
 )
 
 /** escape-status.tsx's shape for GET/POST /party-api/escape - the party-wide

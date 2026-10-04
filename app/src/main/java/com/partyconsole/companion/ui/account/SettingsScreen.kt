@@ -417,7 +417,7 @@ private fun ALDataSection(viewModel: PartyViewModel) {
                         Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = {
                                 scope.launch {
-                                    when (val result = viewModel.api.sendMail("earthiverse", "aldata_auth", key)) {
+                                    when (val result = viewModel.api.sendMail("earthiverse", "aldata_auth", key, 1)) {
                                         is ApiResult.Failure -> error = result.message
                                         is ApiResult.Success -> preparingMail = false
                                     }

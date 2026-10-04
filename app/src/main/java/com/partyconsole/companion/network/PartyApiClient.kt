@@ -393,13 +393,15 @@ class PartyApiClient(
      *  `slot` is that pack's slot index - both distinct from the
      *  requesting character's own inventory slot, which this command
      *  doesn't need (the server finds room on its own). */
-    suspend fun withdrawFromBank(character: String, item: Item, pack: String, slot: Int, markAll: Boolean = false, removeAutoBankMark: Boolean = false): ApiResult<CommandResult> {
+    suspend fun withdrawFromBank(character: String, item: Item, pack: String, slot: Int, markAll: Boolean = false, removeAutoBankMark: Boolean = false, upgradeTiers: Int? = null): ApiResult<CommandResult> {
         // bank-withdrawal.tsx: removeAutoBankMark confirms dropping an
         // automatic bank mark when the server asks (auto_bank_confirmation_required).
         val extra = buildMap {
             put("pack", JsonPrimitive(pack))
             put("markAll", JsonPrimitive(markAll))
             put("removeAutoBankMark", JsonPrimitive(removeAutoBankMark))
+            // party-inventory-panels.tsx onBankUpgrade: withdraw the item to upgrade it.
+            upgradeTiers?.let { put("upgradeTiers", JsonPrimitive(it)) }
         }
         return itemCommand("withdraw", character, item, JsonPrimitive(slot), extra)
     }
@@ -425,25 +427,20 @@ class PartyApiClient(
      *  first (0-gold) vault using an owned key item; null spends the
      *  vault's `gold` to open an already-accessible vault. The server
      *  enforces ordering/ownership and returns a specific error otherwise. */
-    suspend fun unlockBankVault(pack: String, kind: String? = null): ApiResult<CommandResult> {
-        val body = JsonObject(
-            buildMap {
-                put("pack", JsonPrimitive(pack))
-                kind?.let { put("kind", JsonPrimitive(it)) }
-            },
-        )
-        return post("bank/unlock", body)
-    }
+    suspend fun unlockBankVault(pack: String, kind: String): ApiResult<CommandResult> =
+        // party-inventory-panels.tsx onUnlock: {pack, kind} - "key" or "gold".
+        post("bank/unlock", JsonObject(mapOf("pack" to JsonPrimitive(pack), "kind" to JsonPrimitive(kind))))
 
     /** POST /party-api/deconstruction/mark (merchant/bank-deconstruction.ts,
      *  triggered by `pack` being present) - marks a bank item for scrap
      *  without withdrawing it first. */
-    suspend fun markBankItemForDeconstruction(item: Item, pack: String, slot: Int): ApiResult<CommandResult> {
+    suspend fun markBankItemForDeconstruction(item: Item, pack: String, slot: Int, all: Boolean = false): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
                 "item" to json.encodeToJsonElement(Item.serializer(), item),
                 "pack" to JsonPrimitive(pack),
                 "slot" to JsonPrimitive(slot),
+                "all" to JsonPrimitive(all),
             ),
         )
         return post("deconstruction/mark", body)
@@ -500,10 +497,10 @@ class PartyApiClient(
     /** POST /party-api/merchant/auto-stand (http/automatic-sales.ts) - a
      *  standing "always list this item type on the stand at this price"
      *  rule, merchant-only. */
-    suspend fun autoStand(character: String, item: Item, price: Long, remove: Boolean = false): ApiResult<CommandResult> {
+    suspend fun autoStand(item: Item, price: Long, remove: Boolean = false): ApiResult<CommandResult> {
+        // use-party-console.tsx saveStandListing (auto): no character - the rule is the merchant's.
         val body = JsonObject(
             mapOf(
-                "character" to JsonPrimitive(character),
                 "item" to json.encodeToJsonElement(Item.serializer(), item),
                 "price" to JsonPrimitive(price),
                 "action" to JsonPrimitive(if (remove) "remove" else "set"),
@@ -511,6 +508,20 @@ class PartyApiClient(
         )
         return post("merchant/auto-stand", body)
     }
+
+    /** POST /party-api/merchant/stand {...listing, remove: true} - the whole
+     *  listing (id, bank source, trade slot) so the server finds it. */
+    suspend fun removeStandListing(listing: com.partyconsole.companion.model.StandListing): ApiResult<CommandResult> {
+        val body = json.encodeToJsonElement(com.partyconsole.companion.model.StandListing.serializer(), listing) as JsonObject
+        return post("merchant/stand", JsonObject(body + ("remove" to JsonPrimitive(true))))
+    }
+
+    /** POST /party-api/bankbois/create - provision the next overflow-storage bankboi. */
+    suspend fun createBankboi(): ApiResult<CommandResult> = post("bankbois/create", JsonObject(emptyMap()))
+
+    /** POST /party-api/bankbois/{name}/delete - only once it is empty. */
+    suspend fun deleteBankboi(name: String): ApiResult<CommandResult> =
+        post("bankbois/${java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")}/delete", JsonObject(emptyMap()))
 
     /** POST /party-api/merchant/auto-npc-sale with action "clear-all"
      *  (automatic-sales.ts) - drops every auto-NPC-sale rule scoped to
@@ -929,21 +940,27 @@ class PartyApiClient(
         }
     }
 
-    /** POST /party-api/merchant/send-mail (http/send-mail.ts). Server-side
-     *  validation this app should match before calling: recipient
-     *  ^[A-Za-z0-9_]{1,40}$, subject 1-74 chars, message <=1000 chars. No
-     *  item/gold attachment for v1 - that needs a source pack/slot this
-     *  screen has no natural "which character" context for yet. */
-    suspend fun sendMail(recipient: String, subject: String, message: String): ApiResult<CommandResult> {
+    /** POST /party-api/merchant/send-mail - send-mail-dialog.tsx onSend body,
+     *  verbatim: an optional attachment from a pack (merchant, bank pack or
+     *  bankboi:NAME) and slot, with the quantity for stacks. */
+    suspend fun sendMail(recipient: String, subject: String, message: String, quantity: Int, sourcePack: String? = null, sourceSlot: Int? = null, sourceItem: Item? = null): ApiResult<CommandResult> {
         val body = JsonObject(
-            mapOf(
-                "recipient" to JsonPrimitive(recipient),
-                "subject" to JsonPrimitive(subject),
-                "message" to JsonPrimitive(message),
-            ),
+            buildMap {
+                put("recipient", JsonPrimitive(recipient))
+                put("subject", JsonPrimitive(subject))
+                put("message", JsonPrimitive(message))
+                put("quantity", JsonPrimitive(quantity))
+                if (sourcePack != null && sourceSlot != null && sourceItem != null) {
+                    put("source", JsonObject(mapOf("pack" to JsonPrimitive(sourcePack), "slot" to JsonPrimitive(sourceSlot), "item" to json.encodeToJsonElement(Item.serializer(), sourceItem))))
+                }
+            },
         )
         return post("merchant/send-mail", body)
     }
+
+    /** POST /party-api/mail/{refresh|collect|delete} {id}. */
+    suspend fun mailAction(action: String, id: String? = null): ApiResult<CommandResult> =
+        post("mail/$action", JsonObject(buildMap { id?.let { put("id", JsonPrimitive(it)) } }))
 
     /** POST /party-api/mail/collect - collects an attached item/gold from
      *  a received message by its id. */

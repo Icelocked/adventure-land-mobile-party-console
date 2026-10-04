@@ -42,6 +42,8 @@ class FakeConsole : AutoCloseable {
     @Volatile var unpaired = false
     @Volatile var postStatus = 200
     @Volatile var postBody = """{"ok":true}"""
+    /** One-shot replies for a POST path (e.g. "merchant/stand"): status + body. */
+    val failOnce = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, String>>()
 
     private val server = MockWebServer().apply {
         dispatcher = object : Dispatcher() {
@@ -49,7 +51,10 @@ class FakeConsole : AutoCloseable {
                 val path = request.path.orEmpty()
                 requests += Request(request.method.orEmpty(), path, request.body.readUtf8())
                 if (unpaired) return MockResponse().setResponseCode(302).setHeader("Location", "/setup")
-                if (request.method == "POST") return json(postBody).setResponseCode(postStatus)
+                if (request.method == "POST") {
+                    failOnce.remove(path.removePrefix("/party-api/"))?.let { (status, body) -> return json(body).setResponseCode(status) }
+                    return json(postBody).setResponseCode(postStatus)
+                }
                 val url = request.requestUrl!!
                 return when (url.encodedPath) {
                     "/party-api/state" -> {
@@ -86,6 +91,9 @@ fun eventually(timeoutMs: Long = 5_000, condition: () -> Boolean) = runBlocking 
     val until = System.currentTimeMillis() + timeoutMs
     while (!condition()) {
         if (System.currentTimeMillis() > until) error("condition not met within ${timeoutMs}ms")
+        // Under Robolectric the test thread is the main thread: keep its
+        // looper running so Main-dispatched work (viewModelScope) progresses.
+        runCatching { org.robolectric.shadows.ShadowLooper.idleMainLooper() }
         delay(20)
     }
 }

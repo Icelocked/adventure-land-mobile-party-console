@@ -173,13 +173,13 @@ private fun InstanceInfoRow(target: ItemActionTarget, characterName: String) {
 }
 
 @Composable
-private fun TapRow(label: String, onClick: () -> Unit) {
+internal fun TapRow(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
     ) {
-        TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
             Text(label, modifier = Modifier.fillMaxWidth())
         }
     }
@@ -444,7 +444,7 @@ private fun EquipmentActions(
  *  - one row per achievable target tier, "+N → +N+tiers" with the scroll
  *  gold cost, instead of silently always marking a single tier. */
 @Composable
-private fun UpgradeTierPicker(meta: ItemMeta?, level: Int, onPick: (Int) -> Unit) {
+internal fun UpgradeTierPicker(meta: ItemMeta?, level: Int, onPick: (Int) -> Unit) {
     val max = maxOf(0, itemMaximumLevel(meta) - level)
     if (max <= 0) return
     Column(modifier = Modifier.padding(start = 16.dp)) {
@@ -561,7 +561,7 @@ private fun AutoStandForm(
                     error = "Enter a price of at least 1 gold."
                     return@Button
                 }
-                run { viewModel.api.autoStand(characterName, item, value) }
+                run { viewModel.api.autoStand(item, value) }
             }) { Text("Set") }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }

@@ -161,7 +161,29 @@ and a 411x891dp phone.
 - M9: shared-rule conflicts card (shared-rules.ts itemRuleConflicts and
   automatic-commerce-rule-key.tsx verbatim).
 
-Next: A4 (B1 bank item actions, B2 floors and vaults, B3 bankbois, B4 mail).
+### A4 status: done
+
+- B1: bank screen (gold breakdown, sort-on-next-visit, search with
+  dimming, collapsible packs with free counts and items1's RESERVED slots,
+  per-item Withdraw/Stand/NPC/Deconstruct marks, Auto stand, Merchant's
+  Luck clover) and the bank item panel in the dashboard's order: Item
+  details, withdrawal (one / all, auto-bank-mark consent), stand (mark /
+  unmark / auto, full 13-preset listing form), upgrade (via withdrawal /
+  auto), deconstruction (mark / auto with rewards), NPC sale (sell /
+  auto), Clear all marks. Shared `StandListingForm`,
+  `DeconstructionConfirmation`, `AutoNpcSaleConfirmation`.
+- B2: additional storage - floors (accessible / key needed, keys owned),
+  vault unlocks, all confirmed; `bank/unlock` now always sends `kind`.
+- B3: bankbois - create (first one confirmed), state, load, error, items
+  with bank options, two-step delete when empty.
+- B4: mail - inbox, message sheet (collect, two-step delete, reply,
+  attachment details), compose with attachments from the merchant, every
+  bank pack and each bankboi, quantity, postage, two-step send.
+- Fixed on the way: auto-stand sent `character` (the rule is the
+  merchant's).
+- Not yet: offering rows in the bank upgrade options (U1).
+
+Next: A5 (I1-I8 inventory and items).
 
 ### Packages
 

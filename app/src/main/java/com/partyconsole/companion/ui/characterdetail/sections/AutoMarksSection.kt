@@ -72,7 +72,7 @@ fun AutoMarksSection(
 
         if (isMerchant) {
             val standEntries = dynamicState.autoStandMarks.entries
-                .map { (key, rule) -> RuleEntry(key, rule.item, "${rule.price}g") { viewModel.api.autoStand(characterName, rule.item, rule.price, remove = true) } }
+                .map { (key, rule) -> RuleEntry(key, rule.item, "${rule.price}g") { viewModel.api.autoStand(rule.item, rule.price, remove = true) } }
 
             val upgradeEntries = dynamicState.autoUpgradeMarks.entries.flatMap { (owner, rules) ->
                 rules.entries.map { (ruleKey, _) ->
