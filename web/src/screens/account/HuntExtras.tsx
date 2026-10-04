@@ -3,7 +3,8 @@ import { Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SpriteIcon } from '@/components/SpriteIcon'
-import { zones, type Catalog } from '@/lib/farmingZones'
+import { FarmingAreaPreview } from '@/components/map/FarmingAreaPreview'
+import { zones, type Catalog, type Zone } from '@/lib/farmingZones'
 import { defaultPassiveRule, huntSpawnKey, type PassivePatch, type PassiveSettings } from '@/lib/hunting'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import type { Sprite } from '@/models'
@@ -13,7 +14,7 @@ const nameOf = (monster: MonsterChoiceEntry) => monster.name || monster.id
 
 /** hunt-blacklist-picker.tsx: any monster, searchable, added to this
  *  character's Hunt blacklist ("Added" once it is). */
-export function HuntBlacklistPicker({ catalog, blacklist, disabled, onAdd }: { catalog: MonsterChoiceEntry[]; blacklist: Record<string, unknown>; disabled?: boolean; onAdd: (id: string) => Promise<ApiResult<CommandResult>> }) {
+export function HuntBlacklistPicker({ catalog, blacklist, disabled, onAdd, onInspect }: { catalog: MonsterChoiceEntry[]; blacklist: Record<string, unknown>; disabled?: boolean; onAdd: (id: string) => Promise<ApiResult<CommandResult>>; onInspect?: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
@@ -46,16 +47,18 @@ export function HuntBlacklistPicker({ catalog, blacklist, disabled, onAdd }: { c
       {open && (
         <div role="group" aria-label="Add to Hunt blacklist" className="mt-2 w-full rounded-md border border-border p-2">
           <p className="text-sm font-medium">Add to Hunt blacklist</p>
-          <p className="mb-2 text-xs text-muted-foreground">Choose any monster to skip its Hunt quests.</p>
+          <p className="mb-2 text-xs text-muted-foreground">Choose any monster to skip its Hunt quests. Click a monster for details.</p>
           <Input aria-label="Search blacklist monsters" placeholder="Search monsters…" value={search} onChange={(event) => setSearch(event.target.value)} />
           <div className="mt-2 max-h-72 space-y-1.5 overflow-y-auto">
             {rows.map((monster) => (
               <div key={monster.id} className="flex items-center gap-2 rounded border border-border p-1.5">
-                {monster.sprite && <SpriteIcon sprite={monster.sprite} size={32} />}
-                <span className="min-w-0 flex-1 text-sm">
-                  {nameOf(monster)}
-                  <span className="block text-xs text-muted-foreground">{monster.id}</span>
-                </span>
+                <button type="button" aria-label={`Inspect ${nameOf(monster)}`} onClick={() => onInspect?.(monster.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                  {monster.sprite && <SpriteIcon sprite={monster.sprite} size={32} />}
+                  <span className="min-w-0 flex-1 text-sm">
+                    {nameOf(monster)}
+                    <span className="block text-xs text-muted-foreground">{monster.id}</span>
+                  </span>
+                </button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -97,6 +100,8 @@ export function HuntSpawnSettings({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState('')
+  // hunt-spawn-settings.tsx: the expanded monster's (or focused spawn's) area on the map.
+  const [preview, setPreview] = useState<Zone | null>(null)
   const monsters = useMemo(
     () =>
       !open
@@ -132,7 +137,13 @@ export function HuntSpawnSettings({
             const preference = preferred[monster.id]
             const selected = monster.spawns.some((spawn) => huntSpawnKey(spawn) === preference) ? (preference as string) : ''
             return (
-              <details key={monster.id} className="mb-1.5 rounded border border-border">
+              <details
+                key={monster.id}
+                className="mb-1.5 rounded border border-border"
+                onToggle={(event) => {
+                  if (event.currentTarget.open) setPreview(monster.spawns.find((spawn) => huntSpawnKey(spawn) === selected) || monster.spawns[0])
+                }}
+              >
                 <summary className="cursor-pointer p-2 text-sm">
                   <span className="inline-flex items-center gap-2 align-middle">
                     {monster.sprite && <SpriteIcon sprite={monster.sprite} size={24} />}
@@ -153,8 +164,16 @@ export function HuntSpawnSettings({
                   {monster.spawns.map((spawn) => {
                     const key = huntSpawnKey(spawn)
                     return (
-                      <label key={key} className="flex items-center gap-2 text-sm">
-                        <input type="radio" name={`spawn-${monster.id}`} checked={selected === key} onChange={() => void select(monster.id, key)} />
+                      <label key={key} className="flex items-center gap-2 text-sm" onClick={() => setPreview(spawn)} onFocus={() => setPreview(spawn)}>
+                        <input
+                          type="radio"
+                          name={`spawn-${monster.id}`}
+                          checked={selected === key}
+                          onChange={() => {
+                            setPreview(spawn)
+                            void select(monster.id, key)
+                          }}
+                        />
                         {spawn.mapName || spawn.map}{' '}
                         <span className="text-muted-foreground">
                           ({Math.round(spawn.x)}, {Math.round(spawn.y)})
@@ -166,6 +185,9 @@ export function HuntSpawnSettings({
               </details>
             )
           })}
+          <div className="mt-2 h-72" aria-label="Preferred hunt spawn map preview">
+            {preview ? <FarmingAreaPreview area={{ ...preview, id: preview.id || huntSpawnKey(preview) }} radius={400} /> : <p className="p-5 text-sm text-muted-foreground">Expand a monster to preview its spawn areas.</p>}
+          </div>
           {busy && <p role="status" className="text-sm">Saving preference…</p>}
           {saved && <p role="status" className="text-sm">{saved}</p>}
           {error && (
@@ -186,11 +208,13 @@ export function PassiveHuntingMenu({
   catalog,
   disabled,
   onSave,
+  onInspect,
 }: {
   settings: PassiveSettings
   catalog: MonsterChoiceEntry[]
   disabled?: boolean
   onSave: (patch: PassivePatch) => Promise<ApiResult<CommandResult>>
+  onInspect?: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [about, setAbout] = useState(false)
@@ -281,10 +305,10 @@ export function PassiveHuntingMenu({
                       />
                     </td>
                     <td className="p-1.5">
-                      <span className="flex items-center gap-1.5">
+                      <button type="button" aria-label={`Inspect ${nameOf(monster)}`} onClick={() => onInspect?.(monster.id)} className="flex items-center gap-1.5 text-left">
                         {monster.sprite && <SpriteIcon sprite={monster.sprite} size={24} />}
                         {nameOf(monster)}
-                      </span>
+                      </button>
                     </td>
                     <td className="p-1.5">
                       <input

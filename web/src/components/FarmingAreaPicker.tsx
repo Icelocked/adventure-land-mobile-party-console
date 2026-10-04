@@ -127,6 +127,7 @@ export function FarmingAreaPicker({
   const [order, setOrder] = useState<string[]>(() => (phoenix ? startingOrder(areas) : []))
   const [error, setError] = useState<string | null>(null)
   const [large, setLarge] = useState(false)
+  const [fairyNote, setFairyNote] = useState(false)
 
   // Reset the chosen area/order whenever the monster selection changes -
   // a previous choice may no longer even be a candidate.
@@ -184,21 +185,44 @@ export function FarmingAreaPicker({
 
       {preparation && onIdsChange && (
         <div className="mb-2">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm">{ids.length ? ids.map((id) => choiceFor(id)?.name || id).join(', ') : 'No monsters selected'}</span>
+            <span aria-label="Selected monster count" className="rounded border border-border px-1.5 font-mono text-[10px]">
+              {ids.length}
+            </span>
+            <Button type="button" size="sm" variant="outline" disabled={!ids.length} onClick={() => onIdsChange([])}>
+              Clear all
+            </Button>
+          </div>
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters..." className="mb-2" />
           <div className="max-h-40 overflow-y-auto">
-            {monsterOptions.map((monster) => (
-              <label key={monster.id} className="flex items-center gap-2 py-1">
-                <input
-                  type="checkbox"
-                  checked={ids.includes(monster.id)}
-                  onChange={() => onIdsChange(ids.includes(monster.id) ? ids.filter((x) => x !== monster.id) : [...ids, monster.id])}
-                  className="size-4"
-                />
-                <SpriteIcon sprite={monster.sprite} size={24} />
-                <span className="text-sm">{`${monster.name ?? monster.id} · ${monster.id}`}</span>
-              </label>
-            ))}
+            {monsterOptions.map((monster) =>
+              // monster-focus-picker.tsx: Fairy has no verified regular spawn route.
+              monster.id === 'tinyp' ? (
+                <button key={monster.id} type="button" aria-disabled="true" onClick={() => setFairyNote(true)} className="flex w-full items-center gap-2 py-1 text-left text-sm text-muted-foreground">
+                  <SpriteIcon sprite={monster.sprite} size={24} />
+                  <span className="flex-1">{`${monster.name ?? monster.id} · ${monster.id}`}</span>
+                  <span className="text-xs text-amber-200">Disabled</span>
+                </button>
+              ) : (
+                <label key={monster.id} className="flex items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={ids.includes(monster.id)}
+                    onChange={() => onIdsChange(ids.includes(monster.id) ? ids.filter((x) => x !== monster.id) : [...ids, monster.id])}
+                    className="size-4"
+                  />
+                  <SpriteIcon sprite={monster.sprite} size={24} />
+                  <span className="text-sm">{`${monster.name ?? monster.id} · ${monster.id}`}</span>
+                </label>
+              ),
+            )}
           </div>
+          {fairyNote && (
+            <p role="status" className="mt-2 rounded border border-amber-600 p-2 text-sm text-amber-100">
+              Fairy has no verified regular spawn route. Enable “Passively hunt fairy” to attack on sight.
+            </p>
+          )}
         </div>
       )}
 

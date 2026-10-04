@@ -124,7 +124,7 @@ test('Character detail: the leader\'s own focus button falls back to the flat fi
   await server.install(page)
 
   await page.goto('/characters/Ranger1')
-  await expect(page.getByRole('button', { name: 'Crabxx', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Crabxx/ })).toBeVisible()
   await expect(page.getByText('No monsters selected')).not.toBeVisible()
 })
 
@@ -196,6 +196,8 @@ test('Selecting Hunt with an existing backup already configured activates it dir
   server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
   server.leader = 'Ranger1'
   server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  // use-party-console.tsx setFarmingPolicy: a saved waypoint is the backup location.
+  server.extraState = { partyLocation: { map: 'main', x: 100, y: 200 } }
   await server.install(page)
 
   let submittedBody: Record<string, unknown> | null = null
@@ -222,6 +224,7 @@ test('Hunt backup picker, when the server actually requires one, starts from the
   server.bestiaryCatalog = [{ id: 'phoenix', name: 'Phoenix', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
   server.monsterChoices = [{ id: 'phoenix', locations: [{ map: 'main', x: 100, y: 200 }] }]
   server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  server.extraState = { partyLocation: { map: 'main', x: 100, y: 200 } }
   await server.install(page)
 
   let callCount = 0
@@ -429,4 +432,31 @@ test('Character detail: a merchant never shows combat/hunt status at all', async
 
   await page.goto('/characters/Merchantina')
   await expect(page.getByText(/^Fighting /)).not.toBeVisible()
+})
+
+test('Selecting Hunt with no backup location opens the setup picker without posting (use-party-console.tsx setFarmingPolicy)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  server.leader = 'Ranger1'
+  server.bestiaryCatalog = [{ id: 'phoenix', name: 'Phoenix', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }, { id: 'tinyp', name: 'Fairy', hp: 1, attack: 1, xp: 1, threat: 0, drops: [] }]
+  server.monsterChoices = [{ id: 'phoenix', locations: [{ map: 'main', x: 100, y: 200 }] }, { id: 'tinyp', locations: [{ map: 'main', x: 5, y: 5 }] }]
+  server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
+  await server.install(page)
+  let posts = 0
+  await page.route('**/party-api/farming-mode', (route) => {
+    posts++
+    return route.fulfill({ json: { ok: true } })
+  })
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Hunt', exact: true }).click()
+  await expect(page.getByText('Getting ready to hunt')).toBeVisible()
+  expect(posts).toBe(0)
+  // monster-focus-picker.tsx: Fairy is disabled with its explanation; Clear all empties the selection.
+  await page.getByRole('button', { name: /· tinyp/ }).click({ force: true })
+  await expect(page.getByText('Fairy has no verified regular spawn route. Enable “Passively hunt fairy” to attack on sight.')).toBeVisible()
+  await expect(page.getByLabel('Selected monster count').first()).toHaveText('1')
+  await page.getByRole('button', { name: 'Clear all' }).first().click()
+  await expect(page.getByText('No monsters selected').first()).toBeVisible()
 })
