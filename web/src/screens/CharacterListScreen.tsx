@@ -5,7 +5,7 @@ import { useDungeons } from '@/data/useDailyDungeon'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CloudOff, Menu, Plus, RefreshCw } from 'lucide-react'
-import { useCharacterDiagnostics, usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded, useRoster } from '@/data/PartyDataProvider'
+import { useCharacterDiagnostics, useEscapeError, usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded, useRoster } from '@/data/PartyDataProvider'
 import { AccountMenu } from '@/screens/character-detail/AccountMenu'
 import { classLook } from '@/lib/classLook'
 import { activityLine } from '@/lib/activityLine'
@@ -107,7 +107,7 @@ export function CharacterListScreen() {
 
       {/* party-workspace.tsx: the dungeon panel heads the party while a visit runs. */}
       <DungeonPanel />
-      {names.length > 0 && <PartyControls />}
+      {(names.length > 0 || pending.length > 0) && <PartyControls />}
 
       {names.length === 0 && !pending.length ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
@@ -127,7 +127,7 @@ export function CharacterListScreen() {
         </div>
       ) : (
         <ul className="flex flex-col gap-2 p-3">
-          {names.map((name) => (
+          {names.filter((name) => !pending.some((entry) => entry.name === name)).map((name) => (
             <CharacterRow key={name} name={name} state={characters[name]} bestiaryCatalog={dynamicState.bestiaryCatalog} />
           ))}
           {pending.map((entry) => (
@@ -171,6 +171,7 @@ function PartyControls() {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const escape = useEscapeStatus()
+  const escapeReadError = useEscapeError()
   // escape-control.tsx: inside a dungeon, Escape exits the dungeon instead.
   const dungeon = useDungeons()
   const inDungeon = !!dungeon.data && !['idle', 'held'].includes(dungeon.data.state.phase)
@@ -178,7 +179,7 @@ function PartyControls() {
   const [error, setError] = useState<string | null>(null)
 
   const running = !!escape && !['complete', 'failed-hold', 'released'].includes(escape.stage)
-  const failed = !!error || (!!escape && escape.stage !== 'released' && (!!escape.error || escape.stage === 'failed-hold'))
+  const failed = !!error || !!escapeReadError || (!!escape && escape.stage !== 'released' && (!!escape.error || escape.stage === 'failed-hold'))
   // escape-control.tsx labels.
   const label = failed ? 'Escape - failed' : escape?.stage === 'complete' ? 'Escape - success' : 'Escape'
   const [townError, setTownError] = useState<string | null>(null)
@@ -274,7 +275,8 @@ function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: C
               {seenAt > 0 && <FreshnessBadge at={seenAt} className="mt-1" />}
             </>
           ) : (
-            <div className="text-sm text-muted-foreground">offline</div>
+            // connected-character-card.tsx: connected, but no status yet.
+            <div className="text-sm text-muted-foreground">awaiting status</div>
           )}
         </div>
       </Link>
@@ -316,7 +318,7 @@ function PendingCharacterCard({ entry }: { entry: PendingCharacter }) {
   const headless = state.activeSlots?.some((slot) => slot.character === entry.name && slot.kind === 'headless')
   return (
     <li aria-live="polite" className="flex gap-3 rounded-lg border border-border bg-card p-3">
-      <CharacterPortrait html={look?.characterDollHtml} skin={look?.skin} className="h-16 w-12 rounded border border-border" />
+      <CharacterPortrait html={look?.characterDollHtml} sprite={look?.characterSprite} skin={look?.skin} className="h-16 w-12 rounded border border-border" />
       <div className="min-w-0">
         <p className="font-medium">{entry.name}</p>
         <p className="text-xs text-muted-foreground">

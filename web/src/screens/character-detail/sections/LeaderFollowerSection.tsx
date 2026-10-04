@@ -20,6 +20,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
   const configLoaded = useConfigLoaded()
   const isLeader = dynamicState.leader === characterName
   const isFollowing = dynamicState.followers[characterName] === true
+  const [formationError, setFormationError] = useState<string | null>(null)
 
   return (
     <SectionCard title="Formation">
@@ -29,7 +30,9 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
           disabled={!configLoaded}
           onClick={async () => {
             if (isLeader) return
-            await api.setLeader(characterName)
+            setFormationError(null)
+            const result = await api.setLeader(characterName)
+            if (result.kind === 'failure') setFormationError(result.message || 'Formation update failed')
             await refreshNow()
           }}
         >
@@ -39,7 +42,9 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
           selected={isFollowing}
           disabled={!configLoaded}
           onClick={async () => {
-            await api.setFollow(characterName, !isFollowing)
+            setFormationError(null)
+            const result = await api.setFollow(characterName, !isFollowing)
+            if (result.kind === 'failure') setFormationError(result.message || 'Formation update failed')
             await refreshNow()
           }}
         >
@@ -48,6 +53,11 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         <EventSelectionControl state={dynamicState} name={characterName} />
       </div>
       <ConfigLoadingNote />
+      {formationError && (
+        <p role="alert" className="mt-1.5 text-sm text-destructive">
+          {formationError}
+        </p>
+      )}
       {!isLeader && dynamicState.leader && <p className="mt-1.5 text-xs text-muted-foreground">Following {dynamicState.leader}</p>}
     </SectionCard>
   )

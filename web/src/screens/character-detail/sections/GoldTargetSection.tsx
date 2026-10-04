@@ -17,6 +17,7 @@ export function GoldTargetSection({ characterName, serverTarget }: { characterNa
   const [dirty, setDirty] = useState(false)
   const [value, setValue] = useState(String(serverTarget))
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!dirty) setValue(String(serverTarget))
@@ -44,9 +45,11 @@ export function GoldTargetSection({ characterName, serverTarget }: { characterNa
           disabled={!configLoaded || !dirty || saving}
           onClick={async () => {
             setSaving(true)
-            await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 })
+            setError(null)
+            const result = await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 })
+            if (result.kind === 'failure') setError(result.message || 'Command failed')
+            else setDirty(false)
             await refreshNow()
-            setDirty(false)
             setSaving(false)
           }}
         >
@@ -62,15 +65,22 @@ export function GoldTargetSection({ characterName, serverTarget }: { characterNa
         disabled={!configLoaded || saving}
         onClick={async () => {
           setSaving(true)
-          if (dirty) await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 })
-          await api.sendCommand(characterName, { type: 'bank' })
+          setError(null)
+          const saved = dirty ? await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 }) : null
+          const banked = saved?.kind === 'failure' ? saved : await api.sendCommand(characterName, { type: 'bank' })
+          if (banked.kind === 'failure') setError(banked.message || 'Command failed')
+          else setDirty(false)
           await refreshNow()
-          setDirty(false)
           setSaving(false)
         }}
       >
         Exchange gold and items with bank
       </Button>
+      {error && (
+        <p role="alert" className="mt-1.5 text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <ConfigLoadingNote />
     </SectionCard>
   )

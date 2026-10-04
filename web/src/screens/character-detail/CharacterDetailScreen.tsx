@@ -188,7 +188,7 @@ export function CharacterDetailScreen() {
               localLucky={vitals.luckySlotTracking}
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
-            <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />
+            {name === dynamicState.merchantCharacter && <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} />}
             {isMerchant && <RuleConflictsSection />}
             <AutoMarksSection characterName={name} isMerchant={isMerchant} dynamicState={dynamicState} catalogFor={catalogFor} />
             <CombatLogSection characterName={name} />
