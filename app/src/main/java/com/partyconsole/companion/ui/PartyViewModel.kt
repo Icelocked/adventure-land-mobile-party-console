@@ -24,6 +24,8 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     val lastConnectionError: StateFlow<String?> = repository.lastConnectionError
     val roster: StateFlow<Map<String, RosterMember>> = repository.roster
     val dynamicState: StateFlow<PartyStateDynamic> = repository.dynamicState
+    val stateLoaded: StateFlow<Boolean> = repository.stateLoaded
+    val sessionLost: StateFlow<Boolean> = repository.sessionLost
     val mail: StateFlow<MailSnapshot> = repository.mail
     val gameLogs: StateFlow<Map<String, List<GameLogEntry>>> = repository.gameLogs
     val escape: StateFlow<EscapeStatus?> = repository.escape

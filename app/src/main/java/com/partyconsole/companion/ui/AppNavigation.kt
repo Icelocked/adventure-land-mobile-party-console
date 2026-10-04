@@ -60,12 +60,13 @@ private object Routes {
     const val ACCOUNT_SETTINGS = "account/settings"
     const val MERCHANT_COMMERCE = "merchant/{mode}"
     const val ROUTINES = "routines"
-    const val HUNT_SETTINGS = "hunt-settings"
+    const val HUNT_SETTINGS = "characters/{name}/hunt-settings"
     const val WTB = "wtb"
 
     fun characterDetail(name: String) = "characters/$name"
     fun merchantCommerce(mode: String) = "merchant/$mode"
     fun characterMenu(name: String) = "characters/$name/menu"
+    fun huntSettings(name: String) = "characters/$name/hunt-settings"
     fun inventory(name: String) = "characters/$name/inventory"
     fun equipment(name: String) = "characters/$name/equipment"
     fun activity(name: String) = "characters/$name/activity"
@@ -138,6 +139,7 @@ fun AppNavigation(store: ServerConfigStore) {
             CharacterListScreen(
                 viewModel = viewModel,
                 onSelectCharacter = { name -> navController.navigate(Routes.characterDetail(name)) },
+                onReconnect = { navController.navigate(Routes.PAIRING) { popUpTo(0) } },
             )
         }
         composable(
@@ -167,7 +169,7 @@ fun AppNavigation(store: ServerConfigStore) {
                 onOpenMenu = { navController.navigate(Routes.characterMenu(name)) },
                 onOpenMerchantCommerce = { commerceMode -> navController.navigate(Routes.merchantCommerce(commerceMode)) },
                 onOpenRoutines = { navController.navigate(Routes.ROUTINES) },
-                onOpenHuntSettings = { navController.navigate(Routes.HUNT_SETTINGS) },
+                onOpenHuntSettings = { navController.navigate(Routes.huntSettings(name)) },
             )
         }
         composable(
@@ -304,11 +306,15 @@ fun AppNavigation(store: ServerConfigStore) {
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             RoutinesScreen(viewModel, onBack = { navController.popBackStack() })
         }
-        composable(Routes.HUNT_SETTINGS) { backStackEntry ->
+        composable(
+            Routes.HUNT_SETTINGS,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { backStackEntry ->
             val active = settings ?: return@composable
+            val name = backStackEntry.arguments?.getString("name") ?: return@composable
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
-            HuntSettingsScreen(viewModel, onBack = { navController.popBackStack() })
+            HuntSettingsScreen(viewModel, name, onBack = { navController.popBackStack() })
         }
         composable(Routes.WTB) { backStackEntry ->
             val active = settings ?: return@composable

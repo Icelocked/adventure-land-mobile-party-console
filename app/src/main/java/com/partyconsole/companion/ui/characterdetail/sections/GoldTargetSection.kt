@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,6 +18,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
@@ -26,14 +29,17 @@ import kotlinx.coroutines.launch
  *  mechanism, not a placeholder for a feature that doesn't exist. */
 @Composable
 fun GoldTargetSection(characterName: String, serverTarget: Long, viewModel: PartyViewModel) {
+    val loaded by viewModel.stateLoaded.collectAsState()
     var dirty by remember(characterName) { mutableStateOf(false) }
     var value by remember(characterName) { mutableStateOf(serverTarget.toString()) }
     var saving by remember(characterName) { mutableStateOf(false) }
+    var error by remember(characterName) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(serverTarget) {
+    LaunchedEffect(serverTarget, dirty) {
         if (!dirty) value = serverTarget.toString()
     }
     val scope = rememberCoroutineScope()
+    fun target() = mapOf("type" to "gold-target", "amount" to (value.toLongOrNull() ?: 0L))
 
     SectionCard(title = "Gold target") {
         Text(
@@ -49,18 +55,43 @@ fun GoldTargetSection(characterName: String, serverTarget: Long, viewModel: Part
                 modifier = Modifier.weight(1f),
             )
             Button(
-                enabled = dirty && !saving,
+                enabled = loaded && dirty && !saving,
                 modifier = Modifier.padding(start = 8.dp),
                 onClick = {
                     scope.launch {
                         saving = true
-                        viewModel.api.sendCommand(characterName, mapOf("type" to "gold-target", "amount" to (value.toLongOrNull() ?: 0L)))
+                        error = null
+                        when (val result = viewModel.api.sendCommand(characterName, target())) {
+                            is ApiResult.Failure -> error = result.message.ifBlank { "Command failed" }
+                            is ApiResult.Success -> dirty = false
+                        }
                         viewModel.refreshDynamicStateNow()
-                        dirty = false
                         saving = false
                     }
                 },
             ) { Text(if (saving) "Saving..." else "Save") }
         }
+        // gold-target-control.tsx: save the target, then have the merchant
+        // exchange gold and items with the bank for this character.
+        OutlinedButton(
+            enabled = loaded && !saving,
+            modifier = Modifier.padding(top = 8.dp),
+            onClick = {
+                scope.launch {
+                    saving = true
+                    error = null
+                    val saved = if (dirty) viewModel.api.sendCommand(characterName, target()) else null
+                    val banked = if (saved is ApiResult.Failure) saved else viewModel.api.sendCommand(characterName, mapOf("type" to "bank"))
+                    when (banked) {
+                        is ApiResult.Failure -> error = banked.message.ifBlank { "Command failed" }
+                        is ApiResult.Success -> dirty = false
+                    }
+                    viewModel.refreshDynamicStateNow()
+                    saving = false
+                }
+            },
+        ) { Text("Exchange gold and items with bank") }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        ConfigLoadingNote(loaded)
     }
 }

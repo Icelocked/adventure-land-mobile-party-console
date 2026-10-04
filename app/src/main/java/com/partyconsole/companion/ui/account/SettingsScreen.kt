@@ -62,6 +62,11 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var showRealms by remember { mutableStateOf(false) }
     var realmError by remember { mutableStateOf<String?>(null) }
     var setHome by remember { mutableStateOf(false) }
+    var destination by remember { mutableStateOf<String?>(null) }
+    var switching by remember { mutableStateOf(false) }
+    var prefixStatus by remember { mutableStateOf<String?>(null) }
+    var chatError by remember { mutableStateOf<String?>(null) }
+    val loaded by viewModel.stateLoaded.collectAsState()
     val scope = rememberCoroutineScope()
     val json = remember { Json { ignoreUnknownKeys = true } }
 
@@ -71,8 +76,10 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                 .getOrNull()?.let { requirePairing = it.requirePairing }
         }
     }
-    LaunchedEffect(dynamicState.bankboiPrefix) {
-        if (bankboiPrefix == null) bankboiPrefix = dynamicState.bankboiPrefix
+    // Seeded once the server's value has arrived - never from the empty
+    // default, or Save would erase the real prefix.
+    LaunchedEffect(loaded, dynamicState.bankboiPrefix) {
+        if (bankboiPrefix == null && loaded) bankboiPrefix = dynamicState.bankboiPrefix
     }
 
     AccountScreenScaffold("Settings", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
@@ -109,15 +116,34 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = bankboiPrefix ?: "",
-                        onValueChange = { bankboiPrefix = it },
+                        enabled = bankboiPrefix != null,
+                        onValueChange = { bankboiPrefix = it.take(11); prefixStatus = null },
                         singleLine = true,
                         modifier = Modifier.weight(1f).padding(top = 6.dp),
                     )
                     Button(
+                        enabled = bankboiPrefix != null,
                         modifier = Modifier.padding(start = 8.dp, top = 6.dp),
-                        onClick = { scope.launch { viewModel.api.setBankboiPrefix(bankboiPrefix ?: "") } },
-                    ) { Text("Save") }
+                        onClick = {
+                            scope.launch {
+                                prefixStatus = null
+                                when (val result = viewModel.api.setBankboiPrefix((bankboiPrefix ?: "").trim())) {
+                                    is ApiResult.Failure -> prefixStatus = result.message
+                                    is ApiResult.Success -> {
+                                        prefixStatus = "Saved"
+                                        viewModel.refreshDynamicStateNow()
+                                    }
+                                }
+                            }
+                        },
+                    ) { Text(if (prefixStatus == "Saved") "Saved" else "Save name") }
                 }
+                Text(
+                    "Use 3–11 letters, numbers, or underscores. A number is added automatically, such as ${bankboiPrefix?.ifBlank { null } ?: "MyBank"}0.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                prefixStatus?.takeIf { it != "Saved" }?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
             }
         }
 
@@ -134,16 +160,19 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // Rendered from the server value only - no optimistic flip.
                 Switch(
                     checked = dynamicState.anniversaryAutoChat,
+                    enabled = loaded,
                     onCheckedChange = { checked ->
                         scope.launch {
-                            viewModel.api.setAnniversaryAutoChat(checked)
+                            chatError = (viewModel.api.setAnniversaryAutoChat(checked) as? ApiResult.Failure)?.message
                             viewModel.refreshDynamicStateNow()
                         }
                     },
                 )
             }
+            chatError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 16.dp)) }
         }
 
         Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -164,35 +193,99 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
         ALDataSection(viewModel)
 
         dynamicState.realmControl?.let { realm ->
+            // party-inventory-panels.tsx: a switch asks first, with the Realm
+            // Fatigue and Hop Sickness warnings, and waits while one runs.
+            val blocked = realm.operation != null && realm.operation.phase !in setOf("complete", "failed")
+            fun labelFor(key: String?) = realm.realms.find { it.key == key }?.label ?: key ?: "Unknown"
+            val current = realm.currentRealm ?: realm.activeRealm
             Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Realm: ${realm.activeRealm ?: "unknown"}", style = MaterialTheme.typography.titleSmall)
+                    Text("Realm", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Home: ${realm.homeRealm ?: "unknown"}",
+                        "Current: ${if (realm.split) "Mixed realms" else labelFor(current)} · Home: ${labelFor(realm.homeRealm)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (realm.split) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    realmError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
-                    TextButton(onClick = { showRealms = !showRealms }) {
-                        Text(if (showRealms) "Cancel" else "Switch realm...")
+                    if (realm.split) {
+                        for (member in realm.characters) Text("${member.name}: ${member.realm ?: "offline"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                     }
-                    if (showRealms) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = setHome, onCheckedChange = { setHome = it })
-                            Text("Set as home realm", style = MaterialTheme.typography.labelSmall)
+                    val target = destination
+                    if (target == null) {
+                        TextButton(enabled = !blocked, onClick = { showRealms = !showRealms }) {
+                            Text(if (showRealms) "Cancel" else "Change realm…")
                         }
-                        for (option in realm.realms.filter { !it.pvp }) {
-                            TextButton(onClick = {
-                                scope.launch {
-                                    when (val result = viewModel.api.switchRealm(option.key, setHome)) {
-                                        is ApiResult.Failure -> realmError = result.message
-                                        is ApiResult.Success -> { realmError = null; showRealms = false }
-                                    }
+                        if (showRealms) {
+                            for (option in realm.realms) {
+                                TextButton(
+                                    // Nothing to do when the whole party is already there.
+                                    enabled = !option.pvp && !blocked && (realm.split || option.key != current),
+                                    onClick = { realmError = null; setHome = false; destination = option.key },
+                                ) {
+                                    Text("${option.label} (${"%,d".format(option.players)} players)${if (option.pvp) " — disabled" else ""}")
                                 }
-                            }) {
-                                Text("${option.label} (${option.players} online)")
                             }
                         }
+                    } else {
+                        Text("Switch realm?", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                        Text(
+                            "This switches every active party character to ${labelFor(target)} and gives non-merchant characters Realm Fatigue.",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            "Realm Fatigue: approximately 30 minutes. Home-realm rewards are paused; ordinary rewards continue.",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        if (target != realm.homeRealm) {
+                            Text(
+                                "Outside your home realm: Hop Sickness applies −80 Luck, Gold, and XP, plus −20% output, until you return home or change your home realm through Bean.",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            Row(verticalAlignment = Alignment.Top) {
+                                Checkbox(checked = setHome, onCheckedChange = { setHome = it })
+                                Column(modifier = Modifier.padding(top = 12.dp)) {
+                                    Text("Set as home realm", style = MaterialTheme.typography.labelMedium)
+                                    Text(
+                                        "After switching, one non-merchant will visit Bean in Main and request the home change. Current game data exposes no separate home-change cooldown.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        } else {
+                            Text("This destination is already your home realm, so Hop Sickness should not apply.", style = MaterialTheme.typography.labelSmall)
+                        }
+                        realmError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(enabled = !switching, onClick = { destination = null }) { Text("Cancel") }
+                            Button(enabled = !switching, onClick = {
+                                scope.launch {
+                                    realmError = null
+                                    switching = true
+                                    when (val result = viewModel.api.switchRealm(target, setHome)) {
+                                        is ApiResult.Failure -> realmError = result.message
+                                        is ApiResult.Success -> {
+                                            destination = null
+                                            showRealms = false
+                                            viewModel.refreshDynamicStateNow()
+                                        }
+                                    }
+                                    switching = false
+                                }
+                            }) { Text(if (switching) "Starting…" else "Switch all characters") }
+                        }
+                    }
+                    realm.operation?.let { operation ->
+                        Text(
+                            operation.phase.replace("-", " ").replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = when (operation.phase) {
+                                "failed" -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        operation.error?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
+                        for (member in operation.characters) Text("${member.name}: ${member.realm ?: "waiting"}", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

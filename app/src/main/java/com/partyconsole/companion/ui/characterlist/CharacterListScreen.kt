@@ -45,10 +45,11 @@ import com.partyconsole.companion.ui.characterdetail.sections.classLook
 import kotlinx.coroutines.launch
 
 @Composable
-fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -> Unit) {
+fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -> Unit, onReconnect: () -> Unit = {}) {
     val characters by viewModel.characters.collectAsState()
     val connected by viewModel.connected.collectAsState()
     val lastConnectionError by viewModel.lastConnectionError.collectAsState()
+    val sessionLost by viewModel.sessionLost.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
     val accountGold = (dynamicState.bank?.gold ?: 0L) + characters.values.sumOf { it.vitals?.gold ?: 0L }
     val scope = rememberCoroutineScope()
@@ -73,6 +74,18 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (!connected) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            if (sessionLost) {
+                androidx.compose.material3.Card(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("Session expired", style = MaterialTheme.typography.titleSmall)
+                        Text("Party Console no longer recognises this device. Pair it again to reconnect.", style = MaterialTheme.typography.bodySmall)
+                        androidx.compose.material3.Button(onClick = onReconnect, modifier = Modifier.padding(top = 6.dp)) { Text("Pair again") }
+                    }
+                }
+            }
             if (characters.isNotEmpty()) PartyControls(viewModel)
             if (characters.isEmpty()) {
                 Column(

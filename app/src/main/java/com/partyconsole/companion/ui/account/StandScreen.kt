@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.CatalogItem
 import com.partyconsole.companion.model.StandListing
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.itemicon.displayName
 import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
@@ -59,7 +60,10 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
 private fun StandRow(listing: StandListing, catalogFor: (String) -> CatalogItem?, viewModel: PartyViewModel) {
     val scope = rememberCoroutineScope()
     var editing by remember(listing.id) { mutableStateOf(false) }
+    var confirmingRemove by remember(listing.id) { mutableStateOf(false) }
+    var busy by remember(listing.id) { mutableStateOf(false) }
     var price by remember(listing.id) { mutableStateOf(listing.price.toString()) }
+    var error by remember(listing.id) { mutableStateOf<String?>(null) }
 
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -73,13 +77,31 @@ private fun StandRow(listing: StandListing, catalogFor: (String) -> CatalogItem?
             }
             if (listing.slot != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    TextButton(onClick = { editing = !editing }) { Text(if (editing) "Cancel" else "Edit price") }
-                    TextButton(onClick = {
+                    TextButton(enabled = !busy, onClick = { editing = !editing; error = null }) { Text(if (editing) "Cancel" else "Edit price") }
+                    // use-party-console.tsx removeStandListing: the whole listing
+                    // (id and bank source included) with remove, after a second tap.
+                    TextButton(enabled = !busy, onClick = {
+                        if (!confirmingRemove) {
+                            confirmingRemove = true
+                            return@TextButton
+                        }
                         scope.launch {
-                            viewModel.api.markForStand(listing.item, listing.slot, price = listing.price, remove = true)
+                            busy = true
+                            error = null
+                            val result = viewModel.api.markForStand(
+                                listing.item, listing.slot,
+                                bankPack = listing.bankPack,
+                                price = listing.price,
+                                quantity = listing.quantity,
+                                remove = true,
+                                id = listing.id,
+                            )
+                            if (result is ApiResult.Failure) error = result.message
+                            confirmingRemove = false
+                            busy = false
                             viewModel.refreshDynamicStateNow()
                         }
-                    }) { Text("Remove") }
+                    }) { Text(if (busy && confirmingRemove) "Removing…" else if (confirmingRemove) "Really remove?" else "Remove", color = MaterialTheme.colorScheme.error) }
                 }
                 if (editing) {
                     Row(
@@ -93,20 +115,31 @@ private fun StandRow(listing: StandListing, catalogFor: (String) -> CatalogItem?
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
-                        Button(onClick = {
+                        Button(enabled = !busy, onClick = {
+                            val value = price.toLongOrNull()
+                            if (value == null || value < 1) {
+                                error = "Enter a price of at least 1 gold."
+                                return@Button
+                            }
                             scope.launch {
-                                viewModel.api.markForStand(
+                                busy = true
+                                error = null
+                                // Same listing (id, bank source) with the new price.
+                                val result = viewModel.api.markForStand(
                                     listing.item, listing.slot,
-                                    price = price.toLongOrNull() ?: 0L,
+                                    bankPack = listing.bankPack,
+                                    price = value,
                                     quantity = listing.quantity,
                                     id = listing.id,
                                 )
-                                editing = false
+                                if (result is ApiResult.Failure) error = result.message else editing = false
+                                busy = false
                                 viewModel.refreshDynamicStateNow()
                             }
                         }) { Text("Save") }
                     }
                 }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }

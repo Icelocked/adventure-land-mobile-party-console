@@ -29,6 +29,9 @@ fun EquipmentSection(
     catalogFor: (String) -> CatalogItem? = { null },
     onSlotTap: (String, EquippedEntry?) -> Unit = { _, _ -> },
 ) {
+    // equipment.tsx: the merchant's trade1..N stand slots are not equipment -
+    // "Unequip" on one would close the stand and pull the listing.
+    val slots = slots.filterKeys { !it.startsWith("trade") }
     SectionCard(title = "Equipment") {
         if (slots.isEmpty()) {
             SectionEmptyState("No equipment data yet.")

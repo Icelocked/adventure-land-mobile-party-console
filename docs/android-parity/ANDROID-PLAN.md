@@ -69,6 +69,30 @@ since 2026-09-29). Status per BUILD-PLAN package, from the code:
 The remaining P0 items (02, 03, 05, 06, 09, 10, 12, 13, 14, 17, 19, 21, 22,
 25) are re-checked one by one in A0 against the PWA fix.
 
+### A0 status (2026-10-04): done, compile- and unit-test-verified
+
+Every P0 item fixed in the APK by porting the PWA's corrected code:
+02 (no redirect-following, "Session expired" banner with Pair again, poll
+survives errors), 04, 05 (`stateLoaded` gate on every server-seeded
+control), 06, 07 (per-character route, field-by-field saves, read-only
+for followers), 08, 09 (whole policy incl. potion item), 10, 11, 12, 13,
+14, 15 (shared `NpcSaleSheet`), 16, 17, 18, 19 (origin-tagged listings +
+buy confirmation), 20, 22, 23, 24, 25. P0-21 doesn't apply (no Patinder
+code). P0-01 (section polling) and P0-03 (mock) belong to A1.
+
+Found and fixed on the way, beyond BUILD-PLAN's P0 list:
+- **No cookie jar**: the pairing cookie was thrown away, so the APK could
+  never work with "Require secure pairing" on. Now persisted, encrypted.
+- `farming-mode` sent no `character` (changed the leader's policy).
+- Bank withdraw let you pick any character; it now goes through the
+  configured merchant, with the auto-bank-mark confirmation.
+- NPC sale from the merchant's own bag used source `character`.
+- Merchant detection by class replaced with `merchantCharacter` (F1) on
+  the character screen and item panel.
+
+Known gap for A1: `androidTest` doesn't resolve (`ui-test-junit4` has no
+BOM on the androidTest classpath) - pre-existing, CI only runs assembleDebug.
+
 ### Packages
 
 | Phase | Package | APK |
@@ -149,3 +173,7 @@ The remaining P0 items (02, 03, 05, 06, 09, 10, 12, 13, 14, 17, 19, 21, 22,
    project and its credentials in the notifier), UnifiedPush/ntfy
    (self-hosted friendly), or a background poll (WorkManager, at most every
    15 minutes). Decide at A11.
+
+## Queued after A0 (not Android)
+
+- PWA push alerts requested 2026-10-04: **inventory full** and **bank full**.

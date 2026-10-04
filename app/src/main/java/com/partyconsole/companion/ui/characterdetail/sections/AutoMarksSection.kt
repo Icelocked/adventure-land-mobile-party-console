@@ -51,7 +51,7 @@ fun AutoMarksSection(
 ) {
     val npcEntries = dynamicState.autoNpcSales.entries
         .filter { (_, rule) -> if (isMerchant) rule.character == null else rule.character == characterName }
-        .map { (key, rule) -> RuleEntry(key, rule.item, null) { viewModel.api.autoNpcSale(characterName, rule.item, remove = true) } }
+        .map { (key, rule) -> RuleEntry(key, rule.item, null) { viewModel.api.autoNpcSale(if (isMerchant) null else characterName, rule.item, remove = true) } }
     val clearNpc: suspend () -> Unit = { viewModel.api.clearAllAutoNpcSales(if (isMerchant) null else characterName) }
 
     val deconEntries = dynamicState.autoDeconstruction[characterName].orEmpty().entries
