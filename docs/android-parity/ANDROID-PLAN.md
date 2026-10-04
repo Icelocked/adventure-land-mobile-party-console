@@ -183,7 +183,7 @@ and a 411x891dp phone.
   merchant's).
 - Not yet: offering rows in the bank upgrade options (U1).
 
-### A5 status: in progress
+### A5 status: done
 
 - I1: inventory tiles (item-action-banner.ts priority, stat badges, +level,
   operation overlay, lucky-slot outline, merchant suggested-price details)
@@ -200,7 +200,27 @@ and a 411x891dp phone.
   cap), deconstruction and NPC sale with their confirmations, Clear all
   marks. Equipment: Unequip, Active elixir effect, upgrade marks, Clear all
   marks (equipped).
-- Next: I6 item details, I7 gear comparison per slot, I8 auto-rule lists.
+- I6: item details - live meta over the catalog, character · slot
+  context, Add to stand (merchant inventory / bank; disabled when the
+  stand is full), Tracktrix bonuses, Compare (character, then slot) into
+  the gear comparison, the derived equip slot instead of `type`, hands
+  required, exchange sections following the preview level, box / cosmo /
+  sixcake labels, drop sort.
+- I7: gear comparison ported in full - diagnostics-based projection of
+  HP/MP/attack/speeds/armor/resistance/attributes/combat stats, per-side
+  level and stat-scroll previews (exotic stats too), the character doll,
+  set changes (GAINED / LOST), and the slot picked in the options list.
+- I8: automatic rules (merchant only) - NPC sales incl. manual marks,
+  deconstruction incl. marks with Retry, stand, upgrades and compounds
+  with inline target / remaining edits, upgrade offering rules (Edit /
+  Remove / clear), merchant and bank marks; two-tap clear and remove,
+  errors shown, tap a tile for its item details. API: removeNpcSaleMark,
+  removeDeconstructionMark, retryDeconstructionMark.
+- Not yet (owned by later packages): Add to WTB in item details (M7, A6);
+  exchange reward tiles with their automatic options (M10, A8); the
+  bestiary monster view and "Compare from catalog" (X1, A10).
+
+Next: A6 (M4-M8 market, stand and WTB).
 
 ### Packages
 
