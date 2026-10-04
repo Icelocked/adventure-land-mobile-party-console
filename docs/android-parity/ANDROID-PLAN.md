@@ -216,11 +216,40 @@ and a 411x891dp phone.
   Remove / clear), merchant and bank marks; two-tap clear and remove,
   errors shown, tap a tile for its item details. API: removeNpcSaleMark,
   removeDeconstructionMark, retryDeconstructionMark.
-- Not yet (owned by later packages): Add to WTB in item details (M7, A6);
-  exchange reward tiles with their automatic options (M10, A8); the
-  bestiary monster view and "Compare from catalog" (X1, A10).
+- Not yet (owned by later packages): exchange reward tiles with their
+  automatic options (M10, A8); the bestiary monster view and "Compare from
+  catalog" (X1, A10). Add to WTB landed with A6.
 
-Next: A6 (M4-M8 market, stand and WTB).
+### A6 status: done
+
+- M4: Inspect stand - sales reconciled with the trade slots (Live / Paused,
+  read-only unmanaged rows, "Queued sales for stand"), price opens the
+  stand form, two-step Remove, long-press suggested price; buy orders with
+  N wanted, native batch, priority (saved with the bid revision), Auto,
+  Use stand, two-step cancel.
+- M5/M7: shared WTB components (`ui/components/Wtb.kt`): the WTB dialog with
+  its 15 presets at the exact level, Use stand / Accept higher levels,
+  priority, and the full-stand "Make room for a buy order" retry; the WTB
+  orders screen with filter, single-field quantity / priority edits with
+  the bid revision, price via the dialog, preferences-only toggles, the
+  Auto badge and native-stand problems, item picker. Add to WTB in item
+  details.
+- M6: market - status / setup banner, Live WTS / Live WTB / Classifieds /
+  Ponty tabs with counts, one search, WTS filters (deals, bad deals,
+  affordable, blacklisted), grouped listings with deal colouring and stale
+  dimming, confirmed buys split across grouped listings, Make WTB, selling
+  into WTB offers or List when stale, classifieds' Add to WTB / Add to
+  stand, Ponty lots. `domain/Market.kt` ports market.ts.
+- M8: marketplace settings - auto stand buys, blacklist toggle, manual
+  block, strike records with Clear, two-step Clear all.
+- Fixed on the way: `aldata-order` now echoes the listing as received (it
+  sent only the key); Ponty buys send every key of the lot; `saveBid`
+  takes the PWA's options (clear, single-field edits, preferencesOnly,
+  replaceStandEntry) and omits an unset priority; a listing without a
+  slot no longer sends slot 0. The unused live stand search was dropped
+  (Ryan's dashboard never renders its dialog).
+
+Next: A7 (C1, C2, C3, C7, C8 character and farming).
 
 ### Packages
 

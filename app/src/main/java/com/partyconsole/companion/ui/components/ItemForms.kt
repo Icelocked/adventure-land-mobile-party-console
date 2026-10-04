@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.domain.abbreviatedGold
+import com.partyconsole.companion.domain.alDataListing
 import com.partyconsole.companion.domain.deconstructionRewards
 import com.partyconsole.companion.domain.levelPriceHistory
 import com.partyconsole.companion.domain.pontyPrice
@@ -93,8 +94,8 @@ fun StandListingForm(
     val npcSale = npcSaleValue(level, item.gift == true, item.expires, meta).toDouble()
     val ponty = pontyPrice(item, meta).toDouble()
     val freshAfter = System.currentTimeMillis() - 120_000
-    val marketCount = state.aldata?.listings.orEmpty()
-        .filter { (it.seenAt ?: 0) >= freshAfter && it.serverIdentifier != "PVP" && it.item.name == item.name && (it.item.level ?: 0) == level && it.item.p == item.p }
+    val marketCount = state.aldata?.listings.orEmpty().map(::alDataListing)
+        .filter { it.seenAt >= freshAfter && it.serverIdentifier != "PVP" && it.item.name == item.name && (it.item.level ?: 0) == level && it.item.p == item.p }
         .sumOf { maxOf(1, it.quantity) }
     val full = existingId == null && !auto && state.standListings.size >= 16
     fun apply(value: Double) { price = maxOf(1L, value.roundToLong()).toString() }

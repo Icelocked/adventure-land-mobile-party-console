@@ -163,6 +163,7 @@ private fun ItemDetailContent(
     var comparePicker by remember(target.id) { mutableStateOf<String?>(null) }
     var comparing by remember(target.id) { mutableStateOf<Pair<String, String?>?>(null) }
     val tracktrixItem = target.id == "tracker" || target.id == "supercomputer"
+    var addingWtb by remember(target.id) { mutableStateOf(false) }
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)) {
         SpriteIcon(catalogItem.sprite, size = 48.dp)
@@ -173,8 +174,11 @@ private fun ItemDetailContent(
         )
     }
     context?.let { Text("${it.character} · slot ${it.slot}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)) }
-    if (onAddStand != null && context != null && context.slot >= 0) {
-        OutlinedButton(onClick = onAddStand, enabled = !standFull, modifier = Modifier.padding(bottom = 8.dp)) { Text("Add to stand") }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+        if (onAddStand != null && context != null && context.slot >= 0) {
+            OutlinedButton(onClick = onAddStand, enabled = !standFull) { Text("Add to stand") }
+        }
+        if (viewModel != null) OutlinedButton(onClick = { addingWtb = true }) { Text("Add to WTB") }
     }
     if (context != null && tracktrixItem && characters[context.character] != null) {
         TracktrixBonusList(diagnostics[context.character]?.tracktrix as? JsonObject)
@@ -270,6 +274,19 @@ private fun ItemDetailContent(
         "Drops" -> world?.drops?.let { DropsSection(it, onNavigateMonster) }
     }
 
+    if (addingWtb && viewModel != null) {
+        val catalogLookup = { id: String -> catalog?.allItems?.find { it.id == id } }
+        com.partyconsole.companion.ui.components.WtbDialog(
+            viewModel,
+            com.partyconsole.companion.model.Item(name = target.id, level = previewLevel),
+            meta,
+            catalogLookup,
+            catalog?.buyable.orEmpty(),
+            state.standPriceHistory[target.id],
+            state.standBids[target.id],
+            onClose = { addingWtb = false },
+        )
+    }
     val comparison = comparing
     if (comparison != null && viewModel != null) {
         GearComparisonSheet(

@@ -46,6 +46,7 @@ internal object Routes {
     const val ACCOUNT_SKILLS = "account/skills"
     const val ACCOUNT_STAND = "account/stand"
     const val ACCOUNT_MARKET = "account/market"
+    const val MARKET_SETTINGS = "market/settings"
     const val ACCOUNT_BANK = "account/bank"
     const val ACCOUNT_OFFERINGS = "account/offerings"
     const val ACCOUNT_LOGS = "account/logs"
@@ -195,7 +196,19 @@ fun AppNavigation(store: ServerConfigStore) {
             val active = settings ?: return@composable
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
-            MarketScreen(viewModel, onBack = { navController.popBackStack() }, onOpenWtb = { navController.navigate(Routes.WTB) })
+            MarketScreen(
+                viewModel,
+                onBack = { navController.popBackStack() },
+                onOpenWtb = { navController.navigate(Routes.WTB) },
+                onOpenSettings = { navController.navigate(Routes.MARKET_SETTINGS) },
+                onOpenSetup = { navController.navigate(Routes.ACCOUNT_SETTINGS) },
+            )
+        }
+        composable(Routes.MARKET_SETTINGS) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            com.partyconsole.companion.ui.account.MarketplaceSettingsScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable(Routes.ACCOUNT_BANK) { backStackEntry ->
             val active = settings ?: return@composable

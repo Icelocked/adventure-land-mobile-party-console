@@ -486,7 +486,16 @@ data class GiveawayRealm(val key: String, val label: String = "")
 data class MerchantWeapon(val item: Item)
 
 @Serializable
-data class MerchantBlacklistEntry(val reason: String? = null, val at: Long? = null)
+data class MerchantBlacklistEntry(
+    val reason: String? = null,
+    val at: Long? = null,
+    val until: Double? = null,
+    val seller: String? = null,
+    val serverRegion: String? = null,
+    val serverIdentifier: String? = null,
+    val failures: Int? = null,
+    val updatedAt: Long? = null,
+)
 
 @Serializable
 data class NativeStandOffer(
