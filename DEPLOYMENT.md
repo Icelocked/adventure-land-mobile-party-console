@@ -217,11 +217,26 @@ stays pinned to whatever version it last updated to):
 
 The PWA container also runs a small push notifier (`web/notifier`). It
 watches your party-console the same way a paired browser does and sends
-Web Push to phones that enabled notifications. It covers two kinds of
-alert: a character that is stuck or offline (no status for 2 minutes, a
-lost connection or stopped CODE, plus a note when it recovers), and
-merchant and mail events (stand sales, WTB fills, purchases, merchant
-errors, new mail).
+Web Push to phones that enabled notifications. Each phone picks which
+alerts it wants:
+
+| Group | Alert | When |
+|---|---|---|
+| Character health | Stuck or offline | No status report for N minutes (default 2), a lost connection or stopped CODE; again when it recovers |
+| | No actions | No fighting, looting, logging or moving for N minutes (default 5); the merchant is excluded |
+| | Repeated deaths | N deaths within M minutes (default 3 in 30) |
+| | Error bursts | N errors within M minutes (default 5 in 10): game-log errors and the merchant's errors |
+| Progress | Auto-upgrade / auto-compound rule done | A rule's remaining count reaches zero |
+| | Buy-and-upgrade order done | A Buy order with a target level leaves the merchant's queue |
+| | Event completed | An event one of your characters is signed up for ends |
+| Loot | Rare drops | A looted item has a drop chance under 1 in N, is worth at least N gold, or both (your choice) |
+| Trading and mail | Sales and orders filled | Stand sales, WTB fills, Ponty and ALData purchases |
+| | New mail | A new message arrives |
+
+The limits and the rare-drop rule are shared by every phone and are
+changed in Settings → Notifications next to each alert. Each phone also
+has its own quiet hours (Character health alerts still arrive) and can
+mute individual characters.
 
 Requirements:
 
@@ -260,17 +275,18 @@ Requirements:
 - **Android.** Chrome works installed or not.
 
 To turn notifications on, open Settings → Notifications on each phone,
-choose the categories and tap "Enable notifications on this device".
+choose the alerts and tap "Enable notifications on this device".
 The notifier uses that browser's pairing to read the console. If the
 pairing stops working, it sends one "Notifications paused" message; enable
 notifications again to reconnect.
 
 Optional environment variables:
 
-- `STUCK_AFTER_MS`: how long without a status report before a character
-  counts as stuck. Default 120000.
 - `CONSOLE_URL`: where to reach party-console. Default
   `http://party-console:3010`.
+- `POLL_MS`: how often the notifier checks the console. Default 15000.
+
+Each alert that is sent is logged (`docker logs party-console-pwa`).
 
 ## Why not a domain or a public IP?
 
