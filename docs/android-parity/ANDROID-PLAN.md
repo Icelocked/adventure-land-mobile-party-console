@@ -130,7 +130,24 @@ Robolectric notes: `app/src/test/resources/robolectric.properties` sets
 SDK 34, NATIVE graphics (the legacy mode doesn't lay out popups/sheets)
 and a 411x891dp phone.
 
-**A1 done.** Next: A2 (R1 roster/slots/session, R2 realm panel, S1 header).
+**A1 done.**
+
+### A2 status: done
+
+- R1: home lists live characters in the console's order
+  (`domain/Roster.kt`: character-order.ts, pending-character-cards.tsx),
+  pending cards with portrait (the coordinator's doll HTML in a WebView),
+  status and delayed help; "Load character slot N" with the roster picker
+  (headless / Steam / switch Steam primary) and Create character; Bankboi
+  Active card; session controls (Steam, headless, log out - confirmed,
+  refused if the session changed) on the character screen.
+- R2: realm panel (done in A0: confirmation, split realms, operation).
+- S1: header version line, console-update "!", party gold (bank +
+  carried, exact on tap), latency, freshness badges per character.
+- Not yet: the debug-instance browser link (S2), daily-dungeon panel and
+  in-dungeon Escape (C5).
+
+Next: A3 (M1 merchant card, M2 merchant settings, M3 routines, M9 rule conflicts).
 
 ### Packages
 

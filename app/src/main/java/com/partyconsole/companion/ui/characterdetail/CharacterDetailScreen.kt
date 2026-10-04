@@ -84,6 +84,7 @@ fun CharacterDetailScreen(
                     }
                 },
                 actions = {
+                    com.partyconsole.companion.ui.components.SessionControls(viewModel, characterName)
                     IconButton(onClick = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
@@ -110,7 +111,7 @@ fun CharacterDetailScreen(
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
-            VitalsHeader(name = characterName, vitals = vitals, accountGold = accountGold)
+            VitalsHeader(name = characterName, vitals = vitals, accountGold = accountGold, bestiaryCatalog = dynamicState.bestiaryCatalog)
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
             ) {

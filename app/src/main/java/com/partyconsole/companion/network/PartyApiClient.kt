@@ -181,6 +181,27 @@ class PartyApiClient(
         return post("restock", body)
     }
 
+    /** POST /party-api/slots/{slot}/spawn - load a roster member headless
+     *  into an empty slot (roster-controls.tsx). */
+    suspend fun spawnSlot(slot: Int, character: String): ApiResult<CommandResult> =
+        post("slots/$slot/spawn", JsonObject(mapOf("character" to JsonPrimitive(character))))
+
+    /** POST /party-api/slots/{slot}/logout - stop a headless slot's character. */
+    suspend fun logoutSlot(slot: Int): ApiResult<CommandResult> = post("slots/$slot/logout", JsonObject(emptyMap()))
+
+    /** POST /party-api/steam/action - login | primary | headless | logout
+     *  through the Steam bridge (character-session-controls.tsx). */
+    suspend fun steamAction(character: String?, action: String): ApiResult<CommandResult> =
+        post("steam/action", JsonObject(mapOf("character" to (character?.let { JsonPrimitive(it) } ?: JsonNull), "action" to JsonPrimitive(action))))
+
+    /** POST /party-api/steam/recover - recover a failed Steam handoff. */
+    suspend fun steamRecover(): ApiResult<CommandResult> = post("steam/recover", JsonObject(emptyMap()))
+
+    /** POST /party-api/roster/create - create a character with one of its
+     *  class's official starting looks, then spawn it (create-character.tsx). */
+    suspend fun createCharacter(name: String, ctype: String, look: Int): ApiResult<CommandResult> =
+        post("roster/create", JsonObject(mapOf("name" to JsonPrimitive(name), "class" to JsonPrimitive(ctype), "look" to JsonPrimitive(look))))
+
     /** `/party-api/command` type "go-home" (manual-commands.ts goHome) -
      *  back to the character's home spot and home realm. */
     suspend fun goHome(character: String): ApiResult<CommandResult> = sendCommand(character, mapOf("type" to "go-home"))

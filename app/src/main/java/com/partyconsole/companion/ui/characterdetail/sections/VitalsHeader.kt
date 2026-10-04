@@ -50,7 +50,7 @@ fun classLook(ctype: String): Pair<ImageVector, Color> = when (ctype.lowercase()
  *  out of the scrollable body per the mobile-redesign plan so vitals never
  *  scroll out of view while browsing equipment/inventory below. */
 @Composable
-fun VitalsHeader(name: String, vitals: CharacterVitals, accountGold: Long? = null) {
+fun VitalsHeader(name: String, vitals: CharacterVitals, accountGold: Long? = null, bestiaryCatalog: List<com.partyconsole.companion.model.BestiaryMonster> = emptyList()) {
     val (icon, color) = classLook(vitals.ctype)
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -105,7 +105,7 @@ fun VitalsHeader(name: String, vitals: CharacterVitals, accountGold: Long? = nul
             accountGold?.let { Text("Account total ${"%,d".format(it)}g", style = MaterialTheme.typography.labelSmall) }
         }
         Text(
-            activityLine(vitals),
+            activityLine(vitals, bestiaryCatalog),
             style = MaterialTheme.typography.bodyMedium,
             color = if (vitals.rip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
         )
