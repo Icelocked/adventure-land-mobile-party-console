@@ -1,0 +1,33 @@
+{
+ "gameLogs": {
+  "Leada": [
+   {
+    "session": "s",
+    "seq": 1,
+    "at": 1700000000000,
+    "message": "Route rejected",
+    "color": "red"
+   }
+  ]
+ },
+ "combatLogs": {
+  "Leada": [
+   {
+    "at": 1700000000000,
+    "type": "loot",
+    "message": "Looted 1 × bow",
+    "details": {
+     "item": "bow",
+     "quantity": 1
+    }
+   }
+  ]
+ },
+ "merchantActivity": [
+  {
+   "at": 1700000000000,
+   "message": "Sold 2 × hpot0 at stand (+40 gold)",
+   "level": "success"
+  }
+ ]
+}

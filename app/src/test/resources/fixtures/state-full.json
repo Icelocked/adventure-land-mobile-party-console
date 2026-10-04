@@ -1,0 +1,475 @@
+{
+ "roster": [
+  {
+   "name": "Leada",
+   "ctype": "warrior",
+   "level": 70
+  },
+  {
+   "name": "Folla",
+   "ctype": "priest",
+   "level": 68
+  },
+  {
+   "name": "Rangy",
+   "ctype": "ranger",
+   "level": 66
+  },
+  {
+   "name": "Merchy",
+   "ctype": "merchant",
+   "level": 80
+  }
+ ],
+ "bank": {
+  "gold": 5000000,
+  "packs": {
+   "items0": [
+    {
+     "slot": 0,
+     "item": {
+      "name": "bow",
+      "level": 5
+     }
+    },
+    null,
+    {
+     "slot": 2,
+     "item": {
+      "name": "hpot0",
+      "q": 9999
+     }
+    }
+   ],
+   "items1": [
+    null,
+    null
+   ]
+  }
+ },
+ "standListings": [
+  {
+   "id": "l1",
+   "slot": 0,
+   "item": {
+    "name": "wcoat",
+    "level": 0
+   },
+   "price": 9000,
+   "quantity": 1
+  },
+  {
+   "id": "l2",
+   "bankPack": "items0",
+   "bankSlot": 0,
+   "slot": 0,
+   "item": {
+    "name": "bow",
+    "level": 5
+   },
+   "price": 80000,
+   "quantity": 1
+  }
+ ],
+ "merchantCurrent": {
+  "id": "j0",
+  "target": "Leada",
+  "reason": "restock",
+  "routine": "restock",
+  "priority": 90
+ },
+ "merchantQueue": [
+  {
+   "id": "j1",
+   "target": "bank",
+   "reason": "exchange",
+   "autoExchangeKeys": [
+    "box@0"
+   ]
+  },
+  {
+   "id": "j2",
+   "target": "Ponty",
+   "reason": "Ponty purchases",
+   "manual": true
+  },
+  {
+   "id": "j3",
+   "target": "sea",
+   "reason": "fishing",
+   "routine": "fishing"
+  }
+ ],
+ "merchantCatalog": {
+  "allItems": [
+   {
+    "id": "hpot0",
+    "name": "Health Potion",
+    "value": 20,
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "Health Potion",
+      "g": 20
+     },
+     "maxLevel": 0
+    }
+   },
+   {
+    "id": "bow",
+    "name": "Bow",
+    "upgradeable": true,
+    "value": 600,
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "Bow",
+      "g": 600
+     },
+     "upgradeable": true,
+     "maxLevel": 13
+    }
+   },
+   {
+    "id": "ringsj",
+    "name": "Ring of Strength",
+    "compoundable": true,
+    "value": 1000,
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "Ring of Strength",
+      "g": 1000
+     },
+     "compoundable": true,
+     "maxLevel": 7
+    }
+   },
+   {
+    "id": "wcoat",
+    "name": "wcoat",
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "wcoat"
+     },
+     "maxLevel": 0
+    }
+   },
+   {
+    "id": "cscroll0",
+    "name": "cscroll0",
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "cscroll0"
+     },
+     "maxLevel": 0
+    }
+   }
+  ],
+  "buyable": [],
+  "craftable": [],
+  "exchangeable": []
+ },
+ "autoNpcSales": {
+  "hpot0": {
+   "item": {
+    "name": "hpot0"
+   }
+  },
+  "[\"Leada\",\"bow@+0\"]": {
+   "item": {
+    "name": "bow"
+   },
+   "character": "Leada"
+  }
+ },
+ "upgrades": {},
+ "compounds": {},
+ "statScrolls": {},
+ "npcSaleMarks": [],
+ "deconstructionMarks": [],
+ "merchantDeliveries": {},
+ "withdrawals": {
+  "Merchy": [
+   {
+    "pack": "items0",
+    "slot": 2,
+    "item": {
+     "name": "hpot0",
+     "q": 9999
+    }
+   }
+  ]
+ },
+ "deconstructionCatalog": {},
+ "bestiaryCatalog": [],
+ "skillCatalog": [],
+ "combatLogs": {
+  "Leada": [
+   {
+    "at": 1700000000000,
+    "type": "loot",
+    "message": "Looted 1 × bow",
+    "details": {
+     "item": "bow",
+     "quantity": 1
+    }
+   }
+  ]
+ },
+ "merchantActivity": [
+  {
+   "at": 1700000000000,
+   "message": "Sold 2 × hpot0 at stand (+40 gold)",
+   "level": "success"
+  }
+ ],
+ "merchantRoutinePriorities": {
+  "merchant luck": 100,
+  "restock": 90,
+  "stand maintenance": 40
+ },
+ "merchantAutomations": {
+  "auto upgrade": false,
+  "restock": true,
+  "deliveries": true,
+  "withdrawals": false
+ },
+ "gatheringModes": [
+  "mining"
+ ],
+ "standBids": {
+  "ringsj": {
+   "price": 20000,
+   "quantity": 2,
+   "minimumQuality": 1,
+   "priorityOverride": 80
+  }
+ },
+ "realmControl": {
+  "activeRealm": "USI",
+  "currentRealm": "USI",
+  "homeRealm": "USI",
+  "split": false,
+  "characters": [
+   {
+    "name": "Leada",
+    "ctype": "warrior",
+    "realm": "USI",
+    "online": true
+   }
+  ],
+  "realms": [
+   {
+    "key": "USI",
+    "label": "US I",
+    "players": 120,
+    "pvp": false
+   },
+   {
+    "key": "USPVP",
+    "label": "US PVP",
+    "players": 4,
+    "pvp": true
+   }
+  ],
+  "operation": null
+ },
+ "upgradeOfferingRules": [],
+ "luckyUpgradeSlots": {},
+ "luckySlotTracking": {},
+ "huntBlacklist": {
+  "crab": {
+   "monsterId": "crab",
+   "at": 1700000000000,
+   "deaths": 3,
+   "reason": "deaths"
+  }
+ },
+ "monsterFocusByCharacter": {
+  "Rangy": [
+   "bat"
+  ]
+ },
+ "monsterSearchRadiusByCharacter": {
+  "Leada": 400,
+  "Rangy": 600
+ },
+ "monsterFocus": [
+  "goo"
+ ],
+ "monsterChoices": [
+  {
+   "id": "goo",
+   "locations": [
+    {
+     "map": "main",
+     "x": 0,
+     "y": 700
+    }
+   ]
+  },
+  {
+   "id": "bat",
+   "locations": [
+    {
+     "map": "cave",
+     "x": 300,
+     "y": -1000
+    }
+   ]
+  },
+  {
+   "id": "tinyp",
+   "locations": []
+  }
+ ],
+ "phoenixRouteOrder": [],
+ "huntSettings": {
+  "relocateIfCompeting": true,
+  "blacklistDeaths": true,
+  "deathThreshold": 3,
+  "blacklistExpirations": false,
+  "expirationThreshold": 1
+ },
+ "monsterHunt": null,
+ "leader": "Leada",
+ "followers": {
+  "Folla": true
+ },
+ "farmingProfiles": {
+  "Rangy": {
+   "farmingPolicy": "scatter",
+   "huntSettings": {
+    "relocateIfCompeting": false,
+    "blacklistDeaths": true,
+    "deathThreshold": 2,
+    "blacklistExpirations": true,
+    "expirationThreshold": 1
+   },
+   "huntBlacklist": {},
+   "monsterFocus": [
+    "bat"
+   ]
+  }
+ },
+ "aldata": {
+  "listings": [
+   {
+    "key": "a1",
+    "seller": "Someone",
+    "item": {
+     "name": "bow",
+     "level": 6
+    },
+    "price": 120000,
+    "quantity": 1
+   }
+  ]
+ },
+ "ponty": {
+  "listings": [
+   {
+    "key": "p1",
+    "item": {
+     "name": "ringsj",
+     "level": 0
+    },
+    "price": 30000,
+    "unitPrice": 15000,
+    "quantity": 2
+   }
+  ]
+ },
+ "activeSlots": [
+  {
+   "index": 0,
+   "kind": "headless",
+   "character": "Leada",
+   "state": "online"
+  },
+  {
+   "index": 1,
+   "kind": "headless",
+   "character": "Folla",
+   "state": "online"
+  },
+  {
+   "index": 2,
+   "kind": "headless",
+   "character": "Rangy",
+   "state": "online"
+  },
+  {
+   "index": 3,
+   "kind": "headless",
+   "character": "Merchy",
+   "state": "online"
+  }
+ ],
+ "gameVersion": 830,
+ "merchantCharacter": "Merchy",
+ "merchantForceStand": false,
+ "threshold": 250000,
+ "itemCollectionThreshold": 12,
+ "goldTargets": {
+  "Merchy": 2000000
+ },
+ "restockPolicies": {
+  "Leada": {
+   "hp": {
+    "min": 100,
+    "max": 300,
+    "item": "hpot1"
+   },
+   "mp": {
+    "min": 50,
+    "max": 200,
+    "item": "mpot1"
+   }
+  }
+ },
+ "bankboiPrefix": "MyBank",
+ "anniversaryAutoChat": true,
+ "farmingPolicy": "hunt",
+ "autoExchanges": {
+  "box@0": true
+ }
+}

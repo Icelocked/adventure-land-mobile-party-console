@@ -115,7 +115,13 @@ sealed interface ApiResult<out T> {
  *  ones are actually wired to a button). Add a typed convenience method
  *  here as each new screen needs one, rather than guessing the full
  *  surface up front. */
-class PartyApiClient(private val client: OkHttpClient, private val settings: ServerSettings) {
+class PartyApiClient(
+    private val client: OkHttpClient,
+    private val settings: ServerSettings,
+    // query-actions.ts: told about every POST (success or not) so the data
+    // layer can refresh exactly the domains that action touched.
+    private val onAction: (path: String, body: JsonObject) -> Unit = { _, _ -> },
+) {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** GET against the party-api base - used for one-shot reads like
@@ -204,7 +210,14 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         }
     }
 
-    suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> = withContext(Dispatchers.IO) {
+    suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> =
+        try {
+            postOnce(path, body)
+        } finally {
+            onAction("/" + path.trimStart('/'), body)
+        }
+
+    private suspend fun postOnce(path: String, body: JsonObject): ApiResult<CommandResult> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(settings.apiBase.trimEnd('/') + "/" + path.trimStart('/'))
             .post(json.encodeToString(JsonObject.serializer(), body).toRequestBody(JSON_MEDIA_TYPE))

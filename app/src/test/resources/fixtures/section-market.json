@@ -1,0 +1,30 @@
+{
+ "aldata": {
+  "listings": [
+   {
+    "key": "a1",
+    "seller": "Someone",
+    "item": {
+     "name": "bow",
+     "level": 6
+    },
+    "price": 120000,
+    "quantity": 1
+   }
+  ]
+ },
+ "ponty": {
+  "listings": [
+   {
+    "key": "p1",
+    "item": {
+     "name": "ringsj",
+     "level": 0
+    },
+    "price": 30000,
+    "unitPrice": 15000,
+    "quantity": 2
+   }
+  ]
+ }
+}

@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
  *  buttons on every entry. */
 @Composable
 fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
+    com.partyconsole.companion.ui.DomainInterest(viewModel, com.partyconsole.companion.data.Domain.BANK)
     val state by viewModel.dynamicState.collectAsState()
     val roster by viewModel.roster.collectAsState()
     val characters by viewModel.characters.collectAsState()

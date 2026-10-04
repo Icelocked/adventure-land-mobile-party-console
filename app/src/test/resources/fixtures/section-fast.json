@@ -1,0 +1,55 @@
+{
+ "characters": {
+  "Leada": {
+   "hp": 100,
+   "max_hp": 100,
+   "mp": 100,
+   "max_mp": 100,
+   "gold": 12000,
+   "map": "main",
+   "x": 10,
+   "y": 20,
+   "rip": false,
+   "conditions": [
+    {
+     "id": "mluck",
+     "name": "Merchant's Luck",
+     "remainingMs": 60000
+    }
+   ]
+  },
+  "Folla": {
+   "hp": 100,
+   "max_hp": 100,
+   "mp": 100,
+   "max_mp": 100,
+   "gold": 0,
+   "map": "main",
+   "x": 0,
+   "y": 0,
+   "rip": false
+  },
+  "Rangy": {
+   "hp": 100,
+   "max_hp": 100,
+   "mp": 100,
+   "max_mp": 100,
+   "gold": 0,
+   "map": "main",
+   "x": 0,
+   "y": 0,
+   "rip": false
+  },
+  "Merchy": {
+   "hp": 100,
+   "max_hp": 100,
+   "mp": 100,
+   "max_mp": 100,
+   "gold": 0,
+   "map": "main",
+   "x": 0,
+   "y": 0,
+   "rip": false
+  }
+ }
+}

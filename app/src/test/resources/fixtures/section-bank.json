@@ -1,0 +1,29 @@
+{
+ "bank": {
+  "gold": 5000000,
+  "packs": {
+   "items0": [
+    {
+     "slot": 0,
+     "item": {
+      "name": "bow",
+      "level": 5
+     }
+    },
+    null,
+    {
+     "slot": 2,
+     "item": {
+      "name": "hpot0",
+      "q": 9999
+     }
+    }
+   ],
+   "items1": [
+    null,
+    null
+   ]
+  }
+ },
+ "bankbois": []
+}

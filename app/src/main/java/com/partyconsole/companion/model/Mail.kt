@@ -11,6 +11,8 @@ import kotlinx.serialization.json.JsonElement
 data class MailSnapshot(
     val messages: List<ReceivedMail> = emptyList(),
     val count: Int = 0,
+    // mail-query.ts: why the last refresh failed (the inbox is kept).
+    val error: String? = null,
 )
 
 @Serializable

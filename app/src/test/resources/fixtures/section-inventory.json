@@ -1,0 +1,79 @@
+{
+ "characters": {
+  "Leada": {
+   "items": [
+    {
+     "slot": 0,
+     "item": {
+      "name": "hpot0",
+      "q": 200
+     }
+    },
+    {
+     "slot": 1,
+     "item": {
+      "name": "bow",
+      "level": 7
+     }
+    },
+    null
+   ],
+   "slots": {
+    "mainhand": {
+     "item": {
+      "name": "blade",
+      "level": 8
+     }
+    }
+   }
+  },
+  "Folla": {
+   "items": [
+    {
+     "slot": 0,
+     "item": {
+      "name": "ringsj",
+      "level": 1
+     }
+    },
+    null
+   ],
+   "slots": {}
+  },
+  "Rangy": {
+   "items": [
+    null,
+    null
+   ],
+   "slots": {}
+  },
+  "Merchy": {
+   "items": [
+    {
+     "slot": 0,
+     "item": {
+      "name": "wcoat",
+      "level": 0
+     }
+    },
+    {
+     "slot": 1,
+     "item": {
+      "name": "cscroll0",
+      "q": 5
+     }
+    },
+    null
+   ],
+   "slots": {
+    "trade1": {
+     "item": {
+      "name": "bow",
+      "level": 3
+     },
+     "price": 50000
+    }
+   }
+  }
+ }
+}

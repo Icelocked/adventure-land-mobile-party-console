@@ -1,0 +1,163 @@
+{
+ "merchantCurrent": {
+  "id": "j0",
+  "target": "Leada",
+  "reason": "restock",
+  "routine": "restock",
+  "priority": 90
+ },
+ "merchantQueue": [
+  {
+   "id": "j1",
+   "target": "bank",
+   "reason": "exchange",
+   "autoExchangeKeys": [
+    "box@0"
+   ]
+  },
+  {
+   "id": "j2",
+   "target": "Ponty",
+   "reason": "Ponty purchases",
+   "manual": true
+  },
+  {
+   "id": "j3",
+   "target": "sea",
+   "reason": "fishing",
+   "routine": "fishing"
+  }
+ ],
+ "withdrawals": {
+  "Merchy": [
+   {
+    "pack": "items0",
+    "slot": 2,
+    "item": {
+     "name": "hpot0",
+     "q": 9999
+    }
+   }
+  ]
+ },
+ "gatheringModes": [
+  "mining"
+ ],
+ "realmControl": {
+  "activeRealm": "USI",
+  "currentRealm": "USI",
+  "homeRealm": "USI",
+  "split": false,
+  "characters": [
+   {
+    "name": "Leada",
+    "ctype": "warrior",
+    "realm": "USI",
+    "online": true
+   }
+  ],
+  "realms": [
+   {
+    "key": "USI",
+    "label": "US I",
+    "players": 120,
+    "pvp": false
+   },
+   {
+    "key": "USPVP",
+    "label": "US PVP",
+    "players": 4,
+    "pvp": true
+   }
+  ],
+  "operation": null
+ },
+ "upgradeOfferingRules": [],
+ "luckyUpgradeSlots": {},
+ "luckySlotTracking": {},
+ "monsterHunt": null,
+ "aldata": {},
+ "activeSlots": [
+  {
+   "index": 0,
+   "kind": "headless",
+   "character": "Leada",
+   "state": "online"
+  },
+  {
+   "index": 1,
+   "kind": "headless",
+   "character": "Folla",
+   "state": "online"
+  },
+  {
+   "index": 2,
+   "kind": "headless",
+   "character": "Rangy",
+   "state": "online"
+  },
+  {
+   "index": 3,
+   "kind": "headless",
+   "character": "Merchy",
+   "state": "online"
+  }
+ ],
+ "gameVersion": 830,
+ "bankbois": [],
+ "characterDetails": {
+  "Leada": {
+   "name": "Leada",
+   "ctype": "warrior",
+   "level": 70,
+   "seenAt": 1791113884488,
+   "monsterHunt": null
+  },
+  "Folla": {
+   "name": "Folla",
+   "ctype": "priest",
+   "level": 68,
+   "seenAt": 1791113884488,
+   "monsterHunt": null
+  },
+  "Rangy": {
+   "name": "Rangy",
+   "ctype": "ranger",
+   "level": 66,
+   "seenAt": 1791113884488,
+   "monsterHunt": null
+  },
+  "Merchy": {
+   "name": "Merchy",
+   "ctype": "merchant",
+   "level": 80,
+   "seenAt": 1791113884488,
+   "monsterHunt": null
+  }
+ },
+ "characters": {
+  "Leada": {
+   "name": "Leada",
+   "ctype": "warrior",
+   "level": 70
+  },
+  "Folla": {
+   "name": "Folla",
+   "ctype": "priest",
+   "level": 68
+  },
+  "Rangy": {
+   "name": "Rangy",
+   "ctype": "ranger",
+   "level": 66
+  },
+  "Merchy": {
+   "name": "Merchy",
+   "ctype": "merchant",
+   "level": 80
+  }
+ },
+ "serverNow": 1791113884488,
+ "bankGold": 5000000,
+ "referenceRevision": "mock"
+}

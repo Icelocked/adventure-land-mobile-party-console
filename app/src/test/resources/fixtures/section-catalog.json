@@ -1,0 +1,138 @@
+{
+ "monsterChoices": [
+  {
+   "id": "goo",
+   "locations": [
+    {
+     "map": "main",
+     "x": 0,
+     "y": 700
+    }
+   ]
+  },
+  {
+   "id": "bat",
+   "locations": [
+    {
+     "map": "cave",
+     "x": 300,
+     "y": -1000
+    }
+   ]
+  },
+  {
+   "id": "tinyp",
+   "locations": []
+  }
+ ],
+ "bestiaryCatalog": [],
+ "skillCatalog": [],
+ "merchantCatalog": {
+  "allItems": [
+   {
+    "id": "hpot0",
+    "name": "Health Potion",
+    "value": 20,
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "Health Potion",
+      "g": 20
+     },
+     "maxLevel": 0
+    }
+   },
+   {
+    "id": "bow",
+    "name": "Bow",
+    "upgradeable": true,
+    "value": 600,
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "Bow",
+      "g": 600
+     },
+     "upgradeable": true,
+     "maxLevel": 13
+    }
+   },
+   {
+    "id": "ringsj",
+    "name": "Ring of Strength",
+    "compoundable": true,
+    "value": 1000,
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "Ring of Strength",
+      "g": 1000
+     },
+     "compoundable": true,
+     "maxLevel": 7
+    }
+   },
+   {
+    "id": "wcoat",
+    "name": "wcoat",
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "wcoat"
+     },
+     "maxLevel": 0
+    }
+   },
+   {
+    "id": "cscroll0",
+    "name": "cscroll0",
+    "sprite": {
+     "url": "/e2e-sprite.png",
+     "tileSize": 8,
+     "columns": 1,
+     "rows": 1,
+     "x": 0,
+     "y": 0
+    },
+    "meta": {
+     "definition": {
+      "name": "cscroll0"
+     },
+     "maxLevel": 0
+    }
+   }
+  ],
+  "buyable": [],
+  "craftable": [],
+  "exchangeable": []
+ },
+ "referenceRevision": "mock"
+}

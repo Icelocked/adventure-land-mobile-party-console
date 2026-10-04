@@ -92,6 +92,28 @@ Found and fixed on the way, beyond BUILD-PLAN's P0 list:
 
 Known gap for A1: `androidTest` doesn't resolve (`ui-test-junit4` has no
 BOM on the androidTest classpath) - pre-existing, CI only runs assembleDebug.
+(Fixed in A1.)
+
+### A1 status
+
+- [x] Data layer: `data/PartyRepository.kt` ports PartyDataProvider.tsx -
+  per-section single-flight polling on query-cache.tsx's cadences (core 2s,
+  config 15s, bank/market/logs/mail/escape, catalog per referenceRevision,
+  fast/inventory while the stream is down), `{...current, ...patch}` merge,
+  account switch reset, action-driven refresh (`data/QueryActions.kt`,
+  verbatim query-actions.ts), screen interest (`DomainInterest`), pause
+  in the background (ProcessLifecycleOwner), config-loaded gate,
+  diagnostics, server clock offset, latency, logs/escape/mail errors.
+  The catalog (the biggest payload) is decoded once per revision and
+  never fetched twice for one.
+- [x] Test harness: `web/e2e/fixtures/exportAndroidFixtures.ts` writes the
+  PWA mock's section payloads to `app/src/test/resources/fixtures`;
+  `FakeConsole` (MockWebServer) serves them; Robolectric runs Compose
+  screens on the JVM (`FormationScreenTest` ports formation.spec.ts).
+- [ ] `model/State.kt` full typing (F6)
+- [ ] API results carry data/status/code/body (F3)
+- [ ] Shared UI primitives: action toast, confirm, sheet, item tile (F5)
+- [ ] Navigation shell matching the PWA routes; error boundary (F4)
 
 ### Packages
 

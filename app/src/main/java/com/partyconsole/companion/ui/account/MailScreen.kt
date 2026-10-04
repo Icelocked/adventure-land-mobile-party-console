@@ -42,6 +42,7 @@ import kotlinx.serialization.json.contentOrNull
  *  dropped. */
 @Composable
 fun MailScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
+    com.partyconsole.companion.ui.DomainInterest(viewModel, com.partyconsole.companion.data.Domain.MAIL)
     val mail by viewModel.mail.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
     val catalogFor = rememberCatalogLookup(dynamicState.merchantCatalog)
