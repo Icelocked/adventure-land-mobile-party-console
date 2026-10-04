@@ -24,6 +24,7 @@ data class Item(
     val rid: String? = null,
     val b: Boolean? = null,
     val m: JsonElement? = null, // boolean | string | number
+    val data: JsonElement? = null, // item-specific payload (stand-inspection.ts identity)
 )
 
 @Serializable

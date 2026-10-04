@@ -30,7 +30,12 @@ object AppForeground {
     private val _visible = MutableStateFlow(true)
     val visible: StateFlow<Boolean> = _visible.asStateFlow()
 
+    private var observing = false
+
+    /** Safe to call from every Activity creation - observes once. */
     fun observe() {
+        if (observing) return
+        observing = true
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) { _visible.value = true }
             override fun onStop(owner: LifecycleOwner) { _visible.value = false }

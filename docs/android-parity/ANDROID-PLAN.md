@@ -117,8 +117,20 @@ BOM on the androidTest classpath) - pre-existing, CI only runs assembleDebug.
 - [x] Typed `CharacterDiagnostics` from core's characterDetails, with the raw
   object kept and presence (`online()`, 10s) (F2).
 - [x] API results: `CommandResult.data` (whole body), `Failure.status/body/code` (F3).
-- [ ] Shared UI primitives: action toast, confirm, sheet, item tile (F5)
-- [ ] Navigation shell matching the PWA routes; error boundary (F4)
+- [x] Action toast on every POST (lib/actionToast.ts) at the app root (F5).
+  Confirm/sheet primitives are Material 3's; item tiles come with I1.
+- [x] Account menu sheet from home and every character, in the dashboard's
+  order with Mail (N) and Inspect stand · N/16 (`domain/StandInspection.kt`,
+  verbatim stand-inspection.ts); the per-character menu screen is gone.
+  Crash report on next launch as the error boundary (F4).
+- [x] Live vitals: numeric `target` and fractional `ping` no longer fail
+  the decode (the character showed as not reporting).
+
+Robolectric notes: `app/src/test/resources/robolectric.properties` sets
+SDK 34, NATIVE graphics (the legacy mode doesn't lay out popups/sheets)
+and a 411x891dp phone.
+
+**A1 done.** Next: A2 (R1 roster/slots/session, R2 realm panel, S1 header).
 
 ### Packages
 

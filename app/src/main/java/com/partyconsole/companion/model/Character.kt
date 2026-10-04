@@ -36,9 +36,14 @@ data class CharacterVitals(
     val rip: Boolean,
     val xp: Long? = null,
     @SerialName("max_xp") val maxXp: Long? = null,
-    val target: String? = null,
+    // A monster id or a numeric entity id - never coerced server-side
+    // (characters/shared.js), so it stays raw; see [targetId].
+    val target: kotlinx.serialization.json.JsonElement? = null,
     val server: String? = null,
-    val ping: Int? = null,
+    // character.ping is a fractional millisecond count.
+    val ping: Double? = null,
+    // The merchant's stand is open (stand-inspection.ts).
+    val standOpen: Boolean? = null,
     val primaryStat: String? = null,
     val banking: Boolean = false,
     val bankQueued: Boolean = false,
@@ -47,7 +52,9 @@ data class CharacterVitals(
     val farmingMode: String? = null,
     val conditions: List<Condition> = emptyList(),
     val inventorySize: Int? = null,
-)
+) {
+    val targetId: String? get() = (target as? kotlinx.serialization.json.JsonPrimitive)?.content
+}
 
 /** The character's carried items + what's equipped, kept as its own
  *  live-record slice (see network/LiveProtocol.kt) so the inventory tab

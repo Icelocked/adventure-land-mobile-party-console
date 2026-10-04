@@ -1,6 +1,7 @@
 package com.partyconsole.companion.network
 
 import com.partyconsole.companion.model.Item
+import com.partyconsole.companion.ui.components.ActionToasts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -202,7 +203,12 @@ class PartyApiClient(
         }
     }
 
-    suspend fun postRoot(path: String, body: JsonObject): ApiResult<String> = withContext(Dispatchers.IO) {
+    suspend fun postRoot(path: String, body: JsonObject): ApiResult<String> {
+        val toast = ActionToasts.begin()
+        return postRootOnce(path, body).also { ActionToasts.resolve(toast, it is ApiResult.Success) }
+    }
+
+    private suspend fun postRootOnce(path: String, body: JsonObject): ApiResult<String> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(settings.baseUrl.trimEnd('/') + "/" + path.trimStart('/'))
             .post(json.encodeToString(JsonObject.serializer(), body).toRequestBody(JSON_MEDIA_TYPE))
@@ -218,12 +224,19 @@ class PartyApiClient(
         }
     }
 
-    suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> =
+    suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> {
+        // Every mutating action funnels through here - the one place that
+        // acknowledges a tap at once (lib/actionToast.ts).
+        val toast = ActionToasts.begin()
+        var sent = false
         try {
-            postOnce(path, body)
+            // Only an explicit `ok: false` is a refusal (partyApi.ts parseCommandResult).
+            return postOnce(path, body).also { sent = it is ApiResult.Success && (it.value.data?.get("ok") as? JsonPrimitive)?.content != "false" }
         } finally {
+            ActionToasts.resolve(toast, sent)
             onAction("/" + path.trimStart('/'), body)
         }
+    }
 
     private suspend fun postOnce(path: String, body: JsonObject): ApiResult<CommandResult> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
