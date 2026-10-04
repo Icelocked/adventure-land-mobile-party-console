@@ -225,8 +225,26 @@ errors, new mail).
 
 Requirements:
 
-- **HTTPS.** Push only works over HTTPS: Tailscale Funnel/Serve or the
-  Tailscale certificate from 3c.
+- **HTTPS with a trusted certificate.** Android and iOS only allow push for
+  pages opened over HTTPS with a trusted certificate. Plain `http://`
+  addresses and self-signed certificates never work. Notifications are
+  delivered by Google's (Android) and Apple's (iOS) push services, not
+  through your server, so any of these options gets them to the phone
+  anywhere, on mobile data and with Tailscale off:
+  1. **Tailscale Serve (recommended).** Private to your tailnet. In the
+     Tailscale admin console, open DNS and enable "HTTPS Certificates".
+     Then run `tailscale serve --bg 8080` on the PC and open the app at
+     `https://<machine>.<tailnet>.ts.net`. Tapping a notification opens the
+     app, which needs Tailscale connected.
+  2. **Tailscale Funnel.** Same address, also reachable without Tailscale
+     (from any network): `tailscale funnel --bg 8080`. Because the app is
+     then public, keep "Require secure pairing" on in Settings.
+  3. **The Tailscale certificate inside the PWA container** (section 3c).
+  4. **Your own domain** behind a reverse proxy with a real certificate
+     (Caddy or nginx with Let's Encrypt, or a Cloudflare Tunnel).
+
+  Without HTTPS the app still works, but Settings → Notifications explains
+  that push needs HTTPS and the notifier stays idle.
 - **A volume for the notifier's data.** Mount one at `/data/notifier` so
   its keys and subscriptions survive rebuilds:
 

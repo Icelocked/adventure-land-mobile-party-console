@@ -13,6 +13,9 @@ import {
   type PushStatus,
 } from '@/lib/pushNotifications'
 
+// DEPLOYMENT.md section 3e: the HTTPS options for push.
+const HTTPS_GUIDE = 'https://github.com/Icelocked/adventure-land-mobile-party-console/blob/main/DEPLOYMENT.md#3e-phone-notifications-android-and-ios'
+
 /** Phone notifications (this app's own feature, not part of the dashboard):
  *  enable push on this device and choose what to be told about. */
 export function NotificationsSection() {
@@ -61,7 +64,15 @@ export function NotificationsSection() {
     <section aria-label="Notifications" className="rounded-md border border-border bg-card p-4 text-sm">
       <div className="mb-1 font-medium">Notifications</div>
       <p className="mb-2 text-xs text-muted-foreground">Get a phone notification when something needs your attention, even with the app closed.</p>
-      {support === 'insecure' && <p className="text-xs text-amber-300">Notifications need the app to be opened over HTTPS (your Tailscale address).</p>}
+      {support === 'insecure' && (
+        <p className="text-xs text-amber-300">
+          Phones only allow notifications when the app is opened over HTTPS with a trusted certificate - this address is plain HTTP. The easiest fix is Tailscale Serve (private to your
+          tailnet); notifications still reach your phone anywhere once enabled.{' '}
+          <a className="underline" href={HTTPS_GUIDE} target="_blank" rel="noreferrer">
+            How to set up HTTPS
+          </a>
+        </p>
+      )}
       {support === 'ios-needs-install' && (
         <p className="text-xs text-amber-300">On iPhone and iPad, add this app to your Home Screen (Share → Add to Home Screen), open it from there, then enable notifications. Requires iOS 16.4 or later.</p>
       )}
