@@ -365,15 +365,11 @@ private val ITEM_DETAIL_PROPERTY_ORDER = listOf(
 )
 val ITEM_DETAIL_PROPERTY_RANK = ITEM_DETAIL_PROPERTY_ORDER.withIndex().associate { (i, k) -> k to i }
 
-/** Keys item-details.tsx never shows in the stats table - either shown
- *  elsewhere already (name, explanation, level, g/buy price) or purely
- *  internal (skin variants, the raw grades array, upgrade/compound
- *  booleans already surfaced via meta.upgradeable/compoundable). `type`
- *  is intentionally left visible here (unlike the desktop version, which
- *  replaces it with a derived "equip_slot" label this app doesn't compute)
- *  so the equip slot/category is still readable. */
+/** item-details.tsx `ignored`: keys never shown in the stats table -
+ *  shown elsewhere already (name, explanation, level, g/buy price), purely
+ *  internal, or `type`, which is shown as the derived equip slot instead. */
 private val IGNORED_STAT_KEYS = setOf(
-    "skin", "skin_a", "skin_c", "skin_r", "name", "explanation", "g", "s", "grades", "upgrade",
+    "skin", "skin_a", "skin_c", "skin_r", "name", "explanation", "type", "g", "s", "grades", "upgrade",
     "compound", "level", "set",
 )
 
@@ -388,6 +384,14 @@ fun buildStatRows(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType
     val preview = previewProperties(meta, actualLevel, previewLevel, statType)
     val display = LinkedHashMap<String, JsonElement>(definition)
     for ((key, value) in preview) display[key] = JsonPrimitive(value)
+    // item-details.tsx: equipment shows where it goes instead of its type.
+    val type = definition["type"]?.asStringOrNull().orEmpty()
+    comparisonSlots[type]?.takeIf { it.isNotEmpty() }?.let { slots ->
+        display["equip_slot"] = JsonPrimitive(
+            if (type == "weapon") "Main hand" + if (meta?.usage?.hands?.contains(1) == true) " (off hand depends on class)" else ""
+            else slots.joinToString(" or ") { comparisonSlotLabel(it).replaceFirstChar { c -> c.uppercase() } },
+        )
+    }
     val stackSize = definition["s"]?.asDoubleOrNull() ?: 1.0
     display["stackable"] = JsonPrimitive(stackSize > 1)
     if (stackSize > 1) display["max_stack_size"] = JsonPrimitive(stackSize)
@@ -425,7 +429,7 @@ data class ExchangeSections(
 )
 
 private val REWARD_TARGET_REGEX = Regex("^(.*)-(\\d+)$")
-private fun exchangeTarget(reward: String): Pair<String, Int> {
+internal fun exchangeTarget(reward: String): Pair<String, Int> {
     val match = REWARD_TARGET_REGEX.matchEntire(reward)
     val id = match?.groupValues?.get(1)?.takeIf { it.isNotEmpty() } ?: reward
     val level = match?.groupValues?.get(2)?.toIntOrNull() ?: 0

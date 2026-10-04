@@ -236,7 +236,6 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
     if (showingDetails) {
         ModalBottomSheet(onDismissRequest = { showingDetails = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                Text("Bank · $pack · slot ${entry.slot}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ItemDetailBrowser(
                     rootItemId = item.name,
                     rootLevel = level,
@@ -245,10 +244,10 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                     rootStatType = item.statType,
                     rootGift = item.gift == true,
                     rootExpires = item.expires,
+                    context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext("Bank · $pack", entry.slot),
+                    onAddStand = if (merchant != null) ({ showingDetails = false; expanded = "stand" }) else null,
+                    viewModel = viewModel,
                 )
-                if (merchant != null) {
-                    OutlinedButton(onClick = { showingDetails = false; expanded = "stand" }, modifier = Modifier.padding(top = 8.dp)) { Text("Add to stand") }
-                }
             }
         }
     }

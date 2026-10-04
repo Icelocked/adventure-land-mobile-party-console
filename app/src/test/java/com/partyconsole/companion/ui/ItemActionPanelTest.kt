@@ -2,7 +2,9 @@ package com.partyconsole.companion.ui
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -39,17 +41,17 @@ class ItemActionPanelTest {
             """{"id":"$id","name":"$id","meta":{"definition":{"name":"$id","type":"$type","g":1000},"compoundable":${type == "ring"},"maxLevel":7}}""",
         )
         val catalog = console.sections.getValue("catalog")["merchantCatalog"]!!.jsonObject
-        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + ("allItems" to JsonArray(listOf(entry("ringsj", "ring"), entry("elixirdex0", "elixir"), entry("ironore", "material")))))))
+        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + ("allItems" to JsonArray(listOf(entry("ringsj", "ring"), entry("elixirdex0", "elixir"), entry("ironore", "material"), entry("tracker", "misc")))))))
         // A bankboi is a storage worker, never a delivery target.
         console.override("bank", mapOf("bankbois" to Json.parseToJsonElement("""[{"name":"Rangy","state":"idle"}]""")))
     }
 
     private fun posts(path: String) = console.requests.filter { it.method == "POST" && it.path == "/party-api/$path" }.map { Json.parseToJsonElement(it.body).jsonObject }
 
-    private fun open(target: ItemActionTarget, character: String = "Leada"): PartyViewModel {
+    private fun open(target: ItemActionTarget, character: String = "Leada", isMerchant: Boolean = false): PartyViewModel {
         val viewModel = PartyViewModel(console.settings)
         compose.setContent {
-            ItemActionPanel(target, character, isMerchant = false, roster = emptyMap(), viewModel = viewModel,
+            ItemActionPanel(target, character, isMerchant = isMerchant, roster = emptyMap(), viewModel = viewModel,
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), onDismiss = {})
         }
         eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.merchantCatalog != null && viewModel.characterDetails.value.isNotEmpty() }
@@ -143,5 +145,58 @@ class ItemActionPanelTest {
         // project(): DEX moves with the ring.
         compose.onNodeWithText("105").assertExists()
         compose.onNodeWithText("110 (+5 · +4.8%)").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun itemDetailsShowsItsContextAndTheDerivedEquipSlotInsteadOfTheType() {
+        open(ItemActionTarget.InventorySlot(Item(name = "ringsj", level = 2), 0))
+        compose.onNodeWithText("Item details").performClick()
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Leada · slot 0").assertCountEquals(2)
+        // Only the merchant's inventory (or the bank) is a stand source.
+        compose.onNodeWithText("Add to stand").assertDoesNotExist()
+        compose.onNodeWithText("equip slot").performScrollTo().assertExists()
+        compose.onNodeWithText("Ring 1 or Ring 2").assertExists()
+        compose.onNodeWithText("type").assertDoesNotExist()
+    }
+
+    @Test
+    fun itemDetailsAddToStandOpensTheStandFormForTheMerchant() {
+        open(ItemActionTarget.InventorySlot(Item(name = "ironore", q = 5), 2), character = "Merchy", isMerchant = true)
+        compose.onNodeWithText("Item details").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Add to stand").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Stand price").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun itemDetailsShowsTheTracktrixHoldersBonuses() {
+        val details = console.sections.getValue("core")["characterDetails"]!!.jsonObject
+        val tracktrix = Json.parseToJsonElement("""{"tracktrix":{"active":true,"bonuses":{"attack":5,"max_hp":0}}}""").jsonObject
+        console.override("core", mapOf("characterDetails" to JsonObject(details + ("Leada" to JsonObject(details.getValue("Leada").jsonObject + tracktrix)))))
+        val viewModel = open(ItemActionTarget.InventorySlot(Item(name = "tracker"), 2))
+        eventually { viewModel.characterDetails.value["Leada"]?.tracktrix != null }
+        compose.onNodeWithText("Item details").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Current Tracktrix bonuses").assertExists()
+        compose.onNodeWithText("ATTACK").assertExists()
+        compose.onNodeWithText("+5").assertExists()
+        compose.onNodeWithText("MAX HP").assertDoesNotExist()
+    }
+
+    @Test
+    fun itemDetailsComparePicksACharacterThenARingSlot() {
+        open(ItemActionTarget.InventorySlot(Item(name = "ringsj", level = 2), 0))
+        compose.onNodeWithText("Item details").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Compare").performScrollTo().performClick()
+        compose.onNodeWithText("COMPARE +2 FOR").assertExists()
+        compose.onNodeWithText("Folla").performScrollTo().performClick()
+        compose.onNodeWithText("← Folla · Choose equipment slot").assertExists()
+        compose.onNodeWithText("Ring 2").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Equipment comparison").assertExists()
+        compose.onNodeWithText("Replaces ring2 · empty slot").assertExists()
     }
 }

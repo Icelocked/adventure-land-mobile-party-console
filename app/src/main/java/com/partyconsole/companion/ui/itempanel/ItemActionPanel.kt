@@ -45,6 +45,7 @@ import com.partyconsole.companion.ui.components.DeconstructionConfirmation
 import com.partyconsole.companion.ui.components.NpcSaleSheet
 import com.partyconsole.companion.ui.components.StandListingForm
 import com.partyconsole.companion.ui.itemdetail.ItemDetailBrowser
+import com.partyconsole.companion.ui.itemdetail.ItemDetailContext
 import com.partyconsole.companion.ui.itemdetail.STAT_SCROLLS
 import com.partyconsole.companion.ui.itemdetail.comparisonSlotLabel
 import com.partyconsole.companion.ui.itemdetail.comparisonSlotsFor
@@ -157,11 +158,11 @@ fun ItemActionPanel(
                     rootStatType = item.statType,
                     rootGift = item.gift == true,
                     rootExpires = item.expires,
+                    context = ItemDetailContext(characterName, (target as? ItemActionTarget.InventorySlot)?.slot ?: -1),
+                    // connected-inventory.tsx: only the merchant's own inventory is a stand source.
+                    onAddStand = if (isMerchant && target is ItemActionTarget.InventorySlot) ({ showingDetails = false; expanded = "stand" }) else null,
+                    viewModel = viewModel,
                 )
-                // connected-inventory.tsx: only the merchant's own inventory is a stand source.
-                if (isMerchant && target is ItemActionTarget.InventorySlot) {
-                    TextButton(onClick = { showingDetails = false; expanded = "stand" }) { Text("Add to stand") }
-                }
             }
         }
     }
