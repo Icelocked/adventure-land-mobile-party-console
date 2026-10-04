@@ -249,7 +249,35 @@ and a 411x891dp phone.
   slot no longer sends slot 0. The unused live stand search was dropped
   (Ryan's dashboard never renders its dialog).
 
-Next: A7 (C1, C2, C3, C7, C8 character and farming).
+### A7 status: done
+
+- C1: character header - party gold and latency in the top bar, the
+  switcher row even when the character isn't reporting; vitals header with
+  the portrait (opens the stats sheet, Tracktrix badge), online dot, ping,
+  BANKING / BANK QUEUED / STOCKING UP, cave map names; the stats sheet
+  (character-stats-dialog.tsx: damage reduction, attribute effects,
+  primary stat, combat stats); "Active status" with ticking countdowns over
+  a depleting bar (`domain/StatusDuration.kt`, status-duration.ts) and the
+  condition details sheet.
+- C2/C3: farming - live combat target, saved / live mode badge, active
+  farming zone, Hunt status block, Hunt that opens the backup setup when no
+  backup focus+location exists (use-party-console.tsx setFarmingPolicy),
+  monster focus with per-monster priorities and the radius context, the
+  route-to-monster farming-area picker (party-monster-travel for the
+  leader, character-travel otherwise, Phoenix's ordered patrol via
+  navigate-to-monster), followers blocked from routing. `domain/
+  FarmingZones.kt` ports farming-zones.ts and farming-areas.ts verbatim.
+  Merchant-class non-merchant characters now get the focus picker.
+- C7: travel - "Travel to place…" / "Send to…" with the coordinate form
+  (character-travel-dialog.tsx), Return to leader only while a different
+  leader is online, "Send merchant to…" merchant visits.
+- C8: combat log - collapsed, logs-domain interest while open, last 50
+  newest first coloured by type, Clear history.
+- Not yet (owned by later packages): the live target's monster type and the
+  character map / farming-area preview need the map stream (A11); the
+  Events chip in Formation (C4, A9); the lucky slot section (U3, A8).
+
+Next: A8 (U1, U2, U3, M10, M11 upgrades and exchange).
 
 ### Packages
 

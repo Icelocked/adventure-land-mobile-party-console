@@ -37,6 +37,7 @@ import com.partyconsole.companion.ui.characterdetail.sections.FarmingSection
 import com.partyconsole.companion.ui.characterdetail.sections.GoldTargetSection
 import com.partyconsole.companion.ui.characterdetail.sections.InventorySection
 import com.partyconsole.companion.ui.characterdetail.sections.LeaderFollowerSection
+import com.partyconsole.companion.ui.characterdetail.sections.StatusesSection
 import com.partyconsole.companion.ui.characterdetail.sections.MerchantControlsSection
 import com.partyconsole.companion.ui.characterdetail.sections.MerchantQueueSection
 import com.partyconsole.companion.ui.characterdetail.sections.RestockSection
@@ -67,6 +68,8 @@ fun CharacterDetailScreen(
     val characters by viewModel.characters.collectAsState()
     val dynamicState by viewModel.dynamicState.collectAsState()
     val roster by viewModel.roster.collectAsState()
+    val diagnostics by viewModel.characterDetails.collectAsState()
+    val now = com.partyconsole.companion.ui.components.rememberClock()
     val state = characters[characterName]
     var actionTarget by remember { mutableStateOf<ItemActionTarget?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -85,6 +88,8 @@ fun CharacterDetailScreen(
                 },
                 actions = {
                     com.partyconsole.companion.ui.components.SessionControls(viewModel, characterName)
+                    com.partyconsole.companion.ui.components.PartyGold(viewModel)
+                    com.partyconsole.companion.ui.components.LatencyBadge(viewModel)
                     IconButton(onClick = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
@@ -97,10 +102,10 @@ fun CharacterDetailScreen(
     ) { padding ->
         val vitals = state?.vitals
         if (vitals == null) {
-            Text(
-                "This character isn't reporting in right now.",
-                modifier = Modifier.padding(padding).padding(24.dp),
-            )
+            Column(modifier = Modifier.padding(padding)) {
+                CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
+                Text("This character isn't reporting in right now.", modifier = Modifier.padding(24.dp))
+            }
             return@Scaffold
         }
 
@@ -111,29 +116,53 @@ fun CharacterDetailScreen(
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
-            VitalsHeader(name = characterName, vitals = vitals, accountGold = accountGold, bestiaryCatalog = dynamicState.bestiaryCatalog)
+            VitalsHeader(
+                name = characterName,
+                vitals = vitals,
+                accountGold = accountGold,
+                bestiaryCatalog = dynamicState.bestiaryCatalog,
+                // The live target's monster type comes from the map stream (A11).
+                resolvedTargetType = null,
+                diagnostics = diagnostics[characterName],
+                slots = state.inventory?.slots.orEmpty(),
+                online = diagnostics[characterName]?.online(now) == true,
+            )
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
             ) {
+                // connected-character-card.tsx: statuses sit under HP/MP for every class.
+                StatusesSection(characterName, vitals.conditions)
                 LeaderFollowerSection(characterName, dynamicState, viewModel)
                 TravelSection(
                     characterName = characterName,
                     isMerchant = isMerchant,
-                    isLeader = dynamicState.leader == characterName,
                     travelPlaces = dynamicState.travelPlaces,
                     viewModel = viewModel,
                 )
-                if (vitals.ctype != "merchant") {
+                // Merchant-class characters can't run hunts (farming-scope.ts) - a class capability, not the merchant role.
+                if (vitals.ctype != "merchant" || characterName != dynamicState.merchantCharacter) {
                     FarmingSection(
                         characterName = characterName,
                         farmingPolicy = farming.savedMode,
+                        effectiveMode = farming.effectiveMode,
                         followingLeader = farming.followingLeader,
+                        isLeader = dynamicState.leader == characterName,
+                        farmArea = farming.farmArea,
                         monsterFocus = dynamicState.focusFor(characterName),
                         monsterSearchRadius = dynamicState.monsterSearchRadiusByCharacter[characterName] ?: 400,
                         monsterChoices = dynamicState.monsterChoices,
                         bestiaryCatalog = dynamicState.bestiaryCatalog,
+                        phoenixRouteOrder = dynamicState.phoenixRouteOrder,
+                        position = com.partyconsole.companion.model.MapLocation(vitals.map, vitals.x, vitals.y),
+                        target = vitals.targetId,
+                        resolvedTargetType = null,
+                        monsterHunt = farming.hunt,
+                        characterHunt = dynamicState.characterHunt[characterName],
+                        huntBlacklist = farming.blacklist,
                         viewModel = viewModel,
                         onOpenHuntSettings = onOpenHuntSettings,
+                        showModes = vitals.ctype != "merchant",
+                        showFocus = characterName != dynamicState.merchantCharacter,
                     )
                 }
                 if (isMerchant) {
@@ -168,6 +197,7 @@ fun CharacterDetailScreen(
                 if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
                 if (isMerchant) com.partyconsole.companion.ui.characterdetail.sections.RuleConflictsSection(viewModel)
                 AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)
+                com.partyconsole.companion.ui.characterdetail.sections.CombatLogSection(characterName, viewModel)
             }
         }
 

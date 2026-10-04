@@ -65,4 +65,8 @@ data class Condition(
     val remainingMs: Long? = null,
     val stacks: JsonElement? = null, // number | string
     val source: JsonElement? = null, // string | number
+    // condition.tsx: the status sprite, its G definition and live fields.
+    val sprite: Sprite? = null,
+    val definition: kotlinx.serialization.json.JsonObject? = null,
+    val live: kotlinx.serialization.json.JsonObject? = null,
 )

@@ -107,10 +107,11 @@ data class BestiaryDrop(
  *  simpler and uses only server-sourced data). */
 @Serializable
 data class MonsterSpawnRecord(
+    val sourceMap: String = "",
     val map: String,
     val mapName: String? = null,
-    val x: Double = 0.0,
-    val y: Double = 0.0,
+    val x: Double? = null,
+    val y: Double? = null,
     val count: Int? = null,
     val boundary: List<Double>? = null,
     val restrictions: List<String> = emptyList(),
@@ -167,6 +168,8 @@ data class ActivityEntry(
     val at: Long = 0,
     val message: String = "",
     val level: String? = null,
+    // combat-log-entry.ts: skill | kill | loot | death | item.
+    val type: String? = null,
     val details: JsonElement? = null,
 )
 

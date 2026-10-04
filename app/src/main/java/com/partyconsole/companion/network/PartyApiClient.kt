@@ -747,16 +747,49 @@ class PartyApiClient(
     /** POST /party-api/focus - which monsters a character farms/hunts,
      *  per-character (unlike farming-mode). Omitting `monsterSearchRadius`
      *  leaves it unchanged server-side. */
-    suspend fun setFocus(character: String, monsterFocus: List<String>, monsterSearchRadius: Int? = null): ApiResult<CommandResult> {
+    suspend fun setFocus(character: String, monsterFocus: List<String>, monsterSearchRadius: Int? = null, monsterPriorities: Map<String, Int>? = null): ApiResult<CommandResult> {
+        // use-party-console.tsx setFocus: priorities and radius only when given.
         val body = JsonObject(
             buildMap {
                 put("character", JsonPrimitive(character))
                 put("monsterFocus", JsonArray(monsterFocus.map { JsonPrimitive(it) }))
+                monsterPriorities?.let { put("monsterPriorities", JsonObject(it.mapValues { (_, v) -> JsonPrimitive(v) })) }
                 monsterSearchRadius?.let { put("monsterSearchRadius", JsonPrimitive(it)) }
             },
         )
         return post("focus", body)
     }
+
+    private fun locationJson(map: String, x: Double, y: Double) = JsonObject(mapOf("map" to JsonPrimitive(map), "x" to JsonPrimitive(x), "y" to JsonPrimitive(y)))
+
+    /** POST /party-api/navigate-to-monster - sends the whole party convoy to
+     *  one monster (monster-route-button.tsx); `phoenixRouteOrder` only for
+     *  "phoenix". */
+    suspend fun navigateToMonster(monsterId: String, map: String, x: Double, y: Double, phoenixRouteOrder: List<String>? = null): ApiResult<CommandResult> =
+        post(
+            "navigate-to-monster",
+            JsonObject(
+                buildMap {
+                    put("monsterId", JsonPrimitive(monsterId))
+                    put("location", locationJson(map, x, y))
+                    phoenixRouteOrder?.let { put("phoenixRouteOrder", JsonArray(it.map { id -> JsonPrimitive(id) })) }
+                },
+            ),
+        )
+
+    /** `/party-api/command` "party-monster-travel" (the leader) or
+     *  "character-travel" (anyone else): use-party-console.tsx
+     *  startFarmingArea - one character to a farming area for its focus. */
+    suspend fun routeToFarmingArea(character: String, isLeader: Boolean, map: String, x: Double, y: Double, farmingMonsterIds: List<String>, label: String? = null): ApiResult<CommandResult> =
+        sendCommand(
+            character,
+            buildMap {
+                put("type", if (isLeader) "party-monster-travel" else "character-travel")
+                put("location", locationJson(map, x, y))
+                put("farmingMonsterIds", JsonArray(farmingMonsterIds.map { JsonPrimitive(it) }))
+                label?.let { put("label", it) }
+            },
+        )
 
     /** POST /party-api/hunt-blacklist - always scoped to the character
      *  (connected-character-card.tsx); without it the server edits the
@@ -1002,6 +1035,10 @@ class PartyApiClient(
      *  a received message by its id. */
     suspend fun collectMail(id: String): ApiResult<CommandResult> =
         post("mail/collect", JsonObject(mapOf("id" to JsonPrimitive(id))))
+
+    /** POST /party-api/combat-log/:character/clear - combat-log.tsx Clear history. */
+    suspend fun clearCombatLog(character: String): ApiResult<CommandResult> =
+        post("combat-log/${java.net.URLEncoder.encode(character, "UTF-8").replace("+", "%20")}/clear", JsonObject(emptyMap()))
 
     /** POST /party-api/merchant/aldata-order (manual-market-orders.ts) -
      *  use-party-console.tsx buyALDataListing: the listing as received. */
