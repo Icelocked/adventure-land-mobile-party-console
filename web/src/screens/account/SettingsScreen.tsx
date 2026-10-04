@@ -29,6 +29,7 @@ export function SettingsScreen() {
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
   const [prefixStatus, setPrefixStatus] = useState<{ saved: true } | { error: string } | null>(null)
   const [creating, setCreating] = useState(false)
+  const [steamError, setSteamError] = useState<string | null>(null)
   // console-updates.tsx ConsoleUpdateIndicator: arriving from the "!" scrolls to and focuses the update section.
   const location = useLocation()
   const focusTarget = (location.state as { focus?: string } | null)?.focus
@@ -118,9 +119,23 @@ export function SettingsScreen() {
 
         {dynamicState.steamSwitch?.phase === 'failed' && (
           // party-inventory-panels.tsx: offered while a Steam handoff has failed.
-          <Button variant="outline" onClick={() => void api.steamRecover()}>
-            Recover Steam handoff after characters are offline
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                setSteamError(null)
+                const result = await api.steamRecover()
+                if (result.kind === 'failure') setSteamError(result.message || 'Steam recovery failed')
+              }}
+            >
+              Recover Steam handoff after characters are offline
+            </Button>
+            {steamError && (
+              <p role="alert" className="text-sm text-destructive">
+                {steamError}
+              </p>
+            )}
+          </>
         )}
       </div>
       {creating && <CreateCharacterSheet onClose={() => setCreating(false)} />}

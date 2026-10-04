@@ -26,6 +26,7 @@ import { RoutinesScreen } from '@/screens/account/RoutinesScreen'
 import { HuntSettingsScreen } from '@/screens/account/HuntSettingsScreen'
 import { WtbScreen } from '@/screens/account/WtbScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
+import { clearRecoveryHistory } from '@/lib/dashboardRecovery'
 import { AlDataAuthWatcher } from '@/components/AlDataAuthWatcher'
 import { AnniversaryScreen } from '@/screens/account/AnniversaryScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
@@ -38,6 +39,17 @@ export default function App() {
   // query-cache.tsx's DashboardQueries: once any party-api request reports
   // the session is gone, drop cached data and offer a reconnect.
   const [sessionLost, setSessionLost] = useState(false)
+  // app/page.tsx: after 10 s of healthy rendering the one-reload-per-build claim is released.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        clearRecoveryHistory(sessionStorage)
+      } catch {
+        /* storage unavailable */
+      }
+    }, 10_000)
+    return () => clearTimeout(timer)
+  }, [])
   useEffect(() => {
     const lost = () => {
       queryClient.clear()

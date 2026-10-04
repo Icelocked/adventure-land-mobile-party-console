@@ -22,6 +22,7 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
   const [mpMin, setMpMin] = useState(String(serverPolicy.mp.min))
   const [mpMax, setMpMax] = useState(String(serverPolicy.mp.max))
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (dirty) return
@@ -65,21 +66,28 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
       <Button
         className="mt-2"
         size="sm"
-        disabled={!configLoaded || !dirty || saving}
+        disabled={!configLoaded || saving}
         onClick={async () => {
           setSaving(true)
+          setSaveError(null)
           // restock-controls.tsx: digits only, so a cleared field is 0 there too.
-          await api.saveRestock(characterName, {
+          const result = await api.saveRestock(characterName, {
             hp: { ...serverPolicy.hp, min: Number(hpMin), max: Number(hpMax) },
             mp: { ...serverPolicy.mp, min: Number(mpMin), max: Number(mpMax) },
           })
+          if (result.kind === 'failure') setSaveError(result.message || 'Restock update failed')
+          else setDirty(false)
           await refreshNow()
-          setDirty(false)
           setSaving(false)
         }}
       >
         {saving ? 'Saving...' : 'Save'}
       </Button>
+      {saveError && (
+        <p role="alert" className="mt-1.5 text-sm text-destructive">
+          {saveError}
+        </p>
+      )}
       <ConfigLoadingNote />
     </SectionCard>
   )

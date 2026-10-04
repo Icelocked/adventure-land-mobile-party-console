@@ -14,6 +14,7 @@
 - **Phase 8:** U2 (delivered by I2 `cd48303`), U3 `df5cdbf`, U1 `3fd3aee`, M10 `df6bcf6`, M11 `90a5348`.
 - **Phase 9:** C4 `af3e32a`, C6 `8b86631` (done before C5 because the cave map builds on it), C5 `2fe1cf4`.
 - **Phase 10:** X1 `a9e2549`, C9 `ed25876`, I9 `d717c92`, S3 `387ba99`, S2 (this commit).
+- **Second review (2026-10-03):** six-area re-audit against the dashboard; every confirmed gap fixed in four commits (hunt & farming, merchant & items, bank/mail/settings including the nginx proxy routes, party screen). Inventory and market areas got a string-level check only (agent quota).
 - **Next:** all planned packages are built. Remaining work is tracking new party-console releases.
 
 ## Ground rules (set by the owner, binding on every package)

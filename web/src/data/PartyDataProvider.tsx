@@ -227,6 +227,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     const escape = async () => {
       const started = performance.now()
       const result = await api.getJson<{ escape?: EscapeStatus | null }>('escape')
+      queryClient.setQueryData(QK.escapeError, result.kind === 'success' ? null : result.message || 'Escape status unavailable')
       if (result.kind !== 'success') return
       queryClient.setQueryData(QK.latencyMs, Math.round(performance.now() - started))
       queryClient.setQueryData(QK.escape, result.value.escape ?? null)
@@ -470,6 +471,7 @@ export const useDynamicState = (): PartyStateDynamic => useCachedValue(QK.dynami
 export const useMail = (): MailSnapshot => useCachedValue(QK.mail, { messages: [], count: 0 })
 export const useGameLogs = (): Record<string, GameLogEntry[]> => useCachedValue(QK.gameLogs, {})
 export const useLogsError = (): boolean => useCachedValue(QK.logsError, false)
+export const useEscapeError = (): string | null => useCachedValue(QK.escapeError, null)
 export const useAlDataAuthPending = (): boolean => useCachedValue(QK.aldataAuthPending, false)
 export const useAlDataAuthStatus = (): string | null => useCachedValue(QK.aldataAuthStatus, null)
 export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.escape, null)
