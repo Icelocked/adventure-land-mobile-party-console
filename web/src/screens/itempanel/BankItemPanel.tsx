@@ -60,19 +60,26 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   const withdrawInFlight = useRef(false)
   const [withdrawing, setWithdrawing] = useState(false)
   const [confirmingWithdraw, setConfirmingWithdraw] = useState<{ markAll: boolean; upgradeTiers?: number } | null>(null)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
   const withdraw = async (markAll: boolean, upgradeTiers?: number, confirmed = false) => {
-    if (withdrawInFlight.current || !merchant) return
+    // bank-withdrawal.tsx: other withdrawals wait while a confirmation is pending.
+    if (withdrawInFlight.current || !merchant || (confirmingWithdraw && !confirmed)) return
     withdrawInFlight.current = true
     setWithdrawing(true)
     try {
       const result = await api.withdrawFromBank(merchant, item, pack, entry.slot, markAll, confirmed, upgradeTiers)
       if (result.kind === 'failure' && !confirmed && result.code === 'auto_bank_confirmation_required') {
         setError(null)
+        setConfirmError(null)
         setConfirmingWithdraw({ markAll, upgradeTiers })
         return
       }
+      // bank-withdrawal.tsx: a failed confirmed retry keeps the prompt open with its error.
+      if (result.kind === 'failure') {
+        if (confirmed) return setConfirmError(result.message)
+        return setError(result.message)
+      }
       setConfirmingWithdraw(null)
-      if (result.kind === 'failure') return setError(result.message)
       await refreshNow()
       onClose()
     } finally {
@@ -100,8 +107,8 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
 
           {merchant ? (
             <>
-              <TapRow label={withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'} onClick={() => !withdrawing && void withdraw(false)} />
-              <TapRow label="Mark all for withdrawal" onClick={() => !withdrawing && void withdraw(true)} />
+              <TapRow label={withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'} disabled={!!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(false)} />
+              <TapRow label="Mark all for withdrawal" disabled={!!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(true)} />
             </>
           ) : (
             <p className="py-2 text-xs text-muted-foreground">No merchant is configured.</p>
@@ -114,10 +121,23 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
                 <Button size="sm" disabled={withdrawing} onClick={() => void withdraw(confirmingWithdraw.markAll, confirmingWithdraw.upgradeTiers, true)}>
                   {withdrawing ? 'Withdrawing…' : 'Confirm'}
                 </Button>
-                <Button size="sm" variant="outline" disabled={withdrawing} onClick={() => setConfirmingWithdraw(null)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={withdrawing}
+                  onClick={() => {
+                    setConfirmingWithdraw(null)
+                    setConfirmError(null)
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
+              {confirmError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {confirmError}
+                </p>
+              )}
             </div>
           )}
 

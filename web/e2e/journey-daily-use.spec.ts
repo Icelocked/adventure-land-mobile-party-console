@@ -68,7 +68,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
   await page.getByRole('group', { name: 'Mark for deconstruction?' }).getByRole('button', { name: 'Mark for deconstruction' }).click()
-  await expect(page.getByText('No bank data yet.')).not.toBeVisible()
+  await expect(page.getByText('No snapshot yet. Send a character to the bank once to load it.')).not.toBeVisible()
   // Bank-sourced deconstruction queues for the merchant to collect - the
   // item stays put (now marked), it doesn't vanish the instant it's marked.
   await expect(page.getByText('Wolf Coat', { exact: true })).toBeVisible()

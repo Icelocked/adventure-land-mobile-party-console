@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { QK } from '@/data/queryKeys'
 import { DashboardStateImport } from './settings/DashboardStateImport'
@@ -7,7 +7,7 @@ import { ConsoleUpdateSettings, HostingSettings } from './settings/ConsoleSettin
 import { AccountMembers } from './settings/AccountMembers'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { Copy, Eye, EyeOff } from 'lucide-react'
-import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending } from '@/data/PartyDataProvider'
+import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending, useAlDataAuthStatus } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,22 @@ export function SettingsScreen() {
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
   const [prefixStatus, setPrefixStatus] = useState<{ saved: true } | { error: string } | null>(null)
   const [creating, setCreating] = useState(false)
+  // console-updates.tsx ConsoleUpdateIndicator: arriving from the "!" scrolls to and focuses the update section.
+  const location = useLocation()
+  const focusTarget = (location.state as { focus?: string } | null)?.focus
+  useEffect(() => {
+    if (!focusTarget) return
+    let attempts = 0
+    const timer = setInterval(() => {
+      const target = document.getElementById(focusTarget)
+      if (target || ++attempts > 20) {
+        clearInterval(timer)
+        target?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        target?.focus({ preventScroll: true })
+      }
+    }, 50)
+    return () => clearInterval(timer)
+  }, [focusTarget])
 
   // Seed once, from the real config value - never from the empty default.
   useEffect(() => {
@@ -39,8 +55,9 @@ export function SettingsScreen() {
   return (
     <AccountScreenScaffold title="Interface settings" onRefresh={() => void refreshNow()}>
       <div className="flex flex-col gap-3 p-3">
+        <p className="text-xs text-muted-foreground">Manage saved dashboard state, character connections, and market access.</p>
         <DashboardStateImport />
-        {dynamicState.realmControl && <RealmSection control={dynamicState.realmControl} />}
+        <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }} />
 
         <section aria-label="Characters" className="rounded-md border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -126,20 +143,22 @@ function ALDataSection() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const pending = useAlDataAuthPending()
-  const [authStatus, setAuthStatus] = useState<string | null>(null)
+  // The 15 s pending poll runs app-wide (components/AlDataAuthWatcher.tsx).
+  const authStatus = useAlDataAuthStatus()
+  const setAuthStatus = (value: string) => queryClient.setQueryData(QK.aldataAuthStatus, value)
   const aldata = dynamicState.aldata
-  // use-party-console.tsx: while the auth mail is in flight, /aldata/auth is re-read every 15 s until CORRECT.
+  // party-header.tsx: opening settings loads a stored key (still masked) so Copy works.
   useEffect(() => {
-    if (!pending) return
-    const check = async () => {
-      const result = await api.checkAlDataAuth()
-      setAuthStatus(result.kind === 'success' ? result.value : 'unknown')
-      if (result.kind === 'success' && result.value === 'CORRECT') queryClient.setQueryData(QK.aldataAuthPending, false)
+    if (!aldata?.hasKey || key) return
+    let alive = true
+    void api.revealAlDataKey().then((result) => {
+      if (alive && result.kind === 'success') setKey(result.value)
+    })
+    return () => {
+      alive = false
     }
-    void check()
-    const timer = setInterval(() => void check(), 15000)
-    return () => clearInterval(timer)
-  }, [pending, api, queryClient])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aldata?.hasKey])
 
   return (
     <div className="rounded-md border border-border bg-card p-4">
@@ -236,8 +255,8 @@ function ALDataSection() {
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Public market browsing needs no key. Publishing requires authentication: generate a unique key, then Prepare mail to send it to ALData for verification. ALData stores this key in
-        plaintext - never reuse a password. Allow about a minute, then check status.
+        Public market browsing needs no key or separate ALData server. Publishing requires authentication: generate a unique key. Prepare mail opens a prefilled authentication mail. Review the postage
+        and click Send; your merchant will send it. ALData stores this key in plaintext; never reuse a password. Allow about a minute, then check status.
       </p>
       {(error ?? aldata?.error) && <p className="mt-2 text-xs text-destructive">{error ?? aldata?.error}</p>}
     </div>

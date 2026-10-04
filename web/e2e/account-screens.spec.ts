@@ -240,3 +240,17 @@ test('ALData Prepare mail opens the mail composer with the auth draft (use-party
   await compose.getByRole('button', { name: 'Really send mail?' }).click()
   await expect.poll(() => server.lastOrder).toEqual({ path: 'merchant/send-mail', recipient: 'earthiverse', subject: 'aldata_auth', message: 'secret-key', quantity: 1 })
 })
+
+test('Mail compose: the selected attachment opens its item details before sending (send-mail-dialog.tsx)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 3 }] })
+  server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat', upgradeable: true, maxLevel: 10 })
+  await server.install(page)
+  await page.goto('/mail')
+  await page.getByRole('button', { name: 'Write message' }).click()
+  const compose = page.getByRole('region', { name: 'Write message' })
+  await compose.getByRole('button', { name: /Wolf Coat/ }).first().click()
+  await compose.getByRole('button', { name: 'View attachment details' }).click()
+  await expect(page.getByText('Wolf Coat +3').last()).toBeVisible()
+})

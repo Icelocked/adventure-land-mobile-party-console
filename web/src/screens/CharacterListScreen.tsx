@@ -77,7 +77,7 @@ export function CharacterListScreen() {
                 type="button"
                 aria-label="New version available"
                 title="New version available"
-                onClick={() => navigate('/settings')}
+                onClick={() => navigate('/settings', { state: { focus: 'console-updates' } })}
                 className="inline-flex size-5 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white"
               >
                 !

@@ -14,6 +14,7 @@ RUN npm run build
 FROM nginx:alpine AS run
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx-locations.conf /etc/nginx/snippets/pwa-locations.conf
 # Opt-in HTTPS: no-op unless a Tailscale cert is mounted at
 # /etc/nginx/tailscale-certs - see the script itself and DEPLOYMENT.md
 # section 3b for why (Android's PWA install criteria needs HTTPS).

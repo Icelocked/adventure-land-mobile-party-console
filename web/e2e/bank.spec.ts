@@ -149,3 +149,47 @@ test('Bankbois: creating is blocked until a bankboi name is set', async ({ page 
   await expect(section.getByText('Set bankboi name in settings first')).toBeVisible()
   await expect(section.getByRole('button', { name: 'Create bankboi' })).toBeDisabled()
 })
+
+test('Bank parity: Merchant’s Luck clover, Auto stand banner replacing the stand mark, sort toggle help and errors, withdraw confirmation keeps its error', async ({ page }) => {
+  const server = bankServer()
+  server.bankPacks.items1[0] = { slot: 0, item: { name: 'ironore', q: 5, m: 1 } }
+  const key = JSON.stringify({ name: 'bow', level: 2, p: null, stat_type: null })
+  server.extraState = {
+    autoStandMarks: { [key]: { item: { name: 'bow', level: 2 }, price: 1500 } },
+    standListings: [{ id: 's1', bankPack: 'items1', bankSlot: 1, item: { name: 'bow', level: 2 }, price: 1500, quantity: 1 }],
+    merchantRoutinePriorities: {},
+    bankSortMode: 'request',
+    autoItemMarks: { Patinder: { 'ironore@+0': 'bank' } },
+  }
+  await server.install(page)
+  await page.goto('/bank')
+
+  await expect(page.getByLabel("Merchant's Luck duplicate")).toHaveCount(1)
+  const bow = page.getByRole('button', { name: /^Bow \+2/ })
+  await expect(bow.getByText('Auto stand')).toHaveAttribute('title', 'Auto stand · 1,500g')
+  await expect(bow.getByText('Stand', { exact: true })).toHaveCount(0)
+
+  await expect(page.getByText(/^Sorts all accessible bank floors after banking work\./)).toBeVisible()
+  server.failOnce['merchant/bank-sort'] = 'Sorting is unavailable'
+  await page.getByRole('button', { name: /^Sort on next visit/ }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'Sorting is unavailable' })).toBeVisible()
+
+  // Withdraw an auto-bank-marked item: the confirmation stays open with a failure.
+  await page.getByRole('button', { name: /Iron Ore x5/ }).click()
+  await page.getByRole('button', { name: 'Mark for withdrawal' }).click()
+  const confirm = page.getByRole('group', { name: 'Remove automatic bank mark?' })
+  await expect(confirm).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mark all for withdrawal' })).toBeDisabled()
+  server.failOnce['command'] = 'Merchant is busy'
+  await confirm.getByRole('button', { name: 'Confirm' }).click()
+  await expect(confirm.getByRole('alert')).toHaveText('Merchant is busy')
+})
+
+test('Bank: an empty bank tells you how to load the snapshot', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  await server.install(page)
+  await page.goto('/bank')
+  await expect(page.getByText('No snapshot yet. Send a character to the bank once to load it.')).toBeVisible()
+})
