@@ -26,6 +26,7 @@ import { RoutinesScreen } from '@/screens/account/RoutinesScreen'
 import { HuntSettingsScreen } from '@/screens/account/HuntSettingsScreen'
 import { WtbScreen } from '@/screens/account/WtbScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
+import { AlDataAuthWatcher } from '@/components/AlDataAuthWatcher'
 import { AnniversaryScreen } from '@/screens/account/AnniversaryScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
@@ -56,6 +57,8 @@ export default function App() {
         <PartyDataProvider settings={settings} key={settings.baseUrl}>
           <ServerSettingsDialogContext.Provider value={() => setShowOverride(true)}>
             <BrowserRouter>
+              {/* use-party-console.tsx: the ALData auth wait runs wherever the user is. */}
+              <AlDataAuthWatcher />
               <ErrorBoundary>
               <Routes>
                 <Route path="/" element={<CharacterListScreen />} />

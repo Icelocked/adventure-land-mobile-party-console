@@ -239,6 +239,7 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
   useDomainInterest('bank')
   const api = usePartyApi()
   const queryClient = useQueryClient()
+  const [inspectingAttachment, setInspectingAttachment] = useState(false)
   const refreshNow = useRefreshDynamicStateNow()
   const state = useDynamicState()
   const characters = useCharacters()
@@ -364,16 +365,19 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
       {attachment ? (
         <div className="rounded-md border border-amber-700 p-2.5">
           <div className="flex items-center gap-2">
-            <SpriteIcon sprite={attachmentInfo?.sprite ?? attachmentInfo?.meta?.sprite} size={36} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {displayName(attachment.entry.item.name, catalogFor)}
-                {attachmentLevel(attachment.entry.item, attachmentInfo)}
-              </p>
-              <p className="font-mono text-[10px] text-muted-foreground">
-                {attachment.label} · slot {attachment.entry.slot}
-              </p>
-            </div>
+            {/* send-mail-dialog.tsx: the selected attachment opens its item details. */}
+            <button type="button" title="View attachment details" aria-label="View attachment details" onClick={() => setInspectingAttachment(true)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+              <SpriteIcon sprite={attachmentInfo?.sprite ?? attachmentInfo?.meta?.sprite} size={36} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {displayName(attachment.entry.item.name, catalogFor)}
+                  {attachmentLevel(attachment.entry.item, attachmentInfo)}
+                </p>
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  {attachment.label} · slot {attachment.entry.slot}
+                </p>
+              </div>
+            </button>
             <Button
               size="sm"
               variant="outline"
@@ -387,6 +391,19 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
               Clear attachment
             </Button>
           </div>
+          {inspectingAttachment && (
+            <Sheet open onOpenChange={(open) => !open && setInspectingAttachment(false)}>
+              <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+                <ItemDetailBrowser
+                  rootItemId={attachment.entry.item.name}
+                  rootLevel={attachment.entry.item.level ?? 0}
+                  rootStatType={attachment.entry.item.stat_type}
+                  catalog={state.merchantCatalog}
+                  monsters={state.bestiaryCatalog}
+                />
+              </SheetContent>
+            </Sheet>
+          )}
           {stackable && (
             <label className="mt-2 grid gap-1 text-xs text-muted-foreground">
               Quantity (1–{available})

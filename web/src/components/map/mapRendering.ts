@@ -48,9 +48,19 @@ export function visibleTiles(p: PreparedPlacement, left: number, top: number, ri
   }
 }
 
-// map-images.ts / cached-map-image.tsx (no local debug assets here).
+// map-images.ts / game-image-url.ts: on a debug instance, game images come from its local copy.
+let debugAssetsBase: string | null = null
+export function setLocalDebugAssets(base: string | null) {
+  debugAssetsBase = base
+}
+function gameImageUrl(url: string) {
+  if (debugAssetsBase === null || !url.startsWith('https://adventure.land/images/')) return url
+  return `${debugAssetsBase}/debug-assets${url.slice('https://adventure.land'.length)}`
+}
+// cached-map-image.tsx.
 const mapImages = new Map<string, HTMLImageElement>()
-export function cachedMapImage(url: string) {
+export function cachedMapImage(source: string) {
+  const url = gameImageUrl(source)
   let image = mapImages.get(url)
   if (!image && typeof window !== 'undefined') {
     image = new Image()

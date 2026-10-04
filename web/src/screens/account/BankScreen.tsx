@@ -8,7 +8,8 @@ import { BankItemPanel } from '@/screens/itempanel/BankItemPanel'
 import { abbreviatedGold } from '@/lib/gold'
 import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import { sameMarkedItem } from '@/models'
+import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
+import { MluckClover } from '@/components/ItemTileParts'
 import type { BankVault, CatalogItem, CharacterState, InventoryEntry } from '@/models'
 
 /** Shared bank vault browse - ported from ui/account/BankScreen.kt and
@@ -51,7 +52,7 @@ export function BankScreen() {
         <Input type="search" aria-label="Search bank items" placeholder="Search by item name or ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       {!bank || Object.keys(bank.packs).length === 0 ? (
-        <EmptyState message="No bank data yet." />
+        <EmptyState message="No snapshot yet. Send a character to the bank once to load it." />
       ) : (
         <div className="flex flex-col gap-3 px-3">
           {Object.entries(bank.packs).map(([packName, entries]) => {
@@ -125,20 +126,35 @@ function GoldBreakdown({ bankGold, characters }: { bankGold: number; characters:
 function BankSortToggle({ pending }: { pending?: { status: 'queued' | 'sorting' | 'retry'; message?: string } | null }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const statusLabel = pending?.status === 'sorting' ? 'Sorting' : pending?.status === 'retry' ? `Retry pending${pending.message ? `: ${pending.message}` : ''}` : pending ? 'Queued' : ''
   return (
-    <div className="mx-3 mb-3 flex items-center gap-3 rounded-md border border-border bg-card p-3">
-      <Button
-        size="sm"
-        variant={pending ? 'default' : 'outline'}
-        onClick={async () => {
-          await api.requestBankSort(!pending)
-          await refreshNow()
-        }}
-      >
-        Sort on next visit · {pending ? 'On' : 'Off'}
-      </Button>
-      {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
+    <div className="mx-3 mb-3 flex flex-col gap-2 rounded-md border border-border bg-card p-3">
+      <div className="flex items-center gap-3">
+        <Button
+          size="sm"
+          variant={pending ? 'default' : 'outline'}
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setError(null)
+            const result = await api.requestBankSort(!pending)
+            if (result.kind === 'failure') setError(result.message || 'Could not update bank sorting')
+            else await refreshNow()
+            setBusy(false)
+          }}
+        >
+          Sort on next visit · {pending ? 'On' : 'Off'}
+        </Button>
+        {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
+      </div>
+      <p className="text-xs text-muted-foreground">Sorts all accessible bank floors after banking work. Compatible stacks are always combined, even when sorting is off. Does not send the merchant to the bank. If already banking, waits for the following visit.</p>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
@@ -376,14 +392,18 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
     (mark) => mark.state !== 'complete' && mark.storage?.pack === pack && mark.storage?.slot === entry.slot && sameMarkedItem(mark.item, item),
   )
   const reserved = pack === 'items1' && entry.slot >= 35
-  const marks = [withdrawMarked && 'Withdraw', standMarked && 'Stand', npcMarked && 'NPC', deconstructionMarked && 'Deconstruct'].filter(Boolean) as string[]
+  const autoStand = state.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined
+  const marks = [withdrawMarked && 'Withdraw', standMarked && !autoStand && 'Stand', npcMarked && 'NPC', deconstructionMarked && 'Deconstruct'].filter(Boolean) as string[]
   return (
     <button
       type="button"
       onClick={onOpen}
       className={`flex w-full items-center gap-2 rounded-md border bg-card p-2 text-left transition-opacity ${withdrawMarked ? 'border-amber-400' : reserved ? 'border-fuchsia-800' : 'border-border'} ${dimmed ? 'opacity-25' : ''}`}
     >
-      <SpriteIcon sprite={catalogFor(item.name)?.sprite} size={36} />
+      <span className="relative shrink-0">
+        <SpriteIcon sprite={catalogFor(item.name)?.sprite} size={36} />
+        <MluckClover item={item} />
+      </span>
       <span className="min-w-0 flex-1 text-sm">
         {displayName(item.name, catalogFor)}
         {item.level ? ` +${item.level}` : ''}
@@ -391,6 +411,11 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
         {item.stat_type && <span className="ml-1 rounded bg-primary/15 px-1 font-mono text-[10px] uppercase text-primary">{item.stat_type}</span>}
       </span>
       {reserved && <span className="shrink-0 font-mono text-[9px] font-bold tracking-widest text-fuchsia-400">RESERVED</span>}
+      {autoStand && (
+        <span title={`Auto stand · ${Number(autoStand.price || 0).toLocaleString()}g`} className="shrink-0 rounded border border-amber-700 bg-amber-950 px-1 text-[10px] text-amber-200">
+          Auto stand
+        </span>
+      )}
       {marks.map((label) => (
         <span key={label} className="shrink-0 text-[10px] font-medium uppercase text-amber-500">
           {label}

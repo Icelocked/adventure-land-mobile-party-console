@@ -138,3 +138,38 @@ test('Debug instance: the party screen shows the debug banner with the game clie
   await page.goto('/characters/Leada')
   await expect(page.getByRole('link', { name: /^Leada · Debug browser/ })).toBeVisible()
 })
+
+test('Settings parity: description, stored ALData key loaded for Copy, auth wait keeps polling away from Settings, realm panel before data, update ! focuses the update section', async ({ page }) => {
+  const server = settingsServer()
+  server.consoleUpdate = { current: '1.2.0', available: '1.3.0', managed: true, automatic: false, phase: 'available' }
+  server.extraState = { ...server.extraState, aldata: { listings: [], hasKey: true, auth: 'NO' } }
+  await server.install(page)
+  await page.route('**/party-api/aldata/key', (route) => route.fulfill({ json: { key: 'secret-key' } }))
+  let auth = 'PENDING'
+  let authReads = 0
+  await page.route('**/party-api/aldata/auth', (route) => {
+    authReads++
+    return route.fulfill({ json: { auth } })
+  })
+  await page.clock.install()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New version available' }).click()
+  await expect(page.locator('#console-updates')).toBeFocused()
+  await expect(page.getByText('Manage saved dashboard state, character connections, and market access.')).toBeVisible()
+  await expect(page.getByText(/^Current: Unknown/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Copy key' })).toBeEnabled()
+  await expect(page.getByText(/Review the postage and click Send; your merchant will send it\./)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Prepare mail' }).click()
+  const compose = page.getByRole('region', { name: 'Write message' })
+  await compose.getByRole('button', { name: 'Send mail' }).click()
+  await compose.getByRole('button', { name: 'Really send mail?' }).click()
+  await expect.poll(() => authReads).toBeGreaterThan(0)
+  const before = authReads
+  auth = 'CORRECT'
+  await page.clock.runFor(16_000)
+  await expect.poll(() => authReads).toBeGreaterThan(before)
+  await page.goBack()
+  await expect(page.getByText(/^Auth: CORRECT/)).toBeVisible()
+  await expect(page.getByText(/^Waiting for mail delivery/)).toHaveCount(0)
+})

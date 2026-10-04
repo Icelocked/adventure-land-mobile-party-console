@@ -14,6 +14,8 @@ export const QK = {
   logsError: ['logsError'] as const,
   // use-party-console.tsx aldataAuthPending: set after the ALData auth mail is sent.
   aldataAuthPending: ['aldataAuthPending'] as const,
+  // use-party-console.tsx aldataAuthStatus: the latest /aldata/auth answer.
+  aldataAuthStatus: ['aldataAuthStatus'] as const,
   escape: ['escape'] as const,
   latencyMs: ['latencyMs'] as const,
   configLoadedAt: ['configLoadedAt'] as const,

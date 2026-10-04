@@ -1,9 +1,17 @@
+import { useEffect } from 'react'
 import { useDebugBrowser, useDebugGameUrl } from '@/data/useDebugBrowser'
+import { useServerSettings } from '@/data/PartyDataProvider'
+import { setLocalDebugAssets } from '@/components/map/mapRendering'
 
 /** debug-browser.tsx DebugBrowserBanner: on a debug instance, a banner with the game client link. */
 export function DebugBrowserBanner() {
   const debug = useDebugBrowser()
   const href = useDebugGameUrl()
+  const settings = useServerSettings()
+  // debug-browser.tsx: setLocalDebugAssets(debug).
+  useEffect(() => {
+    setLocalDebugAssets(debug ? settings.baseUrl.replace(/\/+$/, '') : null)
+  }, [debug, settings.baseUrl])
   if (!debug) return null
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 border-b border-cyan-800 px-4 py-3 text-sm text-cyan-100">
