@@ -111,8 +111,12 @@ class PartyRepositoryTest {
         console.override("core", mapOf("merchantQueue" to JsonPrimitive("not a list")))
         val before = console.sectionRequests("core").size
         eventually { console.sectionRequests("core").size > before + 1 }
-        // The bad payload is skipped; the last good state stays.
+        // Only the field that changed shape is skipped (here it keeps its
+        // last good value); everything else keeps updating.
         assertEquals(3, repo.dynamicState.value.merchantQueue.size)
+        console.override("config", mapOf("threshold" to JsonPrimitive(1234)))
+        runBlocking { repo.refreshDynamicStateNow() }
+        assertEquals(1234L, repo.dynamicState.value.threshold)
     }
 
     @Test
@@ -132,7 +136,7 @@ class PartyRepositoryTest {
     fun whileTheStreamIsDownFastAndInventoryStandIn() {
         val repo = repository()
         runBlocking { live.emit(LiveEvent.ConnectionHealth(false, "stream down")) }
-        eventually { repo.characters.value["Leada"]?.inventory?.items?.size == 3 }
+        eventually { repo.characters.value["Leada"]?.let { it.inventory?.items?.size == 3 && it.vitals != null } == true }
         val leada = repo.characters.value.getValue("Leada")
         assertEquals("hpot0", leada.inventory?.items?.get(0)?.item?.name)
         assertEquals(12_000L, leada.vitals?.gold)
