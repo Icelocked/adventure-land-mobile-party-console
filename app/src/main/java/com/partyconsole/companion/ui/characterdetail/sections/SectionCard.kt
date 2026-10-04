@@ -34,3 +34,11 @@ fun SectionCard(title: String, content: @Composable () -> Unit) {
 fun SectionEmptyState(message: String) {
     Text(message, style = MaterialTheme.typography.bodySmall)
 }
+
+/** Shown beside any control seeded from server settings until the first
+ *  state arrives - the control stays disabled until then so it can't save
+ *  defaults over the server's real values (the PWA's ConfigLoadingNote). */
+@Composable
+fun ConfigLoadingNote(loaded: Boolean) {
+    if (!loaded) Text("Loading settings…", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
+}

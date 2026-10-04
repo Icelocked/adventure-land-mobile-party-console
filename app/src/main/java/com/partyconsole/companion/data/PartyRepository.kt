@@ -66,6 +66,17 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
     private val _dynamicState = MutableStateFlow(PartyStateDynamic())
     val dynamicState: StateFlow<PartyStateDynamic> = _dynamicState.asStateFlow()
 
+    // True once the first full state has arrived. Every control seeded from
+    // the server stays disabled until then, so it never saves defaults over
+    // real settings (the PWA's useConfigLoaded).
+    private val _stateLoaded = MutableStateFlow(false)
+    val stateLoaded: StateFlow<Boolean> = _stateLoaded.asStateFlow()
+
+    // The pairing gate turned this device away (its cookie expired or was
+    // revoked) - the PWA's "Session expired - Reconnect".
+    private val _sessionLost = MutableStateFlow(false)
+    val sessionLost: StateFlow<Boolean> = _sessionLost.asStateFlow()
+
     // Mail is its own route (GET /party-api/mail), not part of state -
     // polled on the same cadence for the same reason (it changes whenever
     // anyone sends anything, no push notification for it exists).
@@ -104,9 +115,14 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
      *  the UI reflects the change immediately instead of waiting up to 6s
      *  for the next poll tick. */
     suspend fun refreshDynamicStateNow() {
-        (api.get("state") as? ApiResult.Success)?.let { result ->
+        val stateResult = api.get("state")
+        _sessionLost.value = (stateResult as? ApiResult.Failure)?.code == "session_expired"
+        (stateResult as? ApiResult.Success)?.let { result ->
             runCatching { json.decodeFromString(PartyStateDynamic.serializer(), result.value) }
-                .getOrNull()?.let { _dynamicState.value = it }
+                .getOrNull()?.let {
+                    _dynamicState.value = it
+                    _stateLoaded.value = true
+                }
         }
         (api.get("mail") as? ApiResult.Success)?.let { result ->
             runCatching { json.decodeFromString(MailSnapshot.serializer(), result.value) }
@@ -143,7 +159,14 @@ class PartyRepository(private val settings: ServerSettings, scope: CoroutineScop
 
     private suspend fun pollDynamicState() {
         while (true) {
-            refreshDynamicStateNow()
+            // One bad response must never end the poll for good.
+            try {
+                refreshDynamicStateNow()
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                android.util.Log.w("PartyRepository", "state poll failed", error)
+            }
             delay(6000)
         }
     }

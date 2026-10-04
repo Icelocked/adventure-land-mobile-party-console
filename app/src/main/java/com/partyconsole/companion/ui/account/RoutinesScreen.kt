@@ -18,6 +18,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.characterdetail.sections.ConfigLoadingNote
 import kotlinx.coroutines.launch
 
 /** routine-priorities-dialog.tsx ported as its own screen. The dashboard
@@ -45,18 +47,26 @@ import kotlinx.coroutines.launch
 @Composable
 fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     val dynamicState by viewModel.dynamicState.collectAsState()
+    val loaded by viewModel.stateLoaded.collectAsState()
     val scope = rememberCoroutineScope()
 
-    var draft by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
-    var enabledDraft by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+    // party-management-panels.tsx: fishing/mining aren't automations - their
+    // switches mirror the standing gathering modes.
+    val priorities = dynamicState.merchantRoutinePriorities
+    val enabled = dynamicState.merchantAutomations +
+        mapOf("fishing" to dynamicState.gatheringModes.contains("fishing"), "mining" to dynamicState.gatheringModes.contains("mining"))
+    var draft by remember { mutableStateOf(priorities) }
+    var enabledDraft by remember { mutableStateOf(enabled) }
     var seeded by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(dynamicState.merchantRoutinePriorities) {
-        if (!seeded && dynamicState.merchantRoutinePriorities.isNotEmpty()) {
-            draft = dynamicState.merchantRoutinePriorities
-            enabledDraft = dynamicState.merchantAutomations
+    // Seed the draft from live state once, after the server's settings have
+    // arrived - after that, only local edits and Save change it.
+    LaunchedEffect(loaded) {
+        if (!seeded && loaded) {
+            draft = priorities
+            enabledDraft = enabled
             seeded = true
         }
     }
@@ -64,10 +74,14 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     val sortedKeys = ROUTINE_LABELS.keys.sortedWith(
         compareByDescending<String> { draft[it] ?: 50 }.thenBy { ROUTINE_LABELS[it] ?: it },
     )
+    // Deliveries/withdrawals are switched on in Merchant settings; while off
+    // their rows are locked (routine-priorities-dialog.tsx disabledRoutine).
+    fun disabledRoutine(key: String) = key in setOf("deliveries", "withdrawals") && enabled[key] == false
+    val movableKeys = sortedKeys.filter { !disabledRoutine(it) }
 
     fun move(source: String, target: String, after: Boolean) {
-        if (source == target) return
-        val keys = sortedKeys.filter { it != source }.toMutableList()
+        if (source == target || disabledRoutine(source) || disabledRoutine(target)) return
+        val keys = movableKeys.filter { it != source }.toMutableList()
         val index = keys.indexOf(target) + (if (after) 1 else 0)
         keys.add(index, source)
         val next = draft.toMutableMap()
@@ -79,7 +93,7 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
         draft = next
     }
 
-    val enabledCount = ROUTINE_LABELS.keys.count { !hasEnableToggle(it) || enabledDraft[it] != false }
+    val enabledCount = ROUTINE_LABELS.keys.count { !disabledRoutine(it) && (!hasEnableToggle(it) || enabledDraft[it] != false) }
 
     AccountScreenScaffold("Merchant routines · $enabledCount/${ROUTINE_LABELS.size} enabled", onBack) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -90,26 +104,35 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
             )
             LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
                 items(sortedKeys) { key ->
-                    val index = sortedKeys.indexOf(key)
+                    val locked = disabledRoutine(key)
+                    val index = movableKeys.indexOf(key)
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                         Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (hasEnableToggle(key)) {
                                 Checkbox(
                                     checked = enabledDraft[key] != false,
+                                    enabled = seeded,
                                     onCheckedChange = { checked -> enabledDraft = enabledDraft + (key to checked) },
                                 )
                             }
-                            Text(ROUTINE_LABELS[key] ?: key, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(ROUTINE_LABELS[key] ?: key, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                if (locked) Text("Enable in Merchant settings", style = MaterialTheme.typography.labelSmall)
+                            }
                             OutlinedTextField(
-                                value = (draft[key] ?: 50).toString(),
-                                onValueChange = { new -> new.toIntOrNull()?.let { draft = draft + (key to it.coerceIn(0, 100)) } },
+                                value = (if (locked) priorities[key] ?: 90 else draft[key] ?: priorities[key] ?: 50).toString(),
+                                enabled = seeded && !locked,
+                                onValueChange = { new ->
+                                    val value = (new.filter { it.isDigit() }.toIntOrNull() ?: 0).coerceIn(0, 100)
+                                    draft = draft + (key to value)
+                                },
                                 singleLine = true,
                                 modifier = Modifier.width(64.dp),
                             )
-                            IconButton(onClick = { if (index > 0) move(key, sortedKeys[index - 1], false) }, enabled = index > 0) {
+                            IconButton(onClick = { move(key, movableKeys[index - 1], false) }, enabled = seeded && !locked && index > 0) {
                                 Icon(Icons.Filled.ArrowUpward, contentDescription = "Move up")
                             }
-                            IconButton(onClick = { if (index < sortedKeys.size - 1) move(key, sortedKeys[index + 1], true) }, enabled = index < sortedKeys.size - 1) {
+                            IconButton(onClick = { move(key, movableKeys[index + 1], true) }, enabled = seeded && !locked && index >= 0 && index < movableKeys.size - 1) {
                                 Icon(Icons.Filled.ArrowDownward, contentDescription = "Move down")
                             }
                         }
@@ -123,20 +146,31 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                         scope.launch {
                             saving = true
                             error = null
-                            val priorities = ROUTINE_LABELS.keys.associateWith { draft[it] ?: 50 }
-                            val enabled = (AUTOMATIC_ROUTINE_KEYS + setOf("fishing", "mining")).associateWith { enabledDraft[it] != false }
-                            when (val result = viewModel.api.saveRoutinePriorities(priorities, enabled)) {
+                            // routine-priorities-dialog.tsx save: the seeded server maps
+                            // with the user's edits, never synthesised values.
+                            val nextPriorities = draft.toMutableMap()
+                            if (disabledRoutine("deliveries")) nextPriorities.remove("deliveries")
+                            if (disabledRoutine("withdrawals")) nextPriorities.remove("withdrawals")
+                            // Those two toggles belong to Merchant settings.
+                            val nextEnabled = enabledDraft - setOf("deliveries", "withdrawals")
+                            when (val result = viewModel.api.saveRoutinePriorities(nextPriorities, nextEnabled)) {
                                 is ApiResult.Failure -> error = result.message
-                                is ApiResult.Success -> viewModel.refreshDynamicStateNow()
+                                is ApiResult.Success -> {
+                                    // use-party-console.tsx: a successful save closes the dialog.
+                                    viewModel.refreshDynamicStateNow()
+                                    onBack()
+                                }
                             }
                             saving = false
                         }
                     },
-                    enabled = !saving,
+                    enabled = seeded && !saving,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(if (saving) "Saving..." else "Save routines")
                 }
+                OutlinedButton(onClick = onBack, enabled = !saving, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("Cancel") }
+                ConfigLoadingNote(loaded)
             }
         }
     }

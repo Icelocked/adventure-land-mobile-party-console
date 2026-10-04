@@ -1,13 +1,20 @@
 package com.partyconsole.companion.ui.account
 
-/** routine-labels.tsx + automatic-routine-keys.tsx ported verbatim - the
+import com.partyconsole.companion.model.MerchantJob
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+
+/** routine-labels.tsx + automatic-routine-keys.tsx (party-console v1.2.0),
+ *  ported verbatim (same as the PWA's lib/routineLabels.ts) - the
  *  merchant's schedulable work reasons and which ones have an on/off
- *  switch (the rest always run when their trigger condition is met, only
- *  their relative priority is configurable). */
+ *  switch. Re-sync from the dashboard on every release; the server drops
+ *  unknown keys (routine-priorities.ts). */
 val ROUTINE_LABELS: Map<String, String> = linkedMapOf(
     "merchant luck" to "Merchant's Luck",
     "inventory cleanout" to "Emergency inventory cleanout",
     "manual visit" to "Manual player visit",
+    "deliveries" to "Marked deliveries",
+    "withdrawals" to "Marked withdrawals",
     "party collection" to "Automatic item collection",
     "restock" to "Party restock",
     "gold threshold" to "Automatic gold collection",
@@ -16,6 +23,7 @@ val ROUTINE_LABELS: Map<String, String> = linkedMapOf(
     "auto npc sales" to "Auto NPC sales",
     "collect mail" to "Collect mail",
     "stand bid purchases" to "Automatic WTB fills",
+    "upgrade preview" to "Refresh upgrade chances",
     "manual upgrades" to "Manual upgrades",
     "auto upgrade" to "Auto upgrade",
     "manual compounds" to "Manual compounds",
@@ -23,7 +31,8 @@ val ROUTINE_LABELS: Map<String, String> = linkedMapOf(
     "auto compound" to "Auto compound",
     "manual buying" to "Manual buying",
     "manual crafting" to "Manual crafting",
-    "exchange" to "Exchange",
+    "manual exchange" to "Manual exchange",
+    "automatic exchange" to "Automatic exchange",
     "merchant donation" to "Donate gold",
     "send mail" to "Send mail",
     "join giveaway" to "Join giveaways",
@@ -35,9 +44,41 @@ val ROUTINE_LABELS: Map<String, String> = linkedMapOf(
 )
 
 val AUTOMATIC_ROUTINE_KEYS: Set<String> = setOf(
-    "merchant luck", "restock", "gold threshold", "inventory cleanout", "auto compound",
-    "auto upgrade", "exchange", "stand bid purchases", "party collection", "auto npc sales",
+    "merchant luck",
+    "restock",
+    "gold threshold",
+    "inventory cleanout",
+    "auto compound",
+    "auto upgrade",
+    "automatic exchange",
+    "stand bid purchases",
+    "party collection",
+    "auto npc sales",
     "join giveaway",
 )
 
 fun hasEnableToggle(key: String): Boolean = AUTOMATIC_ROUTINE_KEYS.contains(key) || key == "fishing" || key == "mining"
+
+/** runtime/coordinator/merchant/routines.ts routineFor (v1.2.0), verbatim -
+ *  which routine a queued merchant job belongs to. */
+private val PURCHASES = setOf("stand purchases", "stand bid purchases", "ALData marketplace purchases", "Ponty purchases")
+private val ALIASES = mapOf(
+    "stand search" to "manual marketplace purchases",
+    "marked items" to "party collection",
+    "npc sale pickup" to "npc sales",
+    "auto npc sale pickup" to "auto npc sales",
+    "upgrades and compounds" to "manual upgrades",
+)
+
+fun routineFor(job: MerchantJob): String {
+    if (job.reason == "exchange") return if (job.autoExchangeKeys.isNotEmpty()) "automatic exchange" else "manual exchange"
+    job.routine?.let { return it }
+    if (job.reason in PURCHASES) {
+        return if (job.manual == true || (job.bidItemId == null && job.reason != "stand bid purchases")) "manual marketplace purchases" else "stand bid purchases"
+    }
+    if (job.reason == "merchant commerce") {
+        val crafts = (job.order as? JsonObject)?.get("crafts") as? JsonArray
+        return if (!crafts.isNullOrEmpty()) "manual crafting" else "manual buying"
+    }
+    return ALIASES[job.reason] ?: job.reason
+}

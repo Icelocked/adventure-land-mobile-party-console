@@ -13,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,7 +41,9 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     val scope = rememberCoroutineScope()
     var searchTerm by remember { mutableStateOf("") }
     val catalogFor = rememberCatalogLookup(state.merchantCatalog)
-    val listings = (state.aldata?.listings.orEmpty()) + (state.ponty?.listings.orEmpty())
+    // Ponty listings carry no `source` field, so the origin is tagged here
+    // (a Ponty buy sent to aldata-order is refused).
+    val listings = state.aldata?.listings.orEmpty().map { it to "aldata" } + state.ponty?.listings.orEmpty().map { it to "ponty" }
 
     AccountScreenScaffold("Market", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
         androidx.compose.material3.OutlinedButton(onClick = onOpenWtb, modifier = Modifier.padding(start = 12.dp, top = 8.dp)) {
@@ -78,16 +81,19 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
             EmptyState("No market listings loaded yet.")
         } else {
             LazyColumn(contentPadding = PaddingValues(12.dp)) {
-                items(listings) { MarketRow(it, catalogFor, viewModel) }
+                items(listings) { (listing, origin) -> MarketRow(listing, origin, catalogFor, viewModel) }
             }
         }
     }
 }
 
 @Composable
-private fun MarketRow(listing: MarketListing, catalogFor: (String) -> CatalogItem?, viewModel: PartyViewModel) {
+private fun MarketRow(listing: MarketListing, origin: String, catalogFor: (String) -> CatalogItem?, viewModel: PartyViewModel) {
     val scope = rememberCoroutineScope()
     var quantity by remember { mutableStateOf(listing.quantity.toString()) }
+    var confirmingQuantity by remember { mutableStateOf<Int?>(null) }
+    var buying by remember { mutableStateOf(false) }
+    var buyError by remember { mutableStateOf<String?>(null) }
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -107,18 +113,38 @@ private fun MarketRow(listing: MarketListing, catalogFor: (String) -> CatalogIte
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
-                    Button(onClick = {
-                        val qty = quantity.toIntOrNull() ?: 1
-                        scope.launch {
-                            if (listing.source == "ponty") {
-                                viewModel.api.buyPonty(listing.key, qty, listing.unitPrice ?: listing.price)
-                            } else {
-                                viewModel.api.buyAlData(listing.key, qty)
-                            }
-                            viewModel.refreshDynamicStateNow()
+                    Button(enabled = !buying, onClick = {
+                        val qty = quantity.toIntOrNull()
+                        if (qty == null || qty < 1 || qty > listing.quantity) {
+                            buyError = "Enter a quantity from 1 to ${listing.quantity}"
+                        } else {
+                            buyError = null
+                            confirmingQuantity = qty
                         }
                     }) { Text("Buy") }
                 }
+                // Spending gold asks first.
+                confirmingQuantity?.let { qty ->
+                    val unit = if (origin == "ponty") listing.unitPrice ?: listing.price else listing.price
+                    Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Buy $qty for ${"%,d".format(unit * qty)}g?", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        Button(enabled = !buying, onClick = {
+                            scope.launch {
+                                buying = true
+                                val result = if (origin == "ponty") {
+                                    viewModel.api.buyPonty(listing.key, qty, unit)
+                                } else {
+                                    viewModel.api.buyAlData(listing.key, qty)
+                                }
+                                buying = false
+                                if (result is com.partyconsole.companion.network.ApiResult.Failure) buyError = result.message else confirmingQuantity = null
+                                viewModel.refreshDynamicStateNow()
+                            }
+                        }) { Text(if (buying) "Buying…" else "Confirm") }
+                        TextButton(enabled = !buying, onClick = { confirmingQuantity = null }) { Text("Cancel") }
+                    }
+                }
+                buyError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }

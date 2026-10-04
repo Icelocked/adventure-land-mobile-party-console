@@ -1,15 +1,16 @@
 package com.partyconsole.companion.ui.characterdetail.sections
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,22 +19,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.RestockPolicy
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
 /** Ports restock-controls.tsx's HP/MP min/max fields + Save button. Keeps
  *  a local "dirty" copy once the user starts typing so an incoming poll
- *  refresh (PartyRepository polls /party-api/state every ~6s) can't
- *  clobber an in-progress edit - only resets from the server value while
- *  untouched, exactly like the web version's own dirty-tracking. */
+ *  refresh can't clobber an in-progress edit - only resets from the server
+ *  value while untouched. Save sends the whole policy (potion items
+ *  included) and stays disabled until the server's policy has loaded. */
 @Composable
 fun RestockSection(characterName: String, serverPolicy: RestockPolicy, viewModel: PartyViewModel) {
+    val loaded by viewModel.stateLoaded.collectAsState()
     var dirty by remember(characterName) { mutableStateOf(false) }
     var hpMin by remember(characterName) { mutableStateOf(serverPolicy.hp.min.toString()) }
     var hpMax by remember(characterName) { mutableStateOf(serverPolicy.hp.max.toString()) }
     var mpMin by remember(characterName) { mutableStateOf(serverPolicy.mp.min.toString()) }
     var mpMax by remember(characterName) { mutableStateOf(serverPolicy.mp.max.toString()) }
     var saving by remember(characterName) { mutableStateOf(false) }
+    var error by remember(characterName) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(serverPolicy) {
         if (!dirty) {
@@ -59,26 +63,30 @@ fun RestockSection(characterName: String, serverPolicy: RestockPolicy, viewModel
             RestockField("MP max", mpMax, modifier = Modifier.weight(1f)) { mpMax = it; dirty = true }
         }
         Button(
-            enabled = dirty && !saving,
+            enabled = loaded && !saving,
             modifier = Modifier.padding(top = 8.dp),
             onClick = {
                 scope.launch {
                     saving = true
-                    viewModel.api.saveRestock(
-                        character = characterName,
-                        hpMin = hpMin.toIntOrNull() ?: 0,
-                        hpMax = hpMax.toIntOrNull() ?: 0,
-                        mpMin = mpMin.toIntOrNull() ?: 0,
-                        mpMax = mpMax.toIntOrNull() ?: 0,
+                    error = null
+                    // restock-controls.tsx: digits only, so a cleared field is 0 there too.
+                    val policy = RestockPolicy(
+                        hp = serverPolicy.hp.copy(min = hpMin.toIntOrNull() ?: 0, max = hpMax.toIntOrNull() ?: 0),
+                        mp = serverPolicy.mp.copy(min = mpMin.toIntOrNull() ?: 0, max = mpMax.toIntOrNull() ?: 0),
                     )
+                    when (val result = viewModel.api.saveRestock(characterName, policy)) {
+                        is ApiResult.Failure -> error = result.message.ifBlank { "Restock update failed" }
+                        is ApiResult.Success -> dirty = false
+                    }
                     viewModel.refreshDynamicStateNow()
-                    dirty = false
                     saving = false
                 }
             },
         ) {
             Text(if (saving) "Saving..." else "Save")
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        ConfigLoadingNote(loaded)
     }
 }
 

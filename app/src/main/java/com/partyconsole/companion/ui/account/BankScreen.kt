@@ -28,7 +28,10 @@ import com.partyconsole.companion.model.BankVault
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.InventoryEntry
 import com.partyconsole.companion.model.RosterMember
+import com.partyconsole.companion.model.sameMarkedItem
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.components.NpcSaleSheet
 import com.partyconsole.companion.model.CatalogItem
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import com.partyconsole.companion.ui.itemicon.displayName
@@ -216,9 +219,43 @@ private fun BankRow(
     viewModel: PartyViewModel,
 ) {
     val scope = rememberCoroutineScope()
-    var pickingWithdraw by remember(expanded) { mutableStateOf(false) }
-    var pickingStand by remember(expanded) { mutableStateOf(false) }
-    var standPrice by remember(expanded) { mutableStateOf("") }
+    val state by viewModel.dynamicState.collectAsState()
+    val merchant = state.merchantCharacter
+    val meta = catalogFor(entry.item.name)?.meta
+    val stack = maxOf(1, entry.item.q ?: 1)
+    // bank-sheet.tsx: the same identity checks the dashboard badges with.
+    val withdrawMarked = merchant != null && state.withdrawals[merchant].orEmpty().any { it.pack == pack && it.slot == entry.slot && sameMarkedItem(it.item, entry.item) }
+    var mode by remember(expanded) { mutableStateOf<String?>(null) } // "stand" | "npc"
+    var error by remember(expanded) { mutableStateOf<String?>(null) }
+
+    // bank-withdrawal.tsx: in-flight guard (withdraw is a server toggle, so
+    // a second tap would remove the mark just added) and the "Remove
+    // automatic bank mark?" consent on auto_bank_confirmation_required.
+    var withdrawing by remember { mutableStateOf(false) }
+    var confirmingWithdraw by remember(expanded) { mutableStateOf<Boolean?>(null) } // markAll of the pending request
+    fun withdraw(markAll: Boolean, confirmed: Boolean = false) {
+        if (withdrawing || merchant == null || (confirmingWithdraw != null && !confirmed)) return
+        withdrawing = true
+        scope.launch {
+            try {
+                when (val result = viewModel.api.withdrawFromBank(merchant, entry.item, pack, entry.slot, markAll, confirmed)) {
+                    is ApiResult.Failure ->
+                        if (!confirmed && result.code == "auto_bank_confirmation_required") {
+                            error = null
+                            confirmingWithdraw = markAll
+                        } else {
+                            error = result.message
+                        }
+                    is ApiResult.Success -> {
+                        confirmingWithdraw = null
+                        viewModel.refreshDynamicStateNow()
+                    }
+                }
+            } finally {
+                withdrawing = false
+            }
+        }
+    }
 
     Card(onClick = onToggle, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -232,51 +269,131 @@ private fun BankRow(
                 )
             }
             if (expanded) {
-                if (pickingStand) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        OutlinedTextField(
-                            value = standPrice,
-                            onValueChange = { new -> if (new.all { it.isDigit() }) standPrice = new },
-                            label = { Text("Price") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Button(onClick = {
-                            scope.launch {
-                                viewModel.api.markForStand(entry.item, entry.slot, bankPack = pack, price = standPrice.toLongOrNull() ?: 0L)
-                                pickingStand = false
-                                viewModel.refreshDynamicStateNow()
+                when (mode) {
+                    "stand" -> BankStandForm(entry, pack, meta, state.standListings.find { it.bankPack == pack && it.bankSlot == entry.slot && sameMarkedItem(it.item, entry.item) }, viewModel) { mode = null }
+                    "npc" -> NpcSaleSheet(
+                        item = entry.item,
+                        meta = meta,
+                        location = "From the bank ($pack)",
+                        available = stack,
+                        onConfirm = { quantity, acknowledged ->
+                            when (val result = viewModel.api.sellBankItemToNpc(entry.item, pack, entry.slot, quantity, acknowledged)) {
+                                is ApiResult.Failure -> result.message.ifBlank { "NPC sale failed" }
+                                is ApiResult.Success -> {
+                                    viewModel.refreshDynamicStateNow()
+                                    mode = null
+                                    null
+                                }
                             }
-                        }) { Text("List") }
-                    }
-                } else if (!pickingWithdraw) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        TextButton(onClick = { pickingWithdraw = true }) { Text("Withdraw to...") }
-                        TextButton(onClick = { pickingStand = true }) { Text("Mark for stand") }
-                        TextButton(onClick = {
-                            scope.launch { viewModel.api.sellBankItemToNpc(entry.item, pack, entry.slot); viewModel.refreshDynamicStateNow() }
-                        }) { Text("Sell to NPC") }
-                        TextButton(onClick = {
-                            scope.launch { viewModel.api.markBankItemForDeconstruction(entry.item, pack, entry.slot); viewModel.refreshDynamicStateNow() }
-                        }) { Text("Deconstruct") }
-                    }
-                } else {
-                    Column(modifier = Modifier.padding(top = 4.dp)) {
-                        for (name in roster.keys) {
+                        },
+                        onCancel = { mode = null },
+                    )
+                    else -> Column(modifier = Modifier.padding(top = 4.dp)) {
+                        if (merchant == null) {
+                            Text("No merchant is configured.", style = MaterialTheme.typography.labelSmall)
+                        } else {
+                            TextButton(enabled = !withdrawing && confirmingWithdraw == null, onClick = { withdraw(false) }) {
+                                Text(if (withdrawMarked) "Unmark withdrawal" else "Mark for withdrawal")
+                            }
+                            TextButton(enabled = !withdrawing && confirmingWithdraw == null, onClick = { withdraw(true) }) { Text("Mark all for withdrawal") }
+                        }
+                        confirmingWithdraw?.let { markAll ->
+                            Text("Remove automatic bank mark?", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "This item is automatically marked for bank. Allow withdrawal and remove mark?",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(enabled = !withdrawing, onClick = { withdraw(markAll, confirmed = true) }) { Text(if (withdrawing) "Withdrawing…" else "Confirm") }
+                                TextButton(enabled = !withdrawing, onClick = { confirmingWithdraw = null }) { Text("Cancel") }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { mode = "stand" }) { Text("Mark for stand") }
+                            TextButton(onClick = { mode = "npc" }) { Text("Sell to NPC") }
                             TextButton(onClick = {
                                 scope.launch {
-                                    viewModel.api.withdrawFromBank(name, entry.item, pack, entry.slot)
-                                    pickingWithdraw = false
+                                    val result = viewModel.api.markBankItemForDeconstruction(entry.item, pack, entry.slot)
+                                    if (result is ApiResult.Failure) error = result.message
                                     viewModel.refreshDynamicStateNow()
                                 }
-                            }) { Text("  → $name") }
+                            }) { Text("Deconstruct") }
                         }
                     }
                 }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
+    }
+}
+
+/** The bank row's stand listing (party-management-panels.tsx): price
+ *  defaults to the existing listing or the catalog value (never below 1),
+ *  quantity to the existing listing or the stack, and "Mark all" lists
+ *  every identical copy held by the merchant or stored in the bank. */
+@Composable
+private fun BankStandForm(
+    entry: InventoryEntry,
+    pack: String,
+    meta: com.partyconsole.companion.model.ItemMeta?,
+    existing: com.partyconsole.companion.model.StandListing?,
+    viewModel: PartyViewModel,
+    onDone: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val stack = maxOf(1, entry.item.q ?: 1)
+    val catalogValue = ((meta?.definition?.get("g") as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() ?: 0L)
+    var price by remember { mutableStateOf((existing?.price?.takeIf { it > 0 } ?: maxOf(1L, catalogValue)).toString()) }
+    var quantity by remember { mutableStateOf((existing?.quantity?.takeIf { it > 0 } ?: stack).toString()) }
+    var markAll by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = price,
+                onValueChange = { new -> if (new.all { it.isDigit() }) price = new },
+                label = { Text("Price") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            if (stack > 1 && !markAll) {
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { new -> if (new.all { it.isDigit() }) quantity = new },
+                    label = { Text("Quantity") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            androidx.compose.material3.Checkbox(checked = markAll, onCheckedChange = { markAll = it })
+            Text("List every identical copy held by the merchant or stored in the bank at this price", style = MaterialTheme.typography.labelSmall)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !busy, onClick = {
+                val value = price.toLongOrNull()
+                val count = if (stack > 1 && !markAll) quantity.toIntOrNull() else stack
+                when {
+                    value == null || value < 1 -> error = "Enter a price of at least 1 gold."
+                    count == null || count < 1 || count > stack -> error = "Enter a quantity from 1 to $stack."
+                    else -> scope.launch {
+                        busy = true
+                        error = null
+                        val result = viewModel.api.markForStand(entry.item, entry.slot, bankPack = pack, price = value, quantity = count, markAll = markAll, id = existing?.id)
+                        busy = false
+                        if (result is ApiResult.Failure) {
+                            error = result.message
+                        } else {
+                            viewModel.refreshDynamicStateNow()
+                            onDone()
+                        }
+                    }
+                }
+            }) { Text("List") }
+            TextButton(enabled = !busy, onClick = onDone) { Text("Cancel") }
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }

@@ -28,7 +28,8 @@ private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
  *  stream always trust the server the same way; only their timeouts
  *  differ (see each function's doc). */
 private fun baseHttpClientBuilder(settings: ServerSettings): OkHttpClient.Builder {
-    val builder = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
+    // The pairing cookie travels with every request, REST and stream alike.
+    val builder = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).cookieJar(PartyCookies)
     when (settings.trustMode) {
         TrustMode.SYSTEM, TrustMode.CLEARTEXT -> {
             // Ordinary platform trust store. For CLEARTEXT the URL itself
@@ -64,6 +65,9 @@ private fun baseHttpClientBuilder(settings: ServerSettings): OkHttpClient.Builde
  *  "Connecting..." screen with no error and no recovery. */
 fun buildHttpClient(settings: ServerSettings): OkHttpClient =
     baseHttpClientBuilder(settings)
+        // The gateway answers an unpaired request with 302 -> /setup; following
+        // it would hand back the setup page's HTML as if it were data.
+        .followRedirects(false)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
         .build()
@@ -82,6 +86,8 @@ fun buildSseHttpClient(settings: ServerSettings): OkHttpClient =
 data class CommandResult(
     val ok: Boolean = false,
     val error: String? = null,
+    // Machine-readable reason some routes add (e.g. auto_bank_confirmation_required).
+    val code: String? = null,
 )
 
 @kotlinx.serialization.Serializable
@@ -90,9 +96,14 @@ private data class AlDataKeyResponse(val key: String? = null, val error: String?
 @kotlinx.serialization.Serializable
 private data class AlDataAuthResponse(val auth: String? = null, val error: String? = null)
 
+/** The pairing gate's answers (tools/hosting/authorize.ts): a redirect to
+ *  /setup, or 401/403. */
+internal fun sessionLost(code: Int) = code in 300..399 || code == 401 || code == 403
+internal const val SESSION_EXPIRED = "Session expired - pair this device again"
+
 sealed interface ApiResult<out T> {
     data class Success<T>(val value: T) : ApiResult<T>
-    data class Failure(val message: String) : ApiResult<Nothing>
+    data class Failure(val message: String, val code: String? = null) : ApiResult<Nothing>
 }
 
 /** Thin wrapper over the party-api REST surface - every endpoint listed
@@ -121,7 +132,8 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}")
+                if (sessionLost(response.code)) ApiResult.Failure(SESSION_EXPIRED, "session_expired")
+                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}")
                 else ApiResult.Success(text)
             }
         } catch (e: java.io.IOException) {
@@ -129,40 +141,34 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         }
     }
 
-    /** POST /party-api/formation (runtime/coordinator/http/formation.ts) -
-     *  leader is the party leader's name (or null to clear it), independent
-     *  of follow, which is this specific character's own follow-the-leader
-     *  toggle. The web dashboard's two controls (RadioGroup + Checkbox,
-     *  see party-workspace.tsx) both call this same route. */
-    suspend fun setFormation(leader: String?, character: String, follow: Boolean): ApiResult<CommandResult> {
-        val body = JsonObject(
-            buildMap {
-                put("character", kotlinx.serialization.json.JsonPrimitive(character))
-                put("follow", kotlinx.serialization.json.JsonPrimitive(follow))
-                put("leader", leader?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
-            },
-        )
-        return post("formation", body)
-    }
+    /** POST /party-api/formation {leader} - party-workspace.tsx's leader
+     *  radio. Only the leader key, so nobody's follow flag changes. */
+    suspend fun setLeader(leader: String): ApiResult<CommandResult> =
+        post("formation", JsonObject(mapOf("leader" to JsonPrimitive(leader))))
 
-    /** POST /party-api/restock (runtime/coordinator/http/restock.ts) - one
-     *  character's HP/MP auto-potion thresholds. */
-    suspend fun saveRestock(character: String, hpMin: Int, hpMax: Int, mpMin: Int, mpMax: Int): ApiResult<CommandResult> {
-        fun range(min: Int, max: Int) = JsonObject(
-            mapOf(
-                "min" to kotlinx.serialization.json.JsonPrimitive(min),
-                "max" to kotlinx.serialization.json.JsonPrimitive(max),
-            ),
-        )
+    /** POST /party-api/formation {character, follow} - connected-character-
+     *  card.tsx's Follow checkbox. Never sends `leader`: the server applies
+     *  any `leader` key it gets, so sending one would change the leader. */
+    suspend fun setFollow(character: String, follow: Boolean): ApiResult<CommandResult> =
+        post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "follow" to JsonPrimitive(follow))))
+
+    /** POST /party-api/restock (use-party-console.tsx saveRestock) - the
+     *  whole policy, potion `item` included, so saving thresholds never
+     *  drops the chosen potion. */
+    suspend fun saveRestock(character: String, policy: com.partyconsole.companion.model.RestockPolicy): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
-                "character" to kotlinx.serialization.json.JsonPrimitive(character),
-                "hp" to range(hpMin, hpMax),
-                "mp" to range(mpMin, mpMax),
+                "character" to JsonPrimitive(character),
+                "hp" to json.encodeToJsonElement(com.partyconsole.companion.model.RestockRange.serializer(), policy.hp),
+                "mp" to json.encodeToJsonElement(com.partyconsole.companion.model.RestockRange.serializer(), policy.mp),
             ),
         )
         return post("restock", body)
     }
+
+    /** `/party-api/command` type "go-home" (manual-commands.ts goHome) -
+     *  back to the character's home spot and home realm. */
+    suspend fun goHome(character: String): ApiResult<CommandResult> = sendCommand(character, mapOf("type" to "go-home"))
 
     /** party-console's account-pairing controls (/setup/state,
      *  /setup/pairing) live at the server root, not under /party-api - see
@@ -174,7 +180,8 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}") else ApiResult.Success(text)
+                if (sessionLost(response.code)) ApiResult.Failure(SESSION_EXPIRED, "session_expired")
+                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}") else ApiResult.Success(text)
             }
         } catch (e: java.io.IOException) {
             ApiResult.Failure(e.message ?: "network error")
@@ -189,7 +196,8 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}") else ApiResult.Success(text)
+                if (sessionLost(response.code)) ApiResult.Failure(SESSION_EXPIRED, "session_expired")
+                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}") else ApiResult.Success(text)
             }
         } catch (e: java.io.IOException) {
             ApiResult.Failure(e.message ?: "network error")
@@ -204,9 +212,10 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
+                if (sessionLost(response.code)) return@withContext ApiResult.Failure(SESSION_EXPIRED, "session_expired")
                 if (!response.isSuccessful) {
                     val parsed = runCatching { json.decodeFromString(CommandResult.serializer(), text) }.getOrNull()
-                    return@withContext ApiResult.Failure(parsed?.error ?: "HTTP ${response.code}")
+                    return@withContext ApiResult.Failure(parsed?.error ?: "HTTP ${response.code}", parsed?.code)
                 }
                 val result = runCatching { json.decodeFromString(CommandResult.serializer(), text) }
                     .getOrElse { CommandResult(ok = true) }
@@ -277,7 +286,9 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         slot: Int,
         bankPack: String? = null,
         price: Long,
-        quantity: Int = 1,
+        // Required: the server overwrites an existing listing's quantity with it.
+        quantity: Int,
+        markAll: Boolean = false,
         remove: Boolean = false,
         id: String? = null,
     ): ApiResult<CommandResult> {
@@ -289,32 +300,33 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
                 bankPack?.let { put("bankPack", JsonPrimitive(it)) }
                 put("price", JsonPrimitive(price))
                 put("quantity", JsonPrimitive(quantity))
+                put("markAll", JsonPrimitive(markAll))
                 put("remove", JsonPrimitive(remove))
             },
         )
         return post("merchant/stand", body)
     }
 
-    /** POST /party-api/merchant/npc-sale (http/npc-sale.ts) - source is
-     *  always "character" from this app's item-action panel (bank-side
-     *  NPC sales are a bank-screen concern, not this character's, per the
-     *  mobile-redesign plan's Phase 3 account screens). */
+    /** POST /party-api/merchant/npc-sale (use-party-console.tsx
+     *  confirmNpcSale). The configured merchant's own items use source
+     *  "merchant" with no `character`; anyone else's use "character". */
     suspend fun markForNpcSale(
         character: String,
         item: Item,
         slot: Int,
-        quantity: Int = 1,
-        remove: Boolean = false,
+        isMerchant: Boolean,
+        quantity: Int,
+        acknowledged: Boolean,
     ): ApiResult<CommandResult> {
         val body = JsonObject(
-            mapOf(
-                "source" to JsonPrimitive("character"),
-                "character" to JsonPrimitive(character),
-                "slot" to JsonPrimitive(slot),
-                "item" to json.encodeToJsonElement(Item.serializer(), item),
-                "quantity" to JsonPrimitive(quantity),
-                "remove" to JsonPrimitive(remove),
-            ),
+            buildMap {
+                put("source", JsonPrimitive(if (isMerchant) "merchant" else "character"))
+                if (!isMerchant) put("character", JsonPrimitive(character))
+                put("slot", JsonPrimitive(slot))
+                put("item", json.encodeToJsonElement(Item.serializer(), item))
+                put("quantity", JsonPrimitive(quantity))
+                put("acknowledged", JsonPrimitive(acknowledged))
+            },
         )
         return post("merchant/npc-sale", body)
     }
@@ -325,17 +337,20 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
      *  `slot` is that pack's slot index - both distinct from the
      *  requesting character's own inventory slot, which this command
      *  doesn't need (the server finds room on its own). */
-    suspend fun withdrawFromBank(character: String, item: Item, pack: String, slot: Int, markAll: Boolean = false): ApiResult<CommandResult> {
+    suspend fun withdrawFromBank(character: String, item: Item, pack: String, slot: Int, markAll: Boolean = false, removeAutoBankMark: Boolean = false): ApiResult<CommandResult> {
+        // bank-withdrawal.tsx: removeAutoBankMark confirms dropping an
+        // automatic bank mark when the server asks (auto_bank_confirmation_required).
         val extra = buildMap {
             put("pack", JsonPrimitive(pack))
-            if (markAll) put("markAll", JsonPrimitive(true))
+            put("markAll", JsonPrimitive(markAll))
+            put("removeAutoBankMark", JsonPrimitive(removeAutoBankMark))
         }
         return itemCommand("withdraw", character, item, JsonPrimitive(slot), extra)
     }
 
     /** POST /party-api/merchant/npc-sale with source "bank" - sells a bank
      *  item directly without withdrawing it to a character first. */
-    suspend fun sellBankItemToNpc(item: Item, pack: String, slot: Int, quantity: Int = 1, remove: Boolean = false): ApiResult<CommandResult> {
+    suspend fun sellBankItemToNpc(item: Item, pack: String, slot: Int, quantity: Int, acknowledged: Boolean): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
                 "source" to JsonPrimitive("bank"),
@@ -343,7 +358,7 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
                 "slot" to JsonPrimitive(slot),
                 "item" to json.encodeToJsonElement(Item.serializer(), item),
                 "quantity" to JsonPrimitive(quantity),
-                "remove" to JsonPrimitive(remove),
+                "acknowledged" to JsonPrimitive(acknowledged),
             ),
         )
         return post("merchant/npc-sale", body)
@@ -412,13 +427,16 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
 
     /** POST /party-api/merchant/auto-npc-sale (http/automatic-sales.ts) -
      *  a standing "always sell this item type to an NPC" rule. */
-    suspend fun autoNpcSale(character: String, item: Item, remove: Boolean = false): ApiResult<CommandResult> {
+    suspend fun autoNpcSale(character: String?, item: Item, remove: Boolean = false): ApiResult<CommandResult> {
+        // connected-inventory.tsx: `character` is omitted for the configured
+        // merchant (its rule is the account-wide one); with it, the server
+        // stores a per-player rule that never fires for the merchant.
         val body = JsonObject(
-            mapOf(
-                "character" to JsonPrimitive(character),
-                "item" to json.encodeToJsonElement(Item.serializer(), item),
-                "action" to JsonPrimitive(if (remove) "remove" else "set"),
-            ),
+            buildMap {
+                character?.let { put("character", JsonPrimitive(it)) }
+                put("item", json.encodeToJsonElement(Item.serializer(), item))
+                put("action", JsonPrimitive(if (remove) "remove" else "set"))
+            },
         )
         return post("merchant/auto-npc-sale", body)
     }
@@ -606,10 +624,13 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
      *  (monster focus + a real spawn location) the first time, or
      *  whenever changing it - the server 409s with `code:"backup_required"`
      *  if Hunt is requested without one and none is already set. */
-    suspend fun setFarmingMode(mode: String, backupMonsterFocus: List<String>? = null, backupMap: String? = null, backupX: Double? = null, backupY: Double? = null): ApiResult<CommandResult> {
+    suspend fun setFarmingMode(mode: String, character: String, backupMonsterFocus: List<String>? = null, backupMap: String? = null, backupX: Double? = null, backupY: Double? = null): ApiResult<CommandResult> {
+        // use-party-console.tsx setFarmingPolicy: scoped to the character;
+        // without it the server changes the leader's policy.
         val body = JsonObject(
             buildMap {
                 put("mode", JsonPrimitive(mode))
+                put("character", JsonPrimitive(character))
                 if (backupMonsterFocus != null && backupMap != null && backupX != null && backupY != null) {
                     put(
                         "backup",
@@ -646,39 +667,24 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
         return post("focus", body)
     }
 
-    /** POST /party-api/hunt-blacklist - `action:"clear"` drops everything,
-     *  `action:"remove"` drops one monster (needs `monsterId`), `action:
-     *  "add"` manually blacklists one (needs `monsterId`). */
-    suspend fun updateHuntBlacklist(action: String, monsterId: String? = null): ApiResult<CommandResult> {
+    /** POST /party-api/hunt-blacklist - always scoped to the character
+     *  (connected-character-card.tsx); without it the server edits the
+     *  leader's list. */
+    suspend fun updateHuntBlacklist(character: String, action: String, monsterId: String? = null): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
                 put("action", JsonPrimitive(action))
+                put("character", JsonPrimitive(character))
                 monsterId?.let { put("monsterId", JsonPrimitive(it)) }
             },
         )
         return post("hunt-blacklist", body)
     }
 
-    /** POST /party-api/hunt-settings - a partial patch (only send the
-     *  fields changing; server merges over the existing settings). */
-    suspend fun saveHuntSettings(
-        relocateIfCompeting: Boolean,
-        blacklistDeaths: Boolean,
-        deathThreshold: Int,
-        blacklistExpirations: Boolean,
-        expirationThreshold: Int,
-    ): ApiResult<CommandResult> {
-        val body = JsonObject(
-            mapOf(
-                "relocateIfCompeting" to JsonPrimitive(relocateIfCompeting),
-                "blacklistDeaths" to JsonPrimitive(blacklistDeaths),
-                "deathThreshold" to JsonPrimitive(deathThreshold),
-                "blacklistExpirations" to JsonPrimitive(blacklistExpirations),
-                "expirationThreshold" to JsonPrimitive(expirationThreshold),
-            ),
-        )
-        return post("hunt-settings", body)
-    }
+    /** POST /party-api/hunt-settings - a partial patch of only the changed
+     *  fields, scoped to the character. */
+    suspend fun saveHuntSettings(character: String, patch: Map<String, JsonElement>): ApiResult<CommandResult> =
+        post("hunt-settings", JsonObject(patch + ("character" to JsonPrimitive(character))))
 
     /** POST /party-api/merchant/bid - places or edits a standing "buy this
      *  item automatically, up to this price" order. `minimumQuality` is
@@ -701,7 +707,9 @@ class PartyApiClient(private val client: OkHttpClient, private val settings: Ser
                 put("minimumQuality", JsonPrimitive(minimumQuality))
                 put("useStandSlot", JsonPrimitive(useStandSlot))
                 put("acceptHigherLevels", JsonPrimitive(acceptHigherLevels))
-                priorityOverride?.let { put("priorityOverride", JsonPrimitive(it)) }
+                // Always sent: the server keeps the previous override when the
+                // key is missing, so null is how a blank field clears it.
+                put("priorityOverride", priorityOverride?.let { JsonPrimitive(it) } ?: JsonNull)
             },
         )
         return post("merchant/bid", body)

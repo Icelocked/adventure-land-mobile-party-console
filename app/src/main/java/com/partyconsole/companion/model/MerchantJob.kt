@@ -12,9 +12,15 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class MerchantJob(
     val id: String? = null,
-    val target: String,
-    val reason: String,
+    // Defaulted: one malformed job must not fail the whole state decode.
+    val target: String = "",
+    val reason: String = "",
     val routine: String? = null,
+    // routines.ts routineFor inputs.
+    val manual: Boolean? = null,
+    val bidItemId: String? = null,
+    val order: JsonElement? = null,
+    val autoExchangeKeys: List<String> = emptyList(),
     val priority: Int? = null,
     val phase: String? = null,
     val realmBlockedReason: String? = null,
@@ -35,7 +41,8 @@ data class RestockRange(
  *  there) instead of vanishing from RestockSection entirely. */
 @Serializable
 data class RestockPolicy(
-    val hp: RestockRange = RestockRange(),
+    // restock-controls.tsx defaults, the same as the server's.
+    val hp: RestockRange = RestockRange(min = 5, max = 20),
     val mp: RestockRange = RestockRange(),
 )
 
@@ -168,6 +175,9 @@ data class BankSortRequest(
 data class StandListing(
     val id: String? = null,
     val slot: Int? = null,
+    // Set for a listing sold straight from the bank (pack and its slot).
+    val bankPack: String? = null,
+    val bankSlot: Int? = null,
     val item: Item,
     val price: Long = 0,
     val quantity: Int = 1,
@@ -395,8 +405,28 @@ data class RealmOption(
 @Serializable
 data class RealmControl(
     val activeRealm: String? = null,
+    // Where the party actually is (activeRealm is where the coordinator aims it).
+    val currentRealm: String? = null,
     val homeRealm: String? = null,
+    val split: Boolean = false,
+    val characters: List<RealmCharacter> = emptyList(),
     val realms: List<RealmOption> = emptyList(),
+    val operation: RealmOperation? = null,
+)
+
+@Serializable
+data class RealmCharacter(
+    val name: String,
+    val realm: String? = null,
+)
+
+/** realm-operation.tsx - a realm switch (and optional home change) in progress. */
+@Serializable
+data class RealmOperation(
+    val phase: String = "",
+    val realm: String? = null,
+    val error: String? = null,
+    val characters: List<RealmCharacter> = emptyList(),
 )
 
 /** The slice of GET /party-api/state that changes often enough to poll
@@ -488,7 +518,90 @@ data class PartyStateDynamic(
     // AUTOMATIC upgrades within a level range, independent of the item's
     // own upgrade-mark tier.
     val upgradeOfferingRules: List<UpgradeOfferingRule> = emptyList(),
+    // The configured merchant (party-state.tsx). Never infer the merchant
+    // from character class; bankbois are merchants too.
+    val merchantCharacter: String? = null,
+    // Per-character farming profiles for characters that neither lead nor
+    // follow - see resolveFarmingContext.
+    val farmingProfiles: Map<String, FarmingProfile> = emptyMap(),
+    // The leader's own focus (party-wide fallback) and the monsters the
+    // server accepts as focus (monster-choice.tsx).
+    // A string or a list on the wire, so it stays raw (see selectedFocus).
+    val monsterFocus: JsonElement? = null,
+    val monsterChoices: List<MonsterChoice> = emptyList(),
+    // Pending bank withdrawals per character (the merchant) - withdraw is a
+    // server toggle, so these decide "Mark" vs "Unmark".
+    val withdrawals: Map<String, List<WithdrawalRequest>> = emptyMap(),
 )
+
+@Serializable
+data class WithdrawalRequest(
+    val pack: String,
+    val slot: Int,
+    val item: Item,
+)
+
+/** state.ts sameMarkedItem: a mark still refers to this live item. */
+fun sameMarkedItem(markItem: Item, liveItem: Item): Boolean =
+    markItem.name == liveItem.name && (markItem.level ?: 0) == (liveItem.level ?: 0)
+
+/** connected-character-card.tsx: `monsterFocusByCharacter[name] ||
+ *  selectedFocus`, where selectedFocus is use-party-console.tsx's flat
+ *  `monsterFocus` (an array, or one id, defaulting to "goo"). The server
+ *  keeps the leader's own focus in the flat field. */
+fun PartyStateDynamic.focusFor(name: String): List<String> {
+    monsterFocusByCharacter[name]?.let { return it }
+    return when (val flat = monsterFocus) {
+        is kotlinx.serialization.json.JsonArray -> flat.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        is kotlinx.serialization.json.JsonPrimitive -> listOf(flat.content.ifBlank { "goo" })
+        else -> listOf("goo")
+    }
+}
+
+/** monster-choice.tsx's MonsterChoice - only what the focus picker shows. */
+@Serializable
+data class MonsterChoice(
+    val id: String,
+    val name: String? = null,
+    val sprite: Sprite? = null,
+)
+
+/** farming-context.ts's per-character profile. */
+@Serializable
+data class FarmingProfile(
+    val farmingPolicy: String? = null,
+    val huntSettings: HuntSettings? = null,
+    val huntBlacklist: Map<String, HuntBlacklistEntry>? = null,
+    val monsterFocus: JsonElement? = null,
+)
+
+/** farming-context.ts (via the PWA's resolveFarmingContext): whose farming
+ *  settings a character runs on. The leader and its followers use the
+ *  top-level fields; every other character has its own profile. */
+data class FarmingContext(
+    val owner: String,
+    val followingLeader: String?,
+    val savedMode: String,
+    val effectiveMode: String,
+    val blacklist: Map<String, HuntBlacklistEntry>,
+    val settings: HuntSettings?,
+)
+
+fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
+    val followingLeader = leader?.takeIf { it != name && followers[name] == true }
+    val owner = followingLeader ?: name
+    val legacy = owner == leader
+    val personal = farmingProfiles[name]
+    val effective = farmingProfiles[owner]
+    return FarmingContext(
+        owner = owner,
+        followingLeader = followingLeader,
+        savedMode = personal?.farmingPolicy ?: (if (name == leader) farmingPolicy else null) ?: "auto",
+        effectiveMode = effective?.farmingPolicy ?: (if (legacy) farmingPolicy else null) ?: "auto",
+        blacklist = effective?.huntBlacklist ?: (if (legacy) huntBlacklist else null) ?: emptyMap(),
+        settings = effective?.huntSettings ?: if (legacy) huntSettings else null,
+    )
+}
 
 /** upgrade-offerings.ts's table of the 3 offering item ids -> display
  *  name, ported verbatim. */
@@ -540,10 +653,11 @@ data class HuntBlacklistEntry(
  *  blacklisted (too many character deaths or quest expirations to it). */
 @Serializable
 data class HuntSettings(
+    // runtime/coordinator/hunt/settings.ts defaultHuntSettings.
     val relocateIfCompeting: Boolean = true,
     val blacklistDeaths: Boolean = true,
-    val deathThreshold: Int = 3,
-    val blacklistExpirations: Boolean = false,
+    val deathThreshold: Int = 1,
+    val blacklistExpirations: Boolean = true,
     val expirationThreshold: Int = 1,
 )
 

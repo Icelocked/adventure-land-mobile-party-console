@@ -31,6 +31,7 @@ import com.partyconsole.companion.model.MerchantBuyItem
 import com.partyconsole.companion.model.RosterMember
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
+import com.partyconsole.companion.ui.components.NpcSaleSheet
 import com.partyconsole.companion.ui.itemdetail.ItemDetailBrowser
 import com.partyconsole.companion.ui.itemdetail.STAT_SCROLLS
 import com.partyconsole.companion.ui.itemdetail.compoundPassCost
@@ -86,14 +87,14 @@ fun ItemActionPanel(
     // actually held (use-party-console.tsx's statScrollInventory) - summed
     // across the merchant character's own inventory plus the shared bank,
     // since that's who/where a stat-scroll-mark command actually draws from.
-    val statScrollInventory = remember(characters, dynamicState.bank) {
+    val statScrollInventory = remember(characters, dynamicState.bank, dynamicState.merchantCharacter) {
         val quantities = mutableMapOf<String, Int>()
         fun add(entryItem: Item?) {
             if (entryItem != null && STAT_SCROLLS.any { it.scroll == entryItem.name }) {
                 quantities[entryItem.name] = (quantities[entryItem.name] ?: 0) + maxOf(1, entryItem.q ?: 1)
             }
         }
-        val merchant = characters.values.find { it.vitals?.ctype == "merchant" }
+        val merchant = dynamicState.merchantCharacter?.let { characters[it] }
         merchant?.inventory?.items?.forEach { add(it?.item) }
         dynamicState.bank?.packs?.values?.forEach { pack -> pack.forEach { add(it?.item) } }
         quantities
@@ -200,15 +201,18 @@ private fun InventoryActions(
     onCompare: (() -> Unit)? = null,
 ) {
     val dynamicState by viewModel.dynamicState.collectAsState()
+    val loaded by viewModel.stateLoaded.collectAsState()
     val item = target.item
     val slot = target.slot
     val level = item.level ?: 0
     // inventory-panel.tsx only offers upgrade/compound actions when the
-    // account has a merchant character at all (upgrading always routes
-    // through them), independent of which character's item this is.
-    val hasMerchant = roster.values.any { it.ctype == "merchant" }
+    // account has a configured merchant (upgrading always routes through
+    // them), independent of which character's item this is.
+    val hasMerchant = dynamicState.merchantCharacter != null
     val canUpgrade = hasMerchant && meta?.upgradeable == true && itemMaximumLevel(meta) > level
     val canCompound = hasMerchant && meta?.compoundable == true
+    // automatic-item-actions.tsx: the server's validTier caps auto-compound at +7.
+    val canAutoCompound = canCompound && level < minOf(7, itemMaximumLevel(meta))
     val canStatScroll = isMerchant && (meta?.definition?.get("stat") != null)
     // "Buy another level 0" (upgrade-actions.tsx) only for non-merchant holders - the merchant buys
     // directly via the commerce screen instead.
@@ -234,18 +238,39 @@ private fun InventoryActions(
         if (isMerchant) {
             TapRow("Mark for Stand") { onExpand(if (expanded == "stand") null else "stand") }
             if (expanded == "stand") {
-                StandForm(item, slot, viewModel, run)
+                val existing = dynamicState.standListings.find { it.bankPack == null && it.slot == slot && com.partyconsole.companion.model.sameMarkedItem(it.item, item) }
+                StandForm(item, slot, meta, existing, viewModel, run)
             }
             TapRow("Auto-stand this item") { onExpand(if (expanded == "autostand") null else "autostand") }
             if (expanded == "autostand") {
-                AutoStandForm(characterName, item, viewModel, run)
+                val existingRule = dynamicState.autoStandMarks.values.find { it.item.name == item.name && (it.item.level ?: 0) == level }
+                AutoStandForm(characterName, item, meta, existingRule?.price, viewModel, run)
             }
         }
-        TapRow("Mark for NPC Sale") {
-            run { viewModel.api.markForNpcSale(characterName, item, slot) }
+        TapRow("Mark for NPC Sale") { onExpand(if (expanded == "npc") null else "npc") }
+        if (expanded == "npc") {
+            NpcSaleSheet(
+                item = item,
+                meta = meta,
+                location = if (isMerchant) "From the merchant's inventory" else "From $characterName's inventory",
+                available = maxOf(1, item.q ?: 1),
+                onConfirm = { quantity, acknowledged ->
+                    when (val result = viewModel.api.markForNpcSale(characterName, item, slot, isMerchant, quantity, acknowledged)) {
+                        is ApiResult.Failure -> result.message.ifBlank { "NPC sale failed" }
+                        is ApiResult.Success -> {
+                            viewModel.refreshDynamicStateNow()
+                            onExpand(null)
+                            null
+                        }
+                    }
+                },
+                onCancel = { onExpand(null) },
+            )
         }
         TapRow("Auto-sell to NPC") {
-            run { viewModel.api.autoNpcSale(characterName, item) }
+            // connected-inventory.tsx: the configured merchant's rule is the
+            // account-wide one, so `character` is left out for it.
+            run { viewModel.api.autoNpcSale(if (isMerchant) null else characterName, item) }
         }
         TapRow("Mark for Deconstruction") {
             run { viewModel.api.markForDeconstruction(characterName, item, slot) }
@@ -271,8 +296,8 @@ private fun InventoryActions(
             TapRow("Mark for Compound") {
                 run { viewModel.api.itemCommand("compound-mark", characterName, item, JsonPrimitive(slot)) }
             }
-            TapRow("Auto-mark for Compound") { onExpand(if (expanded == "autocompound") null else "autocompound") }
-            if (expanded == "autocompound") {
+            if (canAutoCompound) TapRow("Auto-mark for Compound") { onExpand(if (expanded == "autocompound") null else "autocompound") }
+            if (canAutoCompound && expanded == "autocompound") {
                 CompoundTierPicker(meta, level, buyable) { targetTier ->
                     run { viewModel.api.itemCommand("auto-compound-mark", characterName, item, null, mapOf("targetTier" to JsonPrimitive(targetTier))) }
                 }
@@ -296,8 +321,10 @@ private fun InventoryActions(
             TapRow("Buy another level 0") { run { viewModel.api.itemCommand("buy-copy", characterName, item) } }
         }
         if (exchangeable) {
+            // The server toggles auto-exchange, so an already-marked item (or
+            // one whose marks haven't loaded) must never send it again.
             TapRow(if (autoExchangeMarked) "Auto exchange · already marked" else "Auto exchange") {
-                if (!autoExchangeMarked) {
+                if (loaded && !autoExchangeMarked) {
                     run { viewModel.api.itemCommand("auto-exchange", characterName, item, JsonPrimitive(slot)) }
                 }
             }
@@ -373,7 +400,8 @@ private fun EquipmentActions(
     // failing before this fix).
     val slotArg = JsonPrimitive(target.slotName)
     Column {
-        if (target.slotName != "elixir") {
+        // equipment.tsx: trade1..N are the merchant's stand slots, not gear.
+        if (target.slotName != "elixir" && !target.slotName.startsWith("trade")) {
             TapRow("Unequip") {
                 run { viewModel.api.itemCommand("unequip", characterName, item, slotArg) }
             }
@@ -446,7 +474,7 @@ private fun UpgradeTierPicker(meta: ItemMeta?, level: Int, onPick: (Int) -> Unit
  *  not a free-form number input the way this used to work. */
 @Composable
 private fun CompoundTierPicker(meta: ItemMeta?, level: Int, buyable: List<MerchantBuyItem>, onPick: (Int) -> Unit) {
-    val max = maxOf(0, itemMaximumLevel(meta) - level)
+    val max = maxOf(0, minOf(7, itemMaximumLevel(meta)) - level)
     if (max <= 0) return
     val grades = meta?.definition?.get("grades")?.let { element ->
         (element as? JsonArray)?.mapNotNull {
@@ -499,54 +527,93 @@ private fun StatScrollPicker(meta: ItemMeta?, item: Item, statScrollInventory: M
     }
 }
 
+/** connected-inventory.tsx's default stand price: the existing price, else
+ *  the item's catalog value (never below 1 - the server rejects 0). */
+private fun defaultStandPrice(existing: Long?, meta: ItemMeta?): String {
+    if (existing != null && existing > 0) return existing.toString()
+    val value = (meta?.definition?.get("g") as? JsonPrimitive)?.doubleOrNull?.toLong() ?: 0L
+    return maxOf(1L, value).toString()
+}
+
 @Composable
 private fun AutoStandForm(
     characterName: String,
     item: com.partyconsole.companion.model.Item,
+    meta: ItemMeta?,
+    existingPrice: Long?,
     viewModel: PartyViewModel,
     run: (suspend () -> ApiResult<*>) -> Unit,
 ) {
-    var price by remember { mutableStateOf(item.price?.toString() ?: "") }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedTextField(
-            value = price,
-            onValueChange = { new -> if (new.all { it.isDigit() }) price = new },
-            label = { Text("Price") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-        Button(onClick = {
-            run { viewModel.api.autoStand(characterName, item, price.toLongOrNull() ?: 0L) }
-        }) { Text("Set") }
+    var price by remember { mutableStateOf(defaultStandPrice(existingPrice, meta)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = price,
+                onValueChange = { new -> if (new.all { it.isDigit() }) price = new },
+                label = { Text("Price") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Button(onClick = {
+                val value = price.toLongOrNull()
+                if (value == null || value < 1) {
+                    error = "Enter a price of at least 1 gold."
+                    return@Button
+                }
+                run { viewModel.api.autoStand(characterName, item, value) }
+            }) { Text("Set") }
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
+/** connected-inventory.tsx's stand listing: price defaults to the existing
+ *  listing or the catalog value, quantity to the existing listing or the
+ *  whole stack (the server overwrites an existing listing's quantity). */
 @Composable
 private fun StandForm(
     item: com.partyconsole.companion.model.Item,
     slot: Int,
+    meta: ItemMeta?,
+    existing: com.partyconsole.companion.model.StandListing?,
     viewModel: PartyViewModel,
     run: (suspend () -> ApiResult<*>) -> Unit,
 ) {
-    var price by remember { mutableStateOf(item.price?.toString() ?: "") }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedTextField(
-            value = price,
-            onValueChange = { new -> if (new.all { it.isDigit() }) price = new },
-            label = { Text("Price") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-        Button(onClick = {
-            run { viewModel.api.markForStand(item, slot, price = price.toLongOrNull() ?: 0L) }
-        }) {
-            Text("List")
+    val stack = maxOf(1, item.q ?: 1)
+    var price by remember { mutableStateOf(defaultStandPrice(existing?.price, meta)) }
+    var quantity by remember { mutableStateOf((existing?.quantity?.takeIf { it > 0 } ?: stack).toString()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = price,
+                onValueChange = { new -> if (new.all { it.isDigit() }) price = new },
+                label = { Text("Price") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            if (stack > 1) {
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { new -> if (new.all { it.isDigit() }) quantity = new },
+                    label = { Text("Quantity") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Button(onClick = {
+                val value = price.toLongOrNull()
+                val count = if (stack > 1) quantity.toIntOrNull() else 1
+                when {
+                    value == null || value < 1 -> error = "Enter a price of at least 1 gold."
+                    count == null || count < 1 || count > stack -> error = "Enter a quantity from 1 to $stack."
+                    else -> run { viewModel.api.markForStand(item, slot, price = value, quantity = count, id = existing?.id) }
+                }
+            }) {
+                Text("List")
+            }
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }

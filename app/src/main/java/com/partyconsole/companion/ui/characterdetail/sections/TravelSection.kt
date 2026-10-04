@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.TravelPlace
+import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
@@ -35,7 +36,17 @@ fun TravelSection(
     viewModel: PartyViewModel,
 ) {
     var showPlaces by remember { mutableStateOf(false) }
+    var error by remember(characterName) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    fun send(action: suspend () -> ApiResult<*>, after: () -> Unit = {}) {
+        scope.launch {
+            error = null
+            when (val result = action()) {
+                is ApiResult.Failure -> error = result.message
+                is ApiResult.Success -> after()
+            }
+        }
+    }
 
     SectionCard(title = "Travel") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -43,26 +54,24 @@ fun TravelSection(
                 Text(if (isMerchant) "Send merchant to..." else "Send to...")
             }
             if (isMerchant) {
-                Button(onClick = { scope.launch { viewModel.api.sendCharacterTo(characterName, "main", 0.0, 0.0, "home") } }) {
+                // manual-commands.ts goHome: home spot and home realm (character-
+                // travel to main would overwrite the saved location instead).
+                Button(onClick = { send({ viewModel.api.goHome(characterName) }) }) {
                     Text("Go home")
                 }
             } else if (!isLeader) {
-                Button(onClick = { scope.launch { viewModel.api.returnToLeader(characterName) } }) {
+                Button(onClick = { send({ viewModel.api.returnToLeader(characterName) }) }) {
                     Text("Return to leader")
                 }
             }
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         if (showPlaces) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 for (place in travelPlaces) {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                        onClick = {
-                            scope.launch {
-                                viewModel.api.sendCharacterTo(characterName, place.id, place.x, place.y, place.name)
-                                showPlaces = false
-                            }
-                        },
+                        onClick = { send({ viewModel.api.sendCharacterTo(characterName, place.id, place.x, place.y, place.name) }) { showPlaces = false } },
                     ) {
                         Text(place.name, style = MaterialTheme.typography.bodySmall)
                     }

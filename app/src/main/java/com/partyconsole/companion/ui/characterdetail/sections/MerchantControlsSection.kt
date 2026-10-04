@@ -11,6 +11,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +44,9 @@ fun MerchantControlsSection(
     onOpenRoutines: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    // Force stand and gathering are toggles read from the server; until it
+    // has answered they'd flip a value we haven't seen.
+    val loaded by viewModel.stateLoaded.collectAsState()
     var expanded by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmingClear by remember { mutableStateOf(false) }
@@ -67,19 +72,22 @@ fun MerchantControlsSection(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = forceStand, onClick = { run { viewModel.api.setForceStand(!forceStand) } }, label = { Text("Force stand · ${if (forceStand) "On" else "Off"}") })
+            FilterChip(selected = forceStand, enabled = loaded, onClick = { run { viewModel.api.setForceStand(!forceStand) } }, label = { Text("Force stand · ${if (forceStand) "On" else "Off"}") })
             FilterChip(
                 selected = gatheringModes.contains("mining"),
+                enabled = loaded,
                 onClick = { run { viewModel.api.setGathering("mining", !gatheringModes.contains("mining")) } },
                 label = { Text("Mining · ${if (gatheringModes.contains("mining")) "On" else "Off"}") },
             )
         }
         FilterChip(
             selected = gatheringModes.contains("fishing"),
+            enabled = loaded,
             onClick = { run { viewModel.api.setGathering("fishing", !gatheringModes.contains("fishing")) } },
             label = { Text("Fishing · ${if (gatheringModes.contains("fishing")) "On" else "Off"}") },
         )
 
+        ConfigLoadingNote(loaded)
         Column {
             TextButton(onClick = onOpenRoutines) { Text("Routines") }
             TextButton(onClick = { run { viewModel.api.sendMerchantToParty() } }) { Text("Send to party") }
@@ -97,6 +105,7 @@ fun MerchantControlsSection(
             TextButton(onClick = { toggle("settings") }) { Text("Collection settings") }
             if (expanded == "settings") {
                 CollectionSettingsForm(
+                    loaded = loaded,
                     threshold = threshold,
                     itemCollectionThreshold = itemCollectionThreshold,
                     bankSortMode = bankSortMode,
@@ -137,42 +146,71 @@ private fun DonateForm(onDonate: (Long) -> Unit) {
     }
 }
 
+/** merchant-collection-settings.tsx: both thresholds seed from the server
+ *  (and follow it while untouched), are validated rather than coerced, and
+ *  only Apply when changed. */
 @Composable
 private fun CollectionSettingsForm(
+    loaded: Boolean,
     threshold: Long,
     itemCollectionThreshold: Int,
     bankSortMode: String?,
     onSetBankSortMode: (String) -> Unit,
     onSetThresholds: (Long?, Int?) -> Unit,
 ) {
-    var thresholdInput by remember(threshold) { mutableStateOf(threshold.toString()) }
-    var slotsInput by remember(itemCollectionThreshold) { mutableStateOf(itemCollectionThreshold.toString()) }
+    var thresholdInput by remember { mutableStateOf(threshold.toString()) }
+    var slotsInput by remember { mutableStateOf(itemCollectionThreshold.toString()) }
+    var goldDirty by remember { mutableStateOf(false) }
+    var slotsDirty by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(threshold, goldDirty) { if (!goldDirty) thresholdInput = threshold.toString() }
+    LaunchedEffect(itemCollectionThreshold, slotsDirty) { if (!slotsDirty) slotsInput = itemCollectionThreshold.toString() }
     Column {
         Text("Bank sort", style = MaterialTheme.typography.labelSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = (bankSortMode ?: "automatic") == "automatic", onClick = { onSetBankSortMode("automatic") }, label = { Text("Sort every visit") })
-            FilterChip(selected = bankSortMode == "request", onClick = { onSetBankSortMode("request") }, label = { Text("Request sorting") })
+            FilterChip(selected = (bankSortMode ?: "automatic") == "automatic", enabled = loaded, onClick = { onSetBankSortMode("automatic") }, label = { Text("Sort every visit") })
+            FilterChip(selected = bankSortMode == "request", enabled = loaded, onClick = { onSetBankSortMode("request") }, label = { Text("Request sorting") })
         }
+        Text("Send the merchant when any active character carries more than this amount.", style = MaterialTheme.typography.labelSmall)
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
             OutlinedTextField(
                 value = thresholdInput,
-                onValueChange = { new -> if (new.all { it.isDigit() }) thresholdInput = new },
+                onValueChange = { new -> if (new.all { it.isDigit() }) { thresholdInput = new; goldDirty = true } },
                 label = { Text("Collect above (gold)") },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            Button(onClick = { onSetThresholds(thresholdInput.toLongOrNull() ?: 0L, null) }) { Text("Apply") }
+            Button(enabled = loaded && goldDirty, onClick = {
+                val n = thresholdInput.toLongOrNull()
+                if (n == null || n < 0) {
+                    error = "Enter a non-negative whole number"
+                } else {
+                    error = null
+                    goldDirty = false
+                    onSetThresholds(n, null)
+                }
+            }) { Text("Apply") }
         }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
             OutlinedTextField(
                 value = slotsInput,
-                onValueChange = { new -> if (new.all { it.isDigit() }) slotsInput = new },
+                onValueChange = { new -> if (new.all { it.isDigit() }) { slotsInput = new; slotsDirty = true } },
                 label = { Text("Marked slots required (1-42)") },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            Button(onClick = { onSetThresholds(null, (slotsInput.toIntOrNull() ?: 1).coerceIn(1, 42)) }) { Text("Apply") }
+            Button(enabled = loaded && slotsDirty, onClick = {
+                val value = slotsInput.toIntOrNull()
+                if (value == null || value < 1 || value > 42) {
+                    error = "Use an item-slot threshold from 1 to 42"
+                } else {
+                    error = null
+                    slotsDirty = false
+                    onSetThresholds(null, value)
+                }
+            }) { Text("Apply") }
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

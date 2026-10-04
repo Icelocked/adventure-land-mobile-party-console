@@ -25,6 +25,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.partyconsole.companion.model.farmingContext
+import com.partyconsole.companion.model.focusFor
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 import com.partyconsole.companion.ui.characterdetail.sections.AutoMarksSection
@@ -99,6 +101,9 @@ fun CharacterDetailScreen(
         }
 
         val accountGold = (dynamicState.bank?.gold ?: 0L) + characters.values.sumOf { it.vitals?.gold ?: 0L }
+        // The configured merchant, never the class (bankbois are merchants too).
+        val isMerchant = characterName == dynamicState.merchantCharacter
+        val farming = dynamicState.farmingContext(characterName)
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
@@ -109,7 +114,7 @@ fun CharacterDetailScreen(
                 LeaderFollowerSection(characterName, dynamicState, viewModel)
                 TravelSection(
                     characterName = characterName,
-                    isMerchant = vitals.ctype == "merchant",
+                    isMerchant = isMerchant,
                     isLeader = dynamicState.leader == characterName,
                     travelPlaces = dynamicState.travelPlaces,
                     viewModel = viewModel,
@@ -117,15 +122,17 @@ fun CharacterDetailScreen(
                 if (vitals.ctype != "merchant") {
                     FarmingSection(
                         characterName = characterName,
-                        farmingPolicy = dynamicState.farmingPolicy,
-                        monsterFocus = dynamicState.monsterFocusByCharacter[characterName] ?: emptyList(),
+                        farmingPolicy = farming.savedMode,
+                        followingLeader = farming.followingLeader,
+                        monsterFocus = dynamicState.focusFor(characterName),
                         monsterSearchRadius = dynamicState.monsterSearchRadiusByCharacter[characterName] ?: 400,
+                        monsterChoices = dynamicState.monsterChoices,
                         bestiaryCatalog = dynamicState.bestiaryCatalog,
                         viewModel = viewModel,
                         onOpenHuntSettings = onOpenHuntSettings,
                     )
                 }
-                if (vitals.ctype == "merchant") {
+                if (isMerchant) {
                     MerchantQueueSection(dynamicState.merchantCurrent, dynamicState.merchantQueue, viewModel)
                     MerchantControlsSection(
                         dynamicState.merchantForceStand, dynamicState.gatheringModes,
@@ -154,8 +161,8 @@ fun CharacterDetailScreen(
                     dynamicState.restockPolicies[characterName] ?: com.partyconsole.companion.model.RestockPolicy(),
                     viewModel,
                 )
-                GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
-                AutoMarksSection(characterName, vitals.ctype == "merchant", dynamicState, viewModel, catalogFor)
+                if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
+                AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)
             }
         }
 
@@ -163,7 +170,7 @@ fun CharacterDetailScreen(
             ItemActionPanel(
                 target = target,
                 characterName = characterName,
-                isMerchant = vitals.ctype == "merchant",
+                isMerchant = isMerchant,
                 roster = roster,
                 viewModel = viewModel,
                 sheetState = sheetState,
