@@ -2,6 +2,7 @@ package com.partyconsole.companion.data
 
 import com.partyconsole.companion.model.BankVault
 import com.partyconsole.companion.model.BestiaryMonster
+import com.partyconsole.companion.model.CharacterDiagnostics
 import com.partyconsole.companion.model.CharacterInventory
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.CharacterVitals
@@ -129,8 +130,8 @@ class PartyRepository(
     val latencyMs: StateFlow<Long?> = _latencyMs.asStateFlow()
 
     // core's characterDetails (diagnostics + presence), per active character.
-    private val _characterDetails = MutableStateFlow<Map<String, JsonObject>>(emptyMap())
-    val characterDetails: StateFlow<Map<String, JsonObject>> = _characterDetails.asStateFlow()
+    private val _characterDetails = MutableStateFlow<Map<String, CharacterDiagnostics>>(emptyMap())
+    val characterDetails: StateFlow<Map<String, CharacterDiagnostics>> = _characterDetails.asStateFlow()
 
     // Server clock minus this device's clock (live-metrics.ts serverOffset).
     private val _serverOffset = MutableStateFlow(0L)
@@ -217,7 +218,12 @@ class PartyRepository(
         // live-metrics.ts synchronizeDashboardClock: offset from the round trip's midpoint.
         (value["serverNow"] as? JsonPrimitive)?.longOrNull?.let { _serverOffset.value = it - (sentAt + System.currentTimeMillis()) / 2 }
         (value["characterDetails"] as? JsonObject)?.let { details ->
-            _characterDetails.value = details.mapNotNull { (name, detail) -> (detail as? JsonObject)?.let { name to it } }.toMap()
+            // Each character decodes on its own - one odd report never hides the others.
+            _characterDetails.value = details.mapNotNull { (name, detail) ->
+                val raw = detail as? JsonObject ?: return@mapNotNull null
+                val decoded = runCatching { json.decodeFromJsonElement(CharacterDiagnostics.serializer(), raw) }.getOrElse { CharacterDiagnostics(name = name) }
+                name to decoded.also { it.raw = raw }
+            }.toMap()
         }
         (value["characters"] as? JsonObject)?.let { summaries ->
             val roster = _roster.value.toMutableMap()

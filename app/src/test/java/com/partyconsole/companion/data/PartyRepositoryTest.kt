@@ -62,6 +62,11 @@ class PartyRepositoryTest {
         // catalog, decoded on its own
         assertTrue(state.merchantCatalog!!.allItems.any { it.id == "bow" })
         assertEquals(listOf("goo", "bat", "tinyp"), state.monsterChoices.map { it.id })
+        // core's characterDetails, typed, with presence
+        val leada = repo.characterDetails.value.getValue("Leada")
+        assertTrue(leada.online(now = leada.seenAt!! + 9_000))
+        assertFalse(leada.online(now = leada.seenAt!! + 11_000))
+        assertEquals("warrior", repo.characterDetails.value.getValue("Leada").ctype)
         // roster from config, ctype from the core summaries
         assertEquals("merchant", repo.roster.value["Merchy"]?.ctype)
 

@@ -88,7 +88,13 @@ data class CommandResult(
     val error: String? = null,
     // Machine-readable reason some routes add (e.g. auto_bank_confirmation_required).
     val code: String? = null,
-)
+) {
+    /** The whole parsed response body (the PWA's CommandResult.data) - routes
+     *  that answer with a view (e.g. daily dungeons) are read from here. */
+    @kotlinx.serialization.Transient
+    var data: JsonObject? = null
+        internal set
+}
 
 @kotlinx.serialization.Serializable
 private data class AlDataKeyResponse(val key: String? = null, val error: String? = null)
@@ -103,7 +109,9 @@ internal const val SESSION_EXPIRED = "Session expired - pair this device again"
 
 sealed interface ApiResult<out T> {
     data class Success<T>(val value: T) : ApiResult<T>
-    data class Failure(val message: String, val code: String? = null) : ApiResult<Nothing>
+    /** [status] is the HTTP status (0 for a network error); [body] the parsed
+     *  error body, for routes that explain a refusal (e.g. a 409's `missing`). */
+    data class Failure(val message: String, val code: String? = null, val status: Int = 0, val body: JsonObject? = null) : ApiResult<Nothing>
 }
 
 /** Thin wrapper over the party-api REST surface - every endpoint listed
@@ -225,13 +233,14 @@ class PartyApiClient(
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (sessionLost(response.code)) return@withContext ApiResult.Failure(SESSION_EXPIRED, "session_expired")
+                if (sessionLost(response.code)) return@withContext ApiResult.Failure(SESSION_EXPIRED, "session_expired", response.code)
+                val body = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull()
                 if (!response.isSuccessful) {
-                    val parsed = runCatching { json.decodeFromString(CommandResult.serializer(), text) }.getOrNull()
-                    return@withContext ApiResult.Failure(parsed?.error ?: "HTTP ${response.code}", parsed?.code)
+                    val parsed = body?.let { runCatching { json.decodeFromJsonElement(CommandResult.serializer(), it) }.getOrNull() }
+                    return@withContext ApiResult.Failure(parsed?.error ?: "HTTP ${response.code}", parsed?.code, response.code, body)
                 }
-                val result = runCatching { json.decodeFromString(CommandResult.serializer(), text) }
-                    .getOrElse { CommandResult(ok = true) }
+                val result = body?.let { runCatching { json.decodeFromJsonElement(CommandResult.serializer(), it) }.getOrNull() } ?: CommandResult(ok = true)
+                result.data = body
                 ApiResult.Success(result)
             }
         } catch (e: java.io.IOException) {
