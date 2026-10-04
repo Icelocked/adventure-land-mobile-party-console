@@ -2,7 +2,7 @@
 // PWA's vitest suite (src/lib/notifierDetect.test.ts).
 
 /** Every alert a device can switch on, grouped for the app's Settings. */
-export const ALERTS = ['stuck', 'idle', 'deaths', 'errors', 'rules', 'orders', 'events', 'rare', 'trading', 'mail']
+export const ALERTS = ['stuck', 'idle', 'deaths', 'errors', 'inventory', 'bank', 'rules', 'orders', 'events', 'rare', 'trading', 'mail']
 /** Character-health alerts still arrive during a device's quiet hours. */
 export const URGENT_ALERTS = ['stuck', 'idle', 'deaths', 'errors']
 
@@ -230,6 +230,33 @@ export function inQuietHours(quiet, date) {
 }
 
 /** Which devices get an alert: switched on, not muted for the character, and not in quiet hours unless urgent. */
+/** Characters whose bag is full: every slot up to the reported inventory
+ *  size is taken (section=inventory sends the bag with empty slots as null;
+ *  section=fast carries inventorySize). */
+export function fullInventories(inventory, fast, names) {
+  const full = []
+  for (const name of names) {
+    const items = inventory?.[name]?.items
+    if (!Array.isArray(items)) continue
+    const size = Number(fast?.[name]?.inventorySize) || items.length
+    if (size > 0 && items.slice(0, size).filter(Boolean).length >= size) full.push(name)
+  }
+  return full
+}
+
+/** Free slots across every unlocked bank pack, or null before the bank has
+ *  been seen (section=bank's bank.packs, each pack a fixed list). */
+export function bankFreeSlots(bank) {
+  const packs = bank?.packs
+  if (!packs || typeof packs !== 'object' || !Object.keys(packs).length) return null
+  let free = 0
+  for (const pack of Object.values(packs)) if (Array.isArray(pack)) free += pack.filter((entry) => !entry).length
+  return free
+}
+
+/** Names newly in `current` that weren't in `previous` - alert once per fill. */
+export const newlyAdded = (previous, current) => current.filter((name) => !previous.includes(name))
+
 export function recipients(devices, alert, character, date) {
   return devices.filter(
     (device) =>

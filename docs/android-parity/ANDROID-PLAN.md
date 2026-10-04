@@ -176,4 +176,4 @@ BOM on the androidTest classpath) - pre-existing, CI only runs assembleDebug.
 
 ## Queued after A0 (not Android)
 
-- PWA push alerts requested 2026-10-04: **inventory full** and **bank full**.
+- PWA push alerts requested 2026-10-04: **inventory full** and **bank full** - done (notifier, 2026-10-04).

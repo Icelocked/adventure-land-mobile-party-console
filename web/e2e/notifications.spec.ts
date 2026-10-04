@@ -55,7 +55,7 @@ test('Notifications: enable on this device with chosen alerts, adjust limits, ra
   await expect(section.getByText('On for this device.')).toBeVisible()
   const subscribe = calls.find((call) => call.path === '/subscribe')?.body
   expect(subscribe).toMatchObject({ subscription: { endpoint: 'https://push.example/abc' }, quiet: null, muted: [] })
-  expect(subscribe!.alerts).toEqual(['stuck', 'idle', 'deaths', 'errors', 'rules', 'orders', 'events', 'rare', 'trading'])
+  expect(subscribe!.alerts).toEqual(['stuck', 'idle', 'deaths', 'errors', 'inventory', 'bank', 'rules', 'orders', 'events', 'rare', 'trading'])
 
   // Per-device alert choice saves straight away once subscribed.
   await section.getByRole('checkbox', { name: /New mail/ }).check()

@@ -1,7 +1,7 @@
 /** Web Push for this PWA: subscribes the installed app with the notifier
  *  running in the PWA container (web/notifier, nginx /notify/). Works on
  *  Android Chrome over HTTPS and on iOS 16.4+ once added to the Home Screen. */
-export type AlertId = 'stuck' | 'idle' | 'deaths' | 'errors' | 'rules' | 'orders' | 'events' | 'rare' | 'trading' | 'mail'
+export type AlertId = 'stuck' | 'idle' | 'deaths' | 'errors' | 'inventory' | 'bank' | 'rules' | 'orders' | 'events' | 'rare' | 'trading' | 'mail'
 export const ALERT_GROUPS: { title: string; note?: string; alerts: { id: AlertId; label: string; description: string }[] }[] = [
   {
     title: 'Character health',
@@ -11,6 +11,13 @@ export const ALERT_GROUPS: { title: string; note?: string; alerts: { id: AlertId
       { id: 'idle', label: 'No actions', description: 'No fighting, looting, logging or moving for a while (the merchant is excluded).' },
       { id: 'deaths', label: 'Repeated deaths', description: 'Dying again and again within a window.' },
       { id: 'errors', label: 'Error bursts', description: 'Many errors within a window (game log errors, and the merchant’s errors).' },
+    ],
+  },
+  {
+    title: 'Storage',
+    alerts: [
+      { id: 'inventory', label: 'Inventory full', description: 'A character’s bag has no free slots - and again each time it fills back up.' },
+      { id: 'bank', label: 'Bank full', description: 'Every unlocked bank pack is out of free slots.' },
     ],
   },
   {

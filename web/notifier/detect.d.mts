@@ -39,4 +39,7 @@ export function tradeNotice(entry: Entry): { title: string; body: string } | nul
 export function newEntries<T extends { at: number }>(entries: T[], since: number): T[]
 export function newMail<T extends { id?: string | number }>(messages: T[], seenIds: Set<string>): T[]
 export function inQuietHours(quiet: Device['quiet'], date: Date): boolean
+export function fullInventories(inventory: Record<string, { items?: unknown[] }> | null | undefined, fast: Record<string, { inventorySize?: number }> | null | undefined, names: string[]): string[]
+export function bankFreeSlots(bank: { packs?: Record<string, unknown[]> } | null | undefined): number | null
+export function newlyAdded(previous: string[], current: string[]): string[]
 export function recipients<T extends Device>(devices: T[], alert: string, character: string | undefined, date: Date): T[]

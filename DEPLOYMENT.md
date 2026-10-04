@@ -226,6 +226,8 @@ alerts it wants:
 | | No actions | No fighting, looting, logging or moving for N minutes (default 5); the merchant is excluded |
 | | Repeated deaths | N deaths within M minutes (default 3 in 30) |
 | | Error bursts | N errors within M minutes (default 5 in 10): game-log errors and the merchant's errors |
+| Storage | Inventory full | A character's bag has no free slots (again each time it fills back up) |
+| | Bank full | Every unlocked bank pack is out of free slots |
 | Progress | Auto-upgrade / auto-compound rule done | A rule's remaining count reaches zero |
 | | Buy-and-upgrade order done | A Buy order with a target level leaves the merchant's queue |
 | | Event completed | An event one of your characters is signed up for ends |
