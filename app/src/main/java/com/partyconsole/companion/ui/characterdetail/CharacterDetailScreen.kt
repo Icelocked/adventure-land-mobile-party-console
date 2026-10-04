@@ -76,6 +76,8 @@ fun CharacterDetailScreen(
     val catalogFor = rememberCatalogLookup(dynamicState.merchantCatalog)
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
+    var luckySlotOpen by remember(characterName) { mutableStateOf(false) }
+    var actionOnLucky by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -168,6 +170,14 @@ fun CharacterDetailScreen(
                 if (isMerchant) {
                     MerchantQueueSection(viewModel)
                     MerchantControlsSection(viewModel, onOpenMerchantCommerce, onOpenRoutines)
+                    com.partyconsole.companion.ui.characterdetail.sections.LuckySlotSection(
+                        characterName = characterName,
+                        streams = dynamicState.luckySlotTracking[characterName].orEmpty(),
+                        verified = dynamicState.luckyUpgradeSlots[characterName],
+                        open = luckySlotOpen,
+                        onOpenChange = { luckySlotOpen = it },
+                        localLucky = vitals.luckySlotTracking,
+                    )
                 }
                 EquipmentSection(
                     slots = state.inventory?.slots.orEmpty(),
@@ -186,7 +196,11 @@ fun CharacterDetailScreen(
                     loaded = state.inventory != null,
                     state = dynamicState,
                     catalogFor = catalogFor,
-                    onItemTap = { entry, _ -> actionTarget = ItemActionTarget.InventorySlot(entry.item, entry.slot) },
+                    onItemTap = { entry, lucky ->
+                        actionTarget = ItemActionTarget.InventorySlot(entry.item, entry.slot)
+                        actionOnLucky = lucky
+                    },
+                    onLuckySlotData = { luckySlotOpen = true },
                     localLucky = vitals.luckySlotTracking,
                 )
                 RestockSection(
@@ -206,9 +220,6 @@ fun CharacterDetailScreen(
                 viewModel = viewModel,
                 onNavigate = onNavigate,
                 onDismiss = { menuOpen = false },
-                characterItems = listOfNotNull(
-                    "Upgrade offerings" to Routes.ACCOUNT_OFFERINGS,
-                ),
             )
         }
 
@@ -221,6 +232,7 @@ fun CharacterDetailScreen(
                 viewModel = viewModel,
                 sheetState = sheetState,
                 onDismiss = { actionTarget = null },
+                onLuckySlotData = if (actionOnLucky && target is ItemActionTarget.InventorySlot) ({ luckySlotOpen = true }) else null,
             )
         }
     }

@@ -58,7 +58,6 @@ import com.partyconsole.companion.model.itemFromRuleKey
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.network.CommandResult
 import com.partyconsole.companion.ui.PartyViewModel
-import com.partyconsole.companion.ui.account.RuleFormOverlay
 import com.partyconsole.companion.ui.itemdetail.ItemDetailBrowser
 import com.partyconsole.companion.ui.itemdetail.upgradeRuleTiers
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
@@ -461,6 +460,6 @@ private fun UpgradeOfferingRules(
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
     }
     editing?.let { rule ->
-        RuleFormOverlay(rule = rule, catalog = catalog, merchant = characterName, viewModel = viewModel, onClose = { editing = null })
+        com.partyconsole.companion.ui.components.OfferingDialog(viewModel, characterName, Item(name = rule.name), rule = rule, onClose = { editing = null })
     }
 }

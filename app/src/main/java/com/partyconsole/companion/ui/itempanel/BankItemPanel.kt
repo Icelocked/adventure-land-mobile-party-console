@@ -175,12 +175,17 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
             if (canUpgrade) {
                 TapRow("Mark for upgrade") { toggle("upgrade") }
                 // bank "Mark for upgrade" withdraws the item to the merchant to upgrade it.
-                if (expanded == "upgrade") UpgradeTierPicker(meta, level) { tiers -> withdraw(false, tiers) }
+                if (expanded == "upgrade") {
+                    UpgradeTierPicker(meta, level) { tiers -> withdraw(false, tiers) }
+                    // bank-upgrade-actions.tsx has no offering provider: these stay disabled.
+                    com.partyconsole.companion.ui.components.OfferingRows(viewModel, merchant!!, item, meta, enabled = false)
+                }
                 TapRow("Auto mark for upgrade") { toggle("autoupgrade") }
                 if (expanded == "autoupgrade") {
                     UpgradeTierPicker(meta, level) { tiers ->
                         run { viewModel.api.itemCommand("auto-upgrade-mark", merchant!!, item, JsonPrimitive(-1), mapOf("tiers" to JsonPrimitive(tiers))) }
                     }
+                    com.partyconsole.companion.ui.components.AddUpgradeRule(viewModel, merchant!!, item, meta, enabled = false)
                 }
             }
 

@@ -859,6 +859,19 @@ class PartyApiClient(
      *  `id`) or edits (existing `id`) a standing "use this offering
      *  instead of scrolls during automatic upgrades in this level range"
      *  rule. The server assigns a real id for new rules. */
+    /** POST /party-api/upgrade-preview - upgrade-preview-panel.tsx's 2 s poll
+     *  (no action toast, no domain refresh). `refresh` queues a new server
+     *  preview; otherwise the stored one is returned. */
+    suspend fun upgradePreview(body: JsonObject): ApiResult<JsonObject> = when (val result = postOnce("upgrade-preview", body)) {
+        is ApiResult.Success -> ApiResult.Success(result.value.data ?: JsonObject(emptyMap()))
+        is ApiResult.Failure -> ApiResult.Failure(
+            if (result.code == "session_expired") result.message else (result.body?.get("error") as? JsonPrimitive)?.content ?: "Server preview unavailable",
+            result.code,
+            result.status,
+            result.body,
+        )
+    }
+
     suspend fun saveOfferingRule(character: String, id: String, name: String, floor: Int, ceiling: Int, offering: String, required: Boolean): ApiResult<CommandResult> {
         val rule = JsonObject(
             mapOf(
