@@ -339,7 +339,8 @@ class PartyApiClient(
      *  than creating a new one). */
     suspend fun markForStand(
         item: Item,
-        slot: Int,
+        // Left out for a listing without one (partyApi.ts sends `undefined`).
+        slot: Int?,
         bankPack: String? = null,
         price: Long,
         // Required: the server overwrites an existing listing's quantity with it.
@@ -352,7 +353,7 @@ class PartyApiClient(
             buildMap {
                 id?.let { put("id", JsonPrimitive(it)) }
                 put("item", json.encodeToJsonElement(Item.serializer(), item))
-                put("slot", JsonPrimitive(slot))
+                slot?.let { put("slot", JsonPrimitive(it)) }
                 bankPack?.let { put("bankPack", JsonPrimitive(it)) }
                 put("price", JsonPrimitive(price))
                 put("quantity", JsonPrimitive(quantity))
@@ -776,18 +777,30 @@ class PartyApiClient(
     suspend fun saveHuntSettings(character: String, patch: Map<String, JsonElement>): ApiResult<CommandResult> =
         post("hunt-settings", JsonObject(patch + ("character" to JsonPrimitive(character))))
 
-    /** POST /party-api/merchant/bid - places or edits a standing "buy this
-     *  item automatically, up to this price" order. `minimumQuality` is
-     *  the item's +level (only meaningful for upgradeable/compoundable
-     *  items - the server itself zeroes it otherwise). */
+    /** wtb-preferences.tsx WTBOptions. [value] is sent as given (JsonNull
+     *  clears); null leaves it out. */
+    data class WtbOptions(
+        val editField: String? = null,
+        val value: JsonElement? = null,
+        val bidRevision: Int? = null,
+        val preferencesOnly: Boolean? = null,
+        val useStandSlot: Boolean? = null,
+        val acceptHigherLevels: Boolean? = null,
+        val replaceStandEntry: String? = null,
+    )
+
+    /** POST /party-api/merchant/bid (partyApi.ts saveBid): create, edit or
+     *  (clear) cancel a WTB order. [priorityOverride] is sent as given -
+     *  JsonNull clears the override, null leaves the key out. A full stand
+     *  answers 409 with `occupants` (see the WTB replacement prompt). */
     suspend fun saveBid(
         itemId: String,
         price: Long,
         quantity: Int,
         minimumQuality: Int,
-        priorityOverride: Int?,
-        useStandSlot: Boolean,
-        acceptHigherLevels: Boolean,
+        clear: Boolean,
+        priorityOverride: JsonElement? = null,
+        options: WtbOptions? = null,
     ): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -795,19 +808,19 @@ class PartyApiClient(
                 put("price", JsonPrimitive(price))
                 put("quantity", JsonPrimitive(quantity))
                 put("minimumQuality", JsonPrimitive(minimumQuality))
-                put("useStandSlot", JsonPrimitive(useStandSlot))
-                put("acceptHigherLevels", JsonPrimitive(acceptHigherLevels))
-                // Always sent: the server keeps the previous override when the
-                // key is missing, so null is how a blank field clears it.
-                put("priorityOverride", priorityOverride?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("clear", JsonPrimitive(clear))
+                priorityOverride?.let { put("priorityOverride", it) }
+                options?.editField?.let { put("editField", JsonPrimitive(it)) }
+                options?.value?.let { put("value", it) }
+                options?.bidRevision?.let { put("bidRevision", JsonPrimitive(it)) }
+                options?.preferencesOnly?.let { put("preferencesOnly", JsonPrimitive(it)) }
+                options?.useStandSlot?.let { put("useStandSlot", JsonPrimitive(it)) }
+                options?.acceptHigherLevels?.let { put("acceptHigherLevels", JsonPrimitive(it)) }
+                options?.replaceStandEntry?.let { put("replaceStandEntry", JsonPrimitive(it)) }
             },
         )
         return post("merchant/bid", body)
     }
-
-    /** POST /party-api/merchant/bid with `clear: true` - cancels a WTB order. */
-    suspend fun cancelBid(itemId: String): ApiResult<CommandResult> =
-        post("merchant/bid", JsonObject(mapOf("itemId" to JsonPrimitive(itemId), "clear" to JsonPrimitive(true))))
 
     /** `/party-api/command` type "upgrade-offering-rule" - creates (empty
      *  `id`) or edits (existing `id`) a standing "use this offering
@@ -991,26 +1004,21 @@ class PartyApiClient(
         post("mail/collect", JsonObject(mapOf("id" to JsonPrimitive(id))))
 
     /** POST /party-api/merchant/aldata-order (manual-market-orders.ts) -
-     *  buys from one ALData public listing. Server only reads the
-     *  listing's `key` plus the desired quantity; it must still exist and
-     *  be fresh (<120s old) in the coordinator's own market snapshot. */
-    suspend fun buyAlData(listingKey: String, buyQuantity: Int): ApiResult<CommandResult> {
-        val body = JsonObject(
-            mapOf(
-                "listing" to JsonObject(mapOf("key" to JsonPrimitive(listingKey))),
-                "buyQuantity" to JsonPrimitive(buyQuantity),
-            ),
-        )
-        return post("merchant/aldata-order", body)
-    }
+     *  use-party-console.tsx buyALDataListing: the listing as received. */
+    suspend fun buyAlData(listing: JsonObject, buyQuantity: Int): ApiResult<CommandResult> =
+        post("merchant/aldata-order", JsonObject(mapOf("listing" to JsonObject(listing - "origin" - "groupedListings"), "buyQuantity" to JsonPrimitive(buyQuantity))))
 
-    /** POST /party-api/merchant/ponty-order - `keys` lets the server
-     *  combine several Ponty listings into one purchase; this app always
-     *  buys a single listing, so it's always a one-element list. */
-    suspend fun buyPonty(listingKey: String, quantity: Int, unitPrice: Long): ApiResult<CommandResult> {
+    /** POST /party-api/merchant/aldata-sale - use-party-console.tsx
+     *  sellALDataOrder: sell owned copies into a live ALData buy order. */
+    suspend fun sellAlData(order: JsonObject, sellQuantity: Int): ApiResult<CommandResult> =
+        post("merchant/aldata-sale", JsonObject(mapOf("order" to order, "sellQuantity" to JsonPrimitive(sellQuantity))))
+
+    /** POST /party-api/merchant/ponty-order - use-party-console.tsx
+     *  buyPontyListing: every listing key of the grouped lot. */
+    suspend fun buyPonty(keys: List<String>, quantity: Int, unitPrice: Long): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
-                "keys" to kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive(listingKey))),
+                "keys" to kotlinx.serialization.json.JsonArray(keys.map { JsonPrimitive(it) }),
                 "quantity" to JsonPrimitive(quantity),
                 "unitPrice" to JsonPrimitive(unitPrice),
             ),

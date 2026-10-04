@@ -248,9 +248,16 @@ data class StandSearchState(
     val error: String? = null,
 )
 
+/** aldata-state.tsx. Rows stay as received: a purchase or sale echoes the
+ *  listing back (use-party-console.tsx buyALDataListing / sellALDataOrder);
+ *  domain/Market.kt reads them. */
 @Serializable
 data class AlDataState(
-    val listings: List<MarketListing> = emptyList(),
+    val listings: List<kotlinx.serialization.json.JsonObject> = emptyList(),
+    val buyOrders: List<kotlinx.serialization.json.JsonObject> = emptyList(),
+    // Other owners' published trade intentions (classifieds).
+    val trades: List<kotlinx.serialization.json.JsonObject> = emptyList(),
+    val merchantsUpdatedAt: Long? = null,
     // Publish/auth fields (aldata-state.tsx) - public market browsing needs neither; these only
     // matter for the merchant publishing their own listings to ALData.
     val hasKey: Boolean = false,
@@ -261,7 +268,8 @@ data class AlDataState(
 
 @Serializable
 data class PontyState(
-    val listings: List<MarketListing> = emptyList(),
+    val listings: List<kotlinx.serialization.json.JsonObject> = emptyList(),
+    val error: String? = null,
 )
 
 /** One tile within a shared sprite sheet (e.g. items/pack_20vt8.png) - x/y
