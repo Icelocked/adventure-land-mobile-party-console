@@ -167,7 +167,7 @@ data class PartyStateDynamic(
     val autoStandBuys: Boolean = false,
     val autoBlacklistMerchants: Boolean = false,
     val merchantStandLocation: MapLocation? = null,
-    val standPriceHistory: Map<String, JsonElement> = emptyMap(),
+    val standPriceHistory: Map<String, StandPriceHistory> = emptyMap(),
     val nativeStand: NativeStand? = null,
     val mluckSchedule: MluckSchedule? = null,
     val gatheringCooldowns: GatheringCooldowns? = null,
@@ -564,3 +564,18 @@ data class CharacterDiagnostics(
     /** query-cache.tsx presence: seen by the coordinator within the last 10s. */
     fun online(now: Long = System.currentTimeMillis()): Boolean = now - (seenAt ?: 0) < 10_000
 }
+
+/** suggestedItemValue.ts StandPriceHistory: observed stand prices per item,
+ *  each with the +level it was seen at. */
+@Serializable
+data class StandPriceHistory(
+    val lowest: Double = 0.0,
+    val lowestLevel: Int? = null,
+    val recent: Double = 0.0,
+    val recentLevel: Int? = null,
+    val seenAt: Long = 0,
+    val marketLow: Double? = null,
+    val marketLowLevel: Int? = null,
+    val highestPublicWTB: Double? = null,
+    val highestPublicWTBLevel: Int? = null,
+)
