@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   activityTimes,
+  bankFreeSlots,
   bursts,
   characterProblems,
   completedRules,
@@ -8,12 +9,14 @@ import {
   endedEvents,
   errorTimes,
   finishedUpgradeOrders,
+  fullInventories,
   idleCharacters,
   inQuietHours,
   isRareDrop,
   liveCharacters,
   mergeSettings,
   newEntries,
+  newlyAdded,
   newMail,
   problemTransitions,
   rareIndex,
@@ -73,6 +76,27 @@ describe('push notifier: character health', () => {
     expect(idleCharacters(still, ['Leada', 'Merchy'], 'Merchy', now, 300_000)).toEqual(['Leada'])
     const moved = activityTimes(before, null, null, { Leada: { map: 'main', x: 40, y: 0 } }, { Leada: { map: 'main', x: 0, y: 0 } }, now)
     expect(idleCharacters(moved, ['Leada'], 'Merchy', now, 300_000)).toEqual([])
+  })
+})
+
+describe('push notifier: storage', () => {
+  it('flags a bag with no free slot up to the inventory size, once per fill', () => {
+    const inventory = {
+      Leada: { items: [{ slot: 0 }, { slot: 1 }, null] },
+      Folla: { items: [{ slot: 0 }, { slot: 1 }, { slot: 2 }] },
+      Merchy: { items: [{ slot: 0 }, { slot: 1 }, null, null] },
+    }
+    // Merchy's game bag reports 2 slots: both taken.
+    expect(fullInventories(inventory, { Merchy: { inventorySize: 2 } }, ['Leada', 'Folla', 'Merchy', 'Gone'])).toEqual(['Folla', 'Merchy'])
+    expect(newlyAdded(['Folla'], ['Folla', 'Merchy'])).toEqual(['Merchy'])
+    expect(newlyAdded(['Folla', 'Merchy'], ['Folla'])).toEqual([])
+  })
+
+  it('counts free bank slots across unlocked packs', () => {
+    expect(bankFreeSlots(null)).toBeNull()
+    expect(bankFreeSlots({ packs: {} })).toBeNull()
+    expect(bankFreeSlots({ packs: { items0: [{ slot: 0 }, null], items1: [null] } })).toBe(2)
+    expect(bankFreeSlots({ packs: { items0: [{ slot: 0 }, { slot: 1 }] } })).toBe(0)
   })
 })
 

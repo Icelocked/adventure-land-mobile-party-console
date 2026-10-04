@@ -9,6 +9,9 @@ import webpush from 'web-push'
 import {
   ALERTS,
   DEFAULT_SETTINGS,
+  bankFreeSlots,
+  fullInventories,
+  newlyAdded,
   activityTimes,
   bursts,
   characterProblems,
@@ -84,8 +87,11 @@ const watch = {
   rules: null,
   queue: null,
   schedules: null,
+  fullBags: [],
+  bankFull: false,
   ...load('watch.json', {}),
 }
+let liveNames = []
 let catalog = { revision: null, index: null }
 const persist = () => {
   save('subscriptions.json', devices)
@@ -140,6 +146,7 @@ async function checkCore(cookie, positions) {
   const core = await section('core', cookie)
   const now = Number(core.serverNow) || Date.now()
   const names = liveCharacters(core)
+  liveNames = names
   // Stuck or offline.
   const problems = characterProblems(core, now, settings.stuckMinutes * 60_000)
   for (const event of problemTransitions(watch.problems, problems))
@@ -226,6 +233,26 @@ async function checkConfig(cookie) {
   watch.selectedEvents = [...selectedEventIds(config)]
 }
 
+/** Inventory full (each time a bag fills up) and bank full (each time the
+ *  last free bank slot goes). */
+async function checkStorage(cookie, fast, withBank) {
+  if (wants('inventory')) {
+    const inventory = await section('inventory', cookie)
+    const full = fullInventories(inventory.characters, fast.characters, liveNames)
+    for (const name of newlyAdded(watch.fullBags, full))
+      await push('inventory', { title: `${name}: inventory full`, body: 'No free bag slots left.', tag: `inventory-${name}`, url: characterUrl(name) }, name)
+    watch.fullBags = full
+  }
+  if (withBank && wants('bank')) {
+    const bank = await consoleGet('/party-api/state?section=bank&dashboard=1', cookie)
+    const free = bankFreeSlots(bank.bank)
+    if (free !== null) {
+      if (free === 0 && !watch.bankFull) await push('bank', { title: 'Bank full', body: 'Every unlocked bank pack is out of free slots.', tag: 'bank-full', url: '/bank' })
+      watch.bankFull = free === 0
+    }
+  }
+}
+
 async function checkMail(cookie) {
   const mail = await consoleGet('/party-api/mail', cookie)
   const messages = mail.messages || []
@@ -246,6 +273,7 @@ async function poll() {
     const positions = Object.fromEntries(Object.entries(fast.characters || {}).map(([name, value]) => [name, { map: value.map, x: value.x, y: value.y }]))
     const now = await checkCore(cookie, positions)
     if (tick % 2 === 0) await checkLogs(cookie, now)
+    if (tick % 2 === 0) await checkStorage(cookie, fast, tick % 4 === 0)
     if (tick % 4 === 0) await checkMail(cookie)
     if (watch.credentialFailed) watch.credentialFailed = false
     persist()
