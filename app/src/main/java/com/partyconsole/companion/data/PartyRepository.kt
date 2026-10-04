@@ -151,15 +151,23 @@ class PartyRepository(
 
     private fun mergeState(patch: Map<String, JsonElement>) {
         synchronized(stateLock) {
-            merged = JsonObject(merged + patch)
+            val candidate = JsonObject(merged + patch)
+            if (decodeState(candidate) != null) {
+                merged = candidate
+            } else {
+                val bad = badFields(patch)
+                if (bad != droppedFields) {
+                    droppedFields = bad
+                    log("state fields skipped (shape changed): $bad", IllegalStateException(bad.toString()))
+                }
+                merged = JsonObject(merged + (patch - bad))
+            }
             publish()
         }
     }
 
     private fun publish() {
-        val decoded = runCatching { json.decodeFromJsonElement(PartyStateDynamic.serializer(), merged) }
-            .onFailure { log("state decode failed", it) }
-            .getOrNull() ?: return
+        val decoded = decodeState(merged) ?: return
         _dynamicState.value = decoded.copy(
             travelPlaces = catalog.travelPlaces,
             monsterChoices = catalog.monsterChoices,
@@ -171,6 +179,18 @@ class PartyRepository(
             bankVaults = if (merged.containsKey("bankVaults")) decoded.bankVaults else catalog.bankVaults,
         )
     }
+
+    /** If one field of an incoming section doesn't match the model (a
+     *  console release changed its shape), only that field is rejected - it
+     *  keeps its last good value and the rest of the state keeps updating
+     *  instead of freezing. */
+    private fun decodeState(source: JsonObject): PartyStateDynamic? =
+        runCatching { json.decodeFromJsonElement(PartyStateDynamic.serializer(), source) }.getOrNull()
+
+    private fun badFields(patch: Map<String, JsonElement>): Set<String> = patch.keys.filter { key ->
+        runCatching { json.decodeFromJsonElement(PartyStateDynamic.serializer(), JsonObject(mapOf(key to patch.getValue(key)))) }.isFailure
+    }.toSet()
+    @Volatile private var droppedFields: Set<String> = emptySet()
 
     private suspend fun section(name: String): ApiResult<JsonObject> = getObject("state?catalog=0&dashboard=1&section=$name")
 
