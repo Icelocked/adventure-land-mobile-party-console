@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { StandListingForm } from '@/components/StandListingForm'
 import { AutoNpcSaleConfirmation } from '@/components/ItemConfirmations'
+import { AddUpgradeRule } from '@/components/Offerings'
 import { TapRow, UpgradeTierPicker, CompoundTierPicker } from '@/screens/itempanel/ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 
@@ -261,7 +262,13 @@ function AutomaticItemActions({
       {meta?.upgradeable && itemMaximumLevel(meta) - level > 0 && (
         <>
           <TapRow label={`Auto mark for upgrade${upgradeTiers ? ` · ${upgradeTiers} tier${upgradeTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
-          {expanded === 'upgrade' && <UpgradeTierPicker meta={meta} level={level} current={upgradeTiers} onPick={(tiers) => void command('auto-upgrade-mark', { slot: -1, tiers })} />}
+          {expanded === 'upgrade' && (
+            <>
+              <UpgradeTierPicker meta={meta} level={level} current={upgradeTiers} onPick={(tiers) => void command('auto-upgrade-mark', { slot: -1, tiers })} />
+              {/* party-merchant-commerce-dialog.tsx wraps rewards in the merchant's UpgradeOfferingProvider. */}
+              <AddUpgradeRule character={merchant} item={item} meta={meta} />
+            </>
+          )}
         </>
       )}
       {meta?.compoundable && level < compoundMax && (

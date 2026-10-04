@@ -42,6 +42,8 @@ export interface MockCharacter {
   // String()'d) - this models that real, exact asymmetry.
   target?: string | number
   conditions?: { id: string; name: string; remainingMs?: number }[]
+  // The game realm the character is on (vitals.server).
+  server?: string
   // Equipped slots as the live stream sends them ({slot: {item}}), incl. a merchant's trade1..N.
   slots?: Record<string, { item: MockItem; price?: number } | null>
   // Extra characterDetails fields (the script's stats: str, attack, combatStats, characterDollHtml, ...).
@@ -246,7 +248,7 @@ export class MockPartyServer {
   offlineRoster: { name: string; ctype: string; level: number; online?: boolean }[] = []
 
   private roster() {
-    return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level })), ...this.offlineRoster]
+    return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level, ...(c.server ? { server: c.server } : {}) })), ...this.offlineRoster]
   }
 
   private dynamicState(): Record<string, unknown> {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded, useDynamicState, useCharacters, useCharacterDiagnostics } from '@/data/PartyDataProvider'
 import { merchantPartyGroups } from '@/lib/partyGroups'
@@ -48,6 +48,20 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
   const [confirmingClear, setConfirmingClear] = useState(false)
   const toggle = (key: string) => setExpanded((current) => (current === key ? null : key))
 
+  // send-to-party-control.tsx: one request at a time, controls disabled while it runs.
+  const [sendingToParty, setSendingToParty] = useState(false)
+  const sendingRef = useRef(false)
+  const sendToParty = async (group?: string) => {
+    if (sendingRef.current) return
+    sendingRef.current = true
+    setSendingToParty(true)
+    try {
+      await run(() => api.sendMerchantToParty(group))
+    } finally {
+      sendingRef.current = false
+      setSendingToParty(false)
+    }
+  }
   const run = async (action: () => Promise<{ kind: string; message?: string }>) => {
     setError(null)
     const result = await action()
@@ -92,16 +106,17 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
           variant="outline"
           size="sm"
           className="justify-start"
-          onClick={() => (groups.length <= 1 ? void run(() => api.sendMerchantToParty(groups[0]?.id)) : toggle('party'))}
+          disabled={sendingToParty}
+          onClick={() => (groups.length <= 1 ? void sendToParty(groups[0]?.id) : toggle('party'))}
         >
-          Send to party
+          {sendingToParty ? 'Sending…' : 'Send to party'}
         </Button>
         {expanded === 'party' && (
           // send-to-party-control.tsx: pick a party group when there's more than one.
           <div className="flex flex-col gap-1 py-1 pl-3">
             <p className="text-xs text-muted-foreground">Select party group</p>
             {groups.map((group) => (
-              <Button key={group.id} variant="outline" size="sm" className="h-auto justify-start whitespace-normal py-2 text-left" onClick={() => void run(() => api.sendMerchantToParty(group.id))}>
+              <Button key={group.id} variant="outline" size="sm" disabled={sendingToParty} className="h-auto justify-start whitespace-normal py-2 text-left" onClick={() => void sendToParty(group.id)}>
                 {group.members.join(' · ')}
               </Button>
             ))}
@@ -117,7 +132,16 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
           Join giveaway
         </Button>
         {expanded === 'giveaway' && (
-          <GiveawayForm realms={state.giveawayRealms ?? []} players={state.giveawayPlayers ?? {}} onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))} />
+          <GiveawayForm
+            // connected-character-card.tsx onGiveaway: the merchant's current realm, else the first.
+            initialRealm={(() => {
+              const current = state.merchantCharacter ? characters[state.merchantCharacter]?.vitals?.server : undefined
+              return current ? `SR_${current}` : state.giveawayRealms?.[0]?.key || ''
+            })()}
+            realms={state.giveawayRealms ?? []}
+            players={state.giveawayPlayers ?? {}}
+            onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))}
+          />
         )}
 
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('settings')}>
@@ -194,12 +218,14 @@ function GiveawayForm({
   realms,
   players,
   onJoin,
+  initialRealm = '',
 }: {
+  initialRealm?: string
   realms: { key: string; label: string }[]
   players: Record<string, string[]>
   onJoin: (realm: string, seller: string) => void
 }) {
-  const [realm, setRealm] = useState('')
+  const [realm, setRealm] = useState(initialRealm)
   const [seller, setSeller] = useState('')
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)

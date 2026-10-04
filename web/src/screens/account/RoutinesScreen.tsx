@@ -146,7 +146,11 @@ export function RoutinesScreen() {
             const result = await api.saveRoutinePriorities(nextPriorities, nextEnabled)
             setSaving(false)
             if (result.kind === 'failure') setError(result.message)
-            else await refreshNow()
+            else {
+              // use-party-console.tsx saveRoutinePriorities: a successful save closes the dialog.
+              await refreshNow()
+              navigate(-1)
+            }
           }}
         >
           {saving ? 'Saving...' : 'Save routines'}

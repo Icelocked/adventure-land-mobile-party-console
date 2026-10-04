@@ -104,3 +104,14 @@ test('Mark multiple: stages bank and upgrade rules as Pending, Done saves them, 
   await rules.getByRole('button', { name: 'Stand', exact: true }).click()
   await expect(rules.getByText('0 pending changes. Done saves; closing discards. Existing prices are kept; new stand rules use the item gold value.')).toBeVisible()
 })
+
+test('Exchange reward options include Add upgrade rule for the merchant (upgrade-actions.tsx)', async ({ page }) => {
+  const server = exchangeServer()
+  await server.install(page)
+  await page.goto('/merchant/exchange')
+  await page.getByRole('button', { name: 'Choose' }).click()
+  await page.getByRole('button', { name: 'Exchange reward: bow +2' }).click()
+  await page.getByRole('button', { name: /^Auto mark for upgrade/ }).click()
+  await page.getByRole('button', { name: 'Add upgrade rule' }).click()
+  await expect(page.getByRole('group', { name: 'Add upgrade rule' })).toBeVisible()
+})

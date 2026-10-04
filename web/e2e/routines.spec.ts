@@ -73,3 +73,14 @@ test('Routines: deliveries/withdrawals switched off in Merchant settings are loc
   expect(enabled).not.toHaveProperty('deliveries')
   expect(enabled).not.toHaveProperty('withdrawals')
 })
+
+test('Routines: a successful save closes the routines screen (routine-priorities-dialog.tsx)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  await server.install(page)
+  await page.goto('/characters/Merchantina')
+  await page.goto('/routines')
+  await page.getByRole('button', { name: 'Save routines' }).click()
+  await expect(page).toHaveURL(/\/characters\/Merchantina$/)
+})

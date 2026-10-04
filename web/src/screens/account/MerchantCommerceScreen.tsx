@@ -59,7 +59,11 @@ export function MerchantCommerceScreen() {
   const owned = useMemo(() => inventoryCounts(inventories(characters), dynamicState.bank, dynamicState.bankbois, true), [characters, dynamicState.bank, dynamicState.bankbois])
   const buyableById = useMemo(() => Object.fromEntries((catalog?.buyable ?? []).map((item) => [item.id, item])), [catalog])
 
-  const setModeParam = (next: Mode) => navigate(`/merchant/${next}`, { replace: true })
+  const setModeParam = (next: Mode) => {
+    // merchant-commerce-dialog.tsx: switching mode clears the search.
+    if (next !== mode) setSearch('')
+    navigate(`/merchant/${next}`, { replace: true })
+  }
 
   if (mode === 'buy') {
     return (
@@ -180,8 +184,11 @@ function ItemRow({
   subtitle,
   disabled,
   onAdd,
+  itemId,
   addLabel = 'Add',
 }: {
+  /** merchant-commerce-dialog.tsx: tapping a catalog tile opens its item details. */
+  itemId?: string
   name: string
   sprite?: { url: string; tileSize: number; columns: number; rows: number; x: number; y: number } | null
   subtitle: string
@@ -189,16 +196,27 @@ function ItemRow({
   onAdd: () => void
   addLabel?: string
 }) {
+  const state = useDynamicState()
+  const [inspecting, setInspecting] = useState(false)
   return (
-    <div className={`flex items-center gap-3 rounded-md border border-border bg-card p-2.5 ${disabled ? 'opacity-40' : ''}`}>
-      <SpriteIcon sprite={sprite} size={36} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{name}</div>
-        <div className="font-mono text-xs text-muted-foreground">{subtitle}</div>
-      </div>
+    <div className="flex items-center gap-3 rounded-md border border-border bg-card p-2.5">
+      <button type="button" aria-label={`Inspect ${name}`} disabled={!itemId} onClick={() => setInspecting(true)} className={`flex min-w-0 flex-1 items-center gap-3 text-left ${disabled ? 'opacity-40' : ''}`}>
+        <SpriteIcon sprite={sprite} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{name}</div>
+          <div className="font-mono text-xs text-muted-foreground">{subtitle}</div>
+        </div>
+      </button>
       <Button size="sm" disabled={disabled} onClick={onAdd}>
         {addLabel}
       </Button>
+      {inspecting && itemId && (
+        <Sheet open onOpenChange={(open) => !open && setInspecting(false)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <ItemDetailBrowser rootItemId={itemId} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   )
 }
@@ -258,6 +276,7 @@ function BuyScreen({
   return (
     <AccountScreenScaffold title="Merchant shopping">
       <ModeTabs mode="buy" setMode={setMode} />
+      <p className="px-3 pb-1 text-xs text-muted-foreground">Choose anything sold for gold.</p>
       <SearchBar value={search} onChange={setSearch} />
       {filtered.length === 0 ? (
         <EmptyState message="No buyable items found." />
@@ -266,6 +285,7 @@ function BuyScreen({
           {filtered.map((item) => (
             <ItemRow
               key={item.id}
+              itemId={item.id}
               name={item.name}
               sprite={item.sprite}
               subtitle={`${item.cost.toLocaleString()}g`}
@@ -275,9 +295,11 @@ function BuyScreen({
         </div>
       )}
 
-      {selected.length > 0 && (
+      {/* merchant-commerce-dialog.tsx: the cart panel is always shown. */}
+      {(
         <div className="mt-3 border-t border-border px-3 pt-3">
           <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Cart</p>
+          {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => {
             const line = cart[item.id]
             return (
@@ -417,6 +439,7 @@ function CraftScreen({
             return (
               <div key={recipe.id} className="flex flex-col gap-1">
                 <ItemRow
+                  itemId={recipe.id}
                   name={recipe.name}
                   sprite={recipe.sprite}
                   subtitle={`${recipe.cost.toLocaleString()}g + materials`}
@@ -461,9 +484,11 @@ function CraftScreen({
         </div>
       )}
 
-      {selected.length > 0 && (
+      {/* merchant-commerce-dialog.tsx: the cart panel is always shown. */}
+      {(
         <div className="mt-3 border-t border-border px-3 pt-3">
           <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Craft list</p>
+          {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => (
             <CartRow key={item.id}>
               <SpriteIcon sprite={item.sprite} size={28} />
@@ -693,9 +718,11 @@ function ExchangeScreen({
         </div>
       )}
 
-      {selected.length > 0 && (
+      {/* merchant-commerce-dialog.tsx: the cart panel is always shown. */}
+      {(
         <div className="mt-3 border-t border-border px-3 pt-3">
           <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Exchange cart</p>
+          {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => (
             <CartRow key={item.key}>
               <SpriteIcon sprite={item.sprite} size={28} />

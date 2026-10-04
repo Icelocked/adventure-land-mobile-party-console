@@ -245,7 +245,8 @@ export function FarmingSection({
           character={position}
           // party-workspace.tsx: prefer the character's saved waypoint, else the party's.
           waypoint={state.characterLocations?.[characterName] || state.partyLocation}
-          radius={monsterSearchRadius}
+          // party-workspace.tsx: the leader's radius when there is one.
+          radius={effectiveRadius}
           busy={busy}
           savedPhoenixOrder={phoenixRouteOrder}
           onCancel={() => setPickingArea(false)}
