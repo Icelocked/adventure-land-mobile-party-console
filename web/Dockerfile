@@ -10,6 +10,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
+# The push notifier (notifier/server.mjs) and its one dependency.
+RUN cd notifier && npm ci --omit=dev
 
 FROM nginx:alpine AS run
 COPY --from=build /app/dist /usr/share/nginx/html
@@ -20,4 +22,12 @@ COPY nginx-locations.conf /etc/nginx/snippets/pwa-locations.conf
 # section 3b for why (Android's PWA install criteria needs HTTPS).
 COPY docker-entrypoint-tailscale-https.sh /docker-entrypoint.d/50-tailscale-https.sh
 RUN chmod +x /docker-entrypoint.d/50-tailscale-https.sh
+# Push notifier: a small Node process next to nginx (nginx proxies /notify/
+# to it). Its keys and subscriptions live in /data/notifier - mount a volume
+# there so they survive rebuilds.
+RUN apk add --no-cache nodejs
+COPY --from=build /app/notifier /opt/notifier
+COPY docker-entrypoint-notifier.sh /docker-entrypoint.d/60-notifier.sh
+RUN chmod +x /docker-entrypoint.d/60-notifier.sh
+VOLUME /data/notifier
 EXPOSE 80 443
