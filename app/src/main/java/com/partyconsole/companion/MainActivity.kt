@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.partyconsole.companion.network.PartyCookies
 import com.partyconsole.companion.network.ServerConfigStore
+import com.partyconsole.companion.ui.AppForeground
 import com.partyconsole.companion.ui.AppNavigation
 import com.partyconsole.companion.ui.theme.PartyConsoleTheme
 
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         PartyCookies.init(applicationContext)
+        AppForeground.observe()
         val store = ServerConfigStore(applicationContext)
         setContent {
             PartyConsoleTheme {

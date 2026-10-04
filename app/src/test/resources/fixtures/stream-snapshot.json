@@ -1,0 +1,143 @@
+{
+ "type": "snapshot",
+ "epoch": "e1",
+ "sequence": 1,
+ "characters": {
+  "Leada": {
+   "generation": "g1",
+   "sample": 1,
+   "sampledAt": 1791113884491,
+   "vitals": {
+    "hp": 100,
+    "max_hp": 100,
+    "mp": 100,
+    "max_mp": 100,
+    "gold": 12000,
+    "map": "main",
+    "x": 10,
+    "y": 20,
+    "rip": false,
+    "inventorySize": 3,
+    "conditions": [
+     {
+      "id": "mluck",
+      "name": "Merchant's Luck",
+      "remainingMs": 60000
+     }
+    ]
+   },
+   "items": {
+    "0": {
+     "slot": 0,
+     "item": {
+      "name": "hpot0",
+      "q": 200
+     }
+    },
+    "1": {
+     "slot": 1,
+     "item": {
+      "name": "bow",
+      "level": 7
+     }
+    }
+   },
+   "slots": {
+    "mainhand": {
+     "item": {
+      "name": "blade",
+      "level": 8
+     }
+    }
+   }
+  },
+  "Folla": {
+   "generation": "g1",
+   "sample": 1,
+   "sampledAt": 1791113884491,
+   "vitals": {
+    "hp": 100,
+    "max_hp": 100,
+    "mp": 100,
+    "max_mp": 100,
+    "gold": 0,
+    "map": "main",
+    "x": 0,
+    "y": 0,
+    "rip": false,
+    "inventorySize": 2
+   },
+   "items": {
+    "0": {
+     "slot": 0,
+     "item": {
+      "name": "ringsj",
+      "level": 1
+     }
+    }
+   },
+   "slots": {}
+  },
+  "Rangy": {
+   "generation": "g1",
+   "sample": 1,
+   "sampledAt": 1791113884491,
+   "vitals": {
+    "hp": 100,
+    "max_hp": 100,
+    "mp": 100,
+    "max_mp": 100,
+    "gold": 0,
+    "map": "main",
+    "x": 0,
+    "y": 0,
+    "rip": false,
+    "inventorySize": 2
+   },
+   "items": {},
+   "slots": {}
+  },
+  "Merchy": {
+   "generation": "g1",
+   "sample": 1,
+   "sampledAt": 1791113884491,
+   "vitals": {
+    "hp": 100,
+    "max_hp": 100,
+    "mp": 100,
+    "max_mp": 100,
+    "gold": 0,
+    "map": "main",
+    "x": 0,
+    "y": 0,
+    "rip": false,
+    "inventorySize": 3
+   },
+   "items": {
+    "0": {
+     "slot": 0,
+     "item": {
+      "name": "wcoat",
+      "level": 0
+     }
+    },
+    "1": {
+     "slot": 1,
+     "item": {
+      "name": "cscroll0",
+      "q": 5
+     }
+    }
+   },
+   "slots": {
+    "trade1": {
+     "item": {
+      "name": "bow",
+      "level": 3
+     },
+     "price": 50000
+    }
+   }
+  }
+ }
+}

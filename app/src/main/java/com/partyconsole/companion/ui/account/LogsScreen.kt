@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
  *  that was deferred earlier). */
 @Composable
 fun LogsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
+    com.partyconsole.companion.ui.DomainInterest(viewModel, com.partyconsole.companion.data.Domain.LOGS)
     val state by viewModel.dynamicState.collectAsState()
     val gameLogs by viewModel.gameLogs.collectAsState()
     val combatEntries = state.combatLogs.flatMap { (name, entries) -> entries.map { name to it } }

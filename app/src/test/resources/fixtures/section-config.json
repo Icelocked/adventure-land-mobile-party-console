@@ -1,0 +1,162 @@
+{
+ "bankboiPrefix": "MyBank",
+ "anniversaryAutoChat": true,
+ "farmingProfiles": {
+  "Rangy": {
+   "farmingPolicy": "scatter",
+   "huntSettings": {
+    "relocateIfCompeting": false,
+    "blacklistDeaths": true,
+    "deathThreshold": 2,
+    "blacklistExpirations": true,
+    "expirationThreshold": 1
+   },
+   "huntBlacklist": {},
+   "monsterFocus": [
+    "bat"
+   ]
+  }
+ },
+ "phoenixRouteOrder": [],
+ "threshold": 250000,
+ "itemCollectionThreshold": 12,
+ "merchantDeliveries": {},
+ "standListings": [
+  {
+   "id": "l1",
+   "slot": 0,
+   "item": {
+    "name": "wcoat",
+    "level": 0
+   },
+   "price": 9000,
+   "quantity": 1
+  },
+  {
+   "id": "l2",
+   "bankPack": "items0",
+   "bankSlot": 0,
+   "slot": 0,
+   "item": {
+    "name": "bow",
+    "level": 5
+   },
+   "price": 80000,
+   "quantity": 1
+  }
+ ],
+ "npcSaleMarks": [],
+ "deconstructionMarks": [],
+ "deconstructionCatalog": {},
+ "autoNpcSales": {
+  "hpot0": {
+   "item": {
+    "name": "hpot0"
+   }
+  },
+  "[\"Leada\",\"bow@+0\"]": {
+   "item": {
+    "name": "bow"
+   },
+   "character": "Leada"
+  }
+ },
+ "merchantRoutinePriorities": {
+  "merchant luck": 100,
+  "restock": 90,
+  "stand maintenance": 40
+ },
+ "merchantAutomations": {
+  "auto upgrade": false,
+  "restock": true,
+  "deliveries": true,
+  "withdrawals": false
+ },
+ "standBids": {
+  "ringsj": {
+   "price": 20000,
+   "quantity": 2,
+   "minimumQuality": 1,
+   "priorityOverride": 80
+  }
+ },
+ "upgrades": {},
+ "statScrolls": {},
+ "compounds": {},
+ "autoExchanges": {
+  "box@0": true
+ },
+ "goldTargets": {
+  "Merchy": 2000000
+ },
+ "leader": "Leada",
+ "followers": {
+  "Folla": true
+ },
+ "monsterFocus": [
+  "goo"
+ ],
+ "monsterFocusByCharacter": {
+  "Rangy": [
+   "bat"
+  ]
+ },
+ "monsterSearchRadiusByCharacter": {
+  "Leada": 400,
+  "Rangy": 600
+ },
+ "farmingPolicy": "hunt",
+ "huntBlacklist": {
+  "crab": {
+   "monsterId": "crab",
+   "at": 1700000000000,
+   "deaths": 3,
+   "reason": "deaths"
+  }
+ },
+ "huntSettings": {
+  "relocateIfCompeting": true,
+  "blacklistDeaths": true,
+  "deathThreshold": 3,
+  "blacklistExpirations": false,
+  "expirationThreshold": 1
+ },
+ "restockPolicies": {
+  "Leada": {
+   "hp": {
+    "min": 100,
+    "max": 300,
+    "item": "hpot1"
+   },
+   "mp": {
+    "min": 50,
+    "max": 200,
+    "item": "mpot1"
+   }
+  }
+ },
+ "merchantCharacter": "Merchy",
+ "merchantForceStand": false,
+ "roster": [
+  {
+   "name": "Leada",
+   "ctype": "warrior",
+   "level": 70
+  },
+  {
+   "name": "Folla",
+   "ctype": "priest",
+   "level": 68
+  },
+  {
+   "name": "Rangy",
+   "ctype": "ranger",
+   "level": 66
+  },
+  {
+   "name": "Merchy",
+   "ctype": "merchant",
+   "level": 80
+  }
+ ]
+}
