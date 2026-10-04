@@ -88,7 +88,8 @@ fun ItemActionPanel(
     val characters by viewModel.characters.collectAsState()
     var error by remember(target) { mutableStateOf<String?>(null) }
     var expanded by remember(target) { mutableStateOf<String?>(null) }
-    var comparing by remember(target) { mutableStateOf(false) }
+    // null: closed; "" : the default slot; else the slot picked in the list.
+    var comparing by remember(target) { mutableStateOf<String?>(null) }
     var showingDetails by remember(target) { mutableStateOf(false) }
     val catalogFor = rememberCatalogLookup(state.merchantCatalog)
     val item = target.item
@@ -138,7 +139,7 @@ fun ItemActionPanel(
             when (target) {
                 is ItemActionTarget.InventorySlot -> InventoryActions(
                     viewModel, target, meta, characterName, isMerchant, state.merchantCatalog?.buyable.orEmpty(), statScrollInventory,
-                    expanded, { expanded = it }, ::run, ::finish, onCompare = { comparing = true },
+                    expanded, { expanded = it }, ::run, ::finish, onCompare = { comparing = it },
                 )
                 is ItemActionTarget.EquipmentSlot -> EquipmentActions(viewModel, target, meta, characterName, ::run)
             }
@@ -165,15 +166,8 @@ fun ItemActionPanel(
         }
     }
 
-    if (comparing) {
-        GearComparisonSheet(
-            item = item,
-            meta = meta,
-            characterCtype = roster[characterName]?.ctype ?: characters[characterName]?.vitals?.ctype.orEmpty(),
-            equippedSlots = characters[characterName]?.inventory?.slots ?: emptyMap(),
-            catalogFor = catalogFor,
-            onClose = { comparing = false },
-        )
+    comparing?.let { slot ->
+        GearComparisonSheet(item = item, meta = meta, characterName = characterName, viewModel = viewModel, slot = slot.ifEmpty { null }, onClose = { comparing = null })
     }
 }
 
@@ -199,7 +193,7 @@ private fun InventoryActions(
     onExpand: (String?) -> Unit,
     run: (suspend () -> ApiResult<CommandResult>) -> Unit,
     finish: suspend (ApiResult<CommandResult>) -> String?,
-    onCompare: () -> Unit,
+    onCompare: (String) -> Unit,
 ) {
     val state by viewModel.dynamicState.collectAsState()
     val characters by viewModel.characters.collectAsState()
@@ -268,7 +262,7 @@ private fun InventoryActions(
                 if (expanded == "compare") {
                     Column(modifier = Modifier.padding(start = 16.dp)) {
                         for (comparisonSlot in comparisonSlots) {
-                            Row(modifier = Modifier.fillMaxWidth().clickable { onCompare() }.padding(vertical = 8.dp, horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Row(modifier = Modifier.fillMaxWidth().clickable { onCompare(comparisonSlot) }.padding(vertical = 8.dp, horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(comparisonSlotLabel(comparisonSlot), style = MaterialTheme.typography.bodySmall)
                                 Text(equippedName(comparisonSlot), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -276,7 +270,7 @@ private fun InventoryActions(
                     }
                 }
             } else {
-                TapRow("Compare with equipped") { onCompare() }
+                TapRow("Compare with equipped") { onCompare("") }
             }
         }
 

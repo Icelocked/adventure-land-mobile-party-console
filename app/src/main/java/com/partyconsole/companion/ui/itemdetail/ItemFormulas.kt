@@ -489,3 +489,30 @@ private fun toPrecision(value: Double, sigFigs: Int): String {
         BigDecimal(value).round(MathContext(sigFigs)).stripTrailingZeros().toPlainString()
     }.getOrDefault(value.toString())
 }
+
+/** use-party-console.tsx detailMeta: catalog meta with the live instance's
+ *  meta over it (keeping the catalog's world info when the live one has none). */
+fun detailMeta(known: ItemMeta?, live: ItemMeta?): ItemMeta? = when {
+    known == null -> live
+    live == null -> known
+    else -> live.copy(world = live.world ?: known.world, sprite = live.sprite ?: known.sprite)
+}
+
+/** itemFormulas.ts propertiesAtLevel: the item's reported properties moved
+ *  by the formula delta between its actual level/stat and the preview's.
+ *  Non-numeric reported properties (flags) are left out - only the numbers
+ *  feed the comparison. */
+fun propertiesAtLevel(meta: ItemMeta?, item: com.partyconsole.companion.model.Item, level: Int, statType: String?): Map<String, Double> {
+    val actualCalculated = calculatedLevelProperties(meta, item.statType, maxOf(0, item.level ?: 0))
+    val previewCalculated = calculatedLevelProperties(meta, statType, level)
+    val reported = meta?.properties.orEmpty()
+    val out = linkedMapOf<String, Double>()
+    for (key in actualCalculated.keys + previewCalculated.keys + reported.keys) {
+        val reportedValue = reported[key]
+        if (reportedValue != null && (reportedValue as? JsonPrimitive)?.let { it.isString || it.doubleOrNull != null } != true) continue
+        val current = reportedValue?.let { (it as JsonPrimitive).doubleOrNull ?: 0.0 } ?: actualCalculated[key] ?: 0.0
+        val value = current + (previewCalculated[key] ?: 0.0) - (actualCalculated[key] ?: 0.0)
+        if (value != 0.0) out[key] = value
+    }
+    return out
+}
