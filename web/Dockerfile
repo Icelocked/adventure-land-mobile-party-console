@@ -14,6 +14,11 @@ RUN npm run build
 RUN cd notifier && npm ci --omit=dev
 
 FROM nginx:alpine AS run
+# Release builds pass the tag (e.g. 1.0.0); local builds stay unversioned,
+# which tells the in-app updater to leave them alone.
+ARG PWA_VERSION=""
+ENV PWA_VERSION=$PWA_VERSION
+LABEL org.opencontainers.image.version=$PWA_VERSION       org.opencontainers.image.source=https://github.com/Icelocked/adventure-land-mobile-party-console
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY nginx-locations.conf /etc/nginx/snippets/pwa-locations.conf
@@ -27,6 +32,8 @@ RUN chmod +x /docker-entrypoint.d/50-tailscale-https.sh
 # there so they survive rebuilds.
 RUN apk add --no-cache nodejs
 COPY --from=build /app/notifier /opt/notifier
+# Updater sidecar (same image, different command; see DEPLOYMENT.md).
+COPY --from=build /app/updater /opt/updater
 COPY docker-entrypoint-notifier.sh /docker-entrypoint.d/60-notifier.sh
 RUN chmod +x /docker-entrypoint.d/60-notifier.sh
 VOLUME /data/notifier
