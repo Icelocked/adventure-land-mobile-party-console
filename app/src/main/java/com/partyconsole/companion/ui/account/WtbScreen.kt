@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui.account
 
+import com.partyconsole.companion.ui.DomainInterest
+import com.partyconsole.companion.data.Domain
 import android.content.Context
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -82,6 +84,7 @@ private val VioletBorder = Color(0xFF4C1D95)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun WtbScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
+    DomainInterest(viewModel, Domain.MARKET)
     val state by viewModel.dynamicState.collectAsState()
     val configLoaded by viewModel.stateLoaded.collectAsState()
     val api = viewModel.api

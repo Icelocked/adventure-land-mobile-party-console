@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui.account
 
+import com.partyconsole.companion.ui.DomainInterest
+import com.partyconsole.companion.data.Domain
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -88,6 +90,7 @@ private val Rose = Color(0xFFF43F5E)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
+    DomainInterest(viewModel, Domain.MARKET)
     val state by viewModel.dynamicState.collectAsState()
     val characters by viewModel.characters.collectAsState()
     val diagnostics by viewModel.characterDetails.collectAsState()

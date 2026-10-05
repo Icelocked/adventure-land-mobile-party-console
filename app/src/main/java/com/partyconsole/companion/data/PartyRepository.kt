@@ -37,7 +37,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -432,30 +434,42 @@ class PartyRepository(
     private val interest = mutableMapOf<Domain, Int>()
     private fun interested(domain: Domain) = synchronized(interest) { (interest[domain] ?: 0) > 0 }
 
+    // Wakes one domain's poll loop early, so a screen that needs it doesn't
+    // wait out a long background sleep.
+    private val wake = Domain.entries.associateWith { MutableStateFlow(0) }
+
     /** Raise [domain]'s cadence while the returned handle is open. */
     fun registerInterest(domain: Domain): () -> Unit {
         synchronized(interest) { interest[domain] = (interest[domain] ?: 0) + 1 }
         trigger(domain)
+        wake.getValue(domain).update { it + 1 }
         return { synchronized(interest) { interest[domain] = maxOf(0, (interest[domain] ?: 1) - 1) } }
     }
 
-    /** Poll interval per domain; null = not on a timer right now. Core is
-     *  2s rather than the console's 1s to spare mobile data. */
-    internal fun cadence(domain: Domain): Long? {
+    /** Poll interval per domain; null = not on a timer right now. Tuned for
+     *  mobile data: the live stream carries what changes quickly, polls fill
+     *  in the rest, faster only while a screen that shows a domain is open,
+     *  and every action refreshes what it touched at once. When the stream
+     *  drops, the fallback stays slow: a connection that just failed
+     *  shouldn't be asked for several large payloads a second.
+     *  PWA: web/src/data/PartyDataProvider.tsx (cadences). */
+    internal fun cadence(domain: Domain): Long? = baseCadence(domain)?.let { (it * pollingScale).toLong().coerceAtLeast(50) }
+
+    private fun baseCadence(domain: Domain): Long? {
         val liveDown = _connected.value == false
         return when (domain) {
-            Domain.CORE -> 2_000
+            Domain.CORE -> if (liveDown) 3_000 else 5_000
             Domain.CONFIG -> 15_000
-            Domain.BANK -> if (interested(Domain.BANK)) 2_000 else 15_000
-            Domain.MARKET -> 10_000
-            Domain.LOGS -> if (interested(Domain.LOGS)) 1_000 else 6_000
+            Domain.BANK -> if (interested(Domain.BANK)) 5_000 else 60_000
+            Domain.MARKET -> if (interested(Domain.MARKET)) 10_000 else 60_000
+            Domain.LOGS -> if (interested(Domain.LOGS)) 3_000 else 30_000
             Domain.MAIL -> if (interested(Domain.MAIL)) 2_000 else 10_000
-            Domain.ESCAPE -> if (_escape.value != null) 1_000 else 6_000
+            Domain.ESCAPE -> if (_escape.value != null) 2_000 else 10_000
             // Refetched when core's referenceRevision changes, not on a
             // timer - but retried until the first one lands.
             Domain.CATALOG -> if (catalogLoaded) null else 5_000
-            Domain.FAST -> if (liveDown) 250 else null
-            Domain.INVENTORY -> if (liveDown) 2_000 else null
+            Domain.FAST -> if (liveDown) 2_000 else null
+            Domain.INVENTORY -> if (liveDown) 10_000 else null
         }
     }
 
@@ -523,15 +537,20 @@ class PartyRepository(
                     val interval = cadence(domain)
                     // Polling pauses while the app is in the background.
                     if (interval != null && foreground.value) trigger(domain).await()
-                    sleep(interval ?: 1_000)
+                    sleep(interval ?: 1_000, domain)
                 }
             }
         }
     }
 
-    /** Sleep, but wake at once when the app comes back to the foreground. */
-    private suspend fun sleep(ms: Long) {
-        if (foreground.value) withTimeoutOrNull(ms) { foreground.first { !it } }
+    /** Sleep, but wake at once when the app comes back to the foreground or
+     *  a screen registers interest in [domain]. */
+    private suspend fun sleep(ms: Long, domain: Domain) {
+        val signal = wake.getValue(domain)
+        val seen = signal.value
+        if (foreground.value) withTimeoutOrNull(ms) {
+            merge(foreground.filter { !it }, signal.filter { it != seen }).first()
+        }
         if (!foreground.value) foreground.first { it }
     }
 
@@ -569,8 +588,12 @@ class PartyRepository(
         runCatching { android.util.Log.w("PartyRepository", message, error) }
     }
 
-    private companion object {
-        val CORE_ONLY_KEYS = setOf("characterDetails", "bankbois", "characters", "serverNow")
+    companion object {
+        /** Multiplies every poll interval; tests shorten it so they don't
+         *  wait on the real, mobile-friendly cadences. */
+        @Volatile internal var pollingScale = 1.0
+
+        private val CORE_ONLY_KEYS = setOf("characterDetails", "bankbois", "characters", "serverNow")
     }
 }
 

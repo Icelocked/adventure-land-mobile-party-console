@@ -52,6 +52,8 @@ class FakeConsole : AutoCloseable {
     val failOnce = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, String>>()
 
     init {
+        // Poll at about the old desktop pace so tests don't wait on mobile cadences.
+        com.partyconsole.companion.data.PartyRepository.pollingScale = 0.2
         actionBaseline = com.partyconsole.companion.ui.components.ActionToasts.entries.value.maxOfOrNull { it.id } ?: actionBaseline
     }
 
