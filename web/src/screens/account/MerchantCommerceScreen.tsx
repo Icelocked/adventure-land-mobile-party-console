@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCharacters, useDomainInterest, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { inventoryCounts } from '@/lib/inventoryCounts'
@@ -10,7 +10,7 @@ import { Chip } from '@/components/Chip'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
-import { Settings, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Settings, X } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { ExchangeMarkControls, ExchangeRewardTile, type ExchangeMarkMode, type ExchangeRewardTileData } from '@/components/ExchangeReward'
@@ -229,7 +229,7 @@ function CartRow({ children }: { children: ReactNode }) {
 
 function SubmitBar({ label, disabled, submitting, error, onSubmit }: { label: string; disabled: boolean; submitting: boolean; error: string | null; onSubmit: () => void }) {
   return (
-    <div className="sticky bottom-0 border-t border-border bg-background p-3">
+    <div className="border-t border-border bg-background p-3">
       {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
       <Button className="w-full" disabled={disabled || submitting} onClick={onSubmit}>
         {submitting ? 'Queuing...' : label}
@@ -238,6 +238,40 @@ function SubmitBar({ label, disabled, submitting, error, onSubmit }: { label: st
   )
 }
 
+
+/** The cart, pinned to the bottom of the screen so an added item shows at
+ *  once while the list scrolls above it. Adding something opens it and
+ *  scrolls to the newest line; the header folds it to a summary. */
+function CartDock({ title, lines, units, summary, submit, children }: { title: string; lines: number; units: number; summary?: ReactNode; submit: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(true)
+  const body = useRef<HTMLDivElement>(null)
+  const previousUnits = useRef(units)
+  useEffect(() => {
+    if (units > previousUnits.current) {
+      setOpen(true)
+      requestAnimationFrame(() => body.current?.scrollTo({ top: body.current.scrollHeight }))
+    }
+    previousUnits.current = units
+  }, [units])
+  return (
+    <section aria-label={title} className="sticky bottom-0 z-10 mt-3 border-t border-border bg-background shadow-[0_-6px_16px_rgba(0,0,0,0.45)]">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex w-full items-center gap-2 px-3 py-2 text-left">
+        <span className="font-mono text-xs uppercase text-muted-foreground">
+          {title}
+          {lines ? ` (${lines})` : ''}
+        </span>
+        {summary && <span className="ml-auto font-mono text-xs text-primary">{summary}</span>}
+        {open ? <ChevronDown className={summary ? 'size-4' : 'ml-auto size-4'} /> : <ChevronUp className={summary ? 'size-4' : 'ml-auto size-4'} />}
+      </button>
+      {open && (
+        <div ref={body} className="max-h-[40vh] overflow-y-auto px-3 pb-2">
+          {children}
+        </div>
+      )}
+      {submit}
+    </section>
+  )
+}
 
 function BuyScreen({
   search,
@@ -295,10 +329,13 @@ function BuyScreen({
         </div>
       )}
 
-      {/* The cart panel is always shown. */}
-      {(
-        <div className="mt-3 border-t border-border px-3 pt-3">
-          <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Cart</p>
+      <CartDock
+        title="Cart"
+        lines={selected.length}
+        units={selected.reduce((sum, item) => sum + cart[item.id].quantity, 0)}
+        summary={`Gold${hasEstimatedGold ? ' (est)' : ''}: ${goldTotal.toLocaleString()}g`}
+        submit={<SubmitBar label="Buy all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />}
+      >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => {
             const line = cart[item.id]
@@ -338,12 +375,7 @@ function BuyScreen({
               </CartRow>
             )
           })}
-          <p className="mt-2 font-mono text-sm text-primary">
-            Gold{hasEstimatedGold ? ' (est)' : ''}: {goldTotal.toLocaleString()}g
-          </p>
-        </div>
-      )}
-      <SubmitBar label="Buy all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />
+      </CartDock>
     </AccountScreenScaffold>
   )
 }
@@ -481,10 +513,13 @@ function CraftScreen({
         </div>
       )}
 
-      {/* The cart panel is always shown. */}
-      {(
-        <div className="mt-3 border-t border-border px-3 pt-3">
-          <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Craft list</p>
+      <CartDock
+        title="Craft list"
+        lines={selected.length}
+        units={selected.reduce((sum, item) => sum + cart[item.id], 0)}
+        summary={`Gold: ${goldTotal.toLocaleString()}g`}
+        submit={<SubmitBar label="Craft" disabled={!selected.length || !materialsAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />}
+      >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => (
             <CartRow key={item.id}>
@@ -521,10 +556,7 @@ function CraftScreen({
               )
             })}
           </div>
-          <p className="mt-2 font-mono text-sm text-primary">Gold: {goldTotal.toLocaleString()}g</p>
-        </div>
-      )}
-      <SubmitBar label="Craft" disabled={!selected.length || !materialsAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />
+      </CartDock>
     </AccountScreenScaffold>
   )
 }
@@ -713,10 +745,12 @@ function ExchangeScreen({
         </div>
       )}
 
-      {/* The cart panel is always shown. */}
-      {(
-        <div className="mt-3 border-t border-border px-3 pt-3">
-          <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Exchange cart</p>
+      <CartDock
+        title="Exchange cart"
+        lines={selected.length}
+        units={selected.reduce((sum, item) => sum + cart[item.key], 0)}
+        submit={<SubmitBar label="Exchange all" disabled={!selected.length || !exchangesAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />}
+      >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => (
             <CartRow key={item.key}>
@@ -736,9 +770,7 @@ function ExchangeScreen({
               </Button>
             </CartRow>
           ))}
-        </div>
-      )}
-      <SubmitBar label="Exchange all" disabled={!selected.length || !exchangesAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />
+      </CartDock>
 
       {selectedExchange && (
         <div role="group" aria-label="Exchange details" className="fixed inset-0 z-50 flex flex-col bg-background p-3">

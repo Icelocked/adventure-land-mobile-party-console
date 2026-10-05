@@ -149,3 +149,31 @@ test('Commerce parity: Buy description, always-visible empty cart, catalog rows 
   await page.getByRole('button', { name: 'Inspect Iron Sword' }).click()
   await expect(page.getByRole('button', { name: 'Add to WTB' })).toBeVisible()
 })
+
+test('Buy on a phone: the cart stays pinned, so an item added far down the list shows at once', async ({ page }) => {
+  // Failure mode: the cart sits after the whole catalog, so confirming an
+  // addition means scrolling to the bottom and back.
+  await page.setViewportSize({ width: 390, height: 780 })
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [] })
+  server.buyable = Array.from({ length: 40 }, (_, i) => ({ id: `item${i}`, name: `Item ${String(i).padStart(2, '0')}`, cost: 10 + i }))
+  await server.install(page)
+
+  await page.goto('/merchant/buy')
+  const cart = page.getByRole('region', { name: 'Cart' })
+  await expect(cart).toBeInViewport()
+  const row = page.locator('.rounded-md.border', { hasText: 'Item 30' })
+  await row.scrollIntoViewIfNeeded()
+  await row.getByRole('button', { name: 'Add' }).click()
+  // Still on screen without scrolling, with the new line and the total.
+  await expect(cart).toBeInViewport()
+  await expect(cart.getByLabel('Item 30 quantity')).toBeInViewport()
+  await expect(cart.getByText('Gold: 40g')).toBeVisible()
+  await expect(cart.getByRole('button', { name: 'Buy all' })).toBeInViewport()
+  // The header folds the cart away and back.
+  await cart.getByRole('button', { name: /Cart \(1\)/ }).click()
+  await expect(cart.getByLabel('Item 30 quantity')).toHaveCount(0)
+  await row.getByRole('button', { name: 'Add' }).click()
+  await expect(cart.getByLabel('Item 30 quantity')).toHaveValue('2')
+})

@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.hasAnySibling
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.getValue
@@ -143,14 +145,37 @@ class UpgradesExchangeTest {
     }
 
     @Test
+    fun theCartStaysPinnedSoAnItemAddedFarDownShowsAtOnce() {
+        // Failure mode: the cart sits after the whole catalog, so confirming an
+        // addition means scrolling to the bottom and back.
+        val catalog = console.sections.getValue("catalog")["merchantCatalog"]!!.jsonObject
+        val many = (0 until 40).joinToString(",") { """{"id":"item$it","name":"Item ${it.toString().padStart(2, '0')}","cost":${10 + it},"seller":"basics"}""" }
+        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + mapOf("buyable" to Json.parseToJsonElement("[$many]")))))
+        val viewModel = PartyViewModel(console.settings)
+        compose.setContent { MerchantCommerceScreen(viewModel, "buy", onBack = {}) }
+        eventually { viewModel.dynamicState.value.merchantCatalog?.buyable?.size == 40 }
+        compose.waitForIdle()
+        compose.onAllNodes(hasText("Add"))[35].performScrollTo().performClick()
+        compose.waitForIdle()
+        val inCart = hasAnyAncestor(hasContentDescription("Cart"))
+        compose.onNode(hasContentDescription("Item 35 quantity") and inCart).assertIsDisplayed()
+        compose.onNode(hasText("CART (1)") and inCart).assertIsDisplayed()
+        compose.onNode(hasText("Gold: 45g") and inCart).assertIsDisplayed()
+        compose.onNodeWithText("Buy all").assertIsDisplayed()
+        // The header folds the cart away.
+        compose.onNodeWithContentDescription("Fold Cart").performClick()
+        compose.onNode(hasContentDescription("Item 35 quantity")).assertDoesNotExist()
+    }
+
+    @Test
     fun buyingAnUpgradedTargetSendsTheNinetyPercentBudget() {
         commerce("buy")
-        compose.onNodeWithText("Gold: 0g").performScrollTo().assertExists()
+        compose.onNodeWithText("Gold: 0g").assertIsDisplayed()
         compose.onNodeWithContentDescription("Inspect Bow").assertExists()
         compose.onNodeWithText("600g").assertExists()
         compose.onAllNodesAdd(0)
         compose.onNodeWithContentDescription("Bow target level").performScrollTo().performTextReplacement("+2")
-        compose.onNodeWithText("Gold (est)", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Gold (est)", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Buy all").performClick()
         eventually { posts("merchant/order").isNotEmpty() }
         val line = (posts("merchant/order")[0]["buys"] as JsonArray)[0] as JsonObject
