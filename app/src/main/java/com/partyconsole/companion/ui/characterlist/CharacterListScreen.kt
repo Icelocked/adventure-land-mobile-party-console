@@ -367,6 +367,10 @@ private fun PendingCharacterCard(viewModel: PartyViewModel, entry: PendingCharac
 @Composable
 private fun DebugBrowserBanner(viewModel: PartyViewModel) {
     val debug by viewModel.debugBrowser.collectAsState()
+    // debug-browser.tsx setLocalDebugAssets: map images come from the debug instance's copy.
+    androidx.compose.runtime.LaunchedEffect(debug) {
+        com.partyconsole.companion.ui.map.MapImages.debugAssetsBase = if (debug) viewModel.api.baseUrl.trimEnd('/') else null
+    }
     if (!debug) return
     val context = androidx.compose.ui.platform.LocalContext.current
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

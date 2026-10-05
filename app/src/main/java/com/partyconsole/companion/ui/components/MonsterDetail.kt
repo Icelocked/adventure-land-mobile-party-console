@@ -134,6 +134,7 @@ private fun MonsterNavigatePicker(viewModel: PartyViewModel, monster: BestiaryMo
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp).semantics { contentDescription = "Navigate to ${monster.name}" }) {
                 FarmingAreaPicker(
+                viewModel = viewModel,
                     catalog = state.monsterChoices,
                     bestiaryCatalog = state.bestiaryCatalog,
                     ids = listOf(monster.id),

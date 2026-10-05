@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -91,8 +94,8 @@ fun MonsterSpawns(records: List<MonsterSpawnRecord>?) {
  *  setup ([preparation], with the monster picker inline), Phoenix's ordered
  *  5-region patrol, or the general "choose a farming area" list grouped by
  *  how many selected monsters share each area and ranked by the saved
- *  waypoint, then proximity. The area map preview comes with the native
- *  map (A11); the legend and radius are shown. */
+ *  waypoint, then proximity. The selected area shows FarmingAreaPreview
+ *  with the legend and "Enlarge map" (a full-screen view). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FarmingAreaPicker(
@@ -109,7 +112,10 @@ fun FarmingAreaPicker(
     savedPhoenixOrder: List<String> = emptyList(),
     onCancel: () -> Unit,
     onStart: suspend (Area, List<String>?) -> Unit,
+    // The map preview's source (definitions are cached on the view model).
+    viewModel: com.partyconsole.companion.ui.PartyViewModel? = null,
 ) {
+    var large by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val phoenix = "phoenix" in ids && !preparation
     val zoneCatalog = remember(catalog) { catalog.map { CatalogMonster(it.id, it.locations) } }
@@ -234,9 +240,33 @@ fun FarmingAreaPicker(
                 }
             }
         }
+        if (selected != null && viewModel != null) {
+            com.partyconsole.companion.ui.map.FarmingAreaPreview(viewModel, selected, radius, modifier = Modifier.padding(top = 8.dp))
+        }
         if (selected != null) {
             Text("Cyan: spawn area · White: waypoint", color = Color(0xFFA5F3FC), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             Text(if (phoenix) "Search uses shared sightings and overlapping visibility coverage." else "Gold circle: hunt radius ($radius)", color = Color(0xFFFDE68A), style = MaterialTheme.typography.bodySmall)
+        }
+        if (selected != null && viewModel != null) OutlinedButton(onClick = { large = true }, modifier = Modifier.padding(top = 8.dp)) { Text("Enlarge map") }
+        if (large && selected != null && viewModel != null) {
+            androidx.compose.ui.window.Dialog(onDismissRequest = { large = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+                androidx.compose.material3.Surface(
+                    modifier = Modifier.fillMaxSize().semantics { contentDescription = "${selected.mapName ?: selected.map} farming area" },
+                    color = Color(0xFF081713),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            Text("${selected.mapName ?: selected.map} farming area", fontWeight = FontWeight.Medium, color = Color(0xFFECFDF5), modifier = Modifier.weight(1f))
+                            androidx.compose.material3.IconButton(onClick = { large = false }, modifier = Modifier.semantics { contentDescription = "Close enlarged map" }) {
+                                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Close, contentDescription = null, tint = Color(0xFFD1FAE5))
+                            }
+                        }
+                        androidx.compose.foundation.layout.BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            com.partyconsole.companion.ui.map.FarmingAreaPreview(viewModel, selected, radius, modifier = Modifier.height(maxHeight))
+                        }
+                    }
+                }
+            }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End).padding(top = 8.dp)) {

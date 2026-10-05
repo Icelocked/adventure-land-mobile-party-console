@@ -46,6 +46,8 @@ class FakeConsole : AutoCloseable {
     @Volatile var dailyDungeon: String? = null
     @Volatile var postStatus = 200
     @Volatile var postBody = """{"ok":true}"""
+    /** GET /party-api/map-stream/{name}: the frames (JSON) sent as SSE, the stream then held open. */
+    val mapFrames = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
     /** One-shot replies for a POST path (e.g. "merchant/stand"): status + body. */
     val failOnce = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, String>>()
 
@@ -61,6 +63,14 @@ class FakeConsole : AutoCloseable {
                 }
                 val url = request.requestUrl!!
                 gets[url.encodedPath]?.let { return json(it) }
+                if (url.encodedPath.startsWith("/party-api/map-stream/")) {
+                    val frames = mapFrames[url.pathSegments.last()] ?: return MockResponse().setResponseCode(404)
+                    val events = frames.joinToString("") { "data: ${kotlinx.serialization.json.Json.parseToJsonElement(it)}\n\n" }
+                    val bytes = events.toByteArray().size.toLong()
+                    // Every frame in the first period, then a slow comment keeps the stream open.
+                    return MockResponse().setHeader("Content-Type", "text/event-stream").setBody(events + ":" + " ".repeat((bytes * 30).toInt()) + "\n\n")
+                        .throttleBody(bytes, 2, java.util.concurrent.TimeUnit.SECONDS)
+                }
                 return when (url.encodedPath) {
                     "/party-api/state" -> {
                         val name = url.queryParameter("section").orEmpty()

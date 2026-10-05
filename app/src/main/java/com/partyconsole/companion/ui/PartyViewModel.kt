@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui
 
+import kotlinx.coroutines.async
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -68,6 +70,33 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     val characterDetails: StateFlow<Map<String, CharacterDiagnostics>> = repository.characterDetails
     val serverOffset: StateFlow<Long> = repository.serverOffset
     val api get() = repository.api
+    val mapStreams get() = repository.mapStreams
+
+    // query-cache.tsx useMapDefinition: keyed by core's referenceRevision, kept for the session.
+    private val mapDefinitions = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Deferred<com.partyconsole.companion.model.MapDefinition?>>()
+
+    /** GET maps/{map}?revision=, one retry after 1 s for a transient failure; null on failure. */
+    suspend fun mapDefinition(map: String): com.partyconsole.companion.model.MapDefinition? {
+        val revision = repository.referenceRevision
+        val key = "$revision:$map"
+        val request = mapDefinitions.getOrPut(key) {
+            viewModelScope.async {
+                val path = "maps/${java.net.URLEncoder.encode(map, "UTF-8")}?revision=$revision"
+                val transient = { failure: com.partyconsole.companion.network.ApiResult.Failure -> failure.status == 0 || failure.status >= 500 || failure.status == 408 || failure.status == 429 }
+                var result = api.get(path)
+                if (result is com.partyconsole.companion.network.ApiResult.Failure && transient(result)) {
+                    kotlinx.coroutines.delay(1000)
+                    result = api.get(path)
+                }
+                val text = (result as? com.partyconsole.companion.network.ApiResult.Success)?.value
+                text?.let { runCatching { mapJson.decodeFromString(com.partyconsole.companion.model.MapDefinition.serializer(), it) }.getOrNull() }
+            }
+        }
+        val value = request.await()
+        if (value == null) mapDefinitions.remove(key, request)
+        return value
+    }
+    private val mapJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
     /** Item details' "From catalog": the comparison source the catalog opens
      *  with (the PWA passes it as navigation state). */
     val catalogComparison = MutableStateFlow<com.partyconsole.companion.domain.ComparisonSource?>(null)

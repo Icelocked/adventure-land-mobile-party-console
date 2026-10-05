@@ -151,7 +151,7 @@ class PartyApiClient(
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (sessionLost(response.code)) ApiResult.Failure(SESSION_EXPIRED, "session_expired")
-                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}")
+                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}", status = response.code)
                 else ApiResult.Success(text)
             }
         } catch (e: java.io.IOException) {
