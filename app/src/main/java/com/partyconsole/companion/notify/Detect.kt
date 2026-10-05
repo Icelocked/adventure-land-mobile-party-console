@@ -232,10 +232,27 @@ fun isRareDrop(info: RareInfo?, rare: RareRule): Boolean {
 }
 
 /** merchant-activity entries worth a trading notification. */
+/** One notification for every trade found in a poll, so a busy stand doesn't send a burst. */
+fun tradeDigest(notices: List<Done>): Done? {
+    if (notices.size <= 1) return notices.firstOrNull()
+    val shown = notices.take(3).map { it.body } + listOfNotNull(if (notices.size > 3) "…and ${notices.size - 3} more" else null)
+    return Done("${notices.size} trades", shown.joinToString("\n"))
+}
+
+/** The newest message counted as an error for [name], for the alert text. */
+fun latestError(gameLogs: JsonObject?, merchantActivity: List<JsonElement>, merchantName: String?, name: String): String {
+    val game = gameLogs?.get(name).arr().mapNotNull { it.obj() }.filter { isAlertableGameLogError(it["message"].str()) }
+    val merchant = if (name == merchantName) merchantActivity.mapNotNull { it.obj() }.filter { it["level"].str() == "error" } else emptyList()
+    val newest = (game + merchant).maxByOrNull { it["at"].num() } ?: return ""
+    return newest["message"].str().orEmpty().replace(Regex("\\s+"), " ").take(160)
+}
+
 fun tradeNotice(entry: JsonObject?): Done? {
     val message = entry?.get("message").str().orEmpty()
     val level = entry?.get("level").str()
     if (level == "error") return null
+    // NPC sales are the merchant's own automatic selling, not a trade.
+    if (Regex("\\bto NPC\\b", RegexOption.IGNORE_CASE).containsMatchIn(message)) return null
     return when {
         Regex("^Sold .+ at stand").containsMatchIn(message) -> Done("Stand sale", message)
         message.startsWith("WTB filled for ") -> Done("WTB order filled", message)

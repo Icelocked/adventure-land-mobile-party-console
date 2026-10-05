@@ -32,6 +32,8 @@ import {
   recipients,
   selectedEventIds,
   tradeNotice,
+  tradeDigest,
+  latestError,
 } from './detect.mjs'
 
 const PORT = Number(process.env.NOTIFIER_PORT || 3090)
@@ -194,10 +196,9 @@ async function checkLogs(cookie, now) {
   // Trading notices from the merchant activity log; the first read only marks where history ends.
   const latest = Math.max(0, ...activity.map((entry) => Number(entry.at) || 0))
   if (watch.merchantSince === null) watch.merchantSince = latest
-  for (const entry of newEntries(activity, watch.merchantSince)) {
-    const notice = tradeNotice(entry)
-    if (notice) await push('trading', { ...notice, tag: `trade-${entry.at}`, url: '/' })
-  }
+  const trades = newEntries(activity, watch.merchantSince).map(tradeNotice).filter(Boolean)
+  const digest = tradeDigest(trades)
+  if (digest) await push('trading', { ...digest, tag: `trade-${latest}`, url: '/' })
   watch.merchantSince = Math.max(watch.merchantSince, latest)
   // Rare drops from new loot entries.
   const combatEntries = Object.entries(combatLogs).flatMap(([name, entries]) => (entries || []).map((entry) => ({ ...entry, name })))
@@ -222,7 +223,9 @@ async function checkLogs(cookie, now) {
   const errors = bursts(errorTimes(gameLogs, activity, watch.merchant), now, settings.errors.count, settings.errors.minutes * 60_000, watch.errorAlertAt)
   for (const [name, count] of Object.entries(errors)) {
     watch.errorAlertAt[name] = now
-    await push('errors', { title: `${name}: repeated errors`, body: `${count} errors in the last ${settings.errors.minutes} minutes.`, tag: `errors-${name}`, url: name === watch.merchant ? '/' : characterUrl(name) }, name)
+    const last = latestError(gameLogs, activity, watch.merchant, name)
+    log('errors', name, count, last ? `latest: ${last}` : '')
+    await push('errors', { title: `${name}: repeated errors`, body: `${count} errors in the last ${settings.errors.minutes} minutes.${last ? ` Latest: ${last}` : ''}`, tag: `errors-${name}`, url: name === watch.merchant ? '/' : characterUrl(name) }, name)
   }
 }
 

@@ -137,6 +137,16 @@ class NotifierTest {
         assertEquals("Purchase completed", tradeNotice(obj("""{"at":1,"message":"Bought 1 × ring from Ponty","level":"success"}"""))?.title)
         assertNull(tradeNotice(obj("""{"at":1,"message":"Banked 12 items","level":"info"}""")))
         assertNull(tradeNotice(obj("""{"at":1,"message":"Skipped unavailable Ponty listing: bow","level":"error"}""")))
+        // Failure mode: the merchant's automatic NPC selling sent a "Sale completed" burst.
+        assertNull(tradeNotice(obj("""{"at":1,"message":"Sold 3 × hpamulet to NPC for 1,200 gold","level":"success"}""")))
+        val sales = (1..5).map { Done("Stand sale", "Sold $it × bow at stand") }
+        assertNull(tradeDigest(emptyList()))
+        assertEquals(sales[0], tradeDigest(sales.take(1)))
+        assertEquals(Done("5 trades", "Sold 1 × bow at stand\nSold 2 × bow at stand\nSold 3 × bow at stand\n…and 2 more"), tradeDigest(sales))
+        val errorLogs = obj("""{"Merchy":[{"at":1,"message":"Route rejected"},{"at":3,"message":"Item upgrade failed"},{"at":2,"message":"Movement failed: blocked"}]}""")
+        assertEquals("Movement failed: blocked", latestError(errorLogs, emptyList(), "Merchy", "Merchy"))
+        assertEquals("Exchange failed", latestError(errorLogs, list("""[{"at":4,"message":"Exchange failed","level":"error"}]"""), "Merchy", "Merchy"))
+        assertEquals("", latestError(errorLogs, emptyList(), "Merchy", "Folla"))
 
         assertEquals(listOf(5.0, 9.0), newEntries(list("""[{"at":5},{"at":3},{"at":9}]""").map { it.jsonObject }, 4).map { it["at"].num() })
         assertEquals(listOf("b"), newMail(list("""[{"id":"a"},{"id":"b"}]""").map { it.jsonObject }, setOf("a")).map { it["id"].str() })
