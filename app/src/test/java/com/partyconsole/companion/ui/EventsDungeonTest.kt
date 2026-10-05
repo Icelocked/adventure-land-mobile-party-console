@@ -7,7 +7,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -50,6 +52,11 @@ class EventsDungeonTest {
     private fun JsonObject.text(key: String) = (this[key] as? JsonPrimitive)?.content
     private val uuid = Regex("^[0-9a-f-]{36}$")
 
+    // Buttons stay disabled while the previous action is in flight; on a slow
+    // runner a click can land before that settles and is silently ignored.
+    private fun awaitEnabled(matcher: SemanticsMatcher) =
+        compose.waitUntil(5_000) { compose.onAllNodes(matcher and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+
     private fun member(name: String, fresh: Boolean = true, extra: String = "") = """{"name":"$name","fresh":$fresh,"observation":{"at":${System.currentTimeMillis()},"supported":true,"alive":true,"ready":true,"members":[],"cave":null,"visit":{"available":true,"resets":0,"home":"EU I","checkedAt":${System.currentTimeMillis()}}$extra}}"""
 
     private fun activeCave(choice: String? = null): String {
@@ -86,6 +93,7 @@ class EventsDungeonTest {
         compose.onNodeWithText("Participants: Leada, Folla.").assertExists()
         compose.onNodeWithText("Don’t leave the Cave of Many Dreams for other events").performClick()
         eventually { posts("daily-dungeons").isNotEmpty() }
+        awaitEnabled(hasText("Enter now"))
         compose.onNodeWithText("Enter now").performScrollTo().performClick()
         eventually { posts("daily-dungeons").size == 2 }
         val (settings, enter) = posts("daily-dungeons")
@@ -113,8 +121,10 @@ class EventsDungeonTest {
 
         compose.onNodeWithText("Fountain").performClick()
         eventually { posts("daily-dungeons").size == 1 }
+        awaitEnabled(hasText("Start automatic exploration"))
         compose.onNodeWithText("Start automatic exploration").performClick()
         eventually { posts("daily-dungeons").size == 2 }
+        awaitEnabled(hasText("Exit dungeon"))
         compose.onNodeWithText("Exit dungeon").performClick()
         compose.onNodeWithText("Stay in dungeon").performClick()
         compose.onNodeWithText("Confirm exit").assertDoesNotExist()
@@ -142,6 +152,7 @@ class EventsDungeonTest {
         compose.onNode(hasText("Pay it — 50 shared gold — 1 Amber", substring = true) and inChoice).performClick()
         compose.onNode(hasText("Spend 50 shared gold and 1 Amber if this choice wins?") and inChoice).assertExists()
         assertEquals(0, posts("daily-dungeons").size)
+        awaitEnabled(hasText("Confirm vote") and inChoice)
         compose.onNode(hasText("Confirm vote") and inChoice).performScrollTo().performClick()
         eventually { posts("daily-dungeons").isNotEmpty() }
         posts("daily-dungeons")[0].let {
