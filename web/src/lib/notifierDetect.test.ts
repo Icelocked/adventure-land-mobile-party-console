@@ -9,6 +9,7 @@ import {
   endedEvents,
   errorTimes,
   finishedUpgradeOrders,
+  trackedOrders,
   fullInventories,
   idleCharacters,
   inQuietHours,
@@ -114,6 +115,12 @@ describe('push notifier: progress, loot and trading', () => {
     const queue = [{ id: 'j1', order: { buys: [{ id: 'bow', quantity: 1, level: 9 }, { id: 'hpot0', quantity: 5 }] } }]
     expect(finishedUpgradeOrders(queue, queue)).toEqual([])
     expect(finishedUpgradeOrders(queue, [])).toEqual([{ title: 'Buy-and-upgrade order finished', body: '1 × bow to +9' }])
+    // Failure mode: the order the merchant starts moves to merchantCurrent and
+    // was announced as finished while it was still running.
+    const job = { id: 'j1', order: { buys: [{ id: 'staff', quantity: 1, level: 9 }] } }
+    const waiting = trackedOrders({ merchantQueue: [job], merchantCurrent: null })
+    expect(finishedUpgradeOrders(waiting, trackedOrders({ merchantQueue: [], merchantCurrent: job }))).toEqual([])
+    expect(finishedUpgradeOrders(waiting, trackedOrders({ merchantQueue: [], merchantCurrent: null }))).toHaveLength(1)
   })
 
   it('reports selected events ending', () => {
@@ -161,6 +168,10 @@ describe('push notifier: progress, loot and trading', () => {
     expect(latestError(logs, [], 'Merchy', 'Merchy')).toBe('Movement failed: blocked')
     expect(latestError(logs, [{ at: 4, message: 'Exchange failed', level: 'error' }], 'Merchy', 'Merchy')).toBe('Exchange failed')
     expect(latestError(logs, [], 'Merchy', 'Folla')).toBe('')
+    // An upgrade that destroyed the item is an expected outcome, not an error.
+    const poof = { at: 9, message: 'wshoes upgrade failed', level: 'error', details: 'wshoes was destroyed' }
+    expect(errorTimes({}, [poof], 'Merchy')).toEqual({})
+    expect(errorTimes({}, [{ ...poof, details: 'upgrade rejected: busy' }], 'Merchy')).toEqual({ Merchy: [9] })
   })
 
   it('only reports entries and mail that are new', () => {

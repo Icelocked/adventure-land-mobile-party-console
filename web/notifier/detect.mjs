@@ -82,6 +82,9 @@ export const isGameLogError = (message) => GAME_LOG_ERROR.test(String(message ||
  *  grinding upgrades would otherwise trip the error alert every few minutes. */
 const EXPECTED_FAILURE = /\bItem (?:upgrade|combination) failed\b/i
 export const isAlertableGameLogError = (message) => isGameLogError(message) && !EXPECTED_FAILURE.test(String(message || ''))
+/** The merchant's own error entries, minus an upgrade that destroyed the item
+ *  ("X upgrade failed" with details "X was destroyed"): an expected outcome. */
+export const isAlertableActivityError = (entry) => entry?.level === 'error' && !/\bwas destroyed\b/i.test(String(entry.details || ''))
 
 /** Error timestamps per character: game-log errors (minus failed rolls),
  *  plus the merchant's error-level activity. */
@@ -89,7 +92,7 @@ export function errorTimes(gameLogs, merchantActivity, merchantName) {
   const times = {}
   for (const [name, entries] of Object.entries(gameLogs || {}))
     for (const entry of entries || []) if (isAlertableGameLogError(entry.message)) (times[name] ||= []).push(Number(entry.at))
-  if (merchantName) for (const entry of merchantActivity || []) if (entry.level === 'error') (times[merchantName] ||= []).push(Number(entry.at))
+  if (merchantName) for (const entry of merchantActivity || []) if (isAlertableActivityError(entry)) (times[merchantName] ||= []).push(Number(entry.at))
   return times
 }
 
@@ -154,7 +157,14 @@ export function completedRules(previous, config) {
   return done
 }
 
-/** Merchant buy orders with an upgrade target (merchant-order.ts) that left the queue. */
+/** Merchant buy orders with an upgrade target (merchant-order.ts) that left
+ *  the queue. Pass the queue plus merchantCurrent: the job being worked on
+ *  moves out of the queue into merchantCurrent, which is not finishing. */
+export function trackedOrders(core) {
+  return [...(core?.merchantQueue || []), ...(core?.merchantCurrent ? [core.merchantCurrent] : [])]
+    .map((job) => ({ id: job.id, order: job.order ? { buys: job.order.buys || [] } : undefined }))
+}
+
 export function finishedUpgradeOrders(previousQueue, queue) {
   const remaining = new Set((queue || []).map((job) => job.id))
   const finished = []
@@ -227,7 +237,7 @@ export function tradeDigest(notices) {
 export function latestError(gameLogs, merchantActivity, merchantName, name) {
   const entries = [
     ...((gameLogs || {})[name] || []).filter((entry) => isAlertableGameLogError(entry.message)),
-    ...(name === merchantName ? (merchantActivity || []).filter((entry) => entry.level === 'error') : []),
+    ...(name === merchantName ? (merchantActivity || []).filter(isAlertableActivityError) : []),
   ]
   const newest = entries.reduce((best, entry) => (!best || Number(entry.at) > Number(best.at) ? entry : best), null)
   return newest ? String(newest.message).replace(/\s+/g, ' ').slice(0, 160) : ''

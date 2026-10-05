@@ -110,6 +110,12 @@ class NotifierTest {
         val queue = list("""[{"id":"j1","order":{"buys":[{"id":"bow","quantity":1,"level":9},{"id":"hpot0","quantity":5}]}}]""").map { it.jsonObject }
         assertEquals(emptyList<Done>(), finishedUpgradeOrders(queue, queue))
         assertEquals(listOf(Done("Buy-and-upgrade order finished", "1 × bow to +9")), finishedUpgradeOrders(queue, emptyList()))
+        // Failure mode: the order the merchant starts moves to merchantCurrent
+        // and was announced as finished while it was still running.
+        val job = """{"id":"j1","order":{"buys":[{"id":"staff","quantity":1,"level":9}]}}"""
+        val waiting = trackedOrders(obj("""{"merchantQueue":[$job],"merchantCurrent":null}"""))
+        assertEquals(emptyList<Done>(), finishedUpgradeOrders(waiting, trackedOrders(obj("""{"merchantQueue":[],"merchantCurrent":$job}"""))))
+        assertEquals(1, finishedUpgradeOrders(waiting, trackedOrders(obj("""{"merchantQueue":[],"merchantCurrent":null}"""))).size)
 
         val selected = selectedEventIds(obj("""{"eventSelectionsByCharacter":{"Leada":["goobrawl"]}}"""))
         assertEquals(setOf("goobrawl"), selected)
@@ -147,6 +153,9 @@ class NotifierTest {
         assertEquals("Movement failed: blocked", latestError(errorLogs, emptyList(), "Merchy", "Merchy"))
         assertEquals("Exchange failed", latestError(errorLogs, list("""[{"at":4,"message":"Exchange failed","level":"error"}]"""), "Merchy", "Merchy"))
         assertEquals("", latestError(errorLogs, emptyList(), "Merchy", "Folla"))
+        // An upgrade that destroyed the item is an expected outcome, not an error.
+        assertEquals(emptyMap<String, List<Long>>(), errorTimes(obj("{}"), list("""[{"at":9,"message":"wshoes upgrade failed","level":"error","details":"wshoes was destroyed"}]"""), "Merchy"))
+        assertEquals(mapOf("Merchy" to listOf(9L)), errorTimes(obj("{}"), list("""[{"at":9,"message":"wshoes upgrade failed","level":"error","details":"upgrade rejected: busy"}]"""), "Merchy"))
 
         assertEquals(listOf(5.0, 9.0), newEntries(list("""[{"at":5},{"at":3},{"at":9}]""").map { it.jsonObject }, 4).map { it["at"].num() })
         assertEquals(listOf("b"), newMail(list("""[{"id":"a"},{"id":"b"}]""").map { it.jsonObject }, setOf("a")).map { it["id"].str() })
