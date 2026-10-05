@@ -12,6 +12,8 @@ export interface PwaUpdateStatus {
   automatic: boolean
   managed: boolean
   updater: boolean
+  /** Built from source rather than a release image: update notices only. */
+  development?: boolean
   phase: 'idle' | 'checking' | 'available' | 'installing'
   error?: string
 }
@@ -134,10 +136,10 @@ export function PwaUpdateSettings() {
         Automatically download and install new versions when available
       </label>
       <p className="text-xs text-slate-300">Checks for new releases every 6 hours. Check now checks immediately and also picks up a newer build this device hasn't loaded yet.</p>
-      {state && !state.updater && state.current !== 'development build' && (
+      {state && !state.updater && !state.development && (
         <p className="text-amber-200">Installing from here needs the updater service. See “Automatic updates” in DEPLOYMENT.md; until then, update with the commands in the release notes.</p>
       )}
-      {state?.current === 'development build' && <p className="text-amber-200">Built from source: update notices only. Rebuild from source to update.</p>}
+      {state?.development && <p className="text-amber-200">Built from source: update notices only. Rebuild from source to update.</p>}
       {(error || state?.error) && (
         <p role="alert" className="text-rose-300">
           {error || state?.error}

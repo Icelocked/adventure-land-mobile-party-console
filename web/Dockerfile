@@ -8,6 +8,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
+# The app version from package.json, so a source build can say which
+# version it is built from (shown as e.g. 1.0.0-dev).
+RUN node -p "require('./package.json').version" > notifier/base-version.txt
 # The push notifier (notifier/server.mjs) and its one dependency.
 RUN cd notifier && npm ci --omit=dev
 
