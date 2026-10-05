@@ -71,7 +71,7 @@ class NotifierTest {
         assertEquals(listOf(ProblemEvent("Folla", null)), problemTransitions(mapOf("Folla" to "Connection lost"), emptyMap()))
 
         val times = errorTimes(
-            obj("""{"Leada":[{"at":${now - 60_000},"message":"Route rejected"},{"at":${now - 50_000},"message":"Killed a goo"},{"at":${now - 40_000},"message":"Upgrade failed: no scroll"}]}"""),
+            obj("""{"Leada":[{"at":${now - 60_000},"message":"Route rejected"},{"at":${now - 50_000},"message":"Killed a goo"},{"at":${now - 40_000},"message":"Upgrade failed: no scroll"},{"at":${now - 35_000},"message":"Item upgrade failed"},{"at":${now - 33_000},"message":"Item combination failed"}]}"""),
             list("""[{"at":${now - 30_000},"message":"Exchange failed","level":"error"}]"""),
             "Merchy",
         )

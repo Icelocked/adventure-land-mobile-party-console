@@ -102,10 +102,17 @@ fun problemTransitions(previous: Map<String, String>, current: Map<String, Strin
 private val GAME_LOG_ERROR = Regex("\\b\\w*error\\b|\\bexception\\b|\\bfailed\\b|route rejected|collisions detected|falling back to native|\\b(?:line|column)\\s*:?\\s*\\d+", RegexOption.IGNORE_CASE)
 fun isGameLogError(message: String?) = GAME_LOG_ERROR.containsMatchIn(message.orEmpty())
 
-/** Error timestamps per character: game-log errors, plus the merchant's error-level activity. */
+/** The game's own messages for a failed upgrade or compound roll. The logs
+ *  file them under errors, but they are expected outcomes, so a merchant
+ *  grinding upgrades would otherwise trip the error alert every few minutes. */
+private val EXPECTED_FAILURE = Regex("\\bItem (?:upgrade|combination) failed\\b", RegexOption.IGNORE_CASE)
+fun isAlertableGameLogError(message: String?) = isGameLogError(message) && !EXPECTED_FAILURE.containsMatchIn(message.orEmpty())
+
+/** Error timestamps per character: game-log errors (minus failed rolls),
+ *  plus the merchant's error-level activity. */
 fun errorTimes(gameLogs: JsonObject?, merchantActivity: List<JsonElement>, merchantName: String?): Map<String, List<Long>> {
     val times = linkedMapOf<String, MutableList<Long>>()
-    for ((name, entries) in gameLogs.orEmpty()) for (entry in entries.arr()) if (isGameLogError(entry.obj()?.get("message").str())) times.getOrPut(name) { mutableListOf() } += entry.obj()?.get("at").num().toLong()
+    for ((name, entries) in gameLogs.orEmpty()) for (entry in entries.arr()) if (isAlertableGameLogError(entry.obj()?.get("message").str())) times.getOrPut(name) { mutableListOf() } += entry.obj()?.get("at").num().toLong()
     if (merchantName != null) for (entry in merchantActivity) if (entry.obj()?.get("level").str() == "error") times.getOrPut(merchantName) { mutableListOf() } += entry.obj()?.get("at").num().toLong()
     return times
 }

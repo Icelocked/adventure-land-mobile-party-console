@@ -77,11 +77,18 @@ export function problemTransitions(previous, current) {
 const GAME_LOG_ERROR = /\b\w*error\b|\bexception\b|\bfailed\b|route rejected|collisions detected|falling back to native|\b(?:line|column)\s*:?\s*\d+/i
 export const isGameLogError = (message) => GAME_LOG_ERROR.test(String(message || ''))
 
-/** Error timestamps per character: game-log errors, plus the merchant's error-level activity. */
+/** The game's own messages for a failed upgrade or compound roll. The logs
+ *  file them under errors, but they are expected outcomes, so a merchant
+ *  grinding upgrades would otherwise trip the error alert every few minutes. */
+const EXPECTED_FAILURE = /\bItem (?:upgrade|combination) failed\b/i
+export const isAlertableGameLogError = (message) => isGameLogError(message) && !EXPECTED_FAILURE.test(String(message || ''))
+
+/** Error timestamps per character: game-log errors (minus failed rolls),
+ *  plus the merchant's error-level activity. */
 export function errorTimes(gameLogs, merchantActivity, merchantName) {
   const times = {}
   for (const [name, entries] of Object.entries(gameLogs || {}))
-    for (const entry of entries || []) if (isGameLogError(entry.message)) (times[name] ||= []).push(Number(entry.at))
+    for (const entry of entries || []) if (isAlertableGameLogError(entry.message)) (times[name] ||= []).push(Number(entry.at))
   if (merchantName) for (const entry of merchantActivity || []) if (entry.level === 'error') (times[merchantName] ||= []).push(Number(entry.at))
   return times
 }

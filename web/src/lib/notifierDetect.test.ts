@@ -51,9 +51,9 @@ describe('push notifier: character health', () => {
     expect(problemTransitions({ Folla: 'Connection lost' }, {})).toEqual([{ name: 'Folla', problem: null }])
   })
 
-  it('counts error bursts (game-log errors and the merchant’s error activity) once per burst', () => {
+  it('counts error bursts (game-log errors and the merchant’s error activity) once per burst; failed rolls are not errors', () => {
     const times = errorTimes(
-      { Leada: [{ at: now - 60_000, message: 'Route rejected' }, { at: now - 50_000, message: 'Killed a goo' }, { at: now - 40_000, message: 'Upgrade failed: no scroll' }] },
+      { Leada: [{ at: now - 60_000, message: 'Route rejected' }, { at: now - 50_000, message: 'Killed a goo' }, { at: now - 40_000, message: 'Upgrade failed: no scroll' }, { at: now - 35_000, message: 'Item upgrade failed' }, { at: now - 33_000, message: 'Item combination failed' }] },
       [{ at: now - 30_000, message: 'Exchange failed', level: 'error' }],
       'Merchy',
     )
