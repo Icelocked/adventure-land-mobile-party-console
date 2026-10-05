@@ -21,14 +21,11 @@ sealed interface MapStreamEvent {
     data class State(val state: String) : MapStreamEvent
 }
 
-/** useMapFrames.ts subscribeMapFrames: one stream per character's map
- *  stream (runtime/coordinator/telemetry/map-stream.ts), shared by every
- *  subscriber and closed when the last one leaves. Only views that show a
- *  map open a stream (like the dashboard: the live map and the Cave map);
- *  while one is open the character keeps POSTing frames to the console.
- *  Passive observers (the target-type lookup) only hear frames from a
- *  stream a map view already opened. Reconnects after a failure like a
- *  browser EventSource does. */
+/** One SSE stream per character's map, shared by all subscribers and closed
+ *  when the last leaves. Only views that show a map open one, since an open
+ *  stream keeps the character POSTing frames to the console; passive
+ *  observers only hear streams a map view already opened. Reconnects after
+ *  a failure like a browser EventSource. */
 class MapStreams(private val client: OkHttpClient, private val apiBase: String) {
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
     private val timer by lazy { Timer("map-streams", true) }

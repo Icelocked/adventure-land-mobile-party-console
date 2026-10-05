@@ -10,12 +10,12 @@ import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.StandBid
 import com.partyconsole.companion.model.StandListing
 
-/** The merchant as stand-inspection.ts needs it: its equipped slots (the
- *  trade1..16 stand slots live there) and whether the stand is open. */
+/** The merchant's equipped slots (the trade1..16 stand slots live there)
+ *  and whether the stand is open. */
 data class StandMerchant(val slots: Map<String, EquippedEntry?> = emptyMap(), val standOpen: Boolean? = null)
 
-/** StandScreen.tsx useStandMerchant: the configured merchant's live slots and
- *  stand state (vitals, else its diagnostics). */
+/** The configured merchant's live slots and stand state (vitals, else its
+ *  diagnostics). */
 fun standMerchant(state: PartyStateDynamic, characters: Map<String, CharacterState>, diagnostics: Map<String, CharacterDiagnostics>): StandMerchant? {
     val name = state.merchantCharacter ?: return null
     val character = characters[name]
@@ -23,8 +23,7 @@ fun standMerchant(state: PartyStateDynamic, characters: Map<String, CharacterSta
     return StandMerchant(slots = character?.inventory?.slots ?: emptyMap(), standOpen = standOpen)
 }
 
-// stand-inspection.ts (party-console v1.2.0), verbatim from here down
-// (the PWA's lib/standInspection.ts).
+// PWA: web/src/lib/standInspection.ts.
 private val VALID_STAND_SLOT = Regex("^trade(?:[1-9]|1[0-6])$")
 private fun validStandSlot(slot: String) = VALID_STAND_SLOT.matches(slot)
 private fun identity(a: Item, b: Item) =
@@ -135,7 +134,7 @@ fun standBuyRows(bids: Map<String, StandBid>, native: NativeStand?, merchant: St
         }
 }
 
-/** stand-capacity.ts, verbatim: automatic buys yield their slots to sales;
- *  explicit buy orders reserve them. */
+/** Automatic buys yield their slots to sales; explicit buy orders reserve
+ *  them. */
 fun standIsFull(listings: List<StandListing>, bids: Map<String, StandBid> = emptyMap()): Boolean =
     listings.count { it.state != "paused" } + bids.values.count { it.useStandSlot == true } >= 16

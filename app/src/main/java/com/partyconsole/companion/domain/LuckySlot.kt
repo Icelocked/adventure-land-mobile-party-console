@@ -8,8 +8,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.exp
 import kotlin.math.ln
 
-// runtime/lucky-slot-tracking.ts (party-console v1.2.0), verbatim (the PWA's
-// lib/luckySlot.ts): merge, validation, normalization and the search.
+// Lucky-slot tracking: merge, validation, normalization and the search.
+// PWA: web/src/lib/luckySlot.ts.
 
 /** Merges [incoming] into [previous]; a slot only moves forward. */
 fun mergeSlotStream(previous: MutableMap<String, SlotRollStatistics>, incoming: Map<String, SlotRollStatistics>): Boolean {
@@ -109,5 +109,4 @@ fun luckySlotSearch(tracking: LuckySlotTracking): LuckySlotSearchResult {
     return LuckySlotSearchResult(slot = if (total > 0) best.slot else null, confidence = confidence, samples = best.samples, total = total, inferred = inferred, nextSlot = nextSlot)
 }
 
-/** lucky-upgrade-slot.tsx validLuckySlot. */
 fun validLuckySlot(slot: Int?): Boolean = slot != null && slot in 0 until 42

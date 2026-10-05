@@ -37,7 +37,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 
-/** notifierDetect.test.ts on the Kotlin port, plus the phone's own poll loop. */
+/** Detection cases shared with web/src/lib/notifierDetect.test.ts, plus the
+ *  phone's own poll loop. */
 @RunWith(RobolectricTestRunner::class)
 class NotifierTest {
     @get:Rule val compose = createComposeRule()
