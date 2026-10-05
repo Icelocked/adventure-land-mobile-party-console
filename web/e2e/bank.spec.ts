@@ -209,3 +209,18 @@ test('Bank without a merchant: merchant-only options stay listed but disabled, l
   await expect(page.getByRole('button', { name: 'Sell to NPC…', exact: true })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Sell to NPC…', exact: true })).toHaveClass(/text-rose-400/)
 })
+
+test('Bank: an item with an auto NPC sale rule is tagged, and its option says Update', async ({ page }) => {
+  // Failure mode: the bank showed no sign of the rule, so setting it looked
+  // like it did nothing.
+  const server = bankServer()
+  server.autoNpcSales = { [JSON.stringify({ name: 'ironore', level: 0, p: null, stat_type: null })]: { item: { name: 'ironore', level: 0 } } }
+  await server.install(page)
+
+  await page.goto('/bank')
+  const ore = page.getByRole('button', { name: /Iron Ore x5/ })
+  await expect(ore.getByText('Auto NPC')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Bow \+2/ }).getByText('Auto NPC')).toHaveCount(0)
+  await ore.click()
+  await expect(page.getByRole('button', { name: 'Update auto sell to NPC…', exact: true })).toBeVisible()
+})

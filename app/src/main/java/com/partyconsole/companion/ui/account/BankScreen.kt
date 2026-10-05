@@ -409,6 +409,9 @@ private fun BankRow(viewModel: PartyViewModel, entry: InventoryEntry, pack: Stri
     val deconstructionMarked = state.deconstructionMarks.any { it.state != "complete" && it.storage?.pack == pack && it.storage.slot == entry.slot && sameMarkedItem(it.item, item) }
     val reserved = pack == "items1" && entry.slot >= 35
     val autoStand = state.autoStandMarks[automaticCommerceRuleKey(item)]
+    // The merchant's account-wide auto sale rule. The dashboard's bank doesn't
+    // show it, so marking looked like it did nothing; its inventory does.
+    val autoNpc = state.autoNpcSales.containsKey(automaticCommerceRuleKey(item))
     val marks = listOfNotNull(
         "WITHDRAW".takeIf { withdrawMarked },
         "STAND".takeIf { standMarked && autoStand == null },
@@ -439,6 +442,7 @@ private fun BankRow(viewModel: PartyViewModel, entry: InventoryEntry, pack: Stri
         }
         if (reserved) Text("RESERVED", color = Fuchsia, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
         if (autoStand != null) Text("Auto stand", color = Color(0xFFFDE68A), style = MaterialTheme.typography.labelSmall)
+        if (autoNpc) Text("Auto NPC", color = Color(0xFFFECDD3), style = MaterialTheme.typography.labelSmall)
         for (label in marks) Text(label, color = Amber, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
     }
 }
