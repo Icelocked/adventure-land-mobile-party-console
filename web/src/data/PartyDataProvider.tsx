@@ -103,6 +103,8 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   // up another, and a refresh requested mid-flight runs once more right
   // after (never two at once, never an older response landing last).
   const interest = useRef<Record<string, number>>({})
+  // Wakes one domain's poll loop early (see registerInterest).
+  const wakeDomain = useRef<Record<string, () => void>>({})
   const lastAccountId = useRef<string | null>(null)
   const lastReferenceRevision = useRef<string | null>(null)
   // The market domain's aldata (with listings) - wins over core's stripped copy.
@@ -302,26 +304,29 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     return triggers
   }, [api, queryClient, applyRoster])
 
-  // Core polls every 2s rather than the console's 1s, to spare mobile data.
-  // A domain a visible screen depends on (useDomainInterest) polls faster.
+  // Tuned for mobile data. The live stream carries what changes quickly;
+  // polls fill in the rest, faster only while a screen that shows a domain is
+  // open (useDomainInterest), and every action refreshes what it touched at
+  // once. When the stream drops, the fallback polls stay slow: a connection
+  // that just failed shouldn't be asked for several large payloads a second.
   const cadences = useMemo(() => {
     const interested = (domain: string) => (interest.current[domain] ?? 0) > 0
     // Only once the stream has reported unhealthy - not during the first
     // connect, when a fallback write could overwrite the first snapshot.
     const liveDown = () => queryClient.getQueryData<boolean>(QK.connected) === false
     const policies: Record<keyof typeof fetchers, () => number | null> = {
-      core: () => 2_000,
+      core: () => (liveDown() ? 3_000 : 5_000),
       config: () => 15_000,
-      bank: () => (interested('bank') ? 2_000 : 15_000),
-      market: () => 10_000,
-      logs: () => (interested('logs') ? 1_000 : 6_000),
+      bank: () => (interested('bank') ? 5_000 : 60_000),
+      market: () => (interested('market') ? 10_000 : 60_000),
+      logs: () => (interested('logs') ? 3_000 : 30_000),
       mail: () => (interested('mail') ? 2_000 : 10_000),
-      escape: () => (queryClient.getQueryData(QK.escape) ? 1_000 : 6_000),
+      escape: () => (queryClient.getQueryData(QK.escape) ? 2_000 : 10_000),
       // Refetched when core's referenceRevision changes, not on a timer -
       // but retried until the first one lands.
       catalog: () => (catalogLoaded.current ? null : 5_000),
-      fast: () => (liveDown() ? 250 : null),
-      inventory: () => (liveDown() ? 2_000 : null),
+      fast: () => (liveDown() ? 2_000 : null),
+      inventory: () => (liveDown() ? 10_000 : null),
     }
     return policies
   }, [queryClient, fetchers])
@@ -329,15 +334,17 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   useEffect(() => {
     let cancelled = false
     const sleeps = new Set<() => void>()
-    const sleep = (ms: number) =>
+    const sleep = (ms: number, domain: string) =>
       new Promise<void>((resolve) => {
         const wake = () => {
           clearTimeout(timer)
           sleeps.delete(wake)
+          if (wakeDomain.current[domain] === wake) delete wakeDomain.current[domain]
           resolve()
         }
         const timer = setTimeout(wake, ms)
         sleeps.add(wake)
+        wakeDomain.current[domain] = wake
       })
     for (const domain of Object.keys(fetchers) as (keyof typeof fetchers)[]) {
       void (async () => {
@@ -346,7 +353,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
           // Polling pauses while the app is in the background.
           if (interval !== null && !document.hidden) await fetchers[domain]()
           if (cancelled) return
-          await sleep(interval ?? 1_000)
+          await sleep(interval ?? 1_000, domain)
         }
       })()
     }
@@ -387,7 +394,12 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   const registerInterest = useMemo(
     () => (domain: Domain) => {
       interest.current[domain] = (interest.current[domain] ?? 0) + 1
-      void fetchers[domain]()
+      // Background cadences are slow; wake the loop so it fetches now and
+      // continues at this screen's faster cadence instead of finishing a
+      // long sleep first.
+      const wake = wakeDomain.current[domain]
+      if (wake) wake()
+      else void fetchers[domain]()
       return () => {
         interest.current[domain] = Math.max(0, (interest.current[domain] ?? 1) - 1)
       }

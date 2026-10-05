@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useDomainInterest } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,7 @@ const ACTIVE_OPEN_KEY = 'adventure-land-active-wtb-open'
  *  native-stand problem, and a two-step cancel; "New WTB order" picks an
  *  item for the WTB dialog. */
 export function WtbScreen() {
+  useDomainInterest('market')
   const api = usePartyApi()
   const state = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()

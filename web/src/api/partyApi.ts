@@ -53,10 +53,10 @@ async function timedFetch(url: string, init: RequestInit = {}, timeoutMs: number
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    // /party-api/* responses carry no Cache-Control, and polls hit the same
-    // URL every time, so the browser's heuristic caching could silently
-    // serve a stale snapshot. no-store avoids that regardless of headers.
-    return await fetch(url, { ...init, cache: 'no-store', signal: controller.signal })
+    // no-cache revalidates every request (never a heuristic, stale reuse) and
+    // sends the console's ETag back, so unchanged data returns as a body-less
+    // 304 instead of the full payload: a large saving on mobile data.
+    return await fetch(url, { ...init, cache: 'no-cache', signal: controller.signal })
   } finally {
     clearTimeout(timeout)
   }
