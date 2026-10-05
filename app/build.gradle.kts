@@ -1,8 +1,26 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+// The app version comes from the release tag (`-PappVersion=1.0.0`, set by
+// .github/workflows/release.yml); local builds use the fallback. versionCode
+// is derived from it so every release upgrades in place:
+// major * 10000 + minor * 100 + patch.
+val appVersion = (findProperty("appVersion") as String?)?.removePrefix("v") ?: "0.8.0"
+val appVersionCode = appVersion.split(".").map { it.takeWhile(Char::isDigit).ifEmpty { "0" }.toInt() }
+    .let { (it.getOrElse(0) { 0 } * 10000) + (it.getOrElse(1) { 0 } * 100) + it.getOrElse(2) { 0 } }
+
+// Release signing: one permanent key, so a new APK installs over the old one.
+// CI writes keystore.properties from repository secrets; locally it lives in
+// the repo root (gitignored). Without it, release builds are unsigned.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -13,13 +31,27 @@ android {
         applicationId = "com.partyconsole.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.7.1"
+        versionCode = appVersionCode
+        versionName = appVersion
+    }
+
+    signingConfigs {
+        if (keystoreProperties.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
+            // R8 stays off until a shrunk build has been tested on a device
+            // (kotlinx.serialization and Compose reflection need keep rules).
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

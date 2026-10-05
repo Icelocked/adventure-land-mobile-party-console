@@ -147,9 +147,9 @@ test('Commerce parity: Buy description, always-visible empty cart, catalog rows 
   await expect(page.getByRole('button', { name: 'Add to WTB' })).toBeVisible()
   await page.keyboard.press('Escape')
 
-  await page.getByPlaceholder('Search items...').fill('potion')
+  await page.getByPlaceholder('Search items…').fill('potion')
   await page.getByRole('button', { name: 'Craft', exact: true }).first().click()
-  await expect(page.getByPlaceholder('Search items...')).toHaveValue('')
+  await expect(page.getByPlaceholder('Search items…')).toHaveValue('')
   // A recipe whose materials are missing stays inspectable.
   await page.getByRole('button', { name: 'Inspect Iron Sword' }).click()
   await expect(page.getByRole('button', { name: 'Add to WTB' })).toBeVisible()

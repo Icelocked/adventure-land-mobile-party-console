@@ -413,8 +413,8 @@ function MonsterFocusForm({
   return (
     <div role="group" aria-label="Monster focus" className="mt-2 rounded-md border border-border p-2">
       <div className="mb-2 flex gap-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters..." className="flex-1" />
-        <Button size="sm" variant="outline" onClick={() => setSelected([])}>
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters…" className="flex-1" />
+        <Button size="sm" variant="outline" aria-label="Clear all monster focus" onClick={() => setSelected([])}>
           Clear all
         </Button>
       </div>

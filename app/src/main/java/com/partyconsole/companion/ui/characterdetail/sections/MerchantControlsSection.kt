@@ -183,6 +183,8 @@ private fun DonateForm(merchant: String?, xpPerGold: Double, onDonate: (Long) ->
     var amount by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // party-reference-panels.tsx's donation dialog title.
+        Text("Donate gold for merchant XP", style = MaterialTheme.typography.bodySmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
         Text("${merchant ?: "The merchant"} will withdraw any shortage, travel to the XP frog, and donate this amount.", style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = amount, onValueChange = { amount = it.filter(Char::isDigit) }, label = { Text("Donation amount") }, singleLine = true, modifier = Modifier.weight(1f))

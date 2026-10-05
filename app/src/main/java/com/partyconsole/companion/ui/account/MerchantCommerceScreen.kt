@@ -159,7 +159,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
-                OutlinedTextField(search, { search = it }, placeholder = { Text("Search items...") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp))
+                OutlinedTextField(search, { search = it }, placeholder = { Text("Search items…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp))
                 when (mode) {
                     "buy" -> BuyContent(catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }) { inspecting = Inspecting(it, 0, source = "Merchant catalog") }
                     "craft" -> CraftContent(catalog?.craftable.orEmpty(), buyableById, owned, search, craftCart, { craftCart = it }) { inspecting = Inspecting(it, 0, source = "Crafting catalog") }

@@ -336,7 +336,7 @@ function ItemPicker({ catalog, onCancel, onPick }: { catalog: CatalogItem[]; onC
         </Button>
       </div>
       <div className="p-3">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items..." />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search every item…" />
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-4">
         {filtered.map((item) => (

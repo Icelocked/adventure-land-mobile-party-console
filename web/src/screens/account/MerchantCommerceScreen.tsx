@@ -173,7 +173,7 @@ function ModeTabs({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
 function SearchBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="px-3 pb-2">
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Search items..." />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Search items…" />
     </div>
   )
 }

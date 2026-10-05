@@ -291,7 +291,8 @@ private fun ALDataSection(viewModel: PartyViewModel, onOpenMail: () -> Unit) {
                     val result = if (key.isNotEmpty()) ApiResult.Success(key) else viewModel.api.revealAlDataKey()
                     // use-party-console.tsx: Prepare mail opens the mail composer with the draft (postage shown there).
                     when (result) {
-                        is ApiResult.Success -> {
+                        // use-party-console.tsx aldataAction('send'): no stored key -> "Generate an ALData key first".
+                        is ApiResult.Success -> if (result.value.isEmpty()) error = "Generate an ALData key first" else {
                             viewModel.mailDraft.value = MailDraft("earthiverse", "aldata_auth", result.value)
                             onOpenMail()
                         }

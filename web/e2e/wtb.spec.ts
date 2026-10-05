@@ -61,7 +61,7 @@ test('WTB dialog: presets at the exact level, and a full stand asks which entry 
 
   await page.goto('/wtb')
   await page.getByRole('button', { name: 'New WTB order' }).click()
-  await page.getByPlaceholder('Search items...').fill('Iron Ore')
+  await page.getByPlaceholder('Search every item…').fill('Iron Ore')
   await page.getByText('Iron Ore').click()
   const dialog = page.getByRole('dialog', { name: 'Add to WTB' })
   await dialog.getByRole('button', { name: /^Recent \+5%/ }).click()
