@@ -15,7 +15,7 @@ import type { CatalogItem, Item, StandBid } from '@/models'
 
 const ACTIVE_OPEN_KEY = 'adventure-land-active-wtb-open'
 
-/** stand-sheet.tsx "Active WTB orders": filter with visible/total, each
+/** "Active WTB orders": filter with visible/total, each
  *  order's inspect, inline quantity/price/priority (single-field edits with
  *  the bid revision), Use stand / Accept higher levels, the Auto badge and
  *  native-stand problem, and a two-step cancel; "New WTB order" picks an
@@ -232,7 +232,7 @@ export function WtbScreen() {
 type WtbField = 'quantity' | 'price' | 'priority'
 const FIELD_LABELS = { quantity: 'Quantity', price: 'Price', priority: 'Priority' }
 
-/** active-wtb-fields.tsx: ×qty / price / "P n" buttons; quantity and
+/** ×qty / price / "P n" buttons; quantity and
  *  priority edit inline (Enter or blur saves, Escape cancels), price opens
  *  the WTB dialog. */
 function ActiveWtbFields({ name, bid, disabled, onEditPrice, onSave }: { name: string; bid: StandBid; disabled?: boolean; onEditPrice: () => void; onSave: (field: WtbField, value: number | null) => Promise<string | null> }) {

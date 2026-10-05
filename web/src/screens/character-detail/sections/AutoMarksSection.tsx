@@ -40,11 +40,10 @@ interface RuleEntry {
   onRemove: Action
 }
 
-/** upgrade-rule-quantity.tsx, verbatim. */
 const upgradeRuleQuantity = (rule?: unknown) =>
   typeof rule === 'object' && rule && Number.isSafeInteger(Number((rule as { quantity?: unknown }).quantity)) ? Number((rule as { quantity?: unknown }).quantity) : -1
 
-/** inventory-panel.tsx's automatic sections (merchant only): NPC sales,
+/** Automatic sections (merchant only): NPC sales,
  *  deconstruction, stand, upgrades, compounds, merchant marks and bank
  *  marks - each with a two-tap clear, two-tap remove per entry, inline
  *  target/remaining edits for upgrade and compound rules, and Retry for a
@@ -67,7 +66,7 @@ export function AutoMarksSection({
   if (!isMerchant) return null
 
   const merchant = state.merchantCharacter ?? characterName
-  // connected-inventory.tsx ruleName: shared rules live under the merchant.
+  // Shared rules live under the merchant.
   const ruleName = state.merchantRules ? merchant : characterName
   const autoItemMarks = state.autoItemMarks[ruleName] ?? {}
   const perform = async (action: Action) => {
@@ -398,7 +397,7 @@ function AutoRuleGroup({
   )
 }
 
-/** upgrade-offering-controls.tsx UpgradeOfferingRules: the standing rules
+/** The standing offering rules
  *  with Edit / Remove, and a two-tap clear of them all. */
 function UpgradeOfferingRules({ characterName }: { characterName: string }) {
   const api = usePartyApi()

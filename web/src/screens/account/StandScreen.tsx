@@ -29,7 +29,7 @@ export function useStandMerchant(): StandMerchant | undefined {
   return { slots: character?.inventory?.slots ?? {}, standOpen }
 }
 
-/** stand-sheet.tsx "Inspect stand": items for sale reconciled against the
+/** "Inspect stand": items for sale reconciled against the
  *  live trade slots (Live / Paused, read-only unmanaged rows, a separate
  *  "Queued sales for stand"), each with its price (opens the stand form) and
  *  a two-step Remove; then the buy orders on the stand (N wanted, price via
@@ -50,7 +50,7 @@ export function StandScreen() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editingBuy, setEditingBuy] = useState<Item | null>(null)
   const [inspecting, setInspecting] = useState<Item | null>(null)
-  // stand-sheet.tsx onInspect's source label for the item-details header.
+  // Source label for the item-details header.
   const [inspectSource, setInspectSource] = useState('')
   const [suggesting, setSuggesting] = useState<Item | null>(null)
   const [removeConfirmation, setRemoveConfirmation] = useState<string | null>(null)
@@ -175,7 +175,7 @@ export function StandScreen() {
                       )}
                       {editing === key && (
                         <div className="w-full">
-                          {/* party-inventory-panels.tsx onStandEdit: same listing (id, bank source), current price and quantity. */}
+                          {/* Edits the same listing (id, bank source) with its current price and quantity. */}
                           <StandListingForm
                             item={configured.item}
                             meta={catalogFor(configured.item.name)?.meta}

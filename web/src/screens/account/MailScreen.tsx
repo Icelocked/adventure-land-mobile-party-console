@@ -14,14 +14,14 @@ import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { CatalogItem, InventoryEntry, Item, ReceivedMail } from '@/models'
 
 type CatalogFor = (id: string) => CatalogItem | undefined
-/** use-party-console.tsx mailDraft - e.g. ALData's "Prepare mail". */
+/** A prefilled draft, e.g. from ALData's "Prepare mail". */
 export interface MailDraft {
   recipient: string
   subject: string
   message: string
 }
 
-/** send-mail-dialog.tsx attachmentLevel: " +N" for anything that has levels. */
+/** " +N" for anything that has levels. */
 function attachmentLevel(item: Item, info?: CatalogItem) {
   const definition = info?.meta?.definition
   return item.level != null || info?.upgradeable || info?.compoundable || definition?.upgrade || definition?.compound ? ` +${Number(item.level) || 0}` : ''
@@ -29,7 +29,7 @@ function attachmentLevel(item: Item, info?: CatalogItem) {
 
 const sentAt = (sent?: string) => (sent ? new Date(sent).toLocaleString() : '')
 
-/** send-mail-dialog.tsx, in this app's layout: the received-mail list
+/** Mail: the received-mail list
  *  (Refresh / Write message), a message's detail sheet (attachment collect,
  *  two-step delete, reply), and the compose form - attachments from the
  *  merchant's inventory, every bank pack and each bankboi, postage, and a
@@ -256,7 +256,7 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
   const [error, setError] = useState<string | null>(null)
   const [postage, setPostage] = useState<number | null>(null)
 
-  // GET /mail/postage (send-mail-dialog.tsx postageQuery).
+  // GET /mail/postage.
   useEffect(() => {
     let cancelled = false
     void api.getJson<{ gold?: number }>('mail/postage').then((result) => {
@@ -366,7 +366,7 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
       {attachment ? (
         <div className="rounded-md border border-amber-700 p-2.5">
           <div className="flex items-center gap-2">
-            {/* send-mail-dialog.tsx: the selected attachment opens its item details. */}
+            {/* The selected attachment opens its item details. */}
             <button type="button" title="View attachment details" aria-label="View attachment details" onClick={() => setInspectingAttachment(true)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
               <SpriteIcon sprite={attachmentInfo?.sprite ?? attachmentInfo?.meta?.sprite} size={36} />
               <div className="min-w-0 flex-1">

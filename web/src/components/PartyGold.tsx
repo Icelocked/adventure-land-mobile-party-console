@@ -3,9 +3,8 @@ import { Coins } from 'lucide-react'
 import { useCharacters, useDynamicState } from '@/data/PartyDataProvider'
 import { abbreviatedGold, goldTotals, partyGoldNames } from '@/lib/gold'
 
-/** party-gold.tsx: bank gold (abbreviated) and "(X total)" with what the
- *  active party carries; "—" while any balance is unknown. Tap for the exact
- *  figures (the dashboard's hover title). */
+/** Bank gold (abbreviated) and "(X total)" with what the active party
+ *  carries; "—" while any balance is unknown. Tap for the exact figures. */
 export function PartyGold() {
   const state = useDynamicState()
   const characters = useCharacters()

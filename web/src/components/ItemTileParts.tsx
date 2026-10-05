@@ -4,11 +4,10 @@ import { abbreviatedGold } from '@/lib/gold'
 import { exactLevelPrice, suggestedItemValue, type StandPriceHistory } from '@/lib/suggestedItemValue'
 import type { InventoryEntry, Item, ItemOperation, MerchantBuyItem } from '@/models'
 
-/** item-level-label-class.tsx. */
 export const itemLevelLabelClass = 'absolute bottom-1 z-10 whitespace-nowrap text-[10px] text-emerald-300'
 
-/** item-operation-overlay.tsx: an upgrade/compound in progress - the
- *  pulsing result sprite, success %, and +from → +to. */
+/** An upgrade/compound in progress: the pulsing result sprite, success %,
+ *  and +from → +to. */
 export function ItemOperationOverlay({ operation, size }: { operation: ItemOperation; size: number }) {
   const percent = operation.chance == null ? null : `${(operation.chance * 100).toFixed(2)}%`
   const chanceColor = `hsl(${Math.max(0, Math.min(1, operation.chance ?? 0)) * 120} 85% 65%)`
@@ -37,7 +36,6 @@ export function ItemOperationOverlay({ operation, size }: { operation: ItemOpera
   )
 }
 
-/** mluck-clover.tsx. */
 export function MluckClover({ item }: { item?: Item | null }) {
   return item?.m ? (
     <span
@@ -50,7 +48,6 @@ export function MluckClover({ item }: { item?: Item | null }) {
   ) : null
 }
 
-/** lucky-upgrade-slot.tsx LuckySlotOutline. */
 export function LuckySlotOutline() {
   return (
     <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute -inset-[5px] z-20 h-[calc(100%+10px)] w-[calc(100%+10px)] overflow-visible fill-none text-amber-300">
@@ -64,7 +61,7 @@ export function LuckySlotOutline() {
   )
 }
 
-/** suggested-price-details.tsx: the merchant tile's price evidence. */
+/** The merchant tile's price evidence. */
 export function SuggestedPriceDetails({ entry, buyable, observed }: { entry: InventoryEntry; buyable: MerchantBuyItem[]; observed?: StandPriceHistory }) {
   const valuation = suggestedItemValue(entry, buyable)
   const itemLevel = Number(entry.item.level) || 0

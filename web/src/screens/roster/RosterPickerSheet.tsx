@@ -4,8 +4,7 @@ import { usePartyApi, useDynamicState, useRoster } from '@/data/PartyDataProvide
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 
-/** roster-picker.tsx + party-roster-picker.tsx: choose who to load into an
- *  empty slot (headless or Steam), or - for slot 0 - switch the Steam
+/** Choose who to load into an empty slot (headless or Steam), or - for slot 0 - switch the Steam
  *  character. Offline, inactive roster members only, plus Create character. */
 export function RosterPickerSheet({ slot, onClose, onCreate }: { slot: number; onClose: () => void; onCreate: () => void }) {
   const api = usePartyApi()
@@ -20,7 +19,7 @@ export function RosterPickerSheet({ slot, onClose, onCreate }: { slot: number; o
   const choose = async (name: string) => {
     setBusy(true)
     setError(null)
-    // use-party-console.tsx: slot 0 switches the Steam primary; otherwise
+    // Slot 0 switches the Steam primary; otherwise
     // load headless (slot spawn) or into Steam.
     const result =
       slot === 0 ? await api.steamAction(name, 'primary') : hosting === 'steam' ? await api.steamAction(name, 'login') : await api.spawnSlot(slot, name)

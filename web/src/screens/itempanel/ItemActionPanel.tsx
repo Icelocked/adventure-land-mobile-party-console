@@ -16,11 +16,10 @@ import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog } from '@/models'
 
 export type ItemActionTarget = { kind: 'inventory'; slot: number; item: Item } | { kind: 'equipment'; slotName: string; item: Item }
 
-/** The bottom-docked item panel replacing desktop's left-click-details/
- *  right-click-menu split - ported from ui/itempanel/ItemActionPanel.kt.
- *  Tapping an item opens its options list; "Item details" is the first
- *  option and opens the full ItemDetailBrowser in its own sheet (owner's
- *  layout decision - the details pane no longer hosts the options). */
+/** The bottom-docked item panel, in place of desktop's left-click
+ *  details / right-click menu. Tapping an item opens its options list;
+ *  "Item details" is the first option and opens ItemDetailBrowser in its
+ *  own sheet. */
 export function ItemActionPanel({
   target,
   characterName,
@@ -35,7 +34,7 @@ export function ItemActionPanel({
   isMerchant: boolean
   catalog: MerchantCatalog | null | undefined
   monsters: BestiaryMonster[]
-  // lucky-slot-menu.tsx "Show lucky slot data", when this is the merchant's lucky slot.
+  // "Show lucky slot data", when this is the merchant's lucky slot.
   onLuckySlotData?: () => void
   onClose: () => void
 }) {
@@ -62,10 +61,9 @@ export function ItemActionPanel({
   const meta = catalogFor(item.name)?.meta ?? undefined
   const slotLabel = target.kind === 'inventory' ? `slot ${target.slot}` : target.slotName
 
-  // stat-scroll-mark needs to know which secondary-stat scrolls are
-  // actually held (use-party-console.tsx's statScrollInventory) - summed
-  // across the merchant character's own inventory plus the shared bank,
-  // since that's who/where a stat-scroll-mark command actually draws from.
+  // stat-scroll-mark needs the secondary-stat scrolls actually held, summed
+  // across the merchant's inventory and the shared bank, since that's where
+  // the command draws from.
   const statScrollInventory = useMemo(() => {
     const quantities: Record<string, number> = {}
     const add = (entryItem?: Item | null) => {
@@ -139,7 +137,7 @@ export function ItemActionPanel({
             rootGift={item.gift === true}
             rootExpires={item.expires}
             context={{ character: characterName, slot: target.kind === 'inventory' ? target.slot : -1 }}
-            // connected-inventory.tsx: only the merchant's own inventory is a stand source.
+            // Only the merchant's own inventory is a stand source.
             onAddStand={
               isMerchant && target.kind === 'inventory'
                 ? () => {
@@ -178,8 +176,8 @@ export function TapRow({ label, onClick, disabled, title, className = '' }: { la
 
 const CLEAR_MARKS_TITLE = 'Clear this item’s manual marks and matching shared automatic rules'
 
-/** inventory-panel.tsx's item context menu, in its order and with its
- *  labels and gating, as this app's options list. */
+/** The item options list. Order, labels and gating follow the console's
+ *  inventory-panel.tsx context menu. */
 function InventoryActions({
   target,
   meta,
@@ -234,7 +232,7 @@ function InventoryActions({
   const merchantMarkedItem = (state.merchantMarked[characterName] ?? []).some(same)
   const deliveryTarget = isMerchant ? Object.keys(state.merchantDeliveries).find((name) => (state.merchantDeliveries[name] ?? []).some(same)) : undefined
   const standListing = isMerchant ? state.standListings.find((listing) => !listing.bankPack && listing.slot === slot && sameMarkedItem(listing.item, item)) : undefined
-  // inventory-panel.tsx: standIsFull (sales + buy orders reserving a slot).
+  // Sales and buy orders both reserve a stand slot.
   const standFull = standIsFull(state.standListings, state.standBids)
   const merchantWeaponMarked = isMerchant && !!state.merchantWeapon?.item && sameMarkedItem(state.merchantWeapon.item, item)
   const upgradeMark = meta?.upgradeable ? (state.upgrades[characterName] ?? []).find((mark) => !mark.equipped && mark.slot === slot && sameMarkedItem(mark.item, item)) : undefined
@@ -256,7 +254,7 @@ function InventoryActions({
   const deconstructable = canDeconstruct(item, state.deconstructionCatalog)
   const upgradeMax = Math.max(0, itemMaximumLevel(meta) - level)
   const compoundMax = Math.min(7, itemMaximumLevel(meta))
-  // use-party-console.tsx: online party members other than this one; bankbois are storage workers.
+  // Online party members other than this one; bankbois are storage workers.
   const bankboiNames = new Set(state.bankbois.map((bankboi) => bankboi.name))
   const deliveryTargets = Object.entries(diagnostics)
     .filter(([name, detail]) => name !== characterName && Number(detail.seenAt) > 0 && !bankboiNames.has(name))
@@ -342,7 +340,7 @@ function InventoryActions({
         </>
       ) : null}
 
-      {/* automatic-item-actions.tsx section="exchange". The server toggles this rule. */}
+      {/* The server toggles this rule. */}
       {!!merchant && exchangeable && <TapRow label="Auto exchange" disabled={!configLoaded || autoExchangeMarked} onClick={() => command('auto-exchange', slot)} />}
 
       <TapRow label="Mark for bank" disabled={bankMarked} onClick={() => command('mark', slot)} />
@@ -378,7 +376,7 @@ function InventoryActions({
         </>
       )}
 
-      {/* upgrade-actions.tsx (offerings are U1). */}
+      {/* Upgrade marks, with offerings. */}
       {!!merchant && meta?.upgradeable && upgradeMax > 0 && (
         <>
           <TapRow label={`Mark for upgrade${upgradeMark ? ` · ${upgradeMark.tiers || 1} tier${(upgradeMark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
@@ -480,7 +478,7 @@ function InventoryActions({
   )
 }
 
-/** equip-slot.tsx's menu: Unequip (the elixir only shows its active
+/** Equipped item menu: Unequip (the elixir only shows its active
  *  effect), upgrade marks, and Clear all marks when anything matches. */
 function EquipmentActions({
   target,
@@ -509,7 +507,6 @@ function EquipmentActions({
   const autoTiers = upgradeRuleTiers(autoUpgradeRule)
   const mark = (state.upgrades[characterName] ?? []).find((entry) => entry.equipped && entry.slot === slotName && sameMarkedItem(entry.item, item))
   const statScrollMark = (state.statScrolls[characterName] ?? []).find((entry) => entry.slot === slotName && sameMarkedItem(entry.item, item))
-  // inventory-panel.tsx hasAutomaticMarks.
   const commerceKey = automaticCommerceRuleKey(item)
   const autoItemMarks = state.autoItemMarks[ruleName] ?? {}
   const hasAutomaticMarks = Boolean(
@@ -559,10 +556,8 @@ function EquipmentActions({
   )
 }
 
-/** upgrade-actions.tsx's tier submenu ported as an inline expandable list
- *  (this panel's tap-only pattern has no context-menu submenu equivalent)
- *  - one row per achievable target tier, "+N → +N+tiers" with the scroll
- *  gold cost, instead of silently always marking a single tier. */
+/** Upgrade tier picker as an inline list: one row per achievable target
+ *  tier, "+N → +N+tiers" with the scroll gold cost. */
 export function UpgradeTierPicker({ meta, level, current, onPick }: { meta: ItemMeta | undefined; level: number; current?: number; onPick: (tiers: number) => void }) {
   const max = Math.max(0, itemMaximumLevel(meta) - level)
   if (max <= 0) return null
@@ -585,10 +580,9 @@ export function UpgradeTierPicker({ meta, level, current, onPick }: { meta: Item
   )
 }
 
-/** The compound equivalent of UpgradeTierPicker - inventory-panel.tsx's
- *  "Auto compound" submenu, one row per tier up to itemMaximumLevel (7 for
- *  compoundables) with the real compound-scroll cost (compoundPassCost),
- *  not a free-form number input the way this used to work. */
+/** The compound equivalent of UpgradeTierPicker: one row per tier up to
+ *  itemMaximumLevel (7 for compoundables) with the compound-scroll cost
+ *  (compoundPassCost). */
 export function CompoundTierPicker({ meta, level, buyable, onPick }: { meta: ItemMeta | undefined; level: number; buyable: { id: string; cost: number }[]; onPick: (tier: number) => void }) {
   // The server's validTier caps auto-compound targets at +7 (compound-commands.ts).
   const max = Math.max(0, Math.min(7, itemMaximumLevel(meta)) - level)
@@ -609,11 +603,9 @@ export function CompoundTierPicker({ meta, level, buyable, onPick }: { meta: Ite
   )
 }
 
-/** stat-scroll-mark's option list, ported with the same purchasable-vs-
- *  owned split as inventory-panel.tsx: str/int/dex/vit are always shown
- *  (bought outright for gold), every other stat only shows up once you
- *  already own enough of its scroll - not as an always-visible chip with
- *  no indication of cost or whether you can actually do it. */
+/** Stat-scroll options: str/int/dex/vit are always shown (bought outright
+ *  for gold); every other stat only shows once enough of its scroll is
+ *  owned. */
 function StatScrollPicker({
   meta,
   item,

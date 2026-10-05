@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input'
 
 type Result = { kind: string; message?: string }
 
-/** One merchant setting's busy/error state - each dashboard setting is its
- *  own mutation with its own inline error. */
+/** One merchant setting's busy/error state: each setting is its own
+ *  mutation with its own inline error. */
 function useSetting() {
   const refreshNow = useRefreshDynamicStateNow()
   const [busy, setBusy] = useState(false)
@@ -26,7 +26,7 @@ function useSetting() {
 const box = 'flex flex-col gap-2 rounded-md border border-border p-3 text-sm'
 const help = 'text-xs text-muted-foreground'
 
-/** merchant-collection-settings.tsx's "Merchant settings": bank sorting,
+/** "Merchant settings": bank sorting,
  *  upgrade buy batch, stand location, delivery/withdrawal trips, and the
  *  gold and item collection thresholds. */
 export function MerchantSettings() {
@@ -42,7 +42,6 @@ export function MerchantSettings() {
   )
 }
 
-/** bank-sort-control.tsx (settings mode). */
 function BankSortSetting() {
   const api = usePartyApi()
   const state = useDynamicState()
@@ -68,7 +67,6 @@ function BankSortSetting() {
   )
 }
 
-/** buy-upgrade-batch-setting.tsx */
 function BuyUpgradeBatchSetting() {
   const api = usePartyApi()
   const value = useDynamicState().buyUpgradeBatchSize ?? 1
@@ -95,7 +93,6 @@ function BuyUpgradeBatchSetting() {
   )
 }
 
-/** merchant-stand-location-setting.tsx */
 function StandLocationSetting() {
   const api = usePartyApi()
   const location = useDynamicState().merchantStandLocation
@@ -130,7 +127,6 @@ function StandLocationSetting() {
   )
 }
 
-/** delivery-trip-setting.tsx / withdrawal-trip-setting.tsx */
 function TripSetting({ kind }: { kind: 'deliveries' | 'withdrawals' }) {
   const api = usePartyApi()
   const enabled = useDynamicState().merchantAutomations[kind] !== false
@@ -162,8 +158,8 @@ function TripSetting({ kind }: { kind: 'deliveries' | 'withdrawals' }) {
   )
 }
 
-/** merchant-collection-settings.tsx's two thresholds, with
- *  use-party-console.tsx's validation and re-sync while untouched. */
+/** Gold and item collection thresholds, validated, and re-synced from the
+ *  server while untouched. */
 function ThresholdSettings() {
   const api = usePartyApi()
   const state = useDynamicState()

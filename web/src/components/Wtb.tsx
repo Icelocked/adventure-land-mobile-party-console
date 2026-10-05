@@ -10,7 +10,7 @@ import { exactLevelPrice, suggestedItemValue, type StandPriceHistory } from '@/l
 import type { ApiResult, CommandResult, WtbOptions } from '@/api/partyApi'
 import type { CatalogItem, Item, ItemMeta, MerchantBuyItem, StandBid } from '@/models'
 
-/** wtb-preferences.tsx explanations, verbatim. */
+/** Explanations match the console's wtb-preferences.tsx. */
 export const standBuyExplanation =
   'Uses a merchant stand slot to advertise this buy order to other players. Automatic shopping continues whether this is enabled or disabled.'
 export const higherLevelExplanation =
@@ -18,7 +18,7 @@ export const higherLevelExplanation =
 export const autoStandExplanation =
   'Automatically uses an empty stand slot for a highest priority buy order. A new sell listing takes this slot when needed; your stand-slot preference stays unchecked.'
 
-/** A small "i" that toggles its explanation (the dashboard's hover popover). */
+/** A small "i" that toggles its explanation. */
 export function InfoToggle({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
@@ -35,7 +35,6 @@ export function InfoToggle({ label, children }: { label: string; children: React
   )
 }
 
-/** wtb-preferences.tsx WTBPreference. */
 export function WtbPreference({ label, description, checked, onChange, disabled }: { label: string; description: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
   return (
     <div className="flex shrink-0 items-center gap-1.5 text-xs">
@@ -48,7 +47,7 @@ export function WtbPreference({ label, description, checked, onChange, disabled 
   )
 }
 
-/** wtbpriority-input.tsx: 0–100, blank = routine priority. */
+/** 0–100, blank = routine priority. */
 export function WtbPriorityInput({
   value,
   onChange,
@@ -88,7 +87,6 @@ const TONES = {
 }
 export type PriceTone = keyof typeof TONES
 
-/** stand-price-button.tsx. */
 export function StandPriceButton({ label, value, disabled, onClick, tone, information }: { label: string; value?: number; disabled?: boolean; onClick: () => void; tone: PriceTone; information?: ReactNode }) {
   const usable = Number.isFinite(value) && Number(value) > 0 ? Number(value) : 0
   return (
@@ -102,7 +100,7 @@ export function StandPriceButton({ label, value, disabled, onClick, tone, inform
   )
 }
 
-/** ponty-price.tsx, verbatim: 2 × the item's calculated value (3 × for cash
+/** 2 × the item's calculated value (3 × for cash
  *  items), inferring upgrade/compound when lightweight meta omits it. */
 export function pontyPrice(item: Item, meta?: ItemMeta | null) {
   const definition = meta?.definition || {}
@@ -116,7 +114,7 @@ export function pontyPrice(item: Item, meta?: ItemMeta | null) {
 
 type Occupant = { id: string; itemId: string; kind: string; price: number; quantity: number }
 
-/** wtb-preferences.tsx useWTBReplacement: a 409 with `occupants` asks which
+/** A 409 with `occupants` asks which
  *  stand entry to bounce, then retries with replaceStandEntry. */
 export function useWtbReplacement(catalogFor: (id: string) => CatalogItem | undefined) {
   const [pending, setPending] = useState<{ occupants: Occupant[]; action: (replacement?: string) => Promise<ApiResult<CommandResult>>; onDone?: () => void } | null>(null)
@@ -205,7 +203,7 @@ export function useWtbReplacement(catalogFor: (id: string) => CatalogItem | unde
   return { save, dialog }
 }
 
-/** wtborder-dialog.tsx: price (15 presets at the exact level, existing price
+/** WTB order form: price (15 presets at the exact level, existing price
  *  only when its level matches), quantity, +level, priority, Use stand and
  *  Accept higher levels, and the stand-replacement retry. */
 export function WtbDialog({

@@ -1,7 +1,6 @@
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import type { CharacterDiagnostics, CharacterVitals, EquippedEntry } from '@/models'
 
-/** display-character.ts displayRunSpeed, verbatim. */
 export function displayRunSpeed(character: { ctype: string; speed?: number; unrestrictedSpeed?: number | null; standOpen?: boolean }): number | null {
   if (character.ctype === 'merchant') {
     if (typeof character.unrestrictedSpeed === 'number' && Number.isFinite(character.unrestrictedSpeed)) return character.unrestrictedSpeed
@@ -10,7 +9,7 @@ export function displayRunSpeed(character: { ctype: string; speed?: number; unre
   return character.speed ?? null
 }
 
-/** character-stats-dialog.tsx: level, HP/MP, attack, speeds, armor and
+/** Level, HP/MP, attack, speeds, armor and
  *  resistance with their damage reduction, STR/INT/DEX/VIT/FOR effects
  *  (primary stat marked), luck, and the combat stats. */
 export function CharacterStatsSheet({

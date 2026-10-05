@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 
-/** Shared shell for every scrollable-body section on the character
- *  detail screen - ported from ui/characterdetail/sections/
- *  SectionCard.kt: one consistent title + card look. */
+/** Shared title + card shell for every section on the character detail
+ *  screen. */
 export function SectionCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section aria-label={title} className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">

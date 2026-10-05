@@ -15,7 +15,7 @@ function storedFilters(): Record<string, boolean> {
   }
 }
 
-/** log-sidebar.tsx as a screen: Game logs (category toggles) and
+/** Logs: Game logs (category toggles) and
  *  Dashboard logs (combat, merchant/coordinator, anniversary), a character
  *  filter, the latest 1,000 matching entries in order, auto-following the end. */
 export function LogsScreen() {

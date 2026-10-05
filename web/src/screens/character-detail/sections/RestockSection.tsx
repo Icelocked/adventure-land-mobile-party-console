@@ -8,10 +8,9 @@ import type { RestockPolicy } from '@/models'
 
 const digitsOnly = (value: string) => /^\d*$/.test(value)
 
-/** Ports restock-controls.tsx's HP/MP min/max fields + Save button. Keeps
- *  a local "dirty" copy once the user starts typing so an incoming poll
- *  refresh (~6s) can't clobber an in-progress edit - only resets from the
- *  server value while untouched. */
+/** HP/MP restock min/max fields + Save. Keeps a local "dirty" copy once the
+ *  user starts typing so a poll refresh (~6s) can't clobber an in-progress
+ *  edit; only resets from the server value while untouched. */
 export function RestockSection({ characterName, serverPolicy }: { characterName: string; serverPolicy: RestockPolicy }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -70,7 +69,7 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
         onClick={async () => {
           setSaving(true)
           setSaveError(null)
-          // restock-controls.tsx: digits only, so a cleared field is 0 there too.
+          // Digits only, so a cleared field is 0.
           const result = await api.saveRestock(characterName, {
             hp: { ...serverPolicy.hp, min: Number(hpMin), max: Number(hpMax) },
             mp: { ...serverPolicy.mp, min: Number(mpMin), max: Number(mpMax) },

@@ -11,7 +11,7 @@ import { CaveMap } from './CaveMap'
 
 const exitButton = 'rounded border-2 border-red-500 bg-slate-950 px-3 py-2 text-red-100 hover:border-red-300 hover:bg-red-950 disabled:opacity-50'
 
-/** dungeon-panel.tsx: the Cave of Many Dreams run controls at the top of
+/** The Cave of Many Dreams run controls at the top of
  *  the party screen while a visit is underway. Its dialogs (exit
  *  confirmation, encounter, shop item) are inline groups and sheets. */
 export function DungeonPanel() {

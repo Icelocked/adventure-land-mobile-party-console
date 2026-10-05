@@ -8,7 +8,7 @@ import { subscribeMapFrames } from '@/data/useMapFrames'
 import type { CaveObservation, DungeonView } from '@/models/dungeon'
 import { dungeonButton } from './CaveEventRow'
 
-/** cave-map.tsx: the full floor map with party, room and waypoint pins,
+/** The full floor map with party, room and waypoint pins,
  *  opened from the dungeon panel as a full-screen view. */
 export function CaveMap({
   view,

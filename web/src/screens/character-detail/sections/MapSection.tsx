@@ -6,7 +6,7 @@ import { receiveMapFrame, type MapRenderBuffer } from '@/components/map/mapRende
 import type { MapDefinition } from '@/components/map/mapTypes'
 import { useMapDefinition, useMapFrames, useVisible } from '@/data/useMapFrames'
 
-/** character-map-section.tsx: the collapsible live map under the
+/** The collapsible live map under the
  *  character's position, at 20 fps while open and the page is visible,
  *  with a native-size view (names and hit/heal floaters). */
 export function MapSection({ name, map, x, y }: { name: string; map: string; x: number; y: number }) {
@@ -74,7 +74,7 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
             <Maximize2 className="size-4" />
           </button>
           {streamState !== 'live' ? <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 font-mono text-[10px] text-amber-200">{streamState}</span> : null}
-          {/* Not on the dashboard: the console replays its last frame and keeps the stream open, so a hung character looks live without this. */}
+          {/* The console replays its last frame and keeps the stream open, so a hung character looks live without this. */}
           {streamState === 'live' && (
             <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-1">
               {lastFrameAt > 0 ? <FreshnessBadge at={lastFrameAt} subject="frame" /> : <span className="text-xs text-slate-300">Waiting for the first frame…</span>}

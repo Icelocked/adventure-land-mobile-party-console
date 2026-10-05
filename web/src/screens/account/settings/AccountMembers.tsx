@@ -1,7 +1,7 @@
 import { useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRoster } from '@/data/PartyDataProvider'
 import { CharacterPortrait } from '@/components/CharacterPortrait'
 
-/** account-settings.tsx's member grid: roster and bankbois with the live
+/** Member grid: roster and bankbois with the live
  *  doll/sprite or the saved appearance, class and level, padded to eight
  *  dotted empty slots. */
 export function AccountMembers() {

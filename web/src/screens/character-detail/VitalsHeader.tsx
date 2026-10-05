@@ -5,10 +5,9 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { CharacterStatsSheet } from './CharacterStatsSheet'
 import type { BestiaryMonster, CharacterDiagnostics, CharacterVitals, EquippedEntry, Sprite } from '@/models'
 
-/** The sticky, always-visible top of the character detail screen -
- *  ported from ui/characterdetail/sections/VitalsHeader.kt. Kept out of
- *  the scrollable body so vitals never scroll out of view while browsing
- *  equipment/inventory below. */
+/** The sticky top of the character detail screen, kept out of the
+ *  scrollable body so vitals stay visible while browsing equipment and
+ *  inventory below. */
 export function VitalsHeader({
   name,
   vitals,
@@ -32,14 +31,14 @@ export function VitalsHeader({
   const tracktrix = diagnostics.tracktrix as { active?: boolean; sprite?: Sprite | null; bonuses?: Record<string, number> | null } | undefined
   const ping = vitals.ping ?? diagnostics.ping
   const flags = { ...diagnostics, ...vitals } as { banking?: boolean; bankQueued?: boolean; stocking?: boolean }
-  // character-map-section.tsx: instanced caves get a readable name.
+  // Instanced caves get a readable name.
   const mapLabel = /^zone_[a-f0-9]+_\d+$/.test(vitals.map) ? 'Cave of Many Dreams' : vitals.map
   const xpFraction = vitals.max_xp && vitals.max_xp > 0 ? Math.min(1, Math.max(0, (vitals.xp ?? 0) / vitals.max_xp)) : null
 
   return (
     <div className="flex flex-col gap-1.5 border-b border-border p-4">
       <div className="flex items-center gap-3">
-        {/* character-stats-trigger.tsx: the portrait opens the character's stats. */}
+        {/* The portrait opens the character's stats. */}
         <button
           type="button"
           onClick={() => setStatsOpen(true)}

@@ -1,13 +1,10 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 
-/** npc-sale.ts's modified-item confirmation, ported from party-management-
- *  panels.tsx's rose warning checkbox - NPC-selling an upgraded/stat-
- *  scrolled/shiny item destroys that investment permanently, and the
- *  server refuses the sale outright without `acknowledged: true`. Shown
- *  in place of an instant one-tap sale whenever isModifiedItem(item) is
- *  true; unmodified items skip this and sell immediately, same as the
- *  dashboard. */
+/** NPC-selling an upgraded/stat-scrolled/shiny item destroys that investment
+ *  permanently, and the server refuses the sale without `acknowledged: true`.
+ *  Shown instead of a one-tap sale when isModifiedItem(item); unmodified
+ *  items sell immediately. */
 export function ModifiedItemWarning({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   const [acknowledged, setAcknowledged] = useState(false)
 

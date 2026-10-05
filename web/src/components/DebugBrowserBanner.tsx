@@ -3,12 +3,12 @@ import { useDebugBrowser, useDebugGameUrl } from '@/data/useDebugBrowser'
 import { useServerSettings } from '@/data/PartyDataProvider'
 import { setLocalDebugAssets } from '@/components/map/mapRendering'
 
-/** debug-browser.tsx DebugBrowserBanner: on a debug instance, a banner with the game client link. */
+/** On a debug instance, a banner with the game client link. */
 export function DebugBrowserBanner() {
   const debug = useDebugBrowser()
   const href = useDebugGameUrl()
   const settings = useServerSettings()
-  // debug-browser.tsx: setLocalDebugAssets(debug).
+  // A debug instance serves game assets from its own local copy.
   useEffect(() => {
     setLocalDebugAssets(debug ? settings.baseUrl.replace(/\/+$/, '') : null)
   }, [debug, settings.baseUrl])

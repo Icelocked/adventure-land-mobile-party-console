@@ -12,10 +12,9 @@ import { AddUpgradeRule } from '@/components/Offerings'
 import { TapRow, UpgradeTierPicker, CompoundTierPicker } from '@/screens/itempanel/ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 
-/** exchange-mark-controls.tsx ExchangeMarkMode. */
 export type ExchangeMarkMode = { action: 'bank' | 'stand' | 'npc' | 'upgrade'; targetLevel?: number }
 
-/** exchange-mark-controls.tsx, verbatim labels and gating. */
+/** Labels and gating follow the console's exchange-mark-controls.tsx. */
 export function ExchangeMarkControls({ enabled, mode, saving, onMode }: { enabled: boolean; mode: ExchangeMarkMode | null; saving: boolean; onMode: (mode: ExchangeMarkMode) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -63,7 +62,6 @@ export function ExchangeMarkControls({ enabled, mode, saving, onMode }: { enable
   )
 }
 
-/** exchange-reward-tile.tsx ExchangeRewardTileData. */
 export interface ExchangeRewardTileData {
   id: string
   level: number
@@ -82,9 +80,8 @@ export interface ExchangeRewardTileData {
 
 const PASSIVE_KINDS = ['empty', 'gold', 'shells', 'cx', 'cxbundle', 'open']
 
-/** exchange-reward-tile.tsx: a prospective reward with its automatic-rule
- *  banner. Tapping opens its options list (Item details first, then the
- *  automatic actions the dashboard puts in the tile's context menu); while
+/** A prospective reward with its automatic-rule banner. Tapping opens its
+ *  options list (Item details first, then the automatic actions); while
  *  marking multiple, tapping stages the chosen bulk rule instead. */
 export function ExchangeRewardTile({ reward }: { reward: ExchangeRewardTileData }) {
   const state = useDynamicState()
@@ -103,7 +100,7 @@ export function ExchangeRewardTile({ reward }: { reward: ExchangeRewardTileData 
   const bank = state.autoItemMarks?.[String(merchant)]?.[key] || (!item.level ? state.autoItemMarks?.[String(merchant)]?.[item.name] : undefined)
   const upgradeRule = state.autoUpgradeMarks?.[String(merchant)]?.[key]
   const upgradeTiers = upgradeRuleTiers(upgradeRule)
-  // upgrade-rule-quantity.tsx: -1 unless the rule carries a safe-integer quantity.
+  // -1 unless the rule carries a safe-integer quantity.
   const upgradeQuantity = typeof upgradeRule === 'object' && upgradeRule && Number.isSafeInteger(Number((upgradeRule as { quantity?: unknown }).quantity)) ? Number((upgradeRule as { quantity?: unknown }).quantity) : -1
   const upgradePending = !!upgradeTiers && upgradeQuantity !== 0
   const compound = state.autoCompounds?.[String(merchant)]?.find((rule) => rule.name === item.name)
@@ -196,8 +193,8 @@ export function ExchangeRewardTile({ reward }: { reward: ExchangeRewardTileData 
   )
 }
 
-/** automatic-item-actions.tsx for a prospective reward (slot -1), as this
- *  app's options rows with inline sub-lists and confirmations. */
+/** Automatic item actions for a prospective reward (slot -1), as options
+ *  rows with inline sub-lists and confirmations. */
 function AutomaticItemActions({
   merchant,
   item,
@@ -265,7 +262,7 @@ function AutomaticItemActions({
           {expanded === 'upgrade' && (
             <>
               <UpgradeTierPicker meta={meta} level={level} current={upgradeTiers} onPick={(tiers) => void command('auto-upgrade-mark', { slot: -1, tiers })} />
-              {/* party-merchant-commerce-dialog.tsx wraps rewards in the merchant's UpgradeOfferingProvider. */}
+              {/* Rewards take their offerings from the merchant. */}
               <AddUpgradeRule character={merchant} item={item} meta={meta} />
             </>
           )}

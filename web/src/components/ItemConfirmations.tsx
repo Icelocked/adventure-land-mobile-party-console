@@ -6,9 +6,8 @@ import { npcSaleValue } from '@/lib/itemFormulas'
 import { deconstructionRewards } from '@/models'
 import type { CatalogItem, DeconstructionCatalog, Item, ItemMeta } from '@/models'
 
-/** deconstruction-confirmation.tsx, inline: the rewards per item (each row a
- *  separate roll), cost per item, and a confirm that only sends once the
- *  reward data exists. */
+/** Deconstruction confirmation: rewards per item (each row a separate roll),
+ *  cost per item, and a confirm that only sends once the reward data exists. */
 export function DeconstructionConfirmation({
   item,
   auto,
@@ -79,8 +78,8 @@ export function DeconstructionConfirmation({
   )
 }
 
-/** party-management-panels.tsx "Automatically sell to NPC?": what the rule
- *  matches, its scope, and the proceeds per sale. */
+/** "Automatically sell to NPC?": what the rule matches, its scope, and the
+ *  proceeds per sale. */
 export function AutoNpcSaleConfirmation({
   item,
   meta,

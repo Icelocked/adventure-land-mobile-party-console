@@ -4,7 +4,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { ITEM_DETAIL_PROPERTY_RANK, STAT_SCROLLS, itemMaximumLevel, propertiesAtLevel } from '@/lib/itemFormulas'
 import type { CatalogComparisonEntry } from '@/lib/catalogComparison'
 
-/** catalog-comparison.tsx CatalogComparison: item A as the baseline and up
+/** Item A as the baseline and up
  *  to three alternatives, each with a preview level and stat scroll. */
 export function CatalogComparison({
   entries,

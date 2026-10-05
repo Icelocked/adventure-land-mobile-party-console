@@ -14,8 +14,8 @@ import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type Inventor
 import { TapRow, UpgradeTierPicker } from './ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 
-/** The options list for one bank item - bank-sheet.tsx's context menu, in
- *  order, all acting through the configured merchant: Item details,
+/** The options list for one bank item, all acting through the configured
+ *  merchant: Item details,
  *  withdrawal (one / all), stand (mark / unmark, auto), upgrade (mark via
  *  withdrawal / auto), deconstruction (mark / auto), NPC sale (sell / auto),
  *  and Clear all marks. */
@@ -33,10 +33,10 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   const [error, setError] = useState<string | null>(null)
   const toggle = (key: string) => setExpanded((current) => (current === key ? null : key))
 
-  // bank-sheet.tsx: the same identity checks the dashboard badges with.
+  // The same identity checks the bank row badges use.
   const withdrawMarked = !!merchant && (state.withdrawals[merchant] ?? []).some((w) => w.pack === pack && w.slot === entry.slot && sameMarkedItem(w.item, item))
   const standListing = state.standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, item))
-  // bank-sheet.tsx: standIsFull, and an already-marked copy can still be edited.
+  // A full stand blocks new marks, but an already-marked copy can still be edited.
   const standFull = standIsFull(state.standListings, state.standBids)
   const canUpgrade = !!merchant && !item.l && !(item as { b?: unknown }).b && !!meta?.upgradeable && itemMaximumLevel(meta) > level
 
@@ -55,14 +55,14 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
     onClose()
   }
 
-  // bank-withdrawal.tsx: in-flight guard (withdraw is a server toggle) and
+  // In-flight guard (withdraw is a server toggle) and
   // the "Remove automatic bank mark?" consent on auto_bank_confirmation_required.
   const withdrawInFlight = useRef(false)
   const [withdrawing, setWithdrawing] = useState(false)
   const [confirmingWithdraw, setConfirmingWithdraw] = useState<{ markAll: boolean; upgradeTiers?: number } | null>(null)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const withdraw = async (markAll: boolean, upgradeTiers?: number, confirmed = false) => {
-    // bank-withdrawal.tsx: other withdrawals wait while a confirmation is pending.
+    // Other withdrawals wait while a confirmation is pending.
     if (withdrawInFlight.current || !merchant || (confirmingWithdraw && !confirmed)) return
     withdrawInFlight.current = true
     setWithdrawing(true)
@@ -74,7 +74,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
         setConfirmingWithdraw({ markAll, upgradeTiers })
         return
       }
-      // bank-withdrawal.tsx: a failed confirmed retry keeps the prompt open with its error.
+      // A failed confirmed retry keeps the prompt open with its error.
       if (result.kind === 'failure') {
         if (confirmed) return setConfirmError(result.message)
         return setError(result.message)
@@ -173,7 +173,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               {expanded === 'upgrade' && (
                 <>
                   <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => void withdraw(false, tiers)} />
-                  {/* bank-upgrade-actions.tsx has no offering provider: these stay disabled. */}
+                  {/* Bank items have no offering source, so these stay disabled. */}
                   <OfferingRows character={merchant!} item={item} meta={meta} enabled={false} />
                 </>
               )}
@@ -231,7 +231,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               }}
             />
           )}
-          {/* party-inventory-panels.tsx onBankAutoNpcSale: the rule is created for the merchant. */}
+          {/* The rule is created for the merchant. */}
           {merchant && !item.l && <TapRow label="Auto sell to NPC…" onClick={() => toggle('autonpc')} />}
           {merchant && expanded === 'autonpc' && (
             <AutoNpcSaleConfirmation
