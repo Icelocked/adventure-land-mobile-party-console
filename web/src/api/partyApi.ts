@@ -53,9 +53,9 @@ async function timedFetch(url: string, init: RequestInit = {}, timeoutMs: number
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    // no-cache revalidates every request (never a heuristic, stale reuse) and
-    // sends the console's ETag back, so unchanged data returns as a body-less
-    // 304 instead of the full payload: a large saving on mobile data.
+    // no-cache: never reuse a stored response without asking the server, but
+    // let the browser revalidate if the console ever sends ETags (it currently
+    // marks every response no-store, so each poll is a full download).
     return await fetch(url, { ...init, cache: 'no-cache', signal: controller.signal })
   } finally {
     clearTimeout(timeout)

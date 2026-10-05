@@ -33,7 +33,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         CrashReport.install(applicationContext)
         PartyCookies.init(applicationContext)
-        com.partyconsole.companion.network.HttpCache.init(applicationContext)
         AppForeground.observe()
         AlertNotifications.ensureChannels(applicationContext)
         NotifierControl.apply(applicationContext)
