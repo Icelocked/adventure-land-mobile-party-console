@@ -13,14 +13,12 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Gates the app behind party-console's own browser-pairing check (GET
- *  /setup/state - 200 once paired, else a redirect to /setup that this
- *  client's stricter content-type check turns into "IllegalStateException:
- *  Invalid content-type: text/html", the exact symptom that led here) before
- *  PartyViewModel opens its live SSE connection. Without this, an unpaired
- *  phone just sat on that raw exception forever with no indication that
- *  pairing - not the network - was the blocker. Mirrors the same gate added
- *  to the PWA (web/src/screens/PairingGate.tsx) against the same endpoints. */
+/** Gates the app behind party-console's browser-pairing check before
+ *  PartyViewModel opens its live SSE connection. GET /setup/state returns 200
+ *  once paired, else redirects to /setup, which this client's content-type
+ *  check surfaces as "Invalid content-type: text/html"; without the gate an
+ *  unpaired phone shows only that raw error. PWA:
+ *  web/src/screens/PairingGate.tsx. */
 sealed interface PairingState {
     data object Checking : PairingState
     data object Paired : PairingState

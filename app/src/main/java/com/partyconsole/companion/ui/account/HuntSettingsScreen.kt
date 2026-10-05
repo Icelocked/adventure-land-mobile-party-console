@@ -51,11 +51,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
-/** hunt-settings-control.tsx + the Hunt blacklist from farming-mode-
- *  control.tsx's settings dialog, for one character. Like the dashboard,
- *  every control saves its own field as soon as it changes (thresholds when
- *  the field loses focus), always scoped with `character`; a character
- *  following the leader sees the leader's settings read-only. */
+/** Hunt settings and the Hunt blacklist for one character. Every control
+ *  saves its own field as soon as it changes (thresholds when the field loses
+ *  focus), always scoped with `character`; a character following the leader
+ *  sees the leader's settings read-only. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Unit) {
@@ -82,7 +81,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
     var inspecting by remember { mutableStateOf<BestiaryMonster?>(null) }
     var inspectError by remember { mutableStateOf<String?>(null) }
     var drop by remember { mutableStateOf<String?>(null) }
-    // party-reference-panels.tsx: a drop opened from a monster's details.
+    // A drop opened from a monster's details.
     var dropSource by remember { mutableStateOf("") }
 
     LaunchedEffect(settings.deathThreshold, settings.expirationThreshold) {
@@ -126,7 +125,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
         if (result is ApiResult.Success) viewModel.refreshDynamicStateNow()
         return result
     }
-    // connected-character-card.tsx onInspectMonster: details, or why they are unavailable.
+    // Monster details, or why they are unavailable.
     fun inspectMonster(id: String) {
         val monster = dynamicState.bestiaryCatalog.find { it.id == id }
         if (monster != null) { inspectError = null; inspecting = monster } else inspectError = "Monster details are not available for $id yet."
@@ -266,7 +265,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
                     for ((id, entry) in blacklist) {
                         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                             Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                // farming-mode-control.tsx: a blacklisted monster opens its details.
+                                // A blacklisted monster opens its details.
                                 Row(
                                     modifier = Modifier.weight(1f).clickable { inspectMonster(id) }.semantics { contentDescription = "Inspect ${monsterById[id]?.name ?: id}" },
                                     verticalAlignment = Alignment.CenterVertically,

@@ -28,10 +28,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicLong
 
-/** "A command was just sent" feedback (the PWA's lib/actionToast.ts): the API
- *  client's one POST path reports every action here, so each tap gets an
- *  immediate acknowledgement however slow the network is - without it, taps
- *  on a lossy connection looked like they did nothing and got repeated. */
+/** "A command was just sent" feedback: the API client's one POST path reports
+ *  every action here, so each tap gets an immediate acknowledgement however
+ *  slow the network is. Without it, taps on a lossy connection look like they
+ *  did nothing and get repeated. */
 object ActionToasts {
     enum class Status { SENDING, SENT, FAILED }
     data class Entry(val id: Long, val status: Status)
@@ -60,8 +60,8 @@ object ActionToasts {
 }
 
 /** One stacked pill per in-flight (or just-resolved) command, mounted once at
- *  the app root (the PWA's ActionToastHost). Deliberately generic, even on
- *  failure - the acting screen's own inline error carries the message. */
+ *  the app root. Deliberately generic, even on failure - the acting screen's
+ *  own inline error carries the message. */
 @Composable
 fun ActionToastHost(modifier: Modifier = Modifier) {
     val entries by ActionToasts.entries.collectAsState()

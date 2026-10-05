@@ -25,10 +25,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** shared-rule-conflicts.tsx (the PWA's RuleConflictsSection.tsx): with
- *  shared merchant rules, members' rules that disagree are paused until one
- *  owner's value is chosen; rules that would both act on the same item are
- *  flagged too. Shown on the merchant only, and only when there are any. */
+/** With shared merchant rules, members' rules that disagree are paused until
+ *  one owner's value is chosen; rules that would both act on the same item
+ *  are flagged too. Shown on the merchant only, and only when there are any. */
 @Composable
 fun RuleConflictsSection(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()

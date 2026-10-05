@@ -20,8 +20,8 @@ import com.partyconsole.companion.ui.PartyViewModel
 import kotlin.math.max
 import kotlin.math.min
 
-/** farming-area-preview.tsx: the area's map, scaled to fit the spawn
- *  boundary and hunt radius, with the area overlay and waypoint. */
+/** The area's map, scaled to fit the spawn boundary and hunt radius, with the
+ *  area overlay and waypoint. */
 @Composable
 fun FarmingAreaPreview(viewModel: PartyViewModel, area: Area, radius: Int, modifier: Modifier = Modifier) {
     val query = rememberMapDefinition(viewModel, area.map)

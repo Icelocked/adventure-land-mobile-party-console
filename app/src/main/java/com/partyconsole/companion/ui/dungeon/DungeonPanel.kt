@@ -77,12 +77,11 @@ internal fun DungeonButton(label: String, enabled: Boolean = true, border: Color
     }
 }
 
-/** dungeon-panel.tsx (the PWA's DungeonPanel.tsx): the Cave of Many Dreams
- *  run controls at the top of the party screen while a visit is underway -
- *  exit with confirmation, retry / recover, floor, timer, funds, members,
- *  automatic exploration, priest recovery and "Call Nera", room moves, the
- *  encounter vote (paid votes confirmed), the cave shop and the full
- *  floor map (CaveMap.kt). */
+/** The Cave of Many Dreams run controls at the top of the party screen while
+ *  a visit is underway - exit with confirmation, retry / recover, floor,
+ *  timer, funds, members, automatic exploration, priest recovery and "Call
+ *  Nera", room moves, the encounter vote (paid votes confirmed), the cave
+ *  shop and the full floor map (CaveMap.kt). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DungeonPanel(viewModel: PartyViewModel) {

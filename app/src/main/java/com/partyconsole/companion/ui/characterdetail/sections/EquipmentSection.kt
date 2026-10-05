@@ -42,11 +42,10 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private fun slotLabel(slot: String) = slot.replace(Regex("(\\d+)$"), " $1").replaceFirstChar { it.uppercase() }
 
-/** equipment.tsx + equip-slot.tsx (the PWA's EquipmentSection.tsx): the 15
- *  fixed slots in the dashboard's order (then any other non-stand slot),
- *  "Empty" tiles, +level / stat / mluck badges, set progress current/total,
- *  and the upgrade / stat-scroll banner. A merchant's trade1..N slots are
- *  its stand, not gear. */
+/** Equipment: the 15 fixed slots in the dashboard's order (then any other
+ *  non-stand slot), "Empty" tiles, +level / stat / mluck badges, set progress
+ *  current/total, and the upgrade / stat-scroll banner. A merchant's
+ *  trade1..N slots are its stand, not gear. */
 @Composable
 fun EquipmentSection(
     slots: Map<String, EquippedEntry?>,

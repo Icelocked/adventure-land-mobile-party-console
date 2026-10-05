@@ -58,10 +58,9 @@ import com.partyconsole.companion.ui.map.rememberMapDefinition
 private val caveMap = Regex("^zone_[a-f0-9]+_\\d+$")
 private val MapBackground = Color(0xFF07110F)
 
-/** character-map-section.tsx (the PWA's MapSection.tsx): the collapsible
- *  live map under the character's header, at 20 fps while open and the
- *  app is visible, with a native-size view (names and hit/heal floaters).
- *  Caves send their definition on the stream. */
+/** The collapsible live map under the character's header, at 20 fps while
+ *  open and the app is visible, with a native-size view (names and hit/heal
+ *  floaters). Caves send their definition on the stream. */
 @Composable
 fun MapSection(viewModel: PartyViewModel, name: String, map: String, x: Double, y: Double) {
     val cave = caveMap.matches(map)
@@ -121,7 +120,7 @@ fun MapSection(viewModel: PartyViewModel, name: String, map: String, x: Double, 
                     Text(streamState, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = Color(0xFFFDE68A),
                         modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).background(Color(0xB3000000), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
                 } else {
-                    // Not on the dashboard: the console replays its last frame and keeps the stream open, so a hung character looks live without this.
+                    // App-only: the console replays its last frame and keeps the stream open, so a hung character looks live without this.
                     Box(modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color(0xB3000000), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                         if (lastFrameAt > 0) FreshnessBadge(viewModel, lastFrameAt, "frame")
                         else Text("Waiting for the first frame…", style = MaterialTheme.typography.labelSmall, color = Color(0xFFCBD5E1))

@@ -4,10 +4,9 @@ import com.partyconsole.companion.model.BankSnapshot
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.InventoryEntry
 
-/** lib/account-inventory.ts's inventoryCounts, verbatim: owned quantity per
- *  item (or item+level when [byLevel]) across characters, the bank snapshot
- *  and bankbois. Persisted storage-worker snapshots supersede their stale
- *  online inventories. */
+/** Owned quantity per item (or item+level when [byLevel]) across characters,
+ *  the bank snapshot and bankbois. Persisted storage-worker snapshots
+ *  supersede their stale online inventories. */
 fun inventoryCounts(
     characters: Map<String, CharacterState>,
     bank: BankSnapshot?,

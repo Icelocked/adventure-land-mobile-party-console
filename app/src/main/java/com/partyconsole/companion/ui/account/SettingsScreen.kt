@@ -86,8 +86,7 @@ private fun SettingsCard(label: String, content: @Composable ColumnScope.() -> U
     )
 }
 
-/** party-inventory-panels.tsx "Interface settings" as a screen (the PWA's
- *  SettingsScreen.tsx), in its order: state import/export, realm,
+/** Interface settings, in the dashboard's order: state import/export, realm,
  *  characters (create, member grid, bankboi name), ALData, hosting, console
  *  updates and debugging - then this app's own connection control and the
  *  Steam recovery offered while a handoff has failed. */
@@ -150,7 +149,7 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenMail: ()
                 OutlinedButton(onClick = onChangeServer) { Text("Change server address") }
             }
             if (dynamicState.steamSwitch?.phase == "failed") {
-                // party-inventory-panels.tsx: offered while a Steam handoff has failed.
+                // Offered while a Steam handoff has failed.
                 OutlinedButton(onClick = {
                     scope.launch {
                         steamError = null
@@ -164,9 +163,8 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenMail: ()
     if (creating) CreateCharacterSheet(viewModel) { creating = false }
 }
 
-/** account-settings.tsx's member grid: roster and bankbois with the live
- *  doll/sprite or the saved appearance, class and level, padded to eight
- *  dotted empty slots. */
+/** The member grid: roster and bankbois with the live doll/sprite or the
+ *  saved appearance, class and level, padded to eight dotted empty slots. */
 @Composable
 private fun AccountMembers(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -207,10 +205,10 @@ private fun AccountMembers(viewModel: PartyViewModel) {
     }
 }
 
-/** party-inventory-panels.tsx's ALData key panel: generate / reveal / copy
- *  the publishing key, check auth status, the pending-verification note,
- *  and "Prepare mail" (opens the mail composer with the earthiverse /
- *  aldata_auth draft - it never sends by itself). */
+/** The ALData key panel: generate / reveal / copy the publishing key, check
+ *  auth status, the pending-verification note, and "Prepare mail" (opens the
+ *  mail composer with the earthiverse / aldata_auth draft - it never sends by
+ *  itself). */
 @Composable
 private fun ALDataSection(viewModel: PartyViewModel, onOpenMail: () -> Unit) {
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -223,7 +221,7 @@ private fun ALDataSection(viewModel: PartyViewModel, onOpenMail: () -> Unit) {
     var keyVisible by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // party-header.tsx: opening settings loads a stored key (still masked) so Copy works.
+    // Opening settings loads a stored key (still masked) so Copy works.
     LaunchedEffect(aldata?.hasKey) {
         if (aldata?.hasKey == true && key.isEmpty()) (viewModel.api.revealAlDataKey() as? ApiResult.Success)?.let { key = it.value }
     }
@@ -289,9 +287,9 @@ private fun ALDataSection(viewModel: PartyViewModel, onOpenMail: () -> Unit) {
                     busy = true
                     error = null
                     val result = if (key.isNotEmpty()) ApiResult.Success(key) else viewModel.api.revealAlDataKey()
-                    // use-party-console.tsx: Prepare mail opens the mail composer with the draft (postage shown there).
+                    // Prepare mail opens the mail composer with the draft (postage shown there).
                     when (result) {
-                        // use-party-console.tsx aldataAction('send'): no stored key -> "Generate an ALData key first".
+                        // No stored key -> "Generate an ALData key first".
                         is ApiResult.Success -> if (result.value.isEmpty()) error = "Generate an ALData key first" else {
                             viewModel.mailDraft.value = MailDraft("earthiverse", "aldata_auth", result.value)
                             onOpenMail()
@@ -311,7 +309,7 @@ private fun ALDataSection(viewModel: PartyViewModel, onOpenMail: () -> Unit) {
     }
 }
 
-/** hosting-settings.tsx HostingSettings: the pairing requirement and the setup link. */
+/** Hosting: the pairing requirement and the setup link. */
 @Composable
 private fun HostingSettings(viewModel: PartyViewModel) {
     val scope = rememberCoroutineScope()
@@ -349,7 +347,7 @@ private fun HostingSettings(viewModel: PartyViewModel) {
     }
 }
 
-/** console-updates.tsx ConsoleUpdateSettings (with DebugInstanceSettings). */
+/** Console update settings, with the debug instance controls. */
 @Composable
 private fun ConsoleUpdateSettings(viewModel: PartyViewModel) {
     val scope = rememberCoroutineScope()
@@ -401,8 +399,8 @@ private fun ConsoleUpdateSettings(viewModel: PartyViewModel) {
 @Serializable
 private data class DebugState(val phase: String = "", val message: String = "", val error: String? = null, val port: Int? = null, val token: String? = null, val project: String? = null, val insideDebug: Boolean = false)
 
-/** debug-instance.tsx DebugInstanceSettings: start / stop the Cave debug
- *  instance (polled every 1.5 s) and open its console. */
+/** Start / stop the Cave debug instance (polled every 1.5 s) and open its
+ *  console. */
 @Composable
 private fun DebugInstanceSettings(viewModel: PartyViewModel) {
     val scope = rememberCoroutineScope()
@@ -484,9 +482,8 @@ private val FIELD_LABELS = mapOf(
 
 private fun fieldLabel(field: String) = FIELD_LABELS[field] ?: field.replace(Regex("([A-Z])"), " $1").replaceFirstChar { it.uppercase() }
 
-/** dashboard-state-import.tsx with state-export-button.tsx and
- *  settings-export.ts: export to a chosen file, and import a settings or
- *  legacy caraGarage.jsonl file through preview and digest. */
+/** Settings export to a chosen file, and import of a settings or legacy
+ *  caraGarage.jsonl file through preview and digest. */
 @Composable
 private fun DashboardStateImport(viewModel: PartyViewModel) {
     val context = LocalContext.current
@@ -620,9 +617,9 @@ private fun DashboardStateImport(viewModel: PartyViewModel) {
     }
 }
 
-/** The realm control (party-inventory-panels.tsx): current / home realm, a
- *  confirmed switch with the Realm Fatigue and Hop Sickness warnings and
- *  "Set as home realm", and the running operation. */
+/** The realm control: current / home realm, a confirmed switch with the Realm
+ *  Fatigue and Hop Sickness warnings and "Set as home realm", and the running
+ *  operation. */
 @Composable
 private fun RealmSection(viewModel: PartyViewModel) {
     val dynamicState by viewModel.dynamicState.collectAsState()

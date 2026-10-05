@@ -69,7 +69,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.max
 import kotlin.math.roundToLong
 
-/** wtb-preferences.tsx explanations, verbatim. */
+/** WTB preference explanations, as worded on the dashboard. */
 const val STAND_BUY_EXPLANATION =
     "Uses a merchant stand slot to advertise this buy order to other players. Automatic shopping continues whether this is enabled or disabled."
 const val HIGHER_LEVEL_EXPLANATION =
@@ -77,7 +77,7 @@ const val HIGHER_LEVEL_EXPLANATION =
 const val AUTO_STAND_EXPLANATION =
     "Automatically uses an empty stand slot for a highest priority buy order. A new sell listing takes this slot when needed; your stand-slot preference stays unchecked."
 
-/** A small "i" that toggles its explanation (the dashboard's hover popover). */
+/** A small "i" that toggles its explanation (a hover popover on desktop). */
 @Composable
 fun InfoToggle(label: String, text: String) {
     var open by remember { mutableStateOf(false) }
@@ -91,7 +91,6 @@ fun InfoToggle(label: String, text: String) {
     }
 }
 
-/** wtb-preferences.tsx WTBPreference. */
 @Composable
 fun WtbPreference(label: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
     Row(verticalAlignment = Alignment.Top) {
@@ -103,13 +102,12 @@ fun WtbPreference(label: String, description: String, checked: Boolean, onChange
     }
 }
 
-/** wtbpriority-input.tsx: 0-100, blank = routine priority. */
+/** 0-100, blank = routine priority. */
 fun priorityInput(text: String): String {
     val digits = text.filter(Char::isDigit)
     return if (digits.isEmpty()) "" else minOf(100, digits.take(4).toInt()).toString()
 }
 
-/** stand-price-button.tsx. */
 @Composable
 fun StandPriceButton(label: String, value: Double?, tone: Color, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     val usable = if (value != null && value.isFinite() && value > 0) value else 0.0
@@ -128,8 +126,8 @@ fun StandPriceButton(label: String, value: Double?, tone: Color, modifier: Modif
 
 private data class Occupant(val id: String, val itemId: String, val kind: String, val price: Long, val quantity: Int)
 
-/** wtb-preferences.tsx useWTBReplacement: a failure with `occupants` asks
- *  which stand entry to bounce, then retries with replaceStandEntry. */
+/** A failure with `occupants` asks which stand entry to bounce, then retries
+ *  with replaceStandEntry. */
 class WtbReplacement internal constructor(internal val viewModel: PartyViewModel) {
     internal var pending by mutableStateOf<Pair<List<JsonObject>, Pair<suspend (String?) -> ApiResult<CommandResult>, (() -> Unit)?>>?>(null)
     var error by mutableStateOf("")
@@ -156,8 +154,7 @@ class WtbReplacement internal constructor(internal val viewModel: PartyViewModel
 @Composable
 fun rememberWtbReplacement(viewModel: PartyViewModel): WtbReplacement = remember(viewModel) { WtbReplacement(viewModel) }
 
-/** The replacement prompt and the last save error, where the PWA renders
- *  `replacement.dialog`. */
+/** The replacement prompt and the last save error. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WtbReplacementDialog(replacement: WtbReplacement, catalogFor: (String) -> CatalogItem?) {
@@ -226,7 +223,7 @@ private val Cyan = Color(0xFF06B6D4)
 private val Violet = Color(0xFFA78BFA)
 private val Slate = Color(0xFF94A3B8)
 
-/** wtborder-dialog.tsx: price (15 presets at the exact level, existing price
+/** The WTB order form: price (15 presets at the exact level, existing price
  *  only when its level matches), quantity, +level, priority, Use stand and
  *  Accept higher levels, and the stand-replacement retry. */
 @OptIn(ExperimentalMaterial3Api::class)

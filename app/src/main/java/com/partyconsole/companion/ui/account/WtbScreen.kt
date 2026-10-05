@@ -75,11 +75,10 @@ private const val ACTIVE_OPEN_KEY = "adventure-land-active-wtb-open"
 private val VioletText = Color(0xFFC4B5FD)
 private val VioletBorder = Color(0xFF4C1D95)
 
-/** stand-sheet.tsx "Active WTB orders" (the PWA's WtbScreen.tsx): filter
- *  with visible/total, each order's inspect, inline quantity/price/priority
- *  (single-field edits with the bid revision), Use stand / Accept higher
- *  levels, the Auto badge and native-stand problem, and a two-step cancel;
- *  "New WTB order" picks an item for the WTB dialog. */
+/** "Active WTB orders": filter with visible/total, each order's inspect,
+ *  inline quantity/price/priority (single-field edits with the bid revision),
+ *  Use stand / Accept higher levels, the Auto badge and native-stand problem,
+ *  and a two-step cancel; "New WTB order" picks an item for the WTB dialog. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun WtbScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
@@ -249,9 +248,9 @@ fun WtbScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
 
 private val FIELD_LABELS = mapOf("quantity" to "Quantity", "price" to "Price", "priority" to "Priority")
 
-/** active-wtb-fields.tsx: ×qty / price / "P n" buttons; quantity and
- *  priority edit inline (Done or focus loss saves), price opens the WTB
- *  dialog. [onSave] returns an error message, or null. */
+/** ×qty / price / "P n" buttons; quantity and priority edit inline (Done or
+ *  focus loss saves), price opens the WTB dialog. [onSave] returns an error
+ *  message, or null. */
 @Composable
 private fun ActiveWtbFields(name: String, bid: StandBid, disabled: Boolean, onEditPrice: () -> Unit, onSave: suspend (String, Int?) -> String?) {
     val scope = rememberCoroutineScope()

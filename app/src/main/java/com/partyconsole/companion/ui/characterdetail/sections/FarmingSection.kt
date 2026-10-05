@@ -68,7 +68,7 @@ import kotlin.math.roundToInt
 private val Cyan = Color(0xFF22D3EE)
 private val AmberText = Color(0xFFF59E0B)
 
-/** monster-focus-picker.tsx's trigger label: what's selected right now. */
+/** The monster focus picker's trigger label: what's selected right now. */
 fun focusSummary(monsterFocus: List<String>, bestiaryCatalog: List<BestiaryMonster>): String = when {
     "all" in monsterFocus -> "All monsters"
     monsterFocus.isEmpty() -> "No monsters selected"
@@ -84,11 +84,10 @@ private val MODES = listOf(
     Mode("hunt", "Hunt", "One quest at a time: leader first, then the next member if its monster is blacklisted"),
 )
 
-/** farming-mode-control.tsx (the PWA's FarmingSection.tsx): the live
- *  combat target, the mode selector with the saved / live mode badge, the
- *  active farming zone, Hunt status, the Hunt backup setup, and this
- *  character's monster focus (with priorities and radius), the route-to-
- *  monster farming-area picker, and Hunt settings. */
+/** Farming: the live combat target, the mode selector with the saved / live
+ *  mode badge, the active farming zone, Hunt status, the Hunt backup setup,
+ *  and this character's monster focus (with priorities and radius), the
+ *  route-to- monster farming-area picker, and Hunt settings. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FarmingSection(
@@ -111,8 +110,8 @@ fun FarmingSection(
     huntBlacklist: Map<String, HuntBlacklistEntry>,
     viewModel: PartyViewModel,
     onOpenHuntSettings: () -> Unit,
-    // connected-character-card.tsx: the mode control is for non-merchant classes,
-    // the monster focus picker for everyone but the configured merchant.
+    // The mode control is for non-merchant classes, the monster focus picker
+    // for everyone but the configured merchant.
     showModes: Boolean = true,
     showFocus: Boolean = true,
 ) {
@@ -123,18 +122,18 @@ fun FarmingSection(
     val configLoaded by viewModel.stateLoaded.collectAsState()
     val api = viewModel.api
     val inherited = followingLeader != null
-    // connected-character-card.tsx effectiveMode: the live mode, not the saved policy.
+    // The live mode, not the saved policy.
     val liveMode = characters[characterName]?.vitals?.farmingMode?.ifEmpty { null }
         ?: (diagnostics[characterName]?.raw?.get("farmingMode") as? JsonPrimitive)?.content?.ifEmpty { null }
         ?: state.partyFarmingMode?.ifEmpty { null }
         ?: "default"
-    // monster-route-button.tsx: only the leader or a non-follower can route.
+    // Only the leader or a non-follower can route.
     val canRoute = canRouteToMonster(state.leader, state.followers, characterName)
     val routeDescription = if (canRoute) "Find selected monster" else FOLLOWER_ROUTE_MESSAGE
-    // connected-character-card.tsx: the focus header shows the leader's (effective) radius.
+    // The focus header shows the leader's (effective) radius.
     val effectiveRadius = state.monsterSearchRadiusByCharacter[state.leader ?: characterName]?.takeIf { it != 0 } ?: 400
     var focusOpen by remember(characterName) { mutableStateOf(false) }
-    // monster-focus-picker.tsx: the route button routes the picker's current (unsaved) selection.
+    // The route button routes the picker's current (unsaved) selection.
     var focusDraft by remember(characterName) { mutableStateOf<List<String>?>(null) }
     val routeFocus = if (focusOpen) focusDraft ?: monsterFocus else monsterFocus
     var pickingBackup by remember(characterName) { mutableStateOf(false) }
@@ -143,8 +142,8 @@ fun FarmingSection(
     var busy by remember { mutableStateOf(false) }
     var error by remember(characterName) { mutableStateOf<String?>(null) }
 
-    // use-party-console.tsx setFarmingPolicy, verbatim: Hunt needs a backup focus and
-    // location; without both the setup picker opens before anything is posted.
+    // Hunt needs a backup focus and location; without both the setup picker
+    // opens before anything is posted.
     fun selectMode(mode: String) = scope.launch {
         error = null
         val profile = state.farmingProfiles[characterName]
@@ -171,7 +170,7 @@ fun FarmingSection(
     SectionCard(title = "Farming") {
         LiveCombatStatus(target, resolvedTargetType, bestiaryCatalog)
         if (showModes) {
-            // farming-mode-control.tsx badge: "Copy leader" or the saved policy, with the live mode.
+            // Badge: "Copy leader" or the saved policy, with the live mode.
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("FARMING SETTINGS", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
@@ -245,9 +244,9 @@ fun FarmingSection(
                 bestiaryCatalog = bestiaryCatalog,
                 ids = ids,
                 character = position,
-                // party-workspace.tsx: prefer the character's saved waypoint, else the party's.
+                // Prefer the character's saved waypoint, else the party's.
                 waypoint = state.characterLocations[characterName] ?: state.partyLocation,
-                // party-workspace.tsx: the leader's radius when there is one.
+                // The leader's radius when there is one.
                 radius = effectiveRadius,
                 busy = busy,
                 savedPhoenixOrder = phoenixRouteOrder,
@@ -335,11 +334,10 @@ private fun LiveCombatStatus(target: String?, resolvedTargetType: String?, besti
     }
 }
 
-/** monster-focus-picker.tsx + monster-radius-control.tsx's rules: "All
- *  monsters" is its own row (picking a monster drops it), an empty
- *  selection is saved as [] (never ['all']), Fairy can't be picked, the
- *  per-monster target priority (0-1000, default 50), and the radius is only
- *  sent when changed. */
+/** Monster focus and radius rules: "All monsters" is its own row (picking a
+ *  monster drops it), an empty selection is saved as [] (never ['all']),
+ *  Fairy can't be picked, the per-monster target priority (0-1000, default
+ *  50), and the radius is only sent when changed. */
 @Composable
 private fun MonsterFocusForm(
     characterName: String,
@@ -466,10 +464,10 @@ private fun MonsterFocusForm(
     }
 }
 
-/** farming-mode-control.tsx's hunt status: shown while Hunt is the effective
- *  policy or a Hunt (party or own) exists - stage and message, the backup
- *  batch countdown per member (or the quest owner), the Daisy turn-in wait,
- *  the target, and this character's own quest with its blacklist flag. */
+/** Hunt status: shown while Hunt is the effective policy or a Hunt (party or
+ *  own) exists - stage and message, the backup batch countdown per member (or
+ *  the quest owner), the Daisy turn-in wait, the target, and this character's
+ *  own quest with its blacklist flag. */
 @Composable
 private fun HuntStatusBlock(effectivePolicy: String, hunt: MonsterHuntCycle?, characterHunt: MonsterHuntStatus?, blacklist: Map<String, HuntBlacklistEntry>) {
     if (!(effectivePolicy == "hunt" || hunt != null || characterHunt != null)) return

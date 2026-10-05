@@ -61,9 +61,8 @@ private val Slate = Color(0xFF94A3B8)
 
 data class StandListingDraft(val price: Long, val quantity: Int, val markAll: Boolean)
 
-/** party-management-panels.tsx's stand dialog, inline (the PWA's
- *  StandListingForm.tsx): buy-from-NPC and current market count, the price
- *  with its 13 presets (Market low −5 % disabled below the NPC price),
+/** The stand listing form, inline: buy-from-NPC and current market count, the
+ *  price with its 13 presets (Market low −5 % disabled below the NPC price),
  *  quantity for stacks, "Mark all for stand", the automatic variant, the
  *  16-slot guard for a new listing, and an inline error. [onSubmit] returns
  *  an error message, or null on success. */
@@ -81,7 +80,7 @@ fun StandListingForm(
 ) {
     val state by viewModel.dynamicState.collectAsState()
     val scope = rememberCoroutineScope()
-    // use-party-console.tsx: the item's value (definition.g), at least 1.
+    // The item's value (definition.g), at least 1.
     val defaultPrice = maxOf(1L, (meta?.definition?.get("g") as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() ?: 1L)
     var price by remember(item) { mutableStateOf((existingPrice?.takeIf { it > 0 } ?: defaultPrice).toString()) }
     var quantity by remember(item) { mutableStateOf((existingQuantity?.takeIf { it > 0 } ?: item.q ?: 1).toString()) }
@@ -182,7 +181,7 @@ fun StandListingForm(
     }
 }
 
-/** deconstruction-confirmation.tsx, inline: the rewards per item (each row a
+/** Deconstruction confirmation, inline: the rewards per item (each row a
  *  separate roll), cost per item, and a confirm that only sends once the
  *  reward data exists. */
 @Composable
@@ -244,8 +243,8 @@ fun DeconstructionConfirmation(
     }
 }
 
-/** party-management-panels.tsx "Automatically sell to NPC?": what the rule
- *  matches, its scope, and the proceeds per sale. */
+/** "Automatically sell to NPC?": what the rule matches, its scope, and the
+ *  proceeds per sale. */
 @Composable
 fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character: String?, onConfirm: suspend () -> String?, onCancel: () -> Unit) {
     val scope = rememberCoroutineScope()
@@ -282,7 +281,7 @@ fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character
     }
 }
 
-/** mluck-clover.tsx: an item duplicated by Merchant's Luck. */
+/** Marks an item duplicated by Merchant's Luck. */
 @Composable
 fun MluckClover(item: Item?, modifier: Modifier = Modifier) {
     if (item?.m == null || (item.m as? JsonPrimitive)?.content == "false") return

@@ -19,14 +19,11 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLHandshakeException
 
 /**
- * Drives the "add/edit server" screen. The actual trust decision (see
- * network/ServerConfig.kt's TrustMode doc comment for why there isn't one
- * universal right answer) follows the same pattern well-known self-hosted
- * companion apps use (Home Assistant, Syncthing): try a normal HTTPS
- * connection first; if it fails specifically because the certificate
- * isn't from a publicly trusted CA (not for some other reason like the
- * server being unreachable), offer to show that certificate's fingerprint
- * so the user can verify and pin it - trust-on-first-use, not blind trust.
+ * Drives the "add/edit server" screen. Trust-on-first-use, like Home
+ * Assistant and Syncthing: try normal HTTPS first; only if it fails because
+ * the certificate isn't from a publicly trusted CA (not because the server
+ * is unreachable, say) offer the certificate's fingerprint so the user can
+ * verify and pin it. See TrustMode in network/ServerConfig.kt.
  */
 sealed interface ConnectionCheckState {
     data object Idle : ConnectionCheckState
@@ -44,10 +41,8 @@ class ConnectionViewModel(private val store: ServerConfigStore) : ViewModel() {
         viewModelScope.launch { store.settings.collect { flow.value = it } }
     }.asStateFlow()
 
-    /** Normalizes user input (which may or may not include a scheme) into
-     *  a URI, defaulting to https - matching what most self-hosted app
-     *  connection screens do, since that's the common case for anything
-     *  beyond a pure-LAN/Tailscale setup. */
+    /** Normalizes user input (with or without a scheme) into a URI,
+     *  defaulting to https. */
     private fun normalize(input: String): URI {
         val withScheme = if (input.contains("://")) input else "https://$input"
         return URI(withScheme)
@@ -62,11 +57,10 @@ class ConnectionViewModel(private val store: ServerConfigStore) : ViewModel() {
         val port = if (uri.port != -1) uri.port else if (uri.scheme == "https") 3443 else 3010
 
         if (uri.scheme == "http") {
-            // Cleartext by explicit user choice (they typed http://) - no
-            // certificate involved at all, so there's nothing to check;
-            // this only makes sense reached through an already-private
-            // transport (Tailscale, a LAN), which the connection screen's
-            // own copy should be warning about, not this function.
+            // Cleartext by explicit user choice (they typed http://): no
+            // certificate to check. Only sensible over an already-private
+            // transport (Tailscale, a LAN); the connection screen's copy
+            // carries that warning.
             _checkState.value = ConnectionCheckState.Success
             return
         }

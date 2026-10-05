@@ -102,12 +102,12 @@ private class SetState(val totals: Map<String, Double>, val counts: Map<String, 
 
 private fun numberOf(map: Map<String, JsonElement>, key: String) = (map[key] as? JsonPrimitive)?.doubleOrNull ?: 0.0
 
-/** gear-comparison-dialog.tsx (the PWA's GearComparisonSheet.tsx): the
- *  character's projected totals (HP, MP, attack, speeds, armor, resistance,
- *  attributes, combat stats) with the current item and with this one, each
- *  side's level and stat-scroll preview, the character doll, and set changes
- *  (GAINED / LOST). The base stats are the character's diagnostics from the
- *  core fetch. [slot] is the slot picked in the options list, if any. */
+/** Gear comparison: the character's projected totals (HP, MP, attack, speeds,
+ *  armor, resistance, attributes, combat stats) with the current item and
+ *  with this one, each side's level and stat-scroll preview, the character
+ *  doll, and set changes (GAINED / LOST). The base stats are the character's
+ *  diagnostics from the core fetch. [slot] is the slot picked in the options
+ *  list, if any. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GearComparisonSheet(
@@ -319,7 +319,7 @@ private fun ComparisonPanel(
     ) {
         Text(sectionLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // gear-comparison-dialog.tsx renders the game's own character doll markup.
+            // The game's own character doll markup.
             if (dollHtml != null) CharacterPortrait(dollHtml, null, null, modifier = Modifier.size(width = 64.dp, height = 80.dp))
             Column(modifier = Modifier.padding(start = if (dollHtml != null) 12.dp else 0.dp)) {
                 Text(title, fontWeight = FontWeight.SemiBold)

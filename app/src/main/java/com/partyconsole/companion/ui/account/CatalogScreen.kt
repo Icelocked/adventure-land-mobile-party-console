@@ -81,13 +81,11 @@ private fun CatalogItem.value(key: String): Double =
     (meta?.properties?.get(key) as? JsonPrimitive)?.content?.toDoubleOrNull() ?: def(key)?.content?.toDoubleOrNull() ?: 0.0
 private fun jsNumber(value: Double) = if (value == Math.floor(value) && value.isFinite()) value.toLong().toString() else value.toString()
 
-/** equipment-catalog-dialog.tsx + party-equipment-catalog-dialog.tsx as a
- *  screen (the PWA's CatalogScreen.tsx): equipment only, search by name /
- *  id / set, the 25 sorts with the sorted stat on each tile, type and class
- *  filters with "Exclusive gear", the result line, and details on tap.
- *  Opened from item details' "From catalog", it collects up to three
- *  alternatives against A and shows the catalog comparison. Rows render
- *  lazily (the dashboard's 120-row batches). */
+/** The equipment catalog: search by name / id / set, the 25 sorts with the
+ *  sorted stat on each tile, type and class filters with "Exclusive gear",
+ *  the result line, and details on tap. Opened from item details' "From
+ *  catalog", it collects up to three alternatives against A and shows the
+ *  catalog comparison. Rows render lazily. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
@@ -104,7 +102,7 @@ fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var inspecting by remember { mutableStateOf<CatalogItem?>(null) }
     var entries by remember { mutableStateOf<List<CatalogComparisonEntry>>(emptyList()) }
     var viewComparison by remember { mutableStateOf(false) }
-    // party-equipment-catalog-dialog.tsx: a new comparison source restarts the comparison.
+    // A new comparison source restarts the comparison.
     LaunchedEffect(source) {
         inspecting = null
         entries = source?.let { listOf(comparisonEntry(it)) }.orEmpty()
@@ -251,10 +249,8 @@ fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     }
 }
 
-/** catalog-comparison.tsx CatalogComparison (the PWA's
- *  CatalogComparison.tsx): item A as the baseline and up to three
- *  alternatives, each with a preview level and stat scroll; every stat
- *  difference is against A. */
+/** Item A as the baseline and up to three alternatives, each with a preview
+ *  level and stat scroll; every stat difference is against A. */
 @Composable
 private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (Int, CatalogComparisonEntry) -> Unit, onRemove: (Int) -> Unit) {
     val properties = entries.map { propertiesAtLevel(it.entry.meta, it.entry.item, it.level, it.stat.ifEmpty { null }) }

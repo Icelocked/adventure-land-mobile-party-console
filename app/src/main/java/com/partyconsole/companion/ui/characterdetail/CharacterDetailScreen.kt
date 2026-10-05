@@ -47,12 +47,9 @@ import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
 import com.partyconsole.companion.ui.itempanel.ItemActionPanel
 import com.partyconsole.companion.ui.itempanel.ItemActionTarget
 
-/** Character focus screen: a sticky vitals header (VitalsHeader - never
- *  scrolls out of view) over a scrollable body of section cards. Replaces
- *  the old 3-tab layout per the mobile-redesign plan - "lock the basic
- *  character information at the top... then as you scroll down you get
- *  into all the features". Item taps (equipment/inventory) are wired to
- *  the bottom item-action panel (ui/itempanel/ItemActionPanel.kt). */
+/** Character focus screen: a sticky vitals header (never scrolls out of view)
+ *  over a scrollable body of section cards. Equipment and inventory taps open
+ *  the item-action panel (ui/itempanel/ItemActionPanel.kt). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CharacterDetailScreen(
@@ -132,9 +129,9 @@ fun CharacterDetailScreen(
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
             ) {
-                // connected-character-card.tsx: the live map sits under the card header.
+                // The live map sits under the card header.
                 com.partyconsole.companion.ui.characterdetail.sections.MapSection(viewModel, characterName, vitals.map, vitals.x, vitals.y)
-                // connected-character-card.tsx: statuses sit under HP/MP for every class.
+                // Statuses sit under HP/MP for every class.
                 StatusesSection(characterName, vitals.conditions)
                 LeaderFollowerSection(characterName, dynamicState, viewModel, onOpenAnniversary = { onNavigate(Routes.ANNIVERSARY) })
                 TravelSection(
@@ -143,7 +140,7 @@ fun CharacterDetailScreen(
                     travelPlaces = dynamicState.travelPlaces,
                     viewModel = viewModel,
                 )
-                // Merchant-class characters can't run hunts (farming-scope.ts) - a class capability, not the merchant role.
+                // Merchant-class characters can't run hunts - a class capability, not the merchant role.
                 if (vitals.ctype != "merchant" || characterName != dynamicState.merchantCharacter) {
                     FarmingSection(
                         characterName = characterName,
@@ -185,7 +182,7 @@ fun CharacterDetailScreen(
                     slots = state.inventory?.slots.orEmpty(),
                     upgradeMarks = dynamicState.upgrades[characterName].orEmpty().filter { it.equipped },
                     statScrollMarks = dynamicState.statScrolls[characterName].orEmpty(),
-                    // equipment.tsx: the class, not the configured merchant role.
+                    // By class, not the configured merchant role.
                     isMerchant = vitals.ctype == "merchant",
                     catalogFor = catalogFor,
                     onSlotTap = { slotName, entry -> actionTarget = ItemActionTarget.EquipmentSlot(entry.item, slotName) },

@@ -56,21 +56,19 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.roundToInt
 
-/** Mobile take on party-console's "left-click an item" details dialog
- *  (item-details.tsx, the PWA's ItemDetailBrowser.tsx) - same underlying
- *  data (ItemMeta via the merchant catalog), as a header + a row of chips
- *  for only the sections that apply to THIS item. Tapping a related
+/** Item details (ItemMeta via the merchant catalog) as a header plus chips
+ *  for only the sections that apply to this item. Tapping a related
  *  item/material/set-piece/exchange result or a drop's monster drills into
- *  ITS details with a back button, mirroring desktop's trail navigation. */
+ *  its details with a back button. */
 private sealed interface DetailTarget {
     data class ItemTarget(val id: String, val level: Int = 0) : DetailTarget
     data class MonsterTarget(val id: String) : DetailTarget
 }
 
-/** item-details.tsx's exchange "Add" (enabled when the merchant has enough). */
+/** The exchange "Add" (enabled when the merchant has enough). */
 data class ExchangeAdd(val enabled: Boolean, val onAdd: () -> Unit)
 
-/** item-details.tsx header: whose item and where ("Ranger1 · slot 3"). */
+/** Header: whose item and where ("Ranger1 · slot 3"). */
 data class ItemDetailContext(val character: String, val slot: Int)
 
 @Composable
@@ -83,14 +81,14 @@ fun ItemDetailBrowser(
     rootStatType: String? = null,
     rootGift: Boolean = false,
     rootExpires: JsonElement? = null,
-    // The live instance's meta, merged over the catalog's (use-party-console.tsx detailMeta).
+    // The live instance's meta, merged over the catalog's.
     rootMeta: ItemMeta? = null,
     context: ItemDetailContext? = null,
-    // item-details.tsx "Add to stand": only for the merchant's inventory or the bank.
+    // "Add to stand": only for the merchant's inventory or the bank.
     onAddStand: (() -> Unit)? = null,
     // Party state for Compare, the stand capacity and Tracktrix bonuses.
     viewModel: PartyViewModel? = null,
-    // item-details.tsx: the exchange catalog's "Add" for the inspected exchange.
+    // The exchange catalog's "Add" for the inspected exchange.
     exchangeAdd: ExchangeAdd? = null,
 ) {
     var trail by remember(rootItemId, rootLevel) {
@@ -155,7 +153,7 @@ private fun ItemDetailContent(
     val catalogItem = remember(catalog, target.id) { catalog?.allItems?.find { it.id == target.id } }
     // Reset per navigated item (the content isn't remounted on navigation).
     var previewLevel by remember(target.id, target.level) { mutableStateOf(target.level) }
-    // item-details.tsx: the exchange sections follow the preview-level slider.
+    // The exchange sections follow the preview-level slider.
     val exchanges = remember(catalog, target.id, previewLevel) { exchangeSections(target.id, previewLevel, catalog?.exchangeable.orEmpty()) }
     if (catalogItem == null) {
         Text("No catalog data for \"${target.id}\" yet.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 16.dp))
@@ -170,7 +168,6 @@ private fun ItemDetailContent(
     val characters by (viewModel?.characters ?: emptyCharacters).collectAsState()
     val emptyDiagnostics = remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<String, com.partyconsole.companion.model.CharacterDiagnostics>()) }
     val diagnostics by (viewModel?.characterDetails ?: emptyDiagnostics).collectAsState()
-    // stand-capacity.tsx standIsFull.
     val standFull = standIsFull(state.standListings, state.standBids)
     val partyNames = characters.keys.toList()
     val comparable = viewModel != null && isEquipment(meta?.definition)
@@ -245,7 +242,7 @@ private fun ItemDetailContent(
                             Text(ctype.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    // item-details.tsx "From catalog": this item at the preview level becomes A.
+                    // "From catalog": this item at the preview level becomes A.
                     OutlinedButton(
                         onClick = {
                             comparePicker = null
@@ -533,7 +530,7 @@ private fun IngredientInSection(usedIn: List<ItemCraftUse>, onNavigateItem: (Str
 
 private val NON_INSPECTABLE_KINDS = setOf("empty", "gold", "shells", "cx", "cxbundle")
 
-/** item-exchange-details.tsx: price, rewards and sources. */
+/** Exchange details: price, rewards and sources. */
 @Composable
 private fun ExchangeSection(id: String, box: Boolean, exchanges: ExchangeSections, onNavigateItem: (String, Int) -> Unit) {
     fun levelSuffix(level: Int) = if (level != 0) " +$level" else ""
@@ -607,7 +604,7 @@ private fun ExchangeSection(id: String, box: Boolean, exchanges: ExchangeSection
 
 @Composable
 private fun DropsSection(drops: List<com.partyconsole.companion.model.ItemDropSource>, onNavigateMonster: (String) -> Unit) {
-    // item-details.tsx: sort by percentage (default) or name; ties by name.
+    // Sort by percentage (default) or name; ties by name.
     var sortByName by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val sorted = remember(drops, sortByName) {

@@ -68,9 +68,8 @@ private val SORT_OPTIONS = listOf(
     "next" to "Score to next",
 )
 
-/** bestiary-dialog.tsx as a screen (the PWA's BestiaryScreen.tsx): map
- *  filter, search, sort with direction, Tracktrix bonuses and scores; a
- *  monster opens its details. */
+/** The bestiary: map filter, search, sort with direction, Tracktrix bonuses
+ *  and scores; a monster opens its details. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
@@ -89,7 +88,7 @@ fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var sortMenu by remember { mutableStateOf(false) }
     var inspecting by remember { mutableStateOf<BestiaryMonster?>(null) }
     var drop by remember { mutableStateOf<String?>(null) }
-    // party-reference-panels.tsx: a drop opened from a monster's details.
+    // A drop opened from a monster's details.
     var dropSource by remember { mutableStateOf("") }
     val maps = monsters.flatMap { m -> m.spawnRecords.map { it.map } }.distinct().sorted()
     fun score(monster: BestiaryMonster) = max(0.0, achievements?.get(monster.id)?.score ?: 0.0)

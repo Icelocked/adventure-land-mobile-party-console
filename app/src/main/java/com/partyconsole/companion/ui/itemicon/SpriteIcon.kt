@@ -24,26 +24,16 @@ import coil.request.ImageRequest
 import coil.size.Size as CoilSize
 import com.partyconsole.companion.model.Sprite
 
-/** Renders one tile out of a shared sprite sheet (adventure.land serves
- *  every item's icon as one tile in a big shared PNG, addressed by grid
- *  column/row - see model/Sprite.kt) as a fixed-size icon.
+/** Renders one tile of a shared sprite sheet (grid column/row, see
+ *  model/Sprite.kt) as a fixed-size icon.
  *
- *  This crops the tile from the loaded [android.graphics.Bitmap] directly
- *  via [BitmapPainter]'s srcOffset/srcSize, deriving the tile's pixel
- *  size from the bitmap's OWN dimensions divided by [Sprite.columns]/
- *  [Sprite.rows] - not from [Sprite.tileSize]. Verified against the real
- *  sheets this session: an item sheet's actual pixel dimensions do match
- *  tileSize*columns/rows exactly (e.g. raw_items.png is really 400x800
- *  for tileSize=20/columns=20/rows=40), but a MONSTER sheet's don't at
- *  all (monster2.png is really 720x512, while tileSize=1/columns=12/
- *  rows=8 implies 12x8) - tileSize isn't a reliable source of truth for
- *  every sheet this app renders, so this avoids depending on it for the
- *  actual crop math. An earlier version tried to composite Modifier.scale
- *  with Modifier.offset around an assumed dp-equivalent tileSize, which
- *  doesn't work either (scale's default transform origin is the
- *  composable's own center, not its top-left, so the two transforms don't
- *  compose the way naive CSS-sprite math expects) - cropping the bitmap
- *  directly sidesteps both problems at once. */
+ *  Crops the [android.graphics.Bitmap] directly via [BitmapPainter]'s
+ *  srcOffset/srcSize, deriving the tile size from the bitmap's own
+ *  dimensions divided by [Sprite.columns]/[Sprite.rows], not from
+ *  [Sprite.tileSize]: item sheets match tileSize*columns/rows (raw_items.png
+ *  is 400x800 for 20/20/40) but monster sheets don't (monster2.png is
+ *  720x512 with tileSize=1, 12x8). Modifier.scale + offset doesn't work
+ *  either, since scale transforms around the center, not the top-left. */
 @Composable
 fun SpriteIcon(sprite: Sprite?, size: Dp = 40.dp, modifier: Modifier = Modifier) {
     Box(

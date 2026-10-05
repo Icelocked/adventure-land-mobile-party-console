@@ -41,7 +41,7 @@ import com.partyconsole.companion.model.MerchantBuyItem
 import com.partyconsole.companion.model.StandPriceHistory
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
 
-/** item-action-banner.ts palette: banner background, text and tile border. */
+/** Item-action banner palette: banner background, text and tile border. */
 data class BannerColors(val background: Color, val text: Color, val border: Color)
 
 fun bannerColors(action: BannerAction): BannerColors = when (action) {
@@ -58,7 +58,7 @@ fun bannerColors(action: BannerAction): BannerColors = when (action) {
     BannerAction.WEAPON -> BannerColors(Color(0xFF022C22), Color(0xFFA7F3D0), Color(0xFF34D399))
 }
 
-/** stat-badge-class.tsx: background and text per stat. */
+/** Stat badge background and text per stat. */
 fun statBadgeColors(statType: String?): Pair<Color, Color> = when (statType?.lowercase()) {
     "int" -> Color(0xE6172554) to Color(0xFFBFDBFE)
     "str" -> Color(0xE6450A0A) to Color(0xFFFECACA)
@@ -69,8 +69,8 @@ fun statBadgeColors(statType: String?): Pair<Color, Color> = when (statType?.low
 
 private val LevelGreen = Color(0xFF6EE7B7)
 
-/** One item tile (the PWA's ItemTile): tap opens the item's options; a long
- *  press opens the tooltip details. */
+/** One item tile: tap opens the item's options; a long press opens the
+ *  tooltip details. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ItemTile(label: String, border: Color, onTap: () -> Unit, onLongPress: (() -> Unit)? = null, size: Dp = 60.dp, content: @Composable BoxScope.() -> Unit) {
@@ -108,8 +108,8 @@ fun BoxScope.BannerStrip(banner: ItemActionBanner?) {
     )
 }
 
-/** item-operation-overlay.tsx: an upgrade/compound in progress - the pulsing
- *  result sprite, success %, and +from → +to. */
+/** An upgrade/compound in progress - the pulsing result sprite, success %,
+ *  and +from → +to. */
 @Composable
 fun BoxScope.ItemOperationOverlay(operation: ItemOperation, size: Dp) {
     operation.sprite?.let { Box(modifier = Modifier.alpha(0.7f)) { SpriteIcon(it, size = size) } }
@@ -131,10 +131,10 @@ fun BoxScope.ItemOperationOverlay(operation: ItemOperation, size: Dp) {
     }
 }
 
-/** lucky-upgrade-slot.tsx LuckySlotOutline (a dashed amber ring). */
+/** The lucky upgrade slot's outline (a dashed amber ring). */
 fun Modifier.luckySlotOutline(): Modifier = this.border(2.dp, Color(0xFFFCD34D), RoundedCornerShape(8.dp))
 
-/** suggested-price-details.tsx: the merchant tile's price evidence. */
+/** The merchant tile's suggested-price evidence. */
 @Composable
 fun SuggestedPriceDetails(entry: InventoryEntry, buyable: List<MerchantBuyItem>, observed: StandPriceHistory?) {
     val valuation = suggestedItemValue(entry, buyable)
