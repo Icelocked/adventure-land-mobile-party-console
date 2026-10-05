@@ -65,7 +65,6 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var destination by remember { mutableStateOf<String?>(null) }
     var switching by remember { mutableStateOf(false) }
     var prefixStatus by remember { mutableStateOf<String?>(null) }
-    var chatError by remember { mutableStateOf<String?>(null) }
     val loaded by viewModel.stateLoaded.collectAsState()
     val scope = rememberCoroutineScope()
     val json = remember { Json { ignoreUnknownKeys = true } }
@@ -144,49 +143,6 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 prefixStatus?.takeIf { it != "Saved" }?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column {
-                    Text("Anniversary auto-chat", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Send anniversary chat message when receiving cake from a kiss",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                // Rendered from the server value only - no optimistic flip.
-                Switch(
-                    checked = dynamicState.anniversaryAutoChat,
-                    enabled = loaded,
-                    onCheckedChange = { checked ->
-                        scope.launch {
-                            chatError = (viewModel.api.setAnniversaryAutoChat(checked) as? ApiResult.Failure)?.message
-                            viewModel.refreshDynamicStateNow()
-                        }
-                    },
-                )
-            }
-            chatError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 16.dp)) }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Anniversary chat advertisement", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Sends the cake-slice trade advertisement to in-game chat right now.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                androidx.compose.material3.OutlinedButton(
-                    modifier = Modifier.padding(top = 8.dp),
-                    onClick = { scope.launch { viewModel.api.sendAnniversaryChatAdvertisement() } },
-                ) { Text("Send in-game chat now") }
             }
         }
 

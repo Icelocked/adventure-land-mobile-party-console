@@ -40,6 +40,8 @@ class FakeConsole : AutoCloseable {
     )
     val requests = CopyOnWriteArrayList<Request>()
     @Volatile var unpaired = false
+    /** GET /party-api/daily-dungeons (a DungeonView), when a test sets one. */
+    @Volatile var dailyDungeon: String? = null
     @Volatile var postStatus = 200
     @Volatile var postBody = """{"ok":true}"""
     /** One-shot replies for a POST path (e.g. "merchant/stand"): status + body. */
@@ -63,6 +65,7 @@ class FakeConsole : AutoCloseable {
                     }
                     "/party-api/mail" -> json("""{"messages":[],"count":0}""")
                     "/party-api/escape" -> json("""{"escape":null}""")
+                    "/party-api/daily-dungeons" -> dailyDungeon?.let { json(it) } ?: MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                     // query-cache.tsx: the market domain's first read, before core's referenceRevision.
                     "/party-api/aldata/market" -> json(sections["market"]?.get("aldata")?.takeIf { it is JsonObject }?.toString() ?: """{"listings":[]}""")
                     "/setup/state" -> json("""{"requirePairing":true}""")

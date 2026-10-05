@@ -305,7 +305,29 @@ and a 411x891dp phone.
   rules saved on Done, nested box drill-down, exchange "Add" from item
   details.
 
-Next: A9 (C4, C5, C6 events, dungeons and map).
+### A9 status: done (C4, C5; C6 moves to A11)
+
+- C4: the "Events (n)" control in Formation (`domain/EventPolicy.kt`,
+  event-policy.ts verbatim): the Cave row first, events sorted by name with
+  LIVE / next time and countdown / next chance / stale / Unsupported, saving
+  POST /formation {character, eventSelections}, followers read-only with
+  "Using {leader}'s events", and the anniversary cog opening the new
+  Anniversary screen (round, failsafe, ticket stages, slices, auto-chat,
+  chat advertisement, activity). The anniversary controls left Settings
+  (the PWA has them only there).
+- C5: daily dungeons - `data/DungeonQuery.kt` (dungeon-query.ts: 1 s poll
+  while shown and foregrounded, an operationId per POST, the response
+  replaces the view); the Cave row settings sheet (participants,
+  eligibility errors, event protection, Enter now / Resume visit, Resume
+  ordinary activity); the dungeon panel heading the party (floor, timer,
+  funds, members, retry, return missing participants, exploration, rooms,
+  priest recovery and Call Nera, the encounter with free / confirmed paid
+  votes, the cave shop with inspection and confirmed purchase, exit with
+  confirmation); Escape becomes "Escape — exit dungeon" during a visit.
+- C6 and the Cave full map (waypoint placement) need the map canvas and
+  stream: A11.
+
+Next: A10 (X1, I9, C9, S2, S3 reference, settings and logs).
 
 ### Packages
 

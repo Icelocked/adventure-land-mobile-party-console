@@ -134,7 +134,7 @@ fun CharacterDetailScreen(
             ) {
                 // connected-character-card.tsx: statuses sit under HP/MP for every class.
                 StatusesSection(characterName, vitals.conditions)
-                LeaderFollowerSection(characterName, dynamicState, viewModel)
+                LeaderFollowerSection(characterName, dynamicState, viewModel, onOpenAnniversary = { onNavigate(Routes.ANNIVERSARY) })
                 TravelSection(
                     characterName = characterName,
                     isMerchant = isMerchant,
