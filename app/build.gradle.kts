@@ -84,6 +84,13 @@ android {
             // defaults instead of throwing in plain JVM tests.
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            all { test ->
+                // CI shows only the console, so print why a test failed there.
+                test.testLogging {
+                    events("failed")
+                    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                }
+            }
         }
     }
 }
