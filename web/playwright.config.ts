@@ -1,9 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/** E2E tests run entirely against a mocked /party-api and /setup backend
- *  (see e2e/fixtures/mockPartyServer.ts) - no live party-console server is
- *  needed or touched, so these are safe to run anywhere (including CI)
- *  and never mutate a real account. */
+/** E2E tests run against a mocked /party-api and /setup backend
+ *  (e2e/fixtures/mockPartyServer.ts), never a real party-console. */
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,

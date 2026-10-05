@@ -18,17 +18,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # ubuntu-latest already ships a full Android SDK with licenses
-      # pre-accepted (github.com/actions/runner-images) - the
-      # android-actions/setup-android third-party action is unnecessary
-      # and, in practice, less reliable than just using what's already
-      # there. ANDROID_HOME is already set; the Gradle plugin auto-
+      # ubuntu-latest ships an Android SDK with licenses accepted and
+      # ANDROID_HOME set, so no setup-android action is needed; Gradle
       # downloads compileSdk 35 / build-tools 35.0.0 on first use.
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # Robolectric unit + Compose UI tests (the same suite run locally
-      # before every commit).
+      # Robolectric unit and Compose UI tests.
       - name: Unit and UI tests
         run: ./gradlew testDebugUnitTest --stacktrace
 

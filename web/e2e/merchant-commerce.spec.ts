@@ -1,13 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
-/** Regression coverage for the affordability-gating bug fixed earlier this
- *  project: the per-recipe/per-item "Add" button only guards the
- *  incremental +1 tap - typing a larger quantity directly into the cart
- *  row's own Input bypassed it entirely, leaving Craft/Exchange's actual
- *  submit button enabled for an order the account couldn't afford. The fix
- *  added an aggregate check across the whole cart; these tests exercise
- *  exactly that path (enable via Add, then overrun via direct typing). */
+/** Affordability gating: "Add" only guards the +1 tap, so typing a larger
+ *  quantity into a cart row must still disable Craft/Exchange when the whole
+ *  cart is unaffordable. Each test enables via Add, then overruns by typing. */
 
 test('Craft: submit disables when the cart is typed past what materials are on hand', async ({ page }) => {
   const server = new MockPartyServer()
@@ -32,8 +28,7 @@ test('Craft: submit disables when the cart is typed past what materials are on h
   await expect(page.getByText('Iron Sword')).toBeVisible()
 
   await page.getByRole('button', { name: 'Add' }).click()
-  // "Craft" also matches the mode-tab chip above the list - scope to the
-  // sticky submit bar specifically.
+  // "Craft" also matches the mode tab, so scope to the submit bar.
   const craftButton = page.locator('.sticky.bottom-0').getByRole('button', { name: 'Craft', exact: true })
   await expect(craftButton).toBeEnabled()
 

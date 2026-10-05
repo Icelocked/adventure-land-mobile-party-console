@@ -14,8 +14,7 @@ test('Bank: deconstruction options are hidden unless the item is actually decons
       { slot: 1, item: { name: 'wcoat', level: 0 } },
     ],
   }
-  // Only wcoat is deconstructible - matches deconstruction.ts's
-  // canDeconstruct requiring a catalog entry to exist at all.
+  // Only wcoat is deconstructible: it needs a deconstruction catalog entry.
   server.deconstructionCatalog = { wcoat: { compound: false, rewards: [{ name: 'leather', quantity: 1, chance: 1 }] } }
   await server.install(page)
 
@@ -27,9 +26,8 @@ test('Bank: deconstruction options are hidden unless the item is actually decons
   await page.getByText('Wolf Coat').click()
   await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
   await page.getByRole('group', { name: 'Mark for deconstruction?' }).getByRole('button', { name: 'Mark for deconstruction' }).click()
-  // Bank-sourced deconstruction queues for the merchant to actually
-  // collect - the item stays in the pack (with a marked indicator) until
-  // then, it doesn't vanish the instant it's marked.
+  // Bank-sourced deconstruction queues for the merchant; the item stays in
+  // the pack, marked, until collected.
   await expect(page.getByText('Wolf Coat', { exact: true })).toBeVisible()
   await expect(page.getByText('Deconstruct', { exact: true })).toBeVisible()
 })
@@ -39,9 +37,8 @@ test('Bank: pack header shows occupied/total and free slot count', async ({ page
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
   server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
-  // A 10-slot pack with 2 filled, 8 empty (padded with null, the same
-  // fixed-length shape the real bank snapshot sends) - the list view
-  // alone gave no way to tell open slots existed at all.
+  // A 10-slot pack with 2 filled and 8 empty (null-padded, as the bank
+  // snapshot sends it); empty slots must be visible.
   server.bankPacks = {
     items1: [{ slot: 0, item: { name: 'ironore', level: 0, q: 5 } }, null, null, { slot: 3, item: { name: 'ironore', level: 0 } }, null, null, null, null, null, null],
   }
@@ -105,8 +102,7 @@ test('Bank: marking an item for NPC sale shows a marked indicator', async ({ pag
   await page.getByRole('button', { name: 'Sell to NPC…', exact: true }).click()
   await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
-  // Bank-sourced NPC sales queue for the merchant to collect (they don't
-  // vanish instantly) - the row should still be there, now marked.
+  // Bank-sourced NPC sales queue for the merchant, so the row stays, marked.
   // The sale panel (which names the item) closes once the sale is queued.
   await expect(page.getByRole('group', { name: 'Sell to NPC' })).toHaveCount(0)
   await expect(page.getByText('Iron Ore')).toBeVisible()
