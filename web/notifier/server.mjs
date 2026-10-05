@@ -6,6 +6,7 @@ import { createServer } from 'node:http'
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import webpush from 'web-push'
+import { createUpdates } from './updates.mjs'
 import {
   ALERTS,
   DEFAULT_SETTINGS,
@@ -344,6 +345,9 @@ const sameOrigin = (req) => {
 const MAX_DEVICES = 50
 const status = (device) => (device ? { subscribed: true, alerts: device.alerts, quiet: device.quiet, muted: device.muted, paused: watch.credentialFailed } : { subscribed: false })
 
+const updates = createUpdates({ log: (...args) => log(...args) })
+updates.start()
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://notifier')
@@ -352,6 +356,8 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && !sameOrigin(req)) return send(res, 403, { error: 'Cross-site request refused' })
     if (!(await authorized(req))) return send(res, 401, { error: 'Pair this browser with Party Console first.' })
     const body = req.method === 'POST' ? await readBody(req) : {}
+    const routed = await updates.handle(req, path, body)
+    if (routed) return send(res, ...routed)
     const endpoint = String(body.subscription?.endpoint || body.endpoint || url.searchParams.get('endpoint') || '')
     if (req.method === 'GET' && path === '/status') return send(res, 200, status(devices[endpoint]))
     if (req.method === 'GET' && path === '/settings') return send(res, 200, settings)

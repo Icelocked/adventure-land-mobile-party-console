@@ -6,6 +6,7 @@ import { DashboardStateImport } from './settings/DashboardStateImport'
 import { ConsoleUpdateSettings, HostingSettings } from './settings/ConsoleSettings'
 import { AccountMembers } from './settings/AccountMembers'
 import { NotificationsSection } from './settings/NotificationsSection'
+import { PwaUpdateSettings } from './settings/PwaUpdates'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { Copy, Eye, EyeOff } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending, useAlDataAuthStatus } from '@/data/PartyDataProvider'
@@ -15,7 +16,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
-import { applyPendingUpdate, checkForUpdate, subscribeUpdateStatus, type UpdateStatus } from '@/lib/serviceWorkerUpdate'
 
 /** party-inventory-panels.tsx "Interface settings" as a screen, in its
  *  order: state import/export, realm, characters (create, member grid,
@@ -118,7 +118,7 @@ export function SettingsScreen() {
           </Button>
         </div>
 
-        <AppUpdateSection />
+        <PwaUpdateSettings />
 
         {dynamicState.steamSwitch?.phase === 'failed' && (
           // party-inventory-panels.tsx: offered while a Steam handoff has failed.
@@ -282,38 +282,3 @@ function ALDataSection() {
   )
 }
 
-/** Installed as a home-screen app, there's no browser chrome at all - no
- *  URL bar, no hard-refresh, no way to clear site data. This is the only
- *  way to force a stuck service worker to check for a newer build without
- *  uninstalling and reinstalling the app. */
-function AppUpdateSection() {
-  const [status, setStatus] = useState<UpdateStatus>('idle')
-  useEffect(() => subscribeUpdateStatus(setStatus), [])
-
-  const label =
-    status === 'checking'
-      ? 'Checking…'
-      : status === 'available'
-        ? 'Update found'
-        : status === 'upToDate'
-          ? 'Up to date'
-          : status === 'unsupported'
-            ? 'Not supported in this browser'
-            : 'Check for updates'
-
-  return (
-    <div className="rounded-md border border-border bg-card p-4">
-      <div className="mb-1 text-sm font-medium">App updates</div>
-      <p className="mb-2 text-xs text-muted-foreground">
-        An installed home-screen app has no browser address bar to force-refresh from - use this instead if something looks stale.
-      </p>
-      {status === 'available' ? (
-        <Button onClick={applyPendingUpdate}>Reload to update</Button>
-      ) : (
-        <Button variant="outline" disabled={status === 'checking'} onClick={() => void checkForUpdate()}>
-          {label}
-        </Button>
-      )}
-    </div>
-  )
-}
