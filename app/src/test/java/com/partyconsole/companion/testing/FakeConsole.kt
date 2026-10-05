@@ -51,6 +51,10 @@ class FakeConsole : AutoCloseable {
     /** One-shot replies for a POST path (e.g. "merchant/stand"): status + body. */
     val failOnce = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, String>>()
 
+    init {
+        actionBaseline = com.partyconsole.companion.ui.components.ActionToasts.entries.value.maxOfOrNull { it.id } ?: actionBaseline
+    }
+
     private val server = MockWebServer().apply {
         dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -104,9 +108,19 @@ class FakeConsole : AutoCloseable {
 }
 
 /** Wait (real time) until [condition] holds. */
+/** Ids at or below this belong to earlier tests (ActionToasts is process-wide). */
+@Volatile private var actionBaseline = 0L
+
+private fun actionsInFlight() =
+    com.partyconsole.companion.ui.components.ActionToasts.entries.value.any { it.id > actionBaseline && it.status == com.partyconsole.companion.ui.components.ActionToasts.Status.SENDING }
+
+/** Waits for [condition], then for every action in flight to get its answer.
+ *  A test usually waits for the console to receive a POST; the screen keeps
+ *  its buttons disabled until the reply lands, so on a slow machine the next
+ *  click would otherwise hit a disabled button and be ignored. */
 fun eventually(timeoutMs: Long = 5_000, condition: () -> Boolean) = runBlocking {
     val until = System.currentTimeMillis() + timeoutMs
-    while (!condition()) {
+    while (!condition() || actionsInFlight()) {
         if (System.currentTimeMillis() > until) error("condition not met within ${timeoutMs}ms")
         // Under Robolectric the test thread is the main thread: keep its
         // looper running so Main-dispatched work (viewModelScope) progresses.
