@@ -206,35 +206,6 @@ Without the updater, Settings still tells you when a release is out.
 A local build has no version, so Settings only shows update notices; update
 it the way you built it (`docker compose build --pull party-console-pwa`).
 
-### 4e. Optional: a development copy
-
-To test PWA changes against your real console while the released PWA keeps
-running, add a second service that builds from your local checkout. The
-`dev` profile keeps it from starting unless you ask for it:
-
-```yaml
-  party-console-pwa-dev:
-    build: /path/to/adventure-land-mobile-party-console/web
-    profiles: ["dev"]
-    ports:
-      - "127.0.0.1:8081:80"
-    volumes:
-      - pwa-dev-notifier:/data/notifier
-    restart: "no"
-
-volumes:
-  pwa-dev-notifier:
-```
-
-```bash
-docker compose --profile dev up -d --build party-console-pwa-dev
-docker compose --profile dev stop party-console-pwa-dev
-```
-
-It's a separate site, so pair it separately. To open it from your phone,
-forward it like the main one: `tailscale serve --bg --tcp 8081 tcp://127.0.0.1:8081`.
-The updater only manages `party-console-pwa`, so it never touches this copy.
-
 ## 5. Phone notifications
 
 **Android app:** nothing to set up on the server. Open Settings →
