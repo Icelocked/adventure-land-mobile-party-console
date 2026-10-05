@@ -1,4 +1,4 @@
-/** Ported verbatim from party-console's dashboard/lib/farming-areas.ts. */
+/** Console: dashboard/lib/farming-areas.ts. */
 import * as zones from './farmingZones'
 import type { Area, Catalog, Zone } from './farmingZones'
 

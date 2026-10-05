@@ -1,6 +1,5 @@
 import type { SkillEntry } from '@/models'
 
-/** skill-range-label.tsx, verbatim. */
 export function skillRangeLabel(skill: SkillEntry): string {
   const definition = skill.definition || {}
   if (definition.global) return 'Global'

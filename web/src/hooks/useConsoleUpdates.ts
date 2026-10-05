@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { usePartyApi } from '@/data/PartyDataProvider'
 
-/** tools/update/contracts.ts UpdateStatus - the fields the PWA reads. */
+/** The update service's status; only the fields the PWA reads. */
 export interface ConsoleUpdateStatus {
   current?: string
   displayVersion?: string
@@ -16,8 +16,7 @@ export interface ConsoleUpdateStatus {
   [field: string]: unknown
 }
 
-/** console-updates.tsx useUpdates: the update service's status, re-read
- *  every 3s. */
+/** The update service's status, re-read every 3s. */
 export function useConsoleUpdates() {
   const api = usePartyApi()
   const [state, setState] = useState<ConsoleUpdateStatus | null>(null)

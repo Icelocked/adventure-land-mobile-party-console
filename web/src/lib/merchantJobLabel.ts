@@ -1,8 +1,7 @@
 import type { MerchantJob } from '@/models'
 import { routineFor } from './routineLabels'
 
-/** merchant-job-label.ts (party-console v1.2.0), verbatim: one label for
- *  queue rows, tooltips and cancellation controls. */
+/** One label for queue rows, tooltips and cancellation controls. */
 const labels: Record<string, string> = {
   'party collection': 'Item collection',
   'manual visit': 'Manual visit',

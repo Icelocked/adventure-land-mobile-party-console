@@ -1,4 +1,4 @@
-// runtime/coordinator/navigation/passive-settings.ts, verbatim (the parts the dashboard imports).
+// Console: runtime/coordinator/navigation/passive-settings.ts.
 export interface PassiveRule {
   enabled: boolean
   keepMoving: boolean
@@ -18,16 +18,13 @@ export function migratePassiveSettings(saved?: PassiveSettings | null, legacy: R
   if (saved?.version === 1) return saved
   return { version: 1, useFieldGenerators: true, rules: Object.fromEntries(Object.entries(legacy).map(([id, enabled]) => [id, { ...defaultPassiveRule(id), enabled }])) }
 }
-/** passive-hunting-menu.tsx PassivePatch. */
 export type PassivePatch = { rules?: Record<string, Partial<PassiveRule>>; useFieldGenerators?: boolean }
 
-/** runtime/coordinator/hunt/spawn-preferences.ts huntSpawnKey, verbatim:
- *  stable across catalog ordering; coordinates identify the spawn center. */
+/** Stable across catalog ordering; coordinates identify the spawn center. */
 export function huntSpawnKey(location: { map: string; x: unknown; y: unknown }): string {
   return JSON.stringify([location.map, Number(location.x), Number(location.y)])
 }
 
-/** hunt-blacklist-label.ts, verbatim. */
 export function huntBlacklistLabel(entry: { deaths: number; expirations?: number; reason?: string }): string {
   if (entry.reason === 'Manually blacklisted') return 'manually added'
   const expired = entry.expirations ?? (entry.reason === 'Hunt quest expired before completion' ? 1 : 0)

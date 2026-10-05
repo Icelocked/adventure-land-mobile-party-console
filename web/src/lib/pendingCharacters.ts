@@ -1,7 +1,7 @@
 import type { CharacterConnection, PartyStateDynamic } from '@/models'
 
-/** pending-character-cards.tsx (party-console v1.2.0): status labels and
- *  which characters still show a "pending" card instead of a live one. */
+/** Status labels, and which characters still show a "pending" card
+ *  instead of a live one. */
 export const pendingLabels = {
   loading: 'Loading in Steam',
   code: 'CODE active — waiting for Party Console',

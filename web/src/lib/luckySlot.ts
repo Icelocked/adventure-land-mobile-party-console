@@ -2,7 +2,9 @@ import type { LuckySlotStreams, LuckySlotTracking, SlotRollStatistics } from '@/
 
 export const emptyRolls = (): SlotRollStatistics => ({ totalRolls: 0, sumRolls: 0, rollsAbove96_3: 0, perfectRolls: 0 })
 
-// runtime/lucky-slot-tracking.ts, verbatim: merge, validation and normalization.
+// Console: runtime/lucky-slot-tracking.ts.
+
+// A slot is replaced only by one with more rolls and no smaller counters.
 export function mergeSlotStream(previous: LuckySlotTracking, incoming: LuckySlotTracking): boolean {
   let changed = false
   for (const [slot, stats] of Object.entries(incoming.slots)) {
@@ -40,9 +42,8 @@ export function normalizeSlotTracking(raw: unknown): LuckySlotTracking {
   return result
 }
 
-/** runtime/lucky-slot-tracking.ts aggregateSlotTracking, verbatim: every
- *  persisted stream, with the character's own live local stream merged into
- *  its stream id so replays and moves neither double-count nor drop rolls. */
+/** Sums every persisted stream, with the live local stream merged into its
+ *  own stream id so replays and moves neither double-count nor drop rolls. */
 export function aggregateSlotTracking(streams: LuckySlotStreams = {}, local?: LuckySlotTracking & { streamId?: string }): LuckySlotTracking {
   const combined = { ...streams }
   if (local?.streamId) {
@@ -63,8 +64,7 @@ export function aggregateSlotTracking(streams: LuckySlotStreams = {}, local?: Lu
   return { version: 1, slots }
 }
 
-// Ported verbatim from runtime/lucky-slot-tracking.ts.
-// Source: kaansoral/adventureland_mongodb node/server.js, upgrade handler.
+// Roll model from kaansoral/adventureland_mongodb node/server.js, upgrade handler.
 // 60%: max(U/10000, 0.975*R - 0.012), otherwise uniform R.
 // q_data exposes floor(R*10000), so the >0.963 bucket starts at 0.9631.
 const NORMAL = [0.0001, 0.0369, 0.963]
@@ -87,11 +87,9 @@ export interface LuckySlotSearchResult {
   nextSlot: number
 }
 
-/** Ranks all 42 slots by log-evidence for being the lucky one, ported
- *  verbatim from runtime/lucky-slot-tracking.ts's luckySlotSearch.
- *  Inference requires >=100 rolls in the leading slot and >=99.9%
- *  confidence under the published server model - below that, the next
- *  upgrade rotates through whichever slot has the fewest samples. */
+/** Ranks all 42 slots by log-evidence for being the lucky one. Inference
+ *  needs >=100 rolls in the leading slot and >=99.9% confidence; below
+ *  that, the next upgrade goes to the slot with the fewest samples. */
 export function luckySlotSearch(tracking: LuckySlotTracking): LuckySlotSearchResult {
   const ranked = Array.from({ length: 42 }, (_, slot) => ({
     slot,

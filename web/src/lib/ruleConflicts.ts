@@ -1,7 +1,6 @@
 import { automaticCommerceRuleKey, type Item, type PartyStateDynamic } from '@/models'
 
-/** runtime/coordinator/inventory/item-identity.ts sameMarkedItem, verbatim:
- *  marks are partial identities; a changing stack quantity doesn't count. */
+/** Marks are partial identities; a changing stack quantity doesn't count. */
 const transientProperties = new Set(['q', 'price', 'rid', 'b', 'giveaway'])
 function sameIdentity(first: Item | null | undefined, second: Item | null | undefined): boolean {
   if (!first || !second) return false
@@ -12,8 +11,7 @@ function sameIdentity(first: Item | null | undefined, second: Item | null | unde
 
 const record = (value: unknown): Record<string, unknown> => (value && typeof value === 'object' ? (value as Record<string, unknown>) : {})
 
-/** runtime/coordinator/inventory/shared-rules.ts (party-console v1.2.0):
- *  itemRuleConflicts and the helpers it needs, verbatim. */
+/** Console: runtime/coordinator/inventory/shared-rules.ts itemRuleConflicts. */
 function ruleOwner(state: PartyStateDynamic, name: string): string {
   return state.merchantRules?.version === 1 ? String(state.merchantCharacter) : name
 }
@@ -56,7 +54,6 @@ export function itemRuleConflicts(state: PartyStateDynamic, item: Item): string[
   return actions.length > 1 ? actions : []
 }
 
-/** shared-rule-conflicts.tsx conflictingItems + describe, verbatim. */
 export function conflictingItems(state: PartyStateDynamic) {
   const owner = String(state.merchantCharacter)
   const rules = [...Object.values(state.autoNpcSales || {}), ...Object.values(state.autoStandMarks || {}), ...Object.values(state.autoDeconstruction?.[owner] || {})]

@@ -1,24 +1,19 @@
 import type { ItemDropSource, ItemMeta, MerchantExchangeItem } from '@/models'
 
-/** Faithful TypeScript port of the item-detail math already ported once
- *  to Kotlin (ui/itemdetail/ItemFormulas.kt) from party-console's own
- *  source (calculated-level-properties.tsx, npc-sale-value.tsx, item-
- *  maximum-level.tsx, format-duration.ts, item-detail-property-order.tsx,
- *  drop-rate.ts). Pure functions, no UI. Every game-balance constant here
- *  (grade thresholds, stat-scroll multipliers, upgrade/compound tier
- *  multipliers) is copied verbatim rather than re-derived. */
+/** Item-detail math: stat scaling, NPC sale value, costs, drop rates.
+ *  Pure functions. Game-balance constants (grade thresholds, stat-scroll
+ *  and tier multipliers) come from the console source and the game, not
+ *  derived here. Console: calculated-level-properties.tsx and neighbours. */
 
-// Matches the game server's can_equip_item types (item-actions.ts). Elixirs are consumed effects, not equipment.
+// The game server's can_equip_item types. Elixirs are consumed effects, not equipment.
 const equipmentTypes = new Set(['helmet', 'pants', 'chest', 'weapon', 'amulet', 'earring', 'shoes', 'gloves', 'ring', 'shield', 'belt', 'source', 'orb', 'quiver', 'cape', 'misc_offhand', 'tool'])
 export const isEquipment = (definition?: Record<string, unknown>): boolean => equipmentTypes.has(String(definition?.type ?? ''))
-/** item-actions.ts isUsable, verbatim. */
 export const isUsable = (definition?: Record<string, unknown>): boolean =>
   ['elixir', 'licence', 'spawner'].includes(String(definition?.type || '')) || Array.isArray(definition?.gives)
-/** upgrade-rule-tiers.tsx, verbatim. */
+/** A rule is either a bare tier count or an object with `tiers`. */
 export const upgradeRuleTiers = (rule?: unknown): number => Number(typeof rule === 'object' && rule ? (rule as { tiers?: unknown }).tiers : rule) || 0
 
-/** comparison-slots.tsx ported verbatim - which equip slot(s) a given item type could
- *  replace, for gear-comparison-dialog.tsx's "Compare with equipped". */
+/** Which equip slot(s) an item type could replace, for "Compare with equipped". */
 const COMPARISON_SLOTS: Record<string, string[]> = {
   weapon: ['mainhand'],
   shield: ['offhand'],
@@ -38,9 +33,8 @@ const COMPARISON_SLOTS: Record<string, string[]> = {
   earring: ['earring1', 'earring2'],
 }
 
-/** comparison-slots-for.tsx ported verbatim - a 1-handed weapon can replace either hand,
- *  matching the wielding character's own class (a 2-handed weapon only ever replaces
- *  mainhand). */
+/** A weapon that is 1-handed for this character's class can replace either
+ *  hand; otherwise it only replaces mainhand. */
 export function comparisonSlotsFor(meta: ItemMeta | undefined, characterCtype: string): string[] {
   const type = String(meta?.definition.type ?? '')
   if (type === 'weapon') {
@@ -63,9 +57,8 @@ const isTruthy = (value: unknown): boolean => {
   return true
 }
 
-/** The subset of a definition/scaling record that represents a numeric
- *  in-game stat (item-property-keys.tsx) - everything else (name, skin,
- *  type, grades, ...) is metadata, not a stat to preview at other levels. */
+/** Definition/scaling keys that are numeric stats; everything else (name,
+ *  skin, type, grades, ...) is metadata, not previewed at other levels. */
 const ITEM_PROPERTY_KEYS = new Set([
   'gold', 'luck', 'xp', 'int', 'str', 'dex', 'vit', 'for', 'charisma', 'cuteness', 'awesomeness',
   'bling', 'hp', 'mp', 'attack', 'range', 'armor', 'incdmgamp', 'resistance', 'pnresistance',
@@ -75,9 +68,8 @@ const ITEM_PROPERTY_KEYS = new Set([
   'mp_reduction', 'output', 'courage', 'mcourage', 'pcourage',
 ])
 
-/** stat-scrolls.tsx's per-stat multiplier, used when a generic "stat"
- *  scaling value needs to redirect into the specific stat a stat-scroll-
- *  marked item's `stat_type` names. */
+/** Multiplier applied when the generic "stat" value is redirected into the
+ *  stat named by an item's `stat_type`. */
 const STAT_SCROLL_MULTIPLIER: Record<string, number> = {
   str: 1.0, int: 1.0, dex: 1.0, vit: 1.0, for: 1.0,
   evasion: 0.325, reflection: 0.15, gold: 0.5, luck: 1.0, xp: 0.5,
@@ -88,10 +80,8 @@ const STAT_SCROLL_MULTIPLIER: Record<string, number> = {
 
 const NO_ROUND_KEYS = new Set(['evasion', 'miss', 'reflection', 'dreturn', 'lifesteal', 'manasteal', 'attr0', 'attr1', 'crit', 'critdamage', 'breaks'])
 
-/** Recomputes an item's stat block AT [level] from its base definition
- *  plus per-level scaling deltas - upgrade/compound tiers apply different
- *  multipliers at specific breakpoints (tier 7+ for upgrades, 5+ for
- *  compounds), matching the game's own progression curve exactly. */
+/** An item's stat block at [level]: base definition plus per-level scaling.
+ *  Multipliers step up from tier 7 for upgrades and tier 5 for compounds. */
 export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: string | undefined, level: number): Record<string, number> {
   const definition = meta?.definition ?? {}
   const scaling = meta?.scaling ?? {}
@@ -130,9 +120,8 @@ export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: 
   return values
 }
 
-/** properties-at-level.tsx, verbatim: the server-reported stat block for
- *  the item as it is, moved by the formula's difference between the actual
- *  item and the preview (level and stat scroll). */
+/** The server-reported stat block, shifted by the formula's difference
+ *  between the actual item and the preview (level and stat scroll). */
 export function propertiesAtLevel(meta: ItemMeta | undefined, item: { level?: number; stat_type?: string }, level: number, statType?: string | null) {
   const actualLevel = Math.max(0, Number(item.level) || 0)
   const actualCalculated = calculatedLevelProperties(meta, item.stat_type, actualLevel)
@@ -151,20 +140,17 @@ export function propertiesAtLevel(meta: ItemMeta | undefined, item: { level?: nu
   }, {})
 }
 
-/** use-party-console.tsx detailMeta: catalog meta with the live instance's
- *  meta over it (keeping the catalog's world info when the live one has none). */
+/** Catalog meta with the live instance's meta over it, keeping the
+ *  catalog's world info when the live one has none. */
 export function detailMeta(known: ItemMeta | null | undefined, live: ItemMeta | null | undefined): ItemMeta | undefined {
   if (!known) return live ?? undefined
   if (!live) return known
   return { ...known, ...live, world: live.world || known.world }
 }
 
-/** The stat block to actually display at [previewLevel]: the server's own
- *  current-level `properties` (authoritative) adjusted by the DELTA
- *  between the formula evaluated at the preview level vs. the actual
- *  level, rather than the formula's raw output - mirrors item-
- *  details.tsx's `previewProperties` exactly so a "no scaling data" stat
- *  doesn't silently vanish. */
+/** The stat block to display at [previewLevel]: the server's current
+ *  `properties` plus the formula's delta between the two levels. Using the
+ *  delta rather than the raw formula keeps stats with no scaling data. */
 export function previewProperties(meta: ItemMeta | undefined, actualLevel: number, previewLevel: number, statType: string | undefined): Record<string, number> {
   const current = calculatedLevelProperties(meta, statType, actualLevel)
   const preview = calculatedLevelProperties(meta, statType, previewLevel)
@@ -189,10 +175,8 @@ export function itemMaximumLevel(meta: ItemMeta | undefined): number {
   return meta?.compoundable ? 7 : meta?.upgradeable ? 13 : 0
 }
 
-/** upgrade-scroll-cost.tsx ported verbatim, including its hardcoded
- *  scroll-price fallback (not the live catalog price - this function has
- *  no catalog access at its call site in the dashboard either, so the
- *  approximation is intentional, not a bug to "fix" here). */
+/** Uses hardcoded scroll prices, not the live catalog. The console does
+ *  the same; the approximation is intentional. */
 export function upgradeScrollCost(meta: ItemMeta | undefined, startLevel: number, tiers: number): number {
   const grades = asIntList(meta?.definition.grades) ?? [9, 10, 11, 12]
   const scrollCosts = [1_000, 40_000, 1_600_000, 64_000_000]
@@ -209,10 +193,8 @@ export interface CompoundCost {
   scrolls: number
 }
 
-/** lib/compound-cost.ts's compoundPassCost ported verbatim - minimum
- *  scroll spend to build one target item entirely from +0 copies, using
- *  real compound-scroll ("cscroll0".."cscroll3") prices from the live
- *  merchant catalog rather than a hardcoded approximation. */
+/** Minimum scroll spend to build one target item from +0 copies, priced
+ *  from the live catalog's cscroll0..cscroll3. Null if a price is missing. */
 export function compoundPassCost(grades: number[] | undefined, targetLevel: number, buyable: { id: string; cost: number }[]): CompoundCost | null {
   const thresholds = Array.isArray(grades) ? grades : [9, 10, 11, 12]
   const prices = new Map(buyable.map((item) => [item.id, item.cost]))
@@ -232,9 +214,7 @@ export function compoundPassCost(grades: number[] | undefined, targetLevel: numb
   return { gold, scrolls }
 }
 
-/** stat-scrolls.tsx's table - `purchasable` stats (str/int/dex/vit) are
- *  bought outright for gold; the rest require already owning the scroll
- *  (stat-scroll-quantity.tsx/primary-stat-scroll-cost.tsx). */
+/** `purchasable` scrolls are bought for gold; the rest must already be owned. */
 export const STAT_SCROLLS: { stat: string; scroll: string; label: string; purchasable: boolean }[] = [
   { stat: 'str', scroll: 'strscroll', label: 'STR', purchasable: true },
   { stat: 'int', scroll: 'intscroll', label: 'INT', purchasable: true },
@@ -260,8 +240,7 @@ export const STAT_SCROLLS: { stat: string; scroll: string; label: string; purcha
   { stat: 'output', scroll: 'outputscroll', label: 'Output', purchasable: false },
 ]
 
-/** stat-scroll-quantity.tsx ported verbatim - how many scrolls of a stat
- *  type a mark at this item's current level requires. */
+/** How many stat scrolls an item at this level needs. */
 export function statScrollQuantity(meta: ItemMeta | undefined, level: number): number {
   const grades = asIntList(meta?.definition.grades) ?? [9, 10, 11, 12]
   const lvl = Math.max(0, level)
@@ -273,8 +252,7 @@ export function primaryStatScrollCost(meta: ItemMeta | undefined, level: number)
   return statScrollQuantity(meta, level) * 8_000
 }
 
-/** npc-sale-value.tsx ported verbatim - the exact upgrade/compound
- *  grade-tier gold curve the game itself uses, not an approximation. */
+/** The game's NPC sale value, including its upgrade/compound tier curve. */
 export function npcSaleValue(level: number, gift: boolean, expires: unknown, meta: ItemMeta | undefined): number {
   const definition = meta?.definition ?? {}
   if (gift) return 1
@@ -344,8 +322,8 @@ export function durationStat(key: string, value: number, definitionType: string 
   return formatDuration(ms)
 }
 
-/** item-detail-property-order.tsx's display order for the "Item stats"
- *  table - anything not listed sorts after, alphabetically. */
+/** Display order for the "Item stats" table; unlisted keys sort after,
+ *  alphabetically. */
 const ITEM_DETAIL_PROPERTY_ORDER = [
   'equip_slot', 'stackable', 'max_stack_size', 'tier', 'scroll', 'stat', 'str', 'dex', 'int', 'vit',
   'for', 'hp', 'mp', 'attack', 'frequency', 'range', 'armor', 'resistance', 'apiercing', 'rpiercing',
@@ -355,15 +333,10 @@ const ITEM_DETAIL_PROPERTY_ORDER = [
 ]
 export const ITEM_DETAIL_PROPERTY_RANK = new Map(ITEM_DETAIL_PROPERTY_ORDER.map((key, index) => [key, index]))
 
-/** Keys item-details.tsx never shows in the stats table - either shown
- *  elsewhere already (name, explanation, level, g/buy price) or purely
- *  internal. `type` is intentionally left visible (unlike the desktop
- *  version, which replaces it with a derived "equip_slot" label this app
- *  doesn't compute) so the equip slot/category is still readable. */
-// item-details.tsx `ignored` (type is shown as the derived equip slot instead).
+/** Keys never shown in the stats table: shown elsewhere already or purely
+ *  internal. `type` is shown as the derived equip slot instead. */
 const IGNORED_STAT_KEYS = new Set(['skin', 'skin_a', 'skin_c', 'skin_r', 'name', 'explanation', 'type', 'g', 's', 'grades', 'upgrade', 'compound', 'level', 'set'])
 
-/** comparison-slot-label.tsx, verbatim. */
 export const comparisonSlotLabel = (slot: string) =>
   slot === 'mainhand' ? 'Main hand' : slot === 'offhand' ? 'Off hand' : slot === 'ring1' ? 'Ring 1' : slot === 'ring2' ? 'Ring 2' : slot === 'earring1' ? 'Earring 1' : slot === 'earring2' ? 'Earring 2' : slot
 
@@ -372,16 +345,15 @@ export interface StatRow {
   value: unknown
 }
 
-/** Builds the "Item stats" table exactly as item-details.tsx does: the
- *  raw definition, with [previewProperties] overlaid on top, plus a
- *  derived stackable/max_stack_size pair, ignored keys stripped, sorted
- *  by display rank. */
+/** The "Item stats" table: the raw definition with [previewProperties]
+ *  overlaid, derived equip_slot/stackable/max_stack_size added, ignored
+ *  keys stripped, sorted by display rank. */
 export function buildStatRows(meta: ItemMeta | undefined, actualLevel: number, previewLevel: number, statType: string | undefined): StatRow[] {
   const definition = meta?.definition ?? {}
   const preview = previewProperties(meta, actualLevel, previewLevel, statType)
   const display: Record<string, unknown> = { ...definition }
   for (const [key, value] of Object.entries(preview)) display[key] = value
-  // item-details.tsx: equipment shows where it goes instead of its type.
+  // Equipment shows where it goes instead of its type.
   const type = String(definition.type)
   if ((COMPARISON_SLOTS[type] || []).length)
     display.equip_slot =
@@ -406,9 +378,8 @@ export function buildStatRows(meta: ItemMeta | undefined, actualLevel: number, p
     })
 }
 
-/** Renders one stat value the way item-details.tsx's `<dd>` does: a
- *  duration-shaped key/value becomes "1h 30m", arrays join with commas,
- *  everything else is just its plain string form. */
+/** Duration keys render as "1h 30m", arrays join with commas, everything
+ *  else as a plain string. */
 export function formatStatValue(key: string, value: unknown, definitionType: string | undefined): string {
   if (typeof value === 'number') {
     const duration = durationStat(key, value, definitionType)
@@ -440,12 +411,10 @@ export function exchangeTarget(reward: string): [string, number] {
   return [id, level]
 }
 
-/** item-exchange-details.tsx's three groupings, matched against the
- *  whole exchangeable table by [id]+[level]: what it costs to buy this
- *  item from an exchange NPC ([prices]), what an exchange/box keyed by
- *  this item itself gives back ([rewards]), and - for a base (+0) item
- *  only - every box/table this item can be pulled out of as a random
- *  result ([sources], "Reward in" on desktop). */
+/** Matches the exchangeable table by [id]+[level]: what buying this item
+ *  from an exchange NPC costs ([prices]), what exchanging this item gives
+ *  ([rewards]), and, for +0 items only, which boxes can drop it
+ *  ([sources], "Reward in"). */
 export function exchangeSections(id: string, level: number, exchanges: MerchantExchangeItem[]): ExchangeSections {
   const prices = exchanges.filter((entry) => {
     if (!entry.reward) return false
@@ -471,17 +440,14 @@ export function rewardPercentage(chance: number): string {
   return `${toPrecision(chance * 100, 6)}%`
 }
 
-/** drop-rate.ts's `effectiveDropRate` - a direct monster kill retains its
- *  original chance even when the DISPLAYED rate was capped (e.g. by a
- *  luck multiplier elsewhere), but a multi-step acquisition path (a drop
- *  found by opening a box that's itself a drop) shows the actual chance. */
+/** A direct monster drop keeps its original chance even when the displayed
+ *  rate was capped; a multi-step path (a box that is itself a drop) shows
+ *  the actual chance. */
 export function effectiveDropRate(drop: ItemDropSource): number {
   return drop.sourceType === 'monster' && (drop.acquisitionPath?.length ?? 0) <= 1 ? (drop.originRate ?? drop.rate) : drop.rate
 }
 
-/** drop-rate.ts's `formatDropRate` ported verbatim - rates above 100%
- *  (guaranteed multi-drops) split into a guaranteed count plus a
- *  fractional remainder chance. */
+/** Rates above 100% split into a guaranteed count plus a remainder chance. */
 export function formatDropRate(drop: ItemDropSource): string {
   const rate = Math.max(0, effectiveDropRate(drop))
   const quantity = Math.max(1, drop.quantity || 1)

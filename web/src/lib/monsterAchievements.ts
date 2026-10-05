@@ -3,7 +3,7 @@ import type { BestiaryMonster } from '@/models'
 type Progress = { score: number; owner?: string | null }
 type CharacterAchievements = { name: string; monsterAchievements?: Record<string, Progress> | null }
 
-/** monster-achievements.ts, verbatim: the best score (and its owner) per monster across characters. */
+/** The best score (and its owner) per monster across characters. */
 export function aggregateMonsterAchievements(characters: Record<string, CharacterAchievements>) {
   const result: Record<string, { score: number; owner: string | null }> = {}
   for (const member of Object.values(characters)) {
@@ -15,7 +15,6 @@ export function aggregateMonsterAchievements(characters: Record<string, Characte
   return result
 }
 
-/** bestiary-dialog.tsx achievementMilestones, verbatim. */
 export function achievementMilestones(monster: BestiaryMonster): number[] {
   const entries = monster.definition?.achievements
   return Array.isArray(entries)

@@ -8,8 +8,8 @@ import { bankSaleCopies, same } from './bankSaleCopies'
 import { recoveryDelay } from './dashboardRecovery'
 import { automaticCommerceRuleKey } from '@/models'
 
-// Golden tests: expected values worked by hand from the party-console
-// v1.2.0 sources each module is ported from.
+// Golden tests: expected values worked out by hand from the console
+// sources each module follows.
 describe('routineFor (merchant/routines.ts)', () => {
   it('names exchange jobs by whether they are automatic', () => {
     expect(routineFor({ reason: 'exchange', autoExchangeKeys: ['gem0@0'] })).toBe('automatic exchange')

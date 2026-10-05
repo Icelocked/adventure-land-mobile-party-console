@@ -1,16 +1,10 @@
 import { registerSW } from 'virtual:pwa-register'
 
-/** Once installed to a home screen, a PWA has no browser chrome at all -
- *  no URL bar, no "hard refresh", no way to clear site data. Without an
- *  explicit in-app path, a stuck service worker can pin someone on an old
- *  build indefinitely, with their only real fix being to uninstall and
- *  reinstall the app, or dig into system-level browser settings. This
- *  gives the app two things instead: it detects a new build automatically
- *  (surfaced as a dismissible "Update available" banner rather than a
- *  silent forced reload, since that could yank someone off a half-filled
- *  form), and Settings gets a manual "Check for updates" action that
- *  forces the same check on demand - the in-app equivalent of a hard
- *  refresh, reachable without ever leaving the installed app. */
+/** An installed PWA has no browser chrome, so there is no hard refresh and
+ *  a stuck service worker could pin an old build indefinitely. New builds
+ *  surface as a dismissible "Update available" banner (not a forced
+ *  reload, which could discard a half-filled form), and Settings offers a
+ *  manual "Check for updates". */
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'upToDate' | 'unsupported'
 
 const listeners = new Set<(status: UpdateStatus) => void>()
@@ -48,10 +42,8 @@ export function initServiceWorkerUpdates(): void {
   })
 }
 
-/** The manual "Check for updates" action - forces every registered
- *  service worker to re-fetch and compare against what's actually
- *  deployed right now, the same check the browser would normally only
- *  run on its own schedule. */
+/** Forces every registered service worker to check for a new build now
+ *  instead of on the browser's schedule. */
 export async function checkForUpdate(): Promise<void> {
   if (!('serviceWorker' in navigator)) {
     setStatus('unsupported')
@@ -64,17 +56,14 @@ export async function checkForUpdate(): Promise<void> {
     return
   }
   await Promise.all(registrations.map((registration) => registration.update().catch(() => undefined)))
-  // onNeedRefresh fires asynchronously if a new worker was actually
-  // found - give it a moment before concluding there's nothing new.
-  // Only downgrade 'checking' -> 'upToDate'; if onNeedRefresh already
-  // flipped it to 'available' in the meantime, leave that alone.
+  // onNeedRefresh fires asynchronously if a new worker was found, so wait
+  // a moment, and don't overwrite 'available' if it already fired.
   setTimeout(() => {
     if (status === 'checking') setStatus('upToDate')
   }, 2000)
 }
 
-/** Applies whatever new service worker is already waiting and reloads -
- *  the banner's own "Reload" button, or callable directly. */
+/** Activates the waiting service worker and reloads. */
 export function applyPendingUpdate(): void {
   void applyUpdate?.(true)
 }

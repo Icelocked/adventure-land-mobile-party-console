@@ -20,12 +20,9 @@ import { emptyPartyStateDynamic } from '@/models'
 import { QK } from './queryKeys'
 import { affectedDomains, PARTY_ACTION_EVENT, type Domain, type PartyActionDetail } from './queryActions'
 
-/** Owns one live connection to one configured server and pushes every
- *  known character's state into the shared TanStack Query cache - a
- *  direct port of data/PartyRepository.kt, one instance per active
- *  server connection (recreated whenever [settings] changes - see the
- *  key on <PartyDataProvider> in App.tsx). */
-
+/** Owns the live connection and polling for one server and writes
+ *  everything into the TanStack Query cache. App.tsx keys the provider on
+ *  the settings, so a server change gets a fresh instance. */
 
 const REQUIRED_VITALS_FIELDS = ['hp', 'max_hp', 'mp', 'max_mp', 'gold', 'map', 'x', 'y', 'rip'] as const
 
@@ -33,20 +30,14 @@ function isCompleteVitals(vitals: Record<string, unknown>): boolean {
   return REQUIRED_VITALS_FIELDS.every((field) => vitals[field] !== undefined)
 }
 
-/** Parses the wire-level LiveRecordWire (raw JSON, merged by LiveReceiver
- *  - see api/liveProtocol.ts) into this app's typed model. Matches
- *  dashboard-live.tsx and PartyRepository.kt: reconstructs a FIXED-length
- *  items array sized by vitals.inventorySize, filling gaps with null -
- *  an empty slot is never sent over the wire, so building the list from
- *  present keys alone would silently compact the grid instead of showing
- *  real empty slots in their real positions. */
+/** Converts a merged LiveRecordWire into the typed model. Empty slots are
+ *  never sent, so items are rebuilt as a fixed-length array (sized by
+ *  vitals.inventorySize) with nulls in the gaps; otherwise the grid would
+ *  compact. */
 function recordToState(name: string, record: LiveRecordWire, roster: Record<string, RosterMember>): CharacterState {
-  // ctype/level are never part of the live vitals payload at all (see
-  // module doc) - default them here (matching the Kotlin app's
-  // @Serializable default-value behavior) so a character rendered before
-  // the roster merge below has run still gets a safe "" / 0 rather than
-  // a genuinely-missing key that crashes anything assuming CharacterVitals'
-  // required fields are always actually present at runtime.
+  // ctype/level never arrive in live vitals. Default them so a character
+  // rendered before the roster merge doesn't break code that treats them
+  // as required.
   const withName = { ctype: '', level: 0, ...record.vitals, name }
   const decoded = isCompleteVitals(record.vitals) ? (withName as unknown as CharacterVitals) : null
   const member = roster[name]
@@ -58,8 +49,8 @@ function recordToState(name: string, record: LiveRecordWire, roster: Record<stri
   }
 
   const inventorySize = Number((record.vitals as { inventorySize?: number }).inventorySize) || Object.keys(record.items).length
-  // dashboard-live.tsx (v1.3.0): native arrays can contain occupied overflow
-  // cells beyond isize. Keep them inspectable; inventorySize stays the capacity.
+  // Native arrays can contain occupied overflow cells beyond isize. Keep
+  // them inspectable; inventorySize stays the capacity.
   const displaySize = Object.keys(record.items).reduce((length, key) => (/^\d+$/.test(key) && record.items[key] ? Math.max(length, Number(key) + 1) : length), inventorySize)
   const items: (InventoryEntry | null)[] = []
   for (let index = 0; index < displaySize; index += 1) {
@@ -107,11 +98,10 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     [queryClient],
   )
 
-  // Per-domain polling, mirroring query-cache.tsx's domain policies: every
-  // section is its own single-flight request on its own cadence, so a slow
-  // section never holds up another, and a refresh asked for while one is in
-  // flight runs once more right after it (never two at once, never an older
-  // response landing after a newer one).
+  // Per-domain polling (console: query-cache.tsx). Each section is its own
+  // single-flight request on its own cadence, so a slow section never holds
+  // up another, and a refresh requested mid-flight runs once more right
+  // after (never two at once, never an older response landing last).
   const interest = useRef<Record<string, number>>({})
   const lastAccountId = useRef<string | null>(null)
   const lastReferenceRevision = useRef<string | null>(null)
@@ -132,8 +122,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     }
     const mergeState = (patch: Partial<PartyStateDynamic>) =>
       queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({ ...emptyPartyStateDynamic(), ...(current ?? {}), ...patch }))
-    // dashboard=1 is the dashboard's own request shape (query-cache.tsx reads
-    // every domain as state?catalog=0&dashboard=1&section=X).
+    // dashboard=1 requests the dashboard-shaped payload.
     const section = <T,>(name: string) => api.getJson<T>(`state?catalog=0&dashboard=1&section=${name}`)
 
     const core = async () => {
@@ -142,15 +131,14 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       if (result.kind !== 'success') return
       // bankbois: core only has item-less summaries; the bank section has the full entries.
       const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, serverNow, ...patch } = result.value
-      // query-cache.tsx: a different account on the same server replaces
-      // everything - the dashboard remounts, the PWA reloads.
+      // A different account on the same server invalidates everything; reload.
       const accountId = patch.accountId ?? null
       if (accountId && lastAccountId.current && accountId !== lastAccountId.current) {
         window.location.reload()
         return
       }
       if (accountId) lastAccountId.current = accountId
-      // live-metrics.ts synchronizeDashboardClock: offset from the midpoint of the round trip.
+      // Clock offset, measured against the midpoint of the round trip.
       if (serverNow) queryClient.setQueryData(QK.serverOffset, serverNow - (sentAt + Date.now()) / 2)
       if (characterDetails) queryClient.setQueryData(QK.characterDiagnostics, characterDetails)
       if (summaries) {
@@ -161,12 +149,11 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       const characterHunt = characterDetails
         ? Object.fromEntries(Object.entries(characterDetails).map(([name, detail]) => [name, detail.monsterHunt ?? null]))
         : undefined
-      // use-panel-model.ts lays the market domain over core, so core's
-      // aldata (listings/trades/buyOrders stripped) never replaces the
-      // market's copy once that has loaded.
+      // Core's aldata has listings/trades/buyOrders stripped; never let it
+      // replace the market domain's copy once that has loaded.
       if (marketAldata.current) patch.aldata = marketAldata.current
       mergeState({ ...patch, ...(characterHunt ? { characterHunt } : {}) })
-      // query-cache.tsx keys the catalog by core's referenceRevision.
+      // The catalog is refetched whenever core's referenceRevision changes.
       if (patch.referenceRevision && patch.referenceRevision !== lastReferenceRevision.current) {
         lastReferenceRevision.current = patch.referenceRevision
         void triggers.catalog()
@@ -186,8 +173,8 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       }
     }
 
-    // query-cache.tsx market domain: before core's first referenceRevision
-    // it reads GET /aldata/market alone; afterwards the market section.
+    // Before core's first referenceRevision, read GET /aldata/market alone;
+    // afterwards the market section.
     const market = async () => {
       if (!lastReferenceRevision.current) {
         const result = await api.getJson<PartyStateDynamic['aldata']>('aldata/market')
@@ -210,7 +197,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
 
     const logs = async () => {
       const result = await section<LogsWire>('logs')
-      // log-sidebar.tsx: a failed refresh keeps the retained logs and says so.
+      // A failed refresh keeps the retained logs and flags the error.
       queryClient.setQueryData(QK.logsError, result.kind !== 'success')
       if (result.kind !== 'success') return
       const { combatLogs, merchantActivity, gameLogs } = result.value
@@ -220,7 +207,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
 
     const mail = async () => {
       const result = await api.getJson<Partial<MailSnapshot>>('mail')
-      // mail-query.ts: a failed refresh keeps the last inbox and shows why.
+      // A failed refresh keeps the last inbox and shows why.
       if (result.kind === 'success') queryClient.setQueryData(QK.mail, { messages: [], count: 0, ...result.value })
       else queryClient.setQueryData<MailSnapshot>(QK.mail, (previous) => ({ messages: [], count: 0, ...previous, error: result.message || 'Mail unavailable' }))
     }
@@ -243,8 +230,8 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       mergeState(result.value)
     }
 
-    // dashboard-live.tsx: while the live stream is down, `fast` (vitals) and
-    // `inventory` (items/slots) stand in for it.
+    // While the live stream is down, `fast` (vitals) and `inventory`
+    // (items/slots) polling stand in for it.
     const fallbackRecords = new Map<string, LiveRecordWire>()
     const applyFallback = (name: string, patch: Partial<LiveRecordWire>) => {
       // A response that lands after the stream recovered is stale.
@@ -315,7 +302,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     return triggers
   }, [api, queryClient, applyRoster])
 
-  // query-cache.tsx policies (core is 2s here rather than 1s - mobile data).
+  // Core polls every 2s rather than the console's 1s, to spare mobile data.
   // A domain a visible screen depends on (useDomainInterest) polls faster.
   const cadences = useMemo(() => {
     const interested = (domain: string) => (interest.current[domain] ?? 0) > 0
@@ -356,7 +343,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       void (async () => {
         while (!cancelled) {
           const interval = cadences[domain]()
-          // Polling pauses while the app is in the background, like the dashboard's queries.
+          // Polling pauses while the app is in the background.
           if (interval !== null && !document.hidden) await fetchers[domain]()
           if (cancelled) return
           await sleep(interval ?? 1_000)
@@ -376,7 +363,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     }
   }, [fetchers, cadences])
 
-  // query-actions.ts: after an action, refresh the domains it touched.
+  // After an action, refresh the domains it touched.
   useEffect(() => {
     const onAction = (event: Event) => {
       const { path, body } = (event as CustomEvent<PartyActionDetail>).detail
@@ -389,8 +376,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     return () => window.removeEventListener(PARTY_ACTION_EVENT, onAction)
   }, [fetchers, cadences])
 
-  // After a mutation: refresh core and config together, like query-actions.ts's
-  // ['core', 'config'] group. Resolves once both have landed.
+  // Resolves once core, config and escape have all refreshed.
   const refreshDynamicStateNow = useMemo(
     () => async () => {
       await Promise.all([fetchers.core(), fetchers.config(), fetchers.escape()])
@@ -450,7 +436,7 @@ export const usePartyApi = (): PartyApiClient => usePartyData().api
 export const useServerSettings = (): ServerSettings => usePartyData().settings
 export const useRefreshDynamicStateNow = (): (() => Promise<void>) => usePartyData().refreshDynamicStateNow
 /** A screen that shows this domain makes it poll at its fast cadence while
- *  mounted (query-cache.tsx polls bank/mail/logs faster while they're open). */
+ *  mounted. */
 export function useDomainInterest(domain: Domain): void {
   const { registerInterest } = usePartyData()
   useEffect(() => registerInterest(domain), [registerInterest, domain])
@@ -478,8 +464,8 @@ export const useEscapeError = (): string | null => useCachedValue(QK.escapeError
 export const useAlDataAuthPending = (): boolean => useCachedValue(QK.aldataAuthPending, false)
 export const useAlDataAuthStatus = (): string | null => useCachedValue(QK.aldataAuthStatus, null)
 export const useEscapeStatus = (): EscapeStatus | null => useCachedValue(QK.escape, null)
-/** Round-trip time of the smallest request in the last dynamic-state poll
- *  cycle (see refreshDynamicStateNow) - null until the first poll lands. */
+/** Round-trip time of the last escape poll (the smallest request); null
+ *  until the first one lands. */
 export const useLatencyMs = (): number | null => useCachedValue(QK.latencyMs, null)
 /** When the config section (rules, marks, settings, leader/followers, ...)
  *  last arrived - null until the first one lands. Any control seeded from a
@@ -493,18 +479,18 @@ export function useCharacterDiagnostics(name: string): CharacterDiagnostics | un
 }
 /** Every character's diagnostics (active slots only). */
 export const useCharacterDiagnosticsMap = (): Record<string, CharacterDiagnostics> => useCachedValue(QK.characterDiagnostics, {})
-/** query-cache.tsx presence: seen by the coordinator within the last 10s. */
+/** Seen by the coordinator within the last 10s. */
 export function useCharacterOnline(name: string): boolean {
   const seenAt = Number(useCharacterDiagnostics(name)?.seenAt || 0)
   return Date.now() - seenAt < 10_000
 }
-/** Server clock minus this device's clock (live-metrics.ts serverOffset). */
+/** Server clock minus this device's clock, in ms. */
 export const useServerOffset = (): number => useCachedValue(QK.serverOffset, 0)
-/** The configured merchant (config section) - the merchant ROLE. Never infer
- *  it from character class: bankbois and second merchants share the class. */
+/** The configured merchant. Never infer it from character class: bankbois
+ *  and second merchants share the class. */
 export const useMerchantCharacter = (): string | null => useDynamicState().merchantCharacter ?? null
-/** inventory/shared-rules.ts ruleOwner: with shared merchant rules every
- *  member's rules live under the merchant; otherwise each owns its own. */
+/** With shared merchant rules every member's rules live under the
+ *  merchant; otherwise each character owns its own. */
 export function useRuleOwner(name: string): string {
   const state = useDynamicState()
   return state.merchantRules ? (state.merchantCharacter ?? name) : name
