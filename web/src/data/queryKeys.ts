@@ -1,8 +1,5 @@
-/** TanStack Query cache keys this app's data layer writes to and every
- *  screen reads from - mirrors party-console's own dashboard-live.tsx
- *  pattern (SSE writes into the query cache, screens read via query
- *  hooks) rather than a bespoke store, and mirrors the Android app's
- *  PartyRepository StateFlow surface 1:1 so the port stays mechanical. */
+/** Query cache keys. The data layer (SSE and polling) writes them and
+ *  screens read them through query hooks. */
 export const QK = {
   characters: ['characters'] as const,
   connected: ['connected'] as const,
@@ -13,15 +10,14 @@ export const QK = {
   gameLogs: ['gameLogs'] as const,
   logsError: ['logsError'] as const,
   escapeError: ['escapeError'] as const,
-  // use-party-console.tsx aldataAuthPending: set after the ALData auth mail is sent.
+  // Set after the ALData auth mail is sent.
   aldataAuthPending: ['aldataAuthPending'] as const,
-  // use-party-console.tsx aldataAuthStatus: the latest /aldata/auth answer.
+  // The latest /aldata/auth answer.
   aldataAuthStatus: ['aldataAuthStatus'] as const,
   escape: ['escape'] as const,
   latencyMs: ['latencyMs'] as const,
   configLoadedAt: ['configLoadedAt'] as const,
-  // Per-character dashboard diagnostics (core's characterDetails) and the
-  // server clock offset - see PartyDataProvider's pollDynamicState.
+  // Core's characterDetails and the server clock offset.
   characterDiagnostics: ['characterDiagnostics'] as const,
   serverOffset: ['serverOffset'] as const,
 }

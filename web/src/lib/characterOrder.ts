@@ -1,5 +1,5 @@
-/** runtime/roster/character-order.ts (party-console v1.2.0), verbatim:
- *  primary first, then Steam, then headless; merchants stay last unless primary. */
+/** Primary first, then Steam, then headless; merchants stay last unless
+ *  primary. */
 export function orderCharacters<T extends { name: string; ctype?: string }>(
   characters: T[],
   roster: { name: string }[],

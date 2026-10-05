@@ -1,17 +1,10 @@
 /**
- * Faithful TypeScript port of party-console's own
- * dashboard/features/party/live-protocol.ts (also ported to Kotlin as
- * network/LiveProtocol.kt for the Android app) - same message shape,
- * same snapshot/delta/heartbeat/epoch/sequence reconciliation rules, so
- * this client's view of a character's state can never drift from what
- * the actual web dashboard shows for the same server. vitals/items/slots
- * are kept as raw JSON objects merged key-by-key - the server can add
- * new fields over time and this keeps working without a matching app
- * update.
+ * Client side of the dashboard live stream: snapshot/delta/heartbeat
+ * messages reconciled by epoch and sequence. Keep in step with the
+ * console's dashboard/features/party/live-protocol.ts.
  *
- * If party-console's own live-protocol.ts ever changes, re-port from the
- * new source rather than guessing - this file's job is to match theirs,
- * not to reinterpret it.
+ * vitals/items/slots stay raw JSON merged key-by-key, so new server
+ * fields pass through without an app update.
  */
 export interface LiveRecordWire {
   generation: string
@@ -44,11 +37,9 @@ export class LiveReceiver {
     this.write = write
   }
 
-  /** Returns true if the message was a recognized, in-order protocol
-   *  message (whether or not it changed anything) - false means it was
-   *  malformed or stale and the caller should not treat it as a sign of a
-   *  healthy connection (used to decide whether to reset the heartbeat
-   *  watchdog timer). */
+  /** True for a recognized, in-order message, whether or not it changed
+   *  anything. False (malformed or stale) must not count as a sign of a
+   *  healthy connection. */
   accept(message: LiveMessage): boolean {
     if (!message || !Number.isSafeInteger(message.sequence) || typeof message.epoch !== 'string') return false
     if (message.type === 'heartbeat') return message.epoch === this.epoch
@@ -73,10 +64,8 @@ export class LiveReceiver {
       }
       const previous = this.records.get(name)
       const sameGeneration = previous != null && previous.generation === incoming.generation
-      // Stale-sample guard: a delta that arrived out of order for the
-      // SAME character generation, carrying an older sample number than
-      // what's already held, is ignored rather than rolling the
-      // displayed state backward.
+      // Ignore an older sample from the same generation rather than
+      // rolling the displayed state backward.
       if (sameGeneration && incoming.sample < previous!.sample) continue
 
       const next: LiveRecordWire = {

@@ -1,6 +1,5 @@
 import type { Condition } from '@/models'
 
-// status-duration.ts, verbatim.
 export type StatusDuration = { observed: number; at: number; total: number; source: Condition['source'] }
 export function durationSignature(conditions: Condition[]) {
   return JSON.stringify(conditions.map((condition) => [condition.id, condition.remainingMs, condition.source, condition.definition?.duration]))
@@ -31,7 +30,6 @@ export function statusRemaining(value: StatusDuration | undefined, now: number) 
   return Math.max(0, value.observed - Math.max(0, now - value.at))
 }
 
-/** display-value.ts, verbatim. */
 export function displayValue(value: unknown): string {
   if (value === null) return 'None'
   if (Array.isArray(value)) return value.map(displayValue).join(', ')

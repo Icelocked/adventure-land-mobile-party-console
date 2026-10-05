@@ -1,15 +1,11 @@
-/** dashboard/features/party/query-actions.ts (party-console v1.2.0):
- *  which data domains each action can change, ported verbatim. After an
- *  action the provider refreshes exactly these domains. Re-sync on every
- *  console release - an unknown path refreshes core + config. */
+/** Which data domains each action can change; after an action the
+ *  provider refreshes exactly these. Keep in step with the console's
+ *  dashboard/features/party/query-actions.ts on each release. */
 export type Domain = 'core' | 'config' | 'fast' | 'inventory' | 'logs' | 'bank' | 'market' | 'catalog' | 'mail'
 
-// 'config' (rules/marks/configuration) sits alongside 'core' (live operational
-// state) in every one of these groups: most mutations here are dashboard-driven
-// settings changes, and the two domains split what used to be one 'core'
-// payload, so anything that used to be covered by invalidating 'core' alone
-// needs 'config' invalidated too or the user's own change looks stale for up
-// to the config domain's poll interval.
+// 'config' (rules/marks/settings) accompanies 'core' (live state) in every
+// group: most actions change settings, and without refreshing config the
+// user's change looks stale until the next config poll.
 const core = ['core', 'config'] as const
 const inventory = ['core', 'config', 'inventory', 'fast'] as const
 const commerce = ['core', 'config', 'inventory', 'fast', 'bank', 'market'] as const
@@ -78,9 +74,7 @@ export function affectedDomains(path: string, body?: unknown): readonly Domain[]
   if (/^\/slots\/\d+\/(spawn|logout)$/.test(path)) return inventory
   if (/^\/bankbois\/[^/]+\/delete$/.test(path)) return ['core', 'config', 'bank']
   if (/^\/combat-log\/[^/]+\/clear$/.test(path)) return ['logs']
-  // The dashboard throws here (a missing cache policy is a bug in its own
-  // code); the PWA may call routes it hasn't mapped yet, so fall back to
-  // core + config, the dashboard's default group.
+  // Routes not mapped above fall back to core + config.
   return actionDomains[path as keyof typeof actionDomains] ?? core
 }
 

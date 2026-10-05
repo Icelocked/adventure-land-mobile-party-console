@@ -1,7 +1,6 @@
-/** routine-labels.tsx + automatic-routine-keys.tsx (party-console v1.2.0),
- *  ported verbatim - the merchant's schedulable work reasons and which ones
- *  have an on/off switch. Re-sync from the dashboard on every release; the
- *  server drops unknown keys (routine-priorities.ts). */
+/** The merchant's schedulable work reasons and which ones have an on/off
+ *  switch. Keep in step with the console's routine-labels.tsx; the server
+ *  drops unknown keys. */
 export const ROUTINE_LABELS: Record<string, string> = {
   'merchant luck': "Merchant's Luck",
   'inventory cleanout': 'Emergency inventory cleanout',
@@ -52,8 +51,8 @@ export const AUTOMATIC_ROUTINE_KEYS = new Set([
 
 export const hasEnableToggle = (key: string): boolean => AUTOMATIC_ROUTINE_KEYS.has(key) || key === 'fishing' || key === 'mining'
 
-/** runtime/coordinator/merchant/routines.ts routineFor (v1.2.0), verbatim -
- *  which routine a queued merchant job belongs to. */
+/** Which routine a queued merchant job belongs to.
+ *  Console: runtime/coordinator/merchant/routines.ts. */
 export interface RoutineJob {
   reason: string
   manual?: boolean

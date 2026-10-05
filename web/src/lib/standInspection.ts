@@ -1,7 +1,7 @@
 import type { EquippedEntry, Item, PartyStateDynamic, StandBid, StandListing } from '@/models'
 
-/** The merchant as stand-inspection.ts needs it: its equipped slots (the
- *  trade1..16 stand slots live there) and whether the stand is open. */
+/** The merchant's equipped slots (trade1..16 stand slots live there) and
+ *  whether the stand is open. */
 export interface StandMerchant {
   slots?: Record<string, EquippedEntry | null>
   standOpen?: boolean
@@ -9,7 +9,7 @@ export interface StandMerchant {
 type NativeStand = PartyStateDynamic['nativeStand']
 type NativeOffer = NonNullable<NativeStand>['offers'][string]
 
-// stand-inspection.ts, verbatim from here down.
+// Console: stand-inspection.ts.
 const validStandSlot = (slot: string) => /^trade(?:[1-9]|1[0-6])$/.test(slot)
 const identity = (a: Item, b: Item) =>
   a.name === b.name &&
@@ -94,8 +94,8 @@ export function standBuyRows(bids: Record<string, StandBid>, native: NativeStand
     })
 }
 
-/** stand-capacity.ts, verbatim: automatic buys yield their slots to sales;
- *  explicit buy orders reserve them. */
+/** Automatic buys yield their slots to sales; explicit buy orders
+ *  reserve them. */
 export function standIsFull(listings: StandListing[], bids: Record<string, StandBid> = {}): boolean {
   return listings.filter((listing) => listing.state !== 'paused').length + Object.values(bids).filter((bid) => bid.useStandSlot).length >= 16
 }

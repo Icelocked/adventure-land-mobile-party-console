@@ -5,13 +5,10 @@ import type { MapDefinition, MapFrame } from '@/components/map/mapTypes'
 
 type Listener = { frame: (frame: MapFrame) => void; state?: (state: 'live' | 'reconnecting') => void }
 
-/** One EventSource per character's map stream
- *  (runtime/coordinator/telemetry/map-stream.ts), shared by every
- *  subscriber and closed when the last one leaves. Only views that show a
- *  map open a stream (like the dashboard: the live map and the Cave map);
- *  while one is open the character keeps POSTing frames to the console,
- *  so nothing else may open one. Passive listeners (the target-type
- *  lookup) only hear frames from a stream a map view already opened. */
+/** One EventSource per character's map stream, shared by all subscribers
+ *  and closed when the last leaves. While a stream is open the character
+ *  keeps posting frames to the console, so only map views open one.
+ *  Passive listeners only hear frames from a stream a map view opened. */
 const streams = new Map<string, { source: EventSource; listeners: Set<Listener> }>()
 const passive = new Map<string, Set<Listener>>()
 
@@ -71,7 +68,7 @@ export function useMapFrames(character: string, enabled: boolean, listener: List
   }, [settings, character, enabled])
 }
 
-/** query-cache.tsx useVisible: the document is visible. */
+/** Whether the document is visible. */
 export function useVisible() {
   const [visible, setVisible] = useState(() => typeof document !== 'undefined' && !document.hidden)
   useEffect(() => {
@@ -83,7 +80,7 @@ export function useVisible() {
   return visible
 }
 
-// query-cache.tsx useMapDefinition: keyed by core's referenceRevision, kept for the session.
+// Map definitions, keyed by core's referenceRevision and kept for the session.
 const definitions = new Map<string, Promise<MapDefinition | null>>()
 
 export function useMapDefinition(map: string, enabled = true) {
@@ -98,7 +95,7 @@ export function useMapDefinition(map: string, enabled = true) {
     let request = definitions.get(key)
     if (!request) {
       const path = `maps/${encodeURIComponent(map)}?revision=${revision}`
-      // query-cache.tsx transientRetry: one retry after 1 s for network, 408, 429 and 5xx failures.
+      // One retry after 1s for network, 408, 429 and 5xx failures.
       const transient = (status?: number) => status === undefined || status >= 500 || status === 408 || status === 429
       request = api.getJson<MapDefinition>(path).then(async (first) => {
         let result = first

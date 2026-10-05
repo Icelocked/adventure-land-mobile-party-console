@@ -1,4 +1,4 @@
-/** Ported verbatim from party-console's dashboard/lib/party-routing.ts. */
+/** Console: dashboard/lib/party-routing.ts. */
 export interface RoutingFormation {
   leader?: string | null
   followers?: Record<string, boolean>

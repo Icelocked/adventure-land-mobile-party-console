@@ -1,11 +1,8 @@
 import type { ItemMeta } from './itemDetail'
 import type { Sprite } from './sprite'
 
-/** Mirrors the Android app's model/Item.kt, itself a mirror of
- *  party-console's `Item` type (dashboard/features/party/item.tsx) -
- *  field names match the server's JSON exactly. `unknown` is used in
- *  place of Kotlin's JsonElement for fields with more than one possible
- *  wire shape (string|boolean|number); callers narrow as needed. */
+/** An item as the server sends it. Fields with several possible wire
+ *  shapes (string|boolean|number) are `unknown`; callers narrow them. */
 export interface Item {
   l?: unknown // string | boolean - locked, or a lock reason
   gift?: boolean
@@ -21,15 +18,13 @@ export interface Item {
   m?: unknown // boolean | string | number
 }
 
-/** npc-sale.ts's `modified()`, ported verbatim - an NPC sale destroys an
- *  upgrade/stat-scroll/shiny-variant investment permanently, so the
- *  server refuses to sell one of these without `acknowledged: true`. */
+/** Selling to an NPC destroys an upgrade/stat-scroll/shiny investment,
+ *  so the server refuses these without `acknowledged: true`. */
 export function isModifiedItem(item: Item): boolean {
   return Number(item.level ?? 0) > 0 || !!item.stat_type || !!item.p
 }
 
-/** inventory-entry.tsx's operation: an upgrade/compound in progress on
- *  this slot (item-operation-overlay.tsx). */
+/** An upgrade/compound in progress on this slot. */
 export interface ItemOperation {
   type: string
   fromLevel: number
@@ -41,7 +36,7 @@ export interface ItemOperation {
 export interface InventoryEntry {
   slot: number
   item: Item
-  // Live item meta, when the server attaches it (inventory-entry.tsx).
+  // Live item meta, when the server attaches it.
   meta?: ItemMeta | null
   operation?: ItemOperation | null
 }
@@ -51,8 +46,7 @@ export interface EquippedEntry {
   meta?: ItemMeta | null
 }
 
-/** Mirrors `Condition` (dashboard/features/party/condition.tsx) - one live
- *  status effect (buff/debuff) on a character. */
+/** One live status effect (buff/debuff) on a character. */
 export interface Condition {
   id: string
   name: string
@@ -60,7 +54,7 @@ export interface Condition {
   remainingMs?: number
   stacks?: unknown
   source?: unknown
-  // condition.tsx: the status sprite, its G definition and live fields.
+  // The status sprite, its G definition and live fields.
   sprite?: Sprite | null
   definition?: Record<string, unknown>
   live?: Record<string, unknown>

@@ -1,4 +1,4 @@
-/** lib/event-policy.ts, verbatim. */
+/** Console: lib/event-policy.ts. */
 interface EventFormation {
   leader?: string | null
   merchantCharacter?: string | null
@@ -32,10 +32,8 @@ export function eventPolicy(party: EventFormation, name: string) {
   }
 }
 
-/** event-selection-control.tsx EventSchedule. */
 export type EventSchedule = { id: string; name: string; live?: boolean; next?: number; expires?: number; stale?: boolean; slotAt?: number; slotKind?: string }
 
-/** event-selection-control.tsx eventTimeLabel, verbatim. */
 export function eventTimeLabel(next: number | undefined, now: number) {
   if (!next || !Number.isFinite(next)) return 'Time not announced'
   const ms = next < 1e12 ? next * 1000 : next
