@@ -3,18 +3,16 @@ package com.partyconsole.companion.data
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** The data domains the dashboard polls separately (query-cache.tsx). */
+/** The state domains, each polled separately. */
 enum class Domain { CORE, CONFIG, FAST, INVENTORY, LOGS, BANK, MARKET, CATALOG, MAIL, ESCAPE }
 
 private val CORE = listOf(Domain.CORE, Domain.CONFIG)
 private val INVENTORY = listOf(Domain.CORE, Domain.CONFIG, Domain.INVENTORY, Domain.FAST)
 private val COMMERCE = listOf(Domain.CORE, Domain.CONFIG, Domain.INVENTORY, Domain.FAST, Domain.BANK, Domain.MARKET)
 
-/** dashboard/features/party/query-actions.ts (party-console v1.2.0), ported
- *  verbatim (same as the PWA's data/queryActions.ts): which data domains
- *  each action can change. After an action the repository refreshes exactly
- *  these. Re-sync on every console release - an unknown path refreshes
- *  core + config. */
+/** Which domains each action can change; the repository refreshes these
+ *  after the action. Re-check against the console's query-actions.ts on
+ *  each release. PWA: web/src/data/queryActions.ts. */
 val ACTION_DOMAINS: Map<String, List<Domain>> = mapOf(
     "/daily-dungeons" to CORE,
     "/merchant/bank-sort" to CORE,
@@ -85,8 +83,7 @@ fun affectedDomains(path: String, body: JsonObject?): List<Domain> {
     if (SLOT_ACTION.matches(path)) return INVENTORY
     if (BANKBOI_DELETE.matches(path)) return listOf(Domain.CORE, Domain.CONFIG, Domain.BANK)
     if (COMBAT_LOG_CLEAR.matches(path)) return listOf(Domain.LOGS)
-    // The dashboard throws here (a missing cache policy is a bug in its own
-    // code); the app may call routes it hasn't mapped yet, so fall back to
-    // core + config, the dashboard's default group.
+    // The dashboard throws on an unmapped route; the app may call routes it
+    // hasn't mapped yet, so fall back to core + config.
     return ACTION_DOMAINS[path] ?: CORE
 }

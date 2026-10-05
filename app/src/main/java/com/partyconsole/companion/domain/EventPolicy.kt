@@ -5,7 +5,8 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.math.max
 
-// lib/event-policy.ts (the PWA's lib/eventPolicy.ts), verbatim.
+// Which events a character joins; followers inherit the leader's choice.
+// PWA: web/src/lib/eventPolicy.ts.
 
 val SUPPORTED_EVENTS = listOf("anniversary", "abtesting", "goobrawl", "crabxx", "franky", "icegolem", "snowman")
 
@@ -32,8 +33,8 @@ fun selectedEvents(state: PartyStateDynamic, name: String): List<String> {
 
 fun eventEnabled(state: PartyStateDynamic, name: String, event: String) = event in selectedEvents(state, name)
 
-/** event-selection-control.tsx eventTimeLabel: the local time (short zone)
- *  and the countdown; seconds-based timestamps are accepted. */
+/** The local time (short zone) and the countdown; [next] may be in seconds
+ *  or milliseconds. */
 fun eventTimeLabel(next: Double?, now: Long): String {
     if (next == null || !next.isFinite() || next == 0.0) return "Time not announced"
     val ms = if (next < 1e12) (next * 1000).toLong() else next.toLong()

@@ -6,10 +6,10 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
 
-// farming-zones.ts and farming-areas.ts (party-console's dashboard/lib),
-// ported verbatim: spawn shapes (rectangles or polygons), their distance and
-// overlap, clustering several monsters' spawns into shared farming areas,
-// and the Phoenix patrol's default order.
+// Spawn shapes (rectangles or polygons), their distance and overlap,
+// clustering several monsters' spawns into shared farming areas, and the
+// Phoenix patrol's default order. PWA: web/src/lib/farmingZones.ts and
+// farmingAreas.ts.
 
 @Serializable
 data class Shape(val boundary: List<Double>? = null, val polygon: List<List<Double>>? = null)
@@ -32,7 +32,7 @@ data class Area(
 
 data class Point(val x: Double, val y: Double, val map: String? = null)
 
-/** One monster's spawn locations (monster-choice.tsx's `locations`). */
+/** One monster's spawn locations. */
 data class CatalogMonster(val id: String, val locations: List<Area>)
 
 fun polygon(shape: Shape): List<List<Double>> {
@@ -164,7 +164,7 @@ fun searchPoints(area: Area?): List<Point> {
     return points.filter { contains(area, it, 0.0, 1.0) }
 }
 
-/** farming-areas.ts key(): map plus shapes / boundary / centre. */
+/** Dedup key: map plus shapes / boundary / centre. */
 private fun areaKey(a: Area): String {
     val geometry = when {
         a.shapes != null -> a.shapes.joinToString(",", "[", "]") { jsShape(it) }
@@ -239,7 +239,7 @@ fun farmingAreas(catalog: List<CatalogMonster>, ids: List<String>): List<Area> {
         )
 }
 
-// party-routing.ts, verbatim.
+// Only the leader or an independent character can route to a monster.
 const val FOLLOWER_ROUTE_MESSAGE = "only leader can route to monster"
 
 fun canRouteToMonster(leader: String?, followers: Map<String, Boolean>, character: String): Boolean =

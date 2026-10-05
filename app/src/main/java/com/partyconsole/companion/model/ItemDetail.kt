@@ -3,14 +3,10 @@ package com.partyconsole.companion.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/** The full per-item reference data behind party-console's "left-click an
- *  item" details dialog (item-details.tsx/item-meta.tsx) - `definition` is
- *  the raw game data record (armor/attack/tier/etc., heterogeneous value
- *  types), `properties` is the server's own already-computed current-level
- *  stat block, `scaling` is the per-level stat delta used to preview other
- *  levels (see ItemFormulas.calculatedLevelProperties). Confirmed against
- *  a live GET /party-api/state capture this session - field names and
- *  nesting match exactly. */
+/** Reference data behind the item details view. `definition` is the raw
+ *  game record (mixed value types), `properties` the server-computed stats
+ *  at the current level, and `scaling` the per-level delta used to preview
+ *  other levels. */
 @Serializable
 data class ItemMeta(
     val definition: Map<String, JsonElement> = emptyMap(),
@@ -38,21 +34,18 @@ data class UsageClass(
     val hands: Int? = null,
 )
 
-/** The "where does this fit in the game world" section of an item -
- *  everything item-details.tsx shows below the base stat block, each
- *  independently optional (a plain stat scroll has none of these; a
- *  craftable armor piece might have recipe + drops + usedIn all at once). */
+/** Where an item fits in the game world, shown below its stats. Every part
+ *  is independently optional. */
 @Serializable
 data class ItemWorldInfo(
     val recipe: ItemRecipe? = null,
     val set: ItemSetInfo? = null,
     val drops: List<ItemDropSource> = emptyList(),
     val usedIn: List<ItemCraftUse> = emptyList(),
-    // suggested-item-value.tsx's precomputed per-source prices.
+    // Precomputed per-source price suggestions.
     val suggestedPrices: List<ItemSuggestedPrice> = emptyList(),
 )
 
-/** item-suggested-price.tsx. */
 @Serializable
 data class ItemSuggestedPrice(
     val monsterId: String = "",
@@ -100,7 +93,7 @@ data class ItemDropSource(
     val sourceType: String? = null,
     val acquisitionPath: List<String> = emptyList(),
     val sprite: Sprite? = null,
-    // indirect-bestiary-drops.tsx: the map of a zone drop.
+    // The map of a zone drop.
     val mapId: String? = null,
     val mapName: String? = null,
 )
@@ -138,12 +131,9 @@ data class ItemCraftUse(
     val sprite: Sprite? = null,
 )
 
-/** A merchant NPC exchange/box entry (merchant-exchange-item.tsx) - either
- *  a straight exchange (`reward`/`rewardQuantity` set: pay [required] of
- *  [id] for a fixed reward) or a randomized table (`results`: opening this
- *  item rolls one of several outcomes by `chance`). Item details' "Exchange
- *  price"/"reward"/"Reward in" sections are all derived by matching this
- *  list against the item being viewed - see ItemFormulas.exchangeSections. */
+/** An NPC exchange/box entry: either a fixed exchange (`reward` set: pay
+ *  `required` of `id` for it) or a random table (`results` rolled by
+ *  `chance`). */
 @Serializable
 data class MerchantExchangeItem(
     val key: String,

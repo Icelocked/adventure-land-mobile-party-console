@@ -8,7 +8,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.max
 
-// status-duration.ts, verbatim.
+// Status countdowns: remembers each status's total duration across updates.
+// PWA: web/src/lib/statusDuration.ts.
 
 data class StatusDuration(val observed: Long, val at: Long, val total: Long, val source: JsonElement?)
 
@@ -37,7 +38,7 @@ fun observeStatus(remainingMs: Long?, source: JsonElement?, duration: JsonElemen
 
 fun statusRemaining(value: StatusDuration?, now: Long): Long? = value?.let { max(0L, it.observed - max(0L, now - it.at)) }
 
-/** display-value.ts, verbatim. */
+/** A JSON value as display text. */
 fun displayValue(value: JsonElement?): String = when (value) {
     null -> ""
     is JsonNull -> "None"

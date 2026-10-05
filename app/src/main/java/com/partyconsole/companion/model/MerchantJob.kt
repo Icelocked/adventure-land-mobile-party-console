@@ -3,12 +3,8 @@ package com.partyconsole.companion.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/** Mirrors party-console's MerchantJob type (dashboard/features/party/merchant-job.tsx),
- *  trimmed to what the queue widget displays (see merchant-job-label.ts for
- *  how routine/reason/order become the human label shown per row - this
- *  app derives its own short label from the same fields rather than
- *  porting that whole lookup table for v1). Everything nullable/defaulted:
- *  a job's shape varies a lot by what kind of errand it is. */
+/** One merchant queue job, trimmed to what the queue widget shows.
+ *  Everything is nullable/defaulted: a job's shape varies a lot by errand. */
 @Serializable
 data class MerchantJob(
     val id: String? = null,
@@ -16,12 +12,12 @@ data class MerchantJob(
     val target: String = "",
     val reason: String = "",
     val routine: String? = null,
-    // routines.ts routineFor inputs.
+    // Inputs for working out which routine a job belongs to.
     val manual: Boolean? = null,
     val bidItemId: String? = null,
     val order: JsonElement? = null,
     val autoExchangeKeys: List<String> = emptyList(),
-    // merchant-card-controls.tsx: stuck detection, labels and status.
+    // Stuck detection, labels and status.
     val recoveryAttempts: Int? = null,
     val lastDeferredReason: String? = null,
     val firstDeferredAt: Long? = null,
@@ -38,7 +34,7 @@ data class MerchantJob(
     val realmRetryExhausted: Boolean = false,
 )
 
-/** One HP or MP auto-potion threshold - see restock-policy.tsx. */
+/** One HP or MP auto-potion threshold. */
 @Serializable
 data class RestockRange(
     val min: Int = 0,
@@ -46,32 +42,27 @@ data class RestockRange(
     val item: String? = null,
 )
 
-/** A character's restock policy (restock-controls.tsx) - defaults to a
- *  zeroed range rather than requiring both hp/mp, since a character with
- *  no policy saved yet should still render (as "0/0", editable from
- *  there) instead of vanishing from RestockSection entirely. */
+/** A character's restock policy. Defaulted so a character with no saved
+ *  policy still renders and can be edited. */
 @Serializable
 data class RestockPolicy(
-    // restock-controls.tsx defaults, the same as the server's.
+    // Same defaults as the server.
     val hp: RestockRange = RestockRange(min = 5, max = 20),
     val mp: RestockRange = RestockRange(),
 )
 
-/** Shared bank vault (bank-sheet.tsx's BankSnapshot) - packs keys are pack
- *  names like "items1"/"bank_b1"; each pack is a fixed-length list of
- *  entries, same empty-slot-preserving shape as a character's inventory. */
+/** Shared bank. `packs` keys are pack names like "items1"; each pack is a
+ *  fixed-length slot list with nulls for empty slots, like an inventory. */
 @Serializable
 data class BankSnapshot(
     val gold: Long = 0,
     val packs: Map<String, List<InventoryEntry?>> = emptyMap(),
 )
 
-/** One bank pack's lock state (http/bank-unlock.ts / bank-sheet.tsx's BankVault) - every
- *  pack the account could ever have, locked or not. A pack is unlocked once it shows up as
- *  a key in BankSnapshot.packs; until then this describes what opens it: `floor == "bank"`
- *  packs open for `gold` alone once accessible, but a non-base floor's first (gold = 0)
- *  vault needs its own `key` item owned and unlocked with kind "key" before ANY vault on
- *  that floor (including that one) becomes accessible - see bank-unlock.ts's access(). */
+/** Lock state for every bank pack the account could have. A pack is
+ *  unlocked once it appears in [BankSnapshot.packs]. Base-floor ("bank")
+ *  packs open for `gold`; on other floors the first (gold = 0) vault needs
+ *  its `key` item before any vault on that floor is accessible. */
 @Serializable
 data class BankVaultKey(
     val id: String,
@@ -99,12 +90,7 @@ data class BestiaryDrop(
     val sprite: Sprite? = null,
 )
 
-/** One entry in a BestiaryMonster's spawnRecords - a real map location
- *  this monster spawns at, confirmed against a live GET /party-api/state
- *  capture (farming-area-picker.tsx's `farmingAreas()` groups these same
- *  records client-side using a separate static lib/farming-areas.ts data
- *  file this app doesn't port - picking a plain spawn record directly is
- *  simpler and uses only server-sourced data). */
+/** A map location where a [BestiaryMonster] spawns. */
 @Serializable
 data class MonsterSpawnRecord(
     val sourceMap: String = "",
@@ -117,9 +103,7 @@ data class MonsterSpawnRecord(
     val restrictions: List<String> = emptyList(),
 )
 
-/** bestiary-dialog.tsx's monster reference entry. `definition` (raw skill/
- *  achievement data) stays untyped/unsurfaced for v1 - drops are the
- *  concrete, actionable data players actually look this screen up for. */
+/** A bestiary monster entry. */
 @Serializable
 data class BestiaryMonster(
     val id: String,
@@ -128,7 +112,7 @@ data class BestiaryMonster(
     val attack: Long = 0,
     val xp: Long = 0,
     val threat: Double = 0.0,
-    // bestiary-monster.ts: attack range and the raw G.monsters definition.
+    // Attack range and the raw G.monsters definition.
     val range: Double? = null,
     val definition: kotlinx.serialization.json.JsonObject? = null,
     val sprite: Sprite? = null,
@@ -136,7 +120,7 @@ data class BestiaryMonster(
     val spawnRecords: List<MonsterSpawnRecord> = emptyList(),
 )
 
-/** skills-dialog.tsx's per-class skill list. */
+/** One class's skill list. */
 @Serializable
 data class SkillClass(
     val id: String,
@@ -149,27 +133,21 @@ data class SkillEntry(
     val id: String,
     val name: String,
     val sprite: Sprite? = null,
-    // skill-entry.ts: the full G.skills definition.
+    // The full G.skills definition.
     val definition: kotlinx.serialization.json.JsonObject? = null,
 )
 
-/** One activity-feed line (merchant-activity or combat log) - shared shape
- *  across both per merchant-card-controls.tsx / combat log readers. */
+/** One merchant-activity or combat-log line. */
 @Serializable
 data class ActivityEntry(
     val at: Long = 0,
     val message: String = "",
     val level: String? = null,
-    // combat-log-entry.ts: skill | kill | loot | death | item.
+    // Combat log: skill | kill | loot | death | item.
     val type: String? = null,
     val details: JsonElement? = null,
 )
 
-/** One of the merchant's own 16 stand listing slots (stand-sheet.tsx).
- *  `slot` is the merchant's own INVENTORY slot the item occupies while
- *  listed (needed to remove the listing via PartyApiClient.markForStand
- *  with remove=true) - distinct from `tradeSlot` (the stand UI position,
- *  not modeled here since nothing in this app needs it yet). */
 @Serializable
 data class BankSortRequest(
     val id: String,
@@ -177,6 +155,8 @@ data class BankSortRequest(
     val message: String? = null,
 )
 
+/** One of the merchant's 16 stand listings. `slot` is the merchant's
+ *  inventory slot holding the item, distinct from `tradeSlot`. */
 @Serializable
 data class StandListing(
     val id: String? = null,
@@ -192,16 +172,10 @@ data class StandListing(
     val state: String? = null,
 )
 
-/** One public market listing from ALData or Ponty (stand-sheet.tsx's
- *  market tab) - confirmed against the real GET /party-api/state payload
- *  (there is no flat top-level "marketListings" field, the Phase-3
- *  assumption that one existed was wrong - real listings live under
- *  `aldata.listings` and `ponty.listings`, unified into this one shape
- *  since both are "someone selling an item for a price" at heart).
- *  ALData's price is already per-unit; Ponty's `price` is the TOTAL for
- *  `quantity` (its own `unitPrice` is the per-unit figure) - `unitPrice`
- *  is nullable so callers can prefer it when present, matching how each
- *  source actually reports it rather than assuming one convention. */
+/** One public ALData or Ponty listing, unified from `aldata.listings` and
+ *  `ponty.listings`. ALData's `price` is per unit; Ponty's is the total for
+ *  `quantity`, with `unitPrice` the per-unit figure - prefer `unitPrice`
+ *  when present. */
 @Serializable
 data class MarketListing(
     val key: String? = null,
@@ -211,17 +185,14 @@ data class MarketListing(
     val price: Long = 0,
     val unitPrice: Long? = null,
     val quantity: Int = 1,
-    // use-panel-model.ts standMarketCount: fresh, non-PVP listings only.
+    // Used to count only fresh, non-PVP listings.
     val seenAt: Long? = null,
     val serverIdentifier: String? = null,
     val serverRegion: String? = null,
 )
 
-/** One live "someone's stand is open nearby" result from a stand search -
- *  a different, more transient source than ALData/Ponty's aggregated
- *  market snapshots (player-stand-market-dialog.tsx). Buying one requires
- *  echoing these exact fields back so the coordinator can re-match the
- *  same physical listing (the dashboard never renders this search). */
+/** One live stand-search result. Buying echoes these fields back so the
+ *  coordinator can re-match the same listing. */
 @Serializable
 data class StandSearchListing(
     val seller: String,
@@ -243,9 +214,8 @@ data class StandSearchState(
     val error: String? = null,
 )
 
-/** aldata-state.tsx. Rows stay as received: a purchase or sale echoes the
- *  listing back (use-party-console.tsx buyALDataListing / sellALDataOrder);
- *  domain/Market.kt reads them. */
+/** ALData market state. Rows stay as raw JSON because a purchase or sale
+ *  echoes the listing back; domain/Market.kt reads them. */
 @Serializable
 data class AlDataState(
     val listings: List<kotlinx.serialization.json.JsonObject> = emptyList(),
@@ -253,8 +223,7 @@ data class AlDataState(
     // Other owners' published trade intentions (classifieds).
     val trades: List<kotlinx.serialization.json.JsonObject> = emptyList(),
     val merchantsUpdatedAt: Long? = null,
-    // Publish/auth fields (aldata-state.tsx) - public market browsing needs neither; these only
-    // matter for the merchant publishing their own listings to ALData.
+    // Only used when publishing the merchant's own listings to ALData.
     val hasKey: Boolean = false,
     val auth: String? = null,
     val publishStatus: String? = null,
@@ -267,16 +236,10 @@ data class PontyState(
     val error: String? = null,
 )
 
-/** One tile within a shared sprite sheet (e.g. items/pack_20vt8.png) - x/y
- *  are grid COLUMN/ROW indices, not pixel offsets. `tileSize` is carried
- *  through because the server sends it, but ui/itemicon/SpriteIcon.kt
- *  deliberately does NOT use it for crop math: it's only reliable for
- *  item sheets (confirmed this session - raw_items.png really is
- *  400x800px, exactly tileSize=20 * columns=20/rows=40), not for monster
- *  sheets (monster2.png is really 720x512px, while tileSize=1 with
- *  columns=12/rows=8 would imply 12x8). SpriteIcon instead derives the
- *  real tile size from the loaded bitmap's own dimensions divided by
- *  columns/rows, which is correct for both. */
+/** One tile in a sprite sheet; x/y are column/row indices, not pixels.
+ *  `tileSize` is unreliable for monster sheets (monster2.png is 720x512 but
+ *  reports tileSize=1), so SpriteIcon derives the tile size from the
+ *  bitmap's dimensions and columns/rows instead. */
 @Serializable
 data class Sprite(
     val url: String,
@@ -287,12 +250,8 @@ data class Sprite(
     val y: Int,
 )
 
-/** merchantCatalog.allItems - browsing (CatalogScreen), icon/display-name
- *  lookup (item.name on a live inventory/equipment entry matches `id`
- *  here, NOT `name` - the catalog's `name` is the human-readable display
- *  name, `id` is the internal identifier every live item instance
- *  actually carries as its own `.name`), and the full item-details view
- *  (ui/itemdetail/ItemDetailBrowser.kt) via `meta`. */
+/** merchantCatalog.allItems entry. A live item's `name` matches `id` here;
+ *  `name` is the display name. */
 @Serializable
 data class CatalogItem(
     val id: String,
@@ -322,8 +281,7 @@ data class MerchantBuyItem(
     val scrollCosts: List<Long>? = null,
 )
 
-/** merchantCatalog.craftable - recipes buyable via the merchant crafting
- *  workflow (MerchantCommerceScreen "craft" mode). */
+/** merchantCatalog.craftable - recipes the merchant can craft. */
 @Serializable
 data class MerchantCraftRecipe(
     val id: String,
@@ -338,17 +296,13 @@ data class MerchantCatalog(
     val allItems: List<CatalogItem> = emptyList(),
     val buyable: List<MerchantBuyItem> = emptyList(),
     val craftable: List<MerchantCraftRecipe> = emptyList(),
-    // NPC exchange/box tables - matched against an item by id+level to
-    // build the item-details "Exchange price"/"reward"/"Reward in"
-    // sections (see ItemFormulas.exchangeSections).
+    // NPC exchange/box tables, matched by item id+level for the item
+    // details' exchange sections.
     val exchangeable: List<MerchantExchangeItem> = emptyList(),
 )
 
-/** One entry in `marked`/`merchantMarked` (bank/merchant hold marks) -
- *  slot-based, one specific item instance, as opposed to autoItemMarks'
- *  item-identity-keyed standing rules. `auto` distinguishes a rule-
- *  generated mark (shown as "Auto bank"/"Auto merchant") from a manual
- *  one-off mark (shown as "Mark for bank"/"Mark for merchant"). */
+/** A bank/merchant hold mark on one item instance by slot, as opposed to
+ *  the standing autoItemMarks rules. `auto` means a rule created it. */
 @Serializable
 data class BankMark(
     val slot: Int,
@@ -356,22 +310,16 @@ data class BankMark(
     val auto: Boolean = false,
 )
 
-/** The rule-key format both autoItemMarks and autoUpgradeMarks use:
- *  "{item.name}@+{level or 0}" - see automatic-commerce-rule-key.ts. */
+/** Rule key used by autoItemMarks and autoUpgradeMarks: "{name}@+{level}". */
 fun autoMarkRuleKey(item: Item): String = "${item.name}@+${item.level ?: 0}"
 
-/** Parses a rule key (see autoMarkRuleKey) back into a displayable Item -
- *  used when a collection is keyed by rule string rather than holding a
- *  real Item (autoItemMarks, autoUpgradeMarks). */
+/** Parses a rule key back into a displayable Item. */
 fun itemFromRuleKey(ruleKey: String): Item {
     val parts = ruleKey.split("@+")
     return Item(name = parts.getOrElse(0) { ruleKey }, level = parts.getOrNull(1)?.toIntOrNull())
 }
 
-/** One entry in the flat, account-wide autoNpcSales map - `character`
- *  distinguishes a per-character rule from the merchant's own (absent
- *  character = merchant), matching inventory-panel.tsx's
- *  `!rule.character` check for "is this the merchant's own rule". */
+/** One autoNpcSales rule; a null `character` means the merchant's own. */
 @Serializable
 data class AutoNpcSaleRule(
     val item: Item,
@@ -390,10 +338,8 @@ data class AutoDeconstructionRule(
     val item: Item,
 )
 
-/** One entry in a character's autoCompounds list - `name` only (no
- *  level: compound rules aren't level-specific the way upgrade/bank/
- *  merchant rules are, since compounding advances an item's own level
- *  automatically toward targetTier). */
+/** One autoCompounds rule. No level: compounding advances the item's level
+ *  toward `targetTier` on its own. */
 @Serializable
 data class AutoCompoundRule(
     val name: String,
@@ -401,9 +347,8 @@ data class AutoCompoundRule(
     val quantity: Int = -1,
 )
 
-/** One preset map location the "Send to..." picker offers (travelPlaces) -
- *  `id` is the map name POST /party-api/command's character-travel
- *  command expects. */
+/** A preset "Send to..." location; `id` is the map name character-travel
+ *  expects. */
 @Serializable
 data class TravelPlace(
     val id: String,
@@ -412,8 +357,7 @@ data class TravelPlace(
     val y: Double = 0.0,
 )
 
-/** One selectable Adventure Land realm/server option (realm-control's
- *  realms list) - `key` is what POST /party-api/realm/switch expects. */
+/** A selectable realm; `key` is what /party-api/realm/switch expects. */
 @Serializable
 data class RealmOption(
     val key: String,
@@ -441,7 +385,7 @@ data class RealmCharacter(
     val realm: String? = null,
 )
 
-/** realm-operation.tsx - a realm switch (and optional home change) in progress. */
+/** A realm switch (and optional home change) in progress. */
 @Serializable
 data class RealmOperation(
     val phase: String = "",
@@ -450,16 +394,14 @@ data class RealmOperation(
     val characters: List<RealmCharacter> = emptyList(),
 )
 
-/** upgrade-offerings.ts's table of the 3 offering item ids -> display
- *  name, ported verbatim. */
+/** Offering item id -> display name. */
 val UPGRADE_OFFERING_LABELS: Map<String, String> = linkedMapOf(
     "offeringp" to "Primling",
     "offering" to "Primordial Essence",
     "offeringx" to "Primordial X",
 )
 
-/** upgrade-offerings.ts's UpgradeOfferingRule, ported verbatim. `name` is
- *  the item's internal catalog id (e.g. "coat"), not its display name. */
+/** `name` is the item's catalog id (e.g. "coat"), not its display name. */
 @Serializable
 data class UpgradeOfferingRule(
     val id: String,
@@ -481,9 +423,8 @@ data class StandBid(
     val acceptHigherLevels: Boolean? = null,
 )
 
-/** hunt-blacklist-label.ts's source entry - a monster currently skipped
- *  by Hunt mode, either automatically (deaths/expirations threshold) or
- *  manually. */
+/** A monster Hunt mode currently skips, either automatically
+ *  (deaths/expirations threshold) or manually. */
 @Serializable
 data class HuntBlacklistEntry(
     val monsterId: String,
@@ -495,24 +436,22 @@ data class HuntBlacklistEntry(
     val lastDeathAt: Long? = null,
 )
 
-/** hunt-settings-control.tsx's config - when Hunt mode should relocate to
- *  avoid a competing party, and when a monster should get auto-
- *  blacklisted (too many character deaths or quest expirations to it). */
+/** When Hunt mode relocates away from a competing party, and when a
+ *  monster gets auto-blacklisted (too many deaths or quest expirations). */
 @Serializable
 data class HuntSettings(
-    // runtime/coordinator/hunt/settings.ts defaultHuntSettings.
+    // Same defaults as the server.
     val relocateIfCompeting: Boolean = true,
     val blacklistDeaths: Boolean = true,
     val deathThreshold: Int = 1,
     val blacklistExpirations: Boolean = true,
     val expirationThreshold: Int = 1,
-    // hunt-spawn-settings.tsx: monster id -> huntSpawnKey ("" = automatic).
+    // Monster id -> huntSpawnKey ("" = automatic).
     val preferredSpawns: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
 )
 
-/** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -
- *  fetched separately via ?section=logs, not part of the main dynamic-
- *  state poll (see PartyRepository.pollGameLogs). */
+/** One raw in-game chat/system log line, fetched separately via
+ *  ?section=logs. */
 @Serializable
 data class GameLogEntry(
     val session: String? = null,

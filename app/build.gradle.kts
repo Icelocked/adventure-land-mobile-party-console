@@ -62,14 +62,11 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        // Card(onClick=...) and a few other Material3 entry points used
-        // across the UI screens are still marked experimental upstream -
-        // project-wide opt-in here instead of annotating every composable
-        // individually, matching how most Compose Material3 apps handle
-        // this until those APIs stabilize.
+        // Card(onClick=...) and a few other Material3 APIs are still
+        // experimental; opt in project-wide rather than per composable.
         freeCompilerArgs += listOf(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            // FlowRow (wrapping chip rows, like the PWA's flex-wrap).
+            // FlowRow, for wrapping chip rows.
             "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
         )
     }
@@ -105,30 +102,23 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
-    // Networking - OkHttp for REST + its SSE extension for the live-updates
-    // stream (/dashboard-stream), matching exactly what the web dashboard
-    // itself uses (EventSource), see network/LiveConnection.kt.
+    // OkHttp for REST, and its SSE extension for the live dashboard stream.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Encrypted local storage for the server connection settings (base URL,
-    // pinned certificate fingerprint if the server uses a self-signed cert).
+    // Encrypted pairing cookie and the saved server settings.
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     // Background alert checks (notify/): the 15-minute periodic job.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // Item/monster sprite icons load directly from adventure.land's own
-    // hosted sprite sheets (Coil handles caching so the same sheet isn't
-    // re-fetched per item) - see ui/itemicon/SpriteIcon.kt.
+    // Sprite sheets load from adventure.land; Coil caches them so a sheet
+    // isn't re-fetched per item.
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Pairing-QR scanning (ui/connection/PairingScreen.kt) - CameraX for the
-    // live preview + frame supply, ML Kit for fully on-device barcode
-    // decoding (no network call, matching this app's self-hosted-first
-    // posture). The manual paste-link field covers any device where the
-    // camera permission is declined or unavailable.
+    // Pairing-QR scanning: CameraX for the preview, ML Kit for on-device
+    // barcode decoding (no network call).
     val cameraxVersion = "1.4.1"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
@@ -137,8 +127,8 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     testImplementation("junit:junit:4.13.2")
-    // JVM tests against a mock server (the PWA e2e mock's fixtures) and,
-    // through Robolectric, Compose screens without an emulator.
+    // JVM tests against a mock server serving the shared fixtures, and
+    // Compose screens through Robolectric without an emulator.
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("org.robolectric:robolectric:4.14.1")

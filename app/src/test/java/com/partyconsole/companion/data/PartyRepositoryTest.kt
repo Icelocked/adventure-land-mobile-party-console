@@ -19,8 +19,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** The data layer against the PWA e2e mock's section payloads - the same
- *  checks as the PWA's data-layer and config-section specs. */
+/** The data layer against the shared fixture sections; mirrors the PWA's
+ *  data-layer and config-section specs. */
 class PartyRepositoryTest {
     private lateinit var console: FakeConsole
     private lateinit var scope: CoroutineScope

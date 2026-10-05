@@ -6,9 +6,8 @@ import com.partyconsole.companion.model.BankboiTransaction
 import com.partyconsole.companion.model.CharacterConnection
 import java.util.Locale
 
-/** runtime/roster/character-order.ts (party-console v1.2.0), verbatim (the
- *  PWA's lib/characterOrder.ts): primary first, then Steam, then headless;
- *  merchants stay last unless primary. Ties: roster order, then name. */
+/** Primary first, then Steam, then headless; merchants stay last unless
+ *  primary. Ties: roster order, then name. */
 fun <T> orderCharacters(
     characters: List<T>,
     roster: List<String>,
@@ -31,8 +30,8 @@ fun <T> orderCharacters(
     )
 }
 
-/** pending-character-cards.tsx (party-console v1.2.0): status labels and
- *  which characters show a "pending" card instead of a live one. */
+/** Status labels, and which characters show a "pending" card instead of a
+ *  live one. */
 val PENDING_LABELS = mapOf(
     "loading" to "Loading in Steam",
     "code" to "CODE active — waiting for Party Console",
@@ -70,7 +69,7 @@ fun pendingHelp(status: String): String = when (status) {
     else -> "Still waiting for the game client to finish loading. Check its window for a connection or loading error."
 }
 
-/** abbreviated-gold.tsx (party-console v1.2.0), verbatim. */
+/** "1.234b" / "5.678m" / "123.4K", else the full grouped number. */
 fun abbreviatedGold(value: Long): String = when {
     value >= 1_000_000_000 -> String.format(Locale.US, "%.3fb", value / 1_000_000_000.0)
     value >= 1_000_000 -> String.format(Locale.US, "%.3fm", value / 1_000_000.0)
@@ -78,8 +77,8 @@ fun abbreviatedGold(value: Long): String = when {
     else -> String.format(Locale.getDefault(), "%,d", value)
 }
 
-/** party-gold.tsx partyGoldNames, verbatim: active, loaded slots only,
- *  never bankbois. */
+/** Characters counted in party gold: active, loaded slots only, never
+ *  bankbois. */
 fun partyGoldNames(activeSlots: List<ActiveSlot>, bankbois: List<Bankboi>): List<String> {
     val excluded = bankbois.map { it.name }.toSet()
     return activeSlots
@@ -91,15 +90,15 @@ fun partyGoldNames(activeSlots: List<ActiveSlot>, bankbois: List<Bankboi>): List
 
 data class GoldTotals(val carried: Long?, val total: Long?)
 
-/** party-gold.tsx goldTotals, verbatim: unknown if any balance is. */
+/** Totals are unknown (null) if any balance is. */
 fun goldTotals(bank: Long?, balances: List<Long?>): GoldTotals {
     val carried = if (balances.all { it != null }) balances.sumOf { it!! } else null
     return GoldTotals(carried = carried, total = if (bank != null && carried != null) bank + carried else null)
 }
 
-/** How recently a character last reported (lib/freshness.ts). Not a
- *  dashboard feature: shows a stuck character from the phone. `live`
- *  matches the 10s online window; past a minute it may be hung. */
+/** How recently a character last reported, to spot a stuck character from
+ *  the phone. LIVE matches the 10s online window; past a minute it may be
+ *  hung. */
 enum class FreshnessLevel { LIVE, SLOW, STALE }
 data class Freshness(val level: FreshnessLevel, val label: String)
 

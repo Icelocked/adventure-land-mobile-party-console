@@ -52,8 +52,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 
-/** public-state.ts catalogs(): served only by section=catalog, refetched when
- *  core's referenceRevision changes. Decoded once per revision. */
+/** Reference catalogs, served only by section=catalog and decoded once per
+ *  core referenceRevision. */
 @Serializable
 private data class CatalogSection(
     val travelPlaces: List<TravelPlace> = emptyList(),
@@ -64,14 +64,12 @@ private data class CatalogSection(
     val bankVaults: List<BankVault> = emptyList(),
 )
 
-/** Owns one connection to one configured server - a port of the PWA's
- *  data/PartyDataProvider.tsx (itself query-cache.tsx's domain policies):
- *  every state section is its own single-flight request on its own cadence,
- *  so a slow section never holds up another; actions refresh exactly the
- *  domains they touched; screens raise a domain's cadence while visible;
- *  polling pauses in the background. Recreate (don't reuse) whenever the
- *  active ServerSettings changes. [live] and [foreground] are injectable for
- *  tests. */
+/** Owns one connection to one configured server. Each state section is its
+ *  own single-flight request on its own cadence, so a slow section never
+ *  holds up another; actions refresh the domains they touched; visible
+ *  screens raise a domain's cadence; polling pauses in the background.
+ *  Recreate whenever the active ServerSettings change.
+ *  PWA: web/src/data/PartyDataProvider.tsx. */
 class PartyRepository(
     private val settings: ServerSettings,
     private val scope: CoroutineScope,
@@ -82,7 +80,7 @@ class PartyRepository(
     private val httpClient = buildHttpClient(settings)
     private val sseClient = buildSseHttpClient(settings)
     val api = PartyApiClient(httpClient, settings) { path, body -> onAction(path, body) }
-    /** Per-character live map frames (useMapFrames.ts). */
+    /** Per-character live map frames. */
     val mapStreams = com.partyconsole.companion.network.MapStreams(sseClient, settings.apiBase)
     /** core's referenceRevision ("0" before the first core read) - keys map definitions. */
     val referenceRevision: String get() = lastReferenceRevision ?: "0"
@@ -104,13 +102,12 @@ class PartyRepository(
     private val _dynamicState = MutableStateFlow(PartyStateDynamic())
     val dynamicState: StateFlow<PartyStateDynamic> = _dynamicState.asStateFlow()
 
-    // The config section has arrived (the PWA's useConfigLoaded): every
-    // control seeded from a config field stays disabled until then.
+    // The config section has arrived; controls seeded from config fields
+    // stay disabled until then.
     private val _stateLoaded = MutableStateFlow(false)
     val stateLoaded: StateFlow<Boolean> = _stateLoaded.asStateFlow()
 
-    // The pairing gate turned this device away (its cookie expired or was
-    // revoked) - the PWA's "Session expired - Reconnect".
+    // The pairing gate turned this device away (cookie expired or revoked).
     private val _sessionLost = MutableStateFlow(false)
     val sessionLost: StateFlow<Boolean> = _sessionLost.asStateFlow()
 
@@ -120,7 +117,7 @@ class PartyRepository(
     private val _gameLogs = MutableStateFlow<Map<String, List<GameLogEntry>>>(emptyMap())
     val gameLogs: StateFlow<Map<String, List<GameLogEntry>>> = _gameLogs.asStateFlow()
 
-    // log-sidebar.tsx: a failed refresh keeps the retained logs and says so.
+    // A failed refresh keeps the retained logs and says so.
     private val _logsError = MutableStateFlow(false)
     val logsError: StateFlow<Boolean> = _logsError.asStateFlow()
 
@@ -129,21 +126,20 @@ class PartyRepository(
     private val _escapeError = MutableStateFlow<String?>(null)
     val escapeError: StateFlow<String?> = _escapeError.asStateFlow()
 
-    // Round trip of the smallest request (escape) - the latency badge.
+    // Round trip of the smallest request (escape), for the latency badge.
     private val _latencyMs = MutableStateFlow<Long?>(null)
     val latencyMs: StateFlow<Long?> = _latencyMs.asStateFlow()
 
-    // core's characterDetails (diagnostics + presence), per active character.
+    // Diagnostics and presence per active character.
     private val _characterDetails = MutableStateFlow<Map<String, CharacterDiagnostics>>(emptyMap())
     val characterDetails: StateFlow<Map<String, CharacterDiagnostics>> = _characterDetails.asStateFlow()
 
-    // Server clock minus this device's clock (live-metrics.ts serverOffset).
+    // Server clock minus this device's clock.
     private val _serverOffset = MutableStateFlow(0L)
     val serverOffset: StateFlow<Long> = _serverOffset.asStateFlow()
 
-    // --- merged state: every non-catalog section laid over the previous one
-    // ({...current, ...patch}), decoded into PartyStateDynamic after each
-    // merge; the catalog is decoded on its own, once per referenceRevision.
+    // Every non-catalog section is laid over the previous merge and decoded
+    // into PartyStateDynamic; the catalog is decoded on its own.
     private val stateLock = Any()
     private var merged = JsonObject(emptyMap())
     private var catalog = CatalogSection()
@@ -186,9 +182,8 @@ class PartyRepository(
     }
 
     /** If one field of an incoming section doesn't match the model (a
-     *  console release changed its shape), only that field is rejected - it
-     *  keeps its last good value and the rest of the state keeps updating
-     *  instead of freezing. */
+     *  console release changed its shape), only that field is rejected; it
+     *  keeps its last good value and the rest of the state keeps updating. */
     private fun decodeState(source: JsonObject): PartyStateDynamic? =
         runCatching { json.decodeFromJsonElement(PartyStateDynamic.serializer(), source) }.getOrNull()
 
@@ -215,11 +210,11 @@ class PartyRepository(
     private suspend fun fetchCore() {
         val sentAt = System.currentTimeMillis()
         val value = (section("core") as? ApiResult.Success)?.value ?: return
-        // query-cache.tsx: a different account on the same server replaces everything.
+        // A different account on the same server replaces everything.
         val accountId = (value["accountId"] as? JsonPrimitive)?.content
         if (accountId != null && lastAccountId != null && accountId != lastAccountId) resetAccount()
         if (accountId != null) lastAccountId = accountId
-        // live-metrics.ts synchronizeDashboardClock: offset from the round trip's midpoint.
+        // Offset measured from the round trip's midpoint.
         (value["serverNow"] as? JsonPrimitive)?.longOrNull?.let { _serverOffset.value = it - (sentAt + System.currentTimeMillis()) / 2 }
         (value["characterDetails"] as? JsonObject)?.let { details ->
             // Each character decodes on its own - one odd report never hides the others.
@@ -248,13 +243,12 @@ class PartyRepository(
         }
         // bankbois: core only has item-less summaries; the bank section has the full entries.
         val patch = value.filterKeys { it !in CORE_ONLY_KEYS }.toMutableMap()
-        // use-panel-model.ts lays the market domain over core, so core's
-        // stripped aldata never replaces the market's copy once loaded.
+        // Core's aldata is stripped; never let it replace the market's copy.
         marketAldata?.let { patch["aldata"] = it }
         mergeState(patch)
-        // query-cache.tsx keys the catalog by core's referenceRevision. A
-        // catalog request already under way is not repeated (it is the
-        // biggest payload); a newer revision is picked up by the next poll.
+        // The catalog is keyed by referenceRevision. A catalog request already
+        // under way is not repeated (it is the biggest payload); a newer
+        // revision is picked up by the next poll.
         val revision = (value["referenceRevision"] as? JsonPrimitive)?.content
         if (revision != null) {
             lastReferenceRevision = revision
@@ -272,8 +266,8 @@ class PartyRepository(
         }
     }
 
-    // query-cache.tsx market domain: before core's first referenceRevision it
-    // reads GET /aldata/market alone; afterwards the market section.
+    // Before core's first referenceRevision, read GET /aldata/market alone;
+    // afterwards the market section.
     private suspend fun fetchMarket() {
         if (lastReferenceRevision == null) {
             val value = (getObject("aldata/market") as? ApiResult.Success)?.value ?: return
@@ -302,7 +296,7 @@ class PartyRepository(
 
     private suspend fun fetchMail() {
         when (val result = api.get("mail")) {
-            // mail-query.ts: a failed refresh keeps the last inbox and shows why.
+            // A failed refresh keeps the last inbox and shows why.
             is ApiResult.Failure -> _mail.update { it.copy(error = result.message.ifBlank { "Mail unavailable" }) }
             is ApiResult.Success -> runCatching { json.decodeFromString(MailSnapshot.serializer(), result.value) }
                 .getOrNull()?.let { _mail.value = it.copy(error = null) }
@@ -345,8 +339,8 @@ class PartyRepository(
         }
     }
 
-    // dashboard-live.tsx: while the live stream is down, `fast` (vitals) and
-    // `inventory` (items/slots) stand in for it.
+    // While the live stream is down, the `fast` (vitals) and `inventory`
+    // (items/slots) sections stand in for it.
     private val fallbackRecords = mutableMapOf<String, LiveRecordWire>()
     private fun applyFallback(name: String, update: (LiveRecordWire) -> LiveRecordWire) {
         // A response that lands after the stream recovered is stale.
@@ -385,9 +379,9 @@ class PartyRepository(
         }
     }
 
-    // --- single-flight per domain: a refresh asked for while one is in flight
-    // runs once more right after it (never two at once, never an older
-    // response landing after a newer one).
+    // Single-flight per domain: a refresh requested while one is in flight
+    // runs once more right after it, so there are never two at once and an
+    // older response never lands after a newer one.
     private inner class SingleFlight(private val fetch: suspend () -> Unit) {
         private val lock = Any()
         private var inFlight: Deferred<Unit>? = null
@@ -434,7 +428,7 @@ class PartyRepository(
 
     fun trigger(domain: Domain): Deferred<Unit> = flights.getValue(domain).trigger()
 
-    // A domain a visible screen depends on polls faster (useDomainInterest).
+    // A domain a visible screen depends on polls faster.
     private val interest = mutableMapOf<Domain, Int>()
     private fun interested(domain: Domain) = synchronized(interest) { (interest[domain] ?: 0) > 0 }
 
@@ -445,8 +439,8 @@ class PartyRepository(
         return { synchronized(interest) { interest[domain] = maxOf(0, (interest[domain] ?: 1) - 1) } }
     }
 
-    /** query-cache.tsx policies (core is 2s rather than 1s - mobile data);
-     *  null = not on a timer right now. */
+    /** Poll interval per domain; null = not on a timer right now. Core is
+     *  2s rather than the console's 1s to spare mobile data. */
     internal fun cadence(domain: Domain): Long? {
         val liveDown = _connected.value == false
         return when (domain) {
@@ -465,7 +459,7 @@ class PartyRepository(
         }
     }
 
-    /** query-actions.ts: after an action, refresh the domains it touched. */
+    /** After an action, refresh the domains it touched. */
     private fun onAction(path: String, body: JsonObject) {
         for (domain in affectedDomains(path, body)) {
             if ((domain == Domain.FAST || domain == Domain.INVENTORY) && cadence(domain) == null) continue
@@ -473,8 +467,7 @@ class PartyRepository(
         }
     }
 
-    /** After a mutation: core, config and escape together, like
-     *  query-actions.ts's ['core', 'config'] group. Resolves once all landed. */
+    /** Refreshes core, config and escape together; resolves once all landed. */
     suspend fun refreshDynamicStateNow() {
         listOf(trigger(Domain.CORE), trigger(Domain.CONFIG), trigger(Domain.ESCAPE)).awaitAll()
     }
@@ -548,10 +541,9 @@ class PartyRepository(
         }
     }
 
-    /** Parses the wire-level LiveRecordWire (raw JSON objects, merged by
-     *  LiveReceiver) into this app's typed model. Matches dashboard-live.tsx:
-     *  a FIXED-length item list sized by vitals.inventorySize, gaps as null -
-     *  an empty slot is never sent over the wire. */
+    /** Decodes a merged live record into the typed model. Items become a
+     *  fixed-length list sized by vitals.inventorySize with nulls for gaps,
+     *  since empty slots are never sent. */
     private fun recordToState(name: String, record: LiveRecordWire): CharacterState {
         val decoded = runCatching {
             json.decodeFromJsonElement(CharacterVitals.serializer(), JsonObject(record.vitals + ("name" to JsonPrimitive(name))))
@@ -562,8 +554,8 @@ class PartyRepository(
             runCatching { json.decodeFromJsonElement(EquippedEntry.serializer(), value) }.getOrNull()
         }
         val inventorySize = record.vitals.intField("inventorySize")?.takeIf { it != 0 } ?: record.items.size
-        // dashboard-live.tsx (v1.3.0): native arrays can contain occupied overflow
-        // cells beyond isize. Keep them inspectable; inventorySize stays the capacity.
+        // Native arrays can hold occupied overflow cells beyond isize. Keep
+        // them inspectable; inventorySize stays the capacity.
         val displaySize = liveInventoryDisplaySize(record.items, inventorySize)
         val items = (0 until displaySize).map { index ->
             record.items[index.toString()]?.let { value ->
@@ -582,8 +574,8 @@ class PartyRepository(
     }
 }
 
-/** dashboard-live.tsx (v1.3.0) displaySize: the bag size, extended to the
- *  last occupied numeric slot so overflow cells beyond isize stay visible. */
+/** The bag size, extended to the last occupied numeric slot so overflow
+ *  cells beyond isize stay visible. */
 internal fun liveInventoryDisplaySize(items: JsonObject, inventorySize: Int): Int =
     items.entries.fold(inventorySize) { length, (key, value) ->
         if (key.isNotEmpty() && key.all { it.isDigit() } && value !is kotlinx.serialization.json.JsonNull) maxOf(length, key.toInt() + 1) else length

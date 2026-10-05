@@ -4,12 +4,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/**
- * Mirrors party-console's `Item` type (dashboard/features/party/item.tsx).
- * Field names match the server's JSON exactly - these are also the same
- * field names Adventure Land's own game client uses for an item, which
- * party-console's coordinator passes through mostly as-is.
- */
+/** An item as the game sends it; the coordinator passes Adventure Land's
+ *  short field names through mostly as-is. */
 @Serializable
 data class Item(
     val l: JsonElement? = null, // string | boolean - locked, or a lock reason
@@ -24,14 +20,14 @@ data class Item(
     val rid: String? = null,
     val b: Boolean? = null,
     val m: JsonElement? = null, // boolean | string | number
-    val data: JsonElement? = null, // item-specific payload (stand-inspection.ts identity)
+    val data: JsonElement? = null, // item-specific payload, part of its identity
 )
 
 @Serializable
 data class InventoryEntry(
     val slot: Int,
     val item: Item,
-    // Live item meta, when the server attaches it (inventory-entry.tsx).
+    // Live item meta, when the server attaches it.
     val meta: ItemMeta? = null,
     // An upgrade/compound in progress on this slot.
     val operation: ItemOperation? = null,
@@ -43,7 +39,6 @@ data class EquippedEntry(
     val meta: ItemMeta? = null,
 )
 
-/** inventory-entry.tsx ItemOperation. */
 @Serializable
 data class ItemOperation(
     val type: String = "",
@@ -53,10 +48,7 @@ data class ItemOperation(
     val sprite: Sprite? = null,
 )
 
-/**
- * Mirrors `Condition` (dashboard/features/party/condition.tsx) - one live
- * status effect (e.g. a buff/debuff) on a character.
- */
+/** One live status effect (buff/debuff) on a character. */
 @Serializable
 data class Condition(
     val id: String,
@@ -65,7 +57,7 @@ data class Condition(
     val remainingMs: Long? = null,
     val stacks: JsonElement? = null, // number | string
     val source: JsonElement? = null, // string | number
-    // condition.tsx: the status sprite, its G definition and live fields.
+    // The status sprite, its G definition and live fields.
     val sprite: Sprite? = null,
     val definition: kotlinx.serialization.json.JsonObject? = null,
     val live: kotlinx.serialization.json.JsonObject? = null,

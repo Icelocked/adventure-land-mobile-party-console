@@ -21,10 +21,9 @@ import kotlin.math.max
 
 private val dungeonJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
-/** dungeon-query.ts useDungeons (the PWA's useDailyDungeon.ts): GET
- *  /daily-dungeons every second while a screen shows it and the app is in
- *  the foreground; every POST carries a fresh operationId and its response
- *  replaces the cached view. Shared by the Cave row and the dungeon panel. */
+/** Polls GET /daily-dungeons every second while a screen shows it and the
+ *  app is in the foreground. Every POST carries a fresh operationId and its
+ *  response replaces the cached view. PWA: web/src/data/useDailyDungeon.ts. */
 class DungeonQuery(private val api: PartyApiClient, private val scope: CoroutineScope, private val visible: StateFlow<Boolean>) {
     private val _view = MutableStateFlow<DungeonView?>(null)
     val view: StateFlow<DungeonView?> = _view.asStateFlow()
@@ -97,13 +96,13 @@ class DungeonQuery(private val api: PartyApiClient, private val scope: Coroutine
     }
 }
 
-/** dungeon-query.ts dungeonCountdown, verbatim. */
+/** "Xh Ym Zs" until [at]. */
 fun dungeonCountdown(at: Long, now: Long): String {
     val seconds = max(0L, ceil((at - now) / 1000.0).toLong())
     return "${seconds / 3600}h ${(seconds / 60) % 60}m ${seconds % 60}s"
 }
 
-/** dungeon-query.ts dungeonEntryLabel, verbatim. */
+/** Entry availability; a visit check older than 45s counts as unknown. */
 fun dungeonEntryLabel(view: DungeonView?, now: Long): String {
     val member = view?.members?.firstOrNull()
     val visit = member?.observation?.visit
