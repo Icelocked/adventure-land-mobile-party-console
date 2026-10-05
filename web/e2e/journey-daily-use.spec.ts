@@ -2,21 +2,15 @@ import { test, expect } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
 /**
- * A single long session walking through the app roughly the way a real
- * player actually would in one sitting: check the party, look at one
- * character, get pulled away mid-task to another character, run the
- * merchant through bank/craft/mail/WTB errands, and come back to confirm
- * nothing was left stale or bled between characters along the way.
+ * One long session in a realistic order: check the party, look at one
+ * character, switch to another mid-task, run the merchant through
+ * bank/craft/mail/WTB errands, then confirm nothing went stale or leaked
+ * between characters.
  *
- * This is deliberately ONE test, not a pile of isolated per-screen
- * checks - the earlier e2e pass (account-screens*.spec.ts) already covers
- * each screen in isolation; what was missing was proof that navigating
- * BETWEEN them in a realistic order doesn't break anything. Step 2 in
- * particular is a direct regression test for a real bug fixed earlier
- * this project: FarmingSection's monster-focus form used to keep showing
- * the PREVIOUS character's open form after switching characters, because
- * the character-detail route re-renders the same component instance
- * instead of remounting on a path-param-only change.
+ * Deliberately one test: the per-screen specs cover each screen, this
+ * covers navigating between them. Step 2 guards against the monster-focus
+ * form surviving a character switch, since the character route reuses the
+ * component instance when only the path param changes.
  */
 test('Daily use: switching characters mid-task, then a full merchant errand run, leaves nothing stale', async ({ page }) => {
   const server = new MockPartyServer()
@@ -33,7 +27,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   server.mailMessages = [{ id: 'mail-1', from: 'Warriorname', subject: 'Loot', item: { name: 'wcoat' }, taken: false }]
   await server.install(page)
 
-  // 1. Open the party - a real session usually starts here.
+  // 1. Open the party.
   await page.goto('/')
   await expect(page.getByText('Warriorname')).toBeVisible()
   await expect(page.getByText('Priestname')).toBeVisible()
@@ -41,9 +35,8 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   // party-gold.tsx total: 1000+500+2000 carried + 100 bank
   await expect(page.getByRole('button', { name: 'Party gold' })).toContainText('(3,600 total)')
 
-  // 2. Drill into Warriorname, start (but don't finish) editing their
-  // monster focus, then get pulled away to Priestname mid-task - exactly
-  // the sequence that used to leak Warriorname's open form into Priestname.
+  // 2. Start editing Warriorname's monster focus, then switch to Priestname
+  // mid-task; the open form must not carry over.
   await page.getByText('Warriorname').click()
   await expect(page).toHaveURL(/\/characters\/Warriorname/)
   await page.getByRole('button', { name: 'No monsters selected' }).click()
@@ -59,9 +52,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByRole('button', { name: 'Enable auto sale' }).click()
   await expect(page.getByRole('button', { name: 'Auto sell to NPC…' })).not.toBeVisible()
 
-  // 4. A detour through the account menu to the bank, to clear an item -
-  // then back to right where we left off (Priestname), same as tabbing
-  // out to a different app section and returning.
+  // 4. Detour through the account menu to the bank, then back to Priestname.
   await page.getByRole('button', { name: 'Menu' }).click()
   await page.getByRole('button', { name: 'Inspect Bank' }).click()
   await expect(page.getByText('Wolf Coat')).toBeVisible()
@@ -69,18 +60,15 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByRole('button', { name: 'Mark for deconstruction', exact: true }).click()
   await page.getByRole('group', { name: 'Mark for deconstruction?' }).getByRole('button', { name: 'Mark for deconstruction' }).click()
   await expect(page.getByText('No snapshot yet. Send a character to the bank once to load it.')).not.toBeVisible()
-  // Bank-sourced deconstruction queues for the merchant to collect - the
-  // item stays put (now marked), it doesn't vanish the instant it's marked.
+  // Bank-sourced deconstruction queues for the merchant; the item stays put, marked.
   await expect(page.getByText('Wolf Coat', { exact: true })).toBeVisible()
   await expect(page.getByText('Deconstruct', { exact: true })).toBeVisible()
 
   await page.goBack()
   await expect(page).toHaveURL(/\/characters\/Priestname/)
 
-  // 5. Switch to the merchant and run a realistic errand chain: craft
-  // something affordable, collect mail, and place a standing buy order -
-  // three different screens reached through real in-app navigation, not
-  // page.goto shortcuts, so a broken menu link would fail this too.
+  // 5. As the merchant: craft, collect mail and place a buy order, reaching
+  // each screen through in-app navigation so a broken menu link fails too.
   await page.getByRole('button', { name: /^Merchantina/ }).click()
   await expect(page).toHaveURL(/\/characters\/Merchantina/)
 
@@ -114,12 +102,9 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByRole('button', { name: 'Place WTB' }).click()
   await expect(page.getByRole('button', { name: 'Edit price for Iron Ore' })).toHaveText('50g')
 
-  // 6. Back to the party overview - confirm the WHOLE session's worth of
-  // changes actually stuck (nothing silently reverted or went stale),
-  // and Priestname's much-earlier auto-sell mark from step 3 is still
-  // exactly where it should be after all this navigation.
-  // (Automatic rule lists are merchant-only on the dashboard; a per-player
-  // rule shows as the tile's banner.)
+  // 6. Back on the party overview, every change has stuck, including
+  // Priestname's auto-sell mark from step 3. (A per-player rule shows as the
+  // tile's banner; rule lists are merchant-only.)
   await page.goto('/characters/Priestname')
   await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
 })

@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 # Opt-in auto-updater for the self-hosted PWA (see DEPLOYMENT.md section 3d).
 #
-# Nothing about this project runs this script for you - it's here for
-# anyone who explicitly wants their PWA container to track this repo's
-# latest tagged release automatically, instead of the default (pinned to
-# whatever version you set in .env until you change it yourself). Run it
-# by hand whenever you want to check now, or schedule it (cron/Task
-# Scheduler - see DEPLOYMENT.md) if you want that check to happen on its
-# own. Deleting the scheduled task/cron line fully reverts to manual-only;
-# this script itself changes nothing unless a newer release actually exists.
+# Moves PWA_VERSION in .env to the latest tagged release and rebuilds the
+# container. Run it by hand or from cron/Task Scheduler; it changes nothing
+# when already up to date.
 #
-# Expects to be run from the same directory as the compose.yaml you added
-# the party-console-pwa service to (see section 3b), with a .env file
-# there defining PWA_VERSION (e.g. PWA_VERSION=v0.2.0).
+# Run from the directory holding the compose.yaml with the party-console-pwa
+# service and a .env defining PWA_VERSION (e.g. PWA_VERSION=v0.2.0).
 
 set -euo pipefail
 
@@ -43,7 +37,7 @@ if [ "$latest" = "$current" ]; then
 fi
 
 echo "Updating PWA_VERSION: $current -> $latest"
-# Portable in-place sed (the .bak suffix form works on both GNU and BSD/macOS sed).
+# The .bak suffix form of -i works on both GNU and BSD/macOS sed.
 sed -i.bak -E "s/^PWA_VERSION=.*/PWA_VERSION=$latest/" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
 
 docker compose build --pull "$SERVICE"

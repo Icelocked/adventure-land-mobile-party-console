@@ -1,8 +1,7 @@
 name: Release
 
-# Push a tag like "v0.2.0" to build the app and attach the APK to a new
-# GitHub Release automatically - the only supported way to get a prebuilt
-# APK without building from source yourself.
+# Pushing a tag like "v0.2.0" builds the signed APK and the PWA bundle and
+# attaches both to a new GitHub Release.
 on:
   push:
     tags:
@@ -23,8 +22,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # ubuntu-latest already ships a full Android SDK with licenses
-      # pre-accepted - see the matching note in ci.yml.
+      # ubuntu-latest ships the Android SDK (see ci.yml).
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -65,10 +63,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # A prebuilt static bundle for anyone who'd rather skip `npm run
-      # build` themselves - still needs to be served via the Dockerfile/
-      # nginx.conf (or equivalent) for /party-api/* proxying to work, this
-      # is just the `dist/` output, not a full deployable image.
+      # Just the dist/ output; it still needs nginx.conf (or equivalent)
+      # in front of it to proxy /party-api/.
       - name: Build PWA
         working-directory: web
         run: |

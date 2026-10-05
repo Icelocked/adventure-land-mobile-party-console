@@ -229,7 +229,6 @@ export function inQuietHours(quiet, date) {
   return start <= end ? local >= start && local < end : local >= start || local < end
 }
 
-/** Which devices get an alert: switched on, not muted for the character, and not in quiet hours unless urgent. */
 /** Characters whose bag is full: every slot up to the reported inventory
  *  size is taken (section=inventory sends the bag with empty slots as null;
  *  section=fast carries inventorySize). */
@@ -254,9 +253,10 @@ export function bankFreeSlots(bank) {
   return free
 }
 
-/** Names newly in `current` that weren't in `previous` - alert once per fill. */
+/** Names in `current` that weren't in `previous`, so a fill alerts once. */
 export const newlyAdded = (previous, current) => current.filter((name) => !previous.includes(name))
 
+/** Which devices get an alert: switched on, not muted for the character, and not in quiet hours unless urgent. */
 export function recipients(devices, alert, character, date) {
   return devices.filter(
     (device) =>

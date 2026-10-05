@@ -37,13 +37,11 @@ test('pairing, then marking an inventory item auto-sell, shows it under Automati
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await page.getByRole('button', { name: 'Enable auto sale' }).click()
 
-  // The panel closes itself on success (see ItemActionPanel's run()).
+  // The panel closes itself on success.
   await expect(page.getByRole('button', { name: 'Auto sell to NPC…' })).not.toBeVisible()
 
-  // Automatic rules starts collapsed - expand "Auto NPC sales" and confirm
-  // the marked item shows up with both its name AND its sprite (the exact
-  // bug this test guards against: AutoMarksSection used to render text
-  // only, dropping the sprite the dashboard's own source always shows).
+  // Automatic rules starts collapsed. Expand "Auto NPC sales": the marked
+  // item must show its name and its sprite.
   await page.getByRole('button', { name: /^Auto NPC sales\s*1$/ }).click()
   const row = page.getByRole('button', { name: 'View Wolf Coat' })
   await expect(row).toBeVisible()

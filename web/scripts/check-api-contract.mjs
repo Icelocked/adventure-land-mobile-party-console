@@ -1,26 +1,12 @@
 #!/usr/bin/env node
 /**
- * Drift detector: hits a REAL, LIVE party-console server (read-only GETs
- * only - never POSTs, never mutates anything) and checks that its
- * responses still have the shapes this app's models and the e2e mock
- * server (web/e2e/fixtures/mockPartyServer.ts) assume they have.
+ * Checks a live party-console server (read-only GETs) still returns the
+ * shapes this app's models and the e2e mock (web/e2e/fixtures/mockPartyServer.ts)
+ * assume, so the mocked suite can't stay green while the real API moves.
  *
- * Mocked e2e tests are only as good as the assumptions baked into the
- * mock. This is the check that those assumptions haven't quietly gone
- * stale - it complains loudly the moment a field this app depends on
- * disappears, changes shape, or changes type, rather than letting the
- * mocked test suite stay green while the real app silently breaks.
- *
- * This can only run from a machine that can actually reach the server
- * (e.g. on the same Tailscale network) - GitHub's hosted CI runners
- * cannot, so this is NOT wired into any workflow as a PR gate. It also
- * needs an already-paired browser's session cookie: party-console
- * redirects any unpaired /party-api/* request to a login page instead of
- * answering it (the same browser-pairing gate this project's mobile
- * clients pair against) - grab the "party" cookie's value from your
- * browser's devtools (Application/Storage -> Cookies) after pairing once
- * in a normal browser tab. Run it by hand whenever you want to sanity-
- * check the mock against reality:
+ * It needs a machine that can reach the server, so it is not part of CI,
+ * and a paired browser's "party" cookie value (from devtools), since the
+ * console redirects unpaired /party-api/ requests to /setup.
  *
  *   node scripts/check-api-contract.mjs http://100.x.x.x:3010 <party-cookie-value>
  */
