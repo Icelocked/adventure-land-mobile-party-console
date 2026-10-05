@@ -40,10 +40,9 @@ private val COLORS = mapOf(
     "item" to Color(0xFF34D399),
 )
 
-/** connected-combat-log.tsx + combat-log.tsx (the PWA's
- *  CombatLogSection.tsx): a collapsed "Combat log" that, while open, keeps
- *  the logs domain fresh and lists the last 50 events (newest first,
- *  coloured by type) with Clear history. */
+/** A collapsed "Combat log" that, while open, keeps the logs domain fresh and
+ *  lists the last 50 events (newest first, coloured by type) with Clear
+ *  history. */
 @Composable
 fun CombatLogSection(characterName: String, viewModel: PartyViewModel) {
     var open by remember { mutableStateOf(false) }

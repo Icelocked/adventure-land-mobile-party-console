@@ -47,7 +47,7 @@ data class MapPin(val x: Double, val y: Double, val label: String, val color: In
 data class MapArea(val x: Double, val y: Double, val boundary: List<Double>? = null)
 data class MapPoint(val x: Double, val y: Double)
 
-/** Everything one draw needs (MapCanvas.tsx props). */
+/** Everything one draw needs. */
 data class MapProps(
     val definition: MapDefinition?,
     val frame: MapFrame?,
@@ -63,8 +63,8 @@ data class MapProps(
 
 private data class Viewport(val left: Double, val top: Double, val scale: Double)
 
-/** map-canvas.tsx's draw(), on an Android canvas: terrain, layered entities
- *  with interpolation, target-queue markers, HP/MP bars, names and hit/heal
+/** One map draw on an Android canvas: terrain, layered entities with
+ *  interpolation, target-queue markers, HP/MP bars, names and hit/heal
  *  floaters when detailed, farming-area overlay and pins. Units are dp (the
  *  PWA's CSS pixels); [density] is the device pixel ratio. */
 class MapRenderer(private val context: Context) {
@@ -373,7 +373,7 @@ class MapRenderer(private val context: Context) {
         }
     }
 
-    /** dreams-gate.ts: the native dreams_gate composite at 120 ms cadence. */
+    /** The native dreams_gate composite at 120 ms cadence. */
     private fun drawDreamsGate(canvas: Canvas, definition: MapDefinition, now: Long) {
         fun piece(sheet: String, sx: Int, sy: Int, w: Int, h: Int, x: Int, y: Int) {
             val image = image(definition.tilesets[sheet]?.file.orEmpty()) ?: return
@@ -432,9 +432,9 @@ class MapRenderer(private val context: Context) {
     }
 }
 
-/** MapCanvas.tsx as a composable. Live views pass a [buffer] (redrawn at
- *  [fps] while [active]); static ones (the farming-area preview) pass the
- *  frame in [props]. [onWaypoint] receives a tap in map coordinates. */
+/** The map as a composable. Live views pass a [buffer] (redrawn at [fps]
+ *  while [active]); static ones (the farming-area preview) pass the frame in
+ *  [props]. [onWaypoint] receives a tap in map coordinates. */
 @Composable
 fun MapCanvas(
     props: MapProps,

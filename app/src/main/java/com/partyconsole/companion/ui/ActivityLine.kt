@@ -3,12 +3,11 @@ package com.partyconsole.companion.ui
 import com.partyconsole.companion.model.BestiaryMonster
 import com.partyconsole.companion.model.CharacterVitals
 
-/** The "what are they actively doing" one-line readout (the PWA's
- *  lib/activityLine.ts), shared by the party list and the character
- *  header: dead first, then a named activity flag, then the fight, then
- *  the location. `vitals.target` is a per-instance entity id, so it is only
- *  named when it (or the live-resolved [resolvedTargetType]) matches a
- *  bestiary entry - never shown raw. */
+/** The "what are they actively doing" one-line readout, shared by the party
+ *  list and the character header: dead first, then a named activity flag,
+ *  then the fight, then the location. `vitals.target` is a per-instance
+ *  entity id, so it is only named when it (or the live-resolved
+ *  [resolvedTargetType]) matches a bestiary entry - never shown raw. */
 fun activityLine(vitals: CharacterVitals, bestiaryCatalog: List<BestiaryMonster> = emptyList(), resolvedTargetType: String? = null): String = when {
     vitals.rip -> "dead"
     vitals.banking -> "banking"

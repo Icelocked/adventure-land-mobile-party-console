@@ -57,10 +57,10 @@ import java.util.Date
 
 private val Amber = Color(0xFFF59E0B)
 
-/** use-party-console.tsx mailDraft - e.g. ALData's "Prepare mail". */
+/** A prefilled compose draft, e.g. from ALData's "Prepare mail". */
 data class MailDraft(val recipient: String, val subject: String, val message: String)
 
-/** send-mail-dialog.tsx attachmentLevel: " +N" for anything that has levels. */
+/** " +N" for anything that has levels. */
 private fun attachmentLevel(item: Item, info: CatalogItem?): String {
     val definition = info?.meta?.definition
     val levelled = item.level != null || info?.upgradeable == true || info?.compoundable == true || definition?.get("upgrade") != null || definition?.get("compound") != null
@@ -71,9 +71,8 @@ private fun sentAt(sent: String?) = sent?.let { runCatching { DateFormat.getDate
 private fun ReceivedMail.takenState(): String? = (taken as? JsonPrimitive)?.content
 private fun ReceivedMail.collectionState(): String = (collection as? JsonPrimitive)?.content.orEmpty()
 
-/** send-mail-dialog.tsx in this app's layout (the PWA's MailScreen.tsx): the
- *  received-mail list (Refresh / Write message), a message's detail sheet
- *  (attachment collect, two-step delete, reply), and the compose form -
+/** Mail: the received-mail list (Refresh / Write message), a message's detail
+ *  sheet (attachment collect, two-step delete, reply), and the compose form -
  *  attachments from the merchant's inventory, every bank pack and each
  *  bankboi, postage, and a two-step send. */
 @Composable
@@ -252,7 +251,7 @@ private fun ComposeSection(viewModel: PartyViewModel, draft: MailDraft?, catalog
     var postage by remember { mutableStateOf<Long?>(null) }
     var inspectingAttachment by remember { mutableStateOf(false) }
 
-    // GET /mail/postage (send-mail-dialog.tsx postageQuery).
+    // GET /mail/postage.
     LaunchedEffect(Unit) {
         (viewModel.api.get("mail/postage") as? ApiResult.Success)?.let { result ->
             runCatching { (Json.parseToJsonElement(result.value) as JsonObject)["gold"] as? JsonPrimitive }.getOrNull()?.content?.toDoubleOrNull()?.let { postage = it.toLong() }
@@ -287,7 +286,7 @@ private fun ComposeSection(viewModel: PartyViewModel, draft: MailDraft?, catalog
         if (chosen != null) {
             Column(modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, Amber.copy(alpha = 0.6f)), RoundedCornerShape(6.dp)).padding(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // send-mail-dialog.tsx: the selected attachment opens its item details.
+                    // The selected attachment opens its item details.
                     Row(modifier = Modifier.weight(1f).clickable { inspectingAttachment = true }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SpriteIcon(attachmentInfo?.sprite ?: attachmentInfo?.meta?.sprite, size = 36.dp)
                         Column {
@@ -366,7 +365,7 @@ private fun ComposeSection(viewModel: PartyViewModel, draft: MailDraft?, catalog
                             error = result.message.ifBlank { "Mail could not be queued" }
                             confirming = false
                         } else {
-                            // use-party-console.tsx: the ALData auth mail starts the pending-auth poll.
+                            // The ALData auth mail starts the pending-auth poll.
                             if (recipient.trim() == "earthiverse" && subject.trim() == "aldata_auth") viewModel.aldataAuthPending.value = true
                             viewModel.refreshDynamicStateNow()
                             onClose()

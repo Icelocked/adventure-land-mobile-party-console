@@ -81,10 +81,10 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private val MODES = listOf("buy", "craft", "exchange")
 
-// merchant-commerce-dialog.tsx: quantities are capped at 9999.
+// Quantities are capped at 9999.
 private fun capQuantity(value: String): Int = minOf(9999, value.filter(Char::isDigit).take(6).toIntOrNull() ?: 0)
 
-/** merchant-commerce-dialog.tsx submit's catch: the message plus each 409 `missing` entry. */
+/** A submit error: the message plus each 409 `missing` entry. */
 private fun orderError(result: ApiResult.Failure): String {
     val missing = (result.body?.get("missing") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
     fun s(o: JsonObject, k: String) = (o[k] as? JsonPrimitive)?.content
@@ -93,15 +93,13 @@ private fun orderError(result: ApiResult.Failure): String {
 }
 
 private data class BuyLine(val quantity: Int, val level: Int)
-// party-merchant-commerce-dialog.tsx: the item-details header's source.
+// The item-details header's source.
 private data class Inspecting(val id: String, val level: Int, val exchangeAdd: ExchangeAdd? = null, val source: String = "Exchange catalog")
 
-/** merchant-commerce-dialog.tsx (the PWA's MerchantCommerceScreen.tsx) as
- *  its own screen: Buy (cart with target levels and the 90%-confidence
- *  budget), Craft (materials owned / to buy, the recipe preview, the
- *  aggregate availability gate) and Exchange (currency choices grouped,
- *  box/table results as reward tiles with their automatic rules, "Mark
- *  multiple"). */
+/** Buy (cart with target levels and the 90%-confidence budget), Craft
+ *  (materials owned / to buy, the recipe preview, the aggregate availability
+ *  gate) and Exchange (currency choices grouped, box/table results as reward
+ *  tiles with their automatic rules, "Mark multiple"). */
 @Composable
 fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBack: () -> Unit) {
     var mode by remember { mutableStateOf(if (initialMode in MODES) initialMode else "buy") }
@@ -109,7 +107,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
     val characters by viewModel.characters.collectAsState()
     val scope = rememberCoroutineScope()
     val catalog = state.merchantCatalog
-    // party-merchant-commerce-dialog.tsx: usePanelModel(base, { inventory: true, bank: true }).
+    // Item panels here act on bank items too, so keep the bank fresh.
     DomainInterest(viewModel, Domain.BANK)
 
     var search by remember { mutableStateOf("") }
@@ -123,7 +121,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
     val owned = remember(characters, state.bank, state.bankbois) { inventoryCounts(characters, state.bank, byLevel = true, bankbois = state.bankbois) }
     val buyableById = remember(catalog) { catalog?.buyable.orEmpty().associateBy { it.id } }
     fun setMode(next: String) {
-        // merchant-commerce-dialog.tsx: switching mode clears the search.
+        // Switching mode clears the search.
         if (next != mode) search = ""
         mode = next
     }
@@ -274,14 +272,13 @@ private fun CartTitle(text: String) {
     Text(text.uppercase(), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp))
 }
 
-// ---------------------------------------------------------------- Buy ----
+// Buy
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BuyContent(catalog: List<MerchantBuyItem>, search: String, cart: Map<String, BuyLine>, setCart: (Map<String, BuyLine>) -> Unit, onInspect: (String) -> Unit) {
     val filtered = catalog.filter { "${it.name} ${it.id}".lowercase().contains(search.lowercase()) }
     val selected = catalog.filter { (cart[it.id]?.quantity ?: 0) > 0 }
-    // merchant-commerce-dialog.tsx: estimates, hasEstimatedGold and goldTotal.
     val estimates = selected.associate { it.id to upgradeEstimate(it, cart.getValue(it.id).quantity, cart.getValue(it.id).level) }
     val hasEstimatedGold = selected.any { cart.getValue(it.id).level > 0 && it.upgradeable }
     val goldTotal = selected.sumOf { estimates.getValue(it.id).gold }
@@ -292,7 +289,7 @@ private fun BuyContent(catalog: List<MerchantBuyItem>, search: String, cart: Map
             setCart(cart + (item.id to BuyLine((old?.quantity ?: 0) + 1, old?.level ?: 0)))
         }
     }
-    // merchant-commerce-dialog.tsx: the cart panel is always shown.
+    // The cart panel is always shown.
     CartTitle("Cart")
     Column(modifier = Modifier.padding(horizontal = 12.dp)) {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -327,7 +324,7 @@ private fun BuyContent(catalog: List<MerchantBuyItem>, search: String, cart: Map
     }
 }
 
-// -------------------------------------------------------------- Craft ----
+// Craft
 
 private fun canPurchaseMaterial(material: CraftMaterial, buyableById: Map<String, MerchantBuyItem>) = (material.level ?: 0) == 0 && buyableById.containsKey(material.id)
 
@@ -354,7 +351,7 @@ private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<St
         val key = "${material.id}@${material.level ?: 0}"
         (requirements[key]?.second ?: 0) + material.quantity <= (owned[key] ?: 0) || canPurchaseMaterial(material, buyableById)
     }
-    // merchant-commerce-dialog.tsx: ingredientPurchaseCost and additionalRecipeCost.
+    // Ingredient purchase cost plus any additional recipe cost.
     val ingredientPurchaseCost = requirements.entries.sumOf { (key, req) -> maxOf(0, req.second - (owned[key] ?: 0)).toLong() * (buyableById[req.first.id]?.cost ?: 0L) }
     fun additionalRecipeCost(recipe: MerchantCraftRecipe) = recipe.cost + recipe.materials.sumOf { material ->
         val key = "${material.id}@${material.level ?: 0}"
@@ -372,7 +369,7 @@ private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<St
         ItemRow(recipe.name, recipe.sprite, "${"%,d".format(recipe.cost)}g + materials", { onInspect(recipe.id) }, disabled = !canAddRecipe(recipe)) {
             setCart(cart + (recipe.id to (cart[recipe.id] ?: 0) + 1))
         }
-        // The dashboard's hover preview; a phone has no hover, so it toggles inline.
+        // A hover preview on desktop; a phone has no hover, so it toggles inline.
         TextButton(onClick = { previewing = if (open) null else recipe.id }, modifier = Modifier.padding(start = 8.dp)) {
             Text(if (open) "Hide recipe" else "Complete recipe", color = Color(0xFFC4B5FD), style = MaterialTheme.typography.labelSmall)
         }
@@ -431,11 +428,10 @@ private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<St
     }
 }
 
-// ----------------------------------------------------------- Exchange ----
+// Exchange
 
-/** merchant-commerce-dialog.tsx displayedItems: every exchange with a fixed
- *  `reward` groups under one synthetic currency tile with `choices`; box
- *  and table pulls stay their own tiles. */
+/** Every exchange with a fixed `reward` groups under one synthetic currency
+ *  tile with `choices`; box and table pulls stay their own tiles. */
 private data class GroupedExchange(val item: MerchantExchangeItem, val choices: List<MerchantExchangeItem>? = null)
 
 private fun groupExchangeItems(items: List<MerchantExchangeItem>): List<GroupedExchange> {
@@ -467,7 +463,7 @@ private val REWARD_LEVEL = Regex("-(\\d+)$")
 private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<MerchantExchangeItem>, search: String, cart: Map<String, Int>, setCart: (Map<String, Int>) -> Unit, onInspect: (Inspecting) -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
     val characters by viewModel.characters.collectAsState()
-    // merchant-commerce-dialog.tsx exchangeOwned: merchant-class characters, the bank and bankbois.
+    // Owned counts: merchant-class characters, the bank and bankbois.
     val exchangeOwned = remember(characters, state.bank, state.bankbois) {
         inventoryCounts(characters.filterValues { it.vitals?.ctype == "merchant" }, state.bank, byLevel = true, bankbois = state.bankbois)
     }
@@ -504,7 +500,7 @@ private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<Mercha
             Button(enabled = enabled, onClick = addOrChoose) { Text(if (row.choices != null) "Choose" else "Add") }
         }
     }
-    // merchant-commerce-dialog.tsx: the cart panel is always shown.
+    // The cart panel is always shown.
     CartTitle("Exchange cart")
     Column(modifier = Modifier.padding(horizontal = 12.dp)) {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -536,9 +532,9 @@ private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<Mercha
     }
 }
 
-/** merchant-commerce-dialog.tsx's exchange details: the choices or potential
- *  results as reward tiles, "Mark multiple" with the bulk rule controls
- *  (staged drafts saved on Done, discarded on close), and nested drill-down. */
+/** Exchange details: the choices or potential results as reward tiles, "Mark
+ *  multiple" with the bulk rule controls (staged drafts saved on Done,
+ *  discarded on close), and nested drill-down. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExchangeDetails(
@@ -561,7 +557,6 @@ private fun ExchangeDetails(
     var markError by remember(current) { mutableStateOf<String?>(null) }
     val item = current.item
 
-    // party-merchant-commerce-dialog.tsx onSaveExchangeMarks.
     suspend fun saveDrafts(list: Collection<Triple<String, Int, ExchangeMarkMode>>) {
         val character = state.merchantCharacter ?: error("No merchant is assigned")
         for ((id, level, mode) in list) {

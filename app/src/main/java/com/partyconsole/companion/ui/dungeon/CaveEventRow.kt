@@ -45,7 +45,7 @@ internal val Amber200 = Color(0xFFFDE68A)
 internal val Rose200 = Color(0xFFFECDD3)
 internal val Slate300 = Color(0xFFCBD5E1)
 
-/** Keeps the dungeon state polling while shown (useDungeons's visibility). */
+/** Keeps the dungeon state polling while shown. */
 @Composable
 fun rememberDungeons(viewModel: PartyViewModel): DungeonQuery {
     val query = viewModel.dungeons
@@ -56,9 +56,8 @@ fun rememberDungeons(viewModel: PartyViewModel): DungeonQuery {
     return query
 }
 
-/** dungeon-settings.tsx CaveEventRow (the PWA's CaveEventRow.tsx): the Cave
- *  of Many Dreams row at the top of the Events list, with its settings as a
- *  sheet (manual entry, resume, event protection, release). */
+/** The Cave of Many Dreams row at the top of the Events list, with its
+ *  settings as a sheet (manual entry, resume, event protection, release). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CaveEventRow(viewModel: PartyViewModel) {

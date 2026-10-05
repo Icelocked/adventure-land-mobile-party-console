@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.domain.occupiedStandSlots
 import com.partyconsole.companion.domain.standMerchant
 
-/** character-detail/AccountMenu.tsx: the account-wide tools, reachable from
- *  home and from any character, in the dashboard's order. */
+/** The account-wide tools, reachable from home and from any character, in the
+ *  dashboard's order. */
 private val ACCOUNT_ITEMS = listOf(
     "Mail" to Routes.ACCOUNT_MAIL,
     "Catalog" to Routes.ACCOUNT_CATALOG,
@@ -38,13 +38,13 @@ fun AccountMenuSheet(
     viewModel: PartyViewModel,
     onNavigate: (String) -> Unit,
     onDismiss: () -> Unit,
-    // The APK's own per-character screens, shown on a character's menu
-    // until their content is inline on the character screen like the PWA's.
+    // Per-character screens, listed on a character's menu until their
+    // content moves inline onto the character screen.
     characterItems: List<Pair<String, String>> = emptyList(),
 ) {
-    // mail-count.tsx: "Mail (N)" while the inbox has messages.
+    // "Mail (N)" while the inbox has messages.
     val mail by viewModel.mail.collectAsState()
-    // party-header.tsx: "Inspect stand · N/16" (stand-count.tsx).
+    // "Inspect stand · N/16".
     val state by viewModel.dynamicState.collectAsState()
     val characters by viewModel.characters.collectAsState()
     val diagnostics by viewModel.characterDetails.collectAsState()

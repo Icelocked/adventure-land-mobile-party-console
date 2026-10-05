@@ -29,21 +29,19 @@ import com.partyconsole.companion.ui.itemdetail.npcSaleValue
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 
-/** npc-sale.ts: upgraded, stat-scrolled or shiny gear is destroyed by an
- *  NPC sale, and the server refuses it without `acknowledged`. */
+/** Upgraded, stat-scrolled or shiny gear is destroyed by an NPC sale, and the
+ *  server refuses it without `acknowledged`. */
 fun isModifiedItem(item: Item): Boolean = (item.level ?: 0) > 0 || item.statType != null || item.p != null
 
-/** party-management-panels.tsx's "Sell to NPC?" dialog + use-party-
- *  console.tsx confirmNpcSale's checks (the PWA's NpcSaleSheet): the
- *  quantity defaults to the whole stack (fixed for "sell all"), "You will
- *  receive" shows the proceeds, modified gear needs the acknowledgement,
- *  and nothing is sent until Sell is pressed. [onConfirm] returns an error
- *  message, or null on success. */
+/** "Sell to NPC?": the quantity defaults to the whole stack (fixed for "sell
+ *  all"), "You will receive" shows the proceeds, modified gear needs the
+ *  acknowledgement, and nothing is sent until Sell is pressed. [onConfirm]
+ *  returns an error message, or null on success. */
 @Composable
 fun NpcSaleSheet(
     item: Item,
     meta: ItemMeta?,
-    // The dashboard's location line, e.g. "Bank · items0 · slot 3".
+    // Location line, e.g. "Bank · items0 · slot 3".
     location: String,
     available: Int,
     // The merchant collects it from another character first.

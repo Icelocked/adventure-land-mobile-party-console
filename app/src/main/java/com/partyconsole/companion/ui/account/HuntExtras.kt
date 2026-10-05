@@ -57,15 +57,14 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-// The PWA's HuntExtras.tsx: hunt-blacklist-picker.tsx, hunt-spawn-settings.tsx
-// and passive-hunting-menu.tsx.
+// Hunt blacklist picker, spawn preferences and passive hunting settings.
 
 private fun nameOf(monster: MonsterChoice) = monster.name?.ifEmpty { null } ?: monster.id
 private val Bordered = Modifier.border(1.dp, androidx.compose.ui.graphics.Color(0x33FFFFFF), RoundedCornerShape(6.dp))
 
-/** hunt-blacklist-picker.tsx: any monster, searchable, added to this
- *  character's Hunt blacklist ("Added" once it is). The "Add" button that
- *  opens it sits in the screen's Hunt blacklist header. */
+/** Any monster, searchable, added to this character's Hunt blacklist ("Added"
+ *  once it is). The "Add" button that opens it sits in the screen's Hunt
+ *  blacklist header. */
 @Composable
 fun HuntBlacklistPicker(
     catalog: List<MonsterChoice>,
@@ -127,8 +126,8 @@ fun HuntBlacklistPicker(
     }
 }
 
-/** hunt-spawn-settings.tsx: for each monster with more than one spawn,
- *  Automatic (default) or a specific spawn; saved as preferredSpawns. */
+/** For each monster with more than one spawn: Automatic (default) or a
+ *  specific spawn, saved as preferredSpawns. */
 @Composable
 fun HuntSpawnSettings(
     viewModel: PartyViewModel,
@@ -226,8 +225,8 @@ fun HuntSpawnSettings(
     }
 }
 
-/** passive-hunting-menu.tsx: the field-generator toggle and the per-monster
- *  table (attack on sight, keep moving, max level -1 = any, priority 0–1000). */
+/** Passive hunting: the field-generator toggle and the per-monster table
+ *  (attack on sight, keep moving, max level -1 = any, priority 0–1000). */
 @Composable
 fun PassiveHuntingMenu(
     settings: PassiveSettings,
