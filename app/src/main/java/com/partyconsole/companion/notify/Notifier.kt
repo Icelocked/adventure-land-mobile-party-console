@@ -150,14 +150,9 @@ class Notifier(
                 event.name,
             )
         }
-        // Buy-and-upgrade orders that left the merchant queue.
-        val queue = core["merchantQueue"].arr().mapNotNull { it.obj() }.map { job ->
-            val order = job["order"].obj()
-            JsonObject(buildMap {
-                job["id"]?.let { put("id", it) }
-                if (order != null) put("order", JsonObject(mapOf("buys" to (order["buys"] ?: kotlinx.serialization.json.JsonArray(emptyList())))))
-            })
-        }
+        // Buy-and-upgrade orders that left the merchant queue. The job being
+        // worked on moves into merchantCurrent, which is not finishing.
+        val queue = trackedOrders(core)
         watch.queue?.let { previous -> for (done in finishedUpgradeOrders(previous, queue)) push("orders", Notice(done.title, done.body, "order-${done.body}", "/")) }
         // Events that ended.
         val schedules = core["eventSchedules"].arr().mapNotNull { it.obj() }

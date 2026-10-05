@@ -34,6 +34,7 @@ import {
   tradeNotice,
   tradeDigest,
   latestError,
+  trackedOrders,
 } from './detect.mjs'
 
 const PORT = Number(process.env.NOTIFIER_PORT || 3090)
@@ -163,7 +164,7 @@ async function checkCore(cookie, positions) {
     )
   watch.problems = problems
   // Buy-and-upgrade orders that left the merchant queue.
-  const queue = (core.merchantQueue || []).map((job) => ({ id: job.id, order: job.order ? { buys: job.order.buys || [] } : undefined }))
+  const queue = trackedOrders(core)
   if (watch.queue) for (const order of finishedUpgradeOrders(watch.queue, queue)) await push('orders', { ...order, tag: `order-${order.body}`, url: '/' })
   watch.queue = queue
   // Events that ended.

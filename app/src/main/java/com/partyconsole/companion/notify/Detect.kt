@@ -108,12 +108,17 @@ fun isGameLogError(message: String?) = GAME_LOG_ERROR.containsMatchIn(message.or
 private val EXPECTED_FAILURE = Regex("\\bItem (?:upgrade|combination) failed\\b", RegexOption.IGNORE_CASE)
 fun isAlertableGameLogError(message: String?) = isGameLogError(message) && !EXPECTED_FAILURE.containsMatchIn(message.orEmpty())
 
+/** The merchant's own error entries, minus an upgrade that destroyed the item
+ *  ("X upgrade failed" with details "X was destroyed"): an expected outcome. */
+private val DESTROYED = Regex("\\bwas destroyed\\b", RegexOption.IGNORE_CASE)
+fun isAlertableActivityError(entry: JsonObject?) = entry?.get("level").str() == "error" && !DESTROYED.containsMatchIn(entry?.get("details").str().orEmpty())
+
 /** Error timestamps per character: game-log errors (minus failed rolls),
  *  plus the merchant's error-level activity. */
 fun errorTimes(gameLogs: JsonObject?, merchantActivity: List<JsonElement>, merchantName: String?): Map<String, List<Long>> {
     val times = linkedMapOf<String, MutableList<Long>>()
     for ((name, entries) in gameLogs.orEmpty()) for (entry in entries.arr()) if (isAlertableGameLogError(entry.obj()?.get("message").str())) times.getOrPut(name) { mutableListOf() } += entry.obj()?.get("at").num().toLong()
-    if (merchantName != null) for (entry in merchantActivity) if (entry.obj()?.get("level").str() == "error") times.getOrPut(merchantName) { mutableListOf() } += entry.obj()?.get("at").num().toLong()
+    if (merchantName != null) for (entry in merchantActivity) if (isAlertableActivityError(entry.obj())) times.getOrPut(merchantName) { mutableListOf() } += entry.obj()?.get("at").num().toLong()
     return times
 }
 
@@ -183,6 +188,17 @@ fun completedRules(previous: JsonObject, config: JsonObject): List<Done> {
 }
 
 /** Merchant buy orders with an upgrade target that left the queue. */
+/** The queue plus merchantCurrent: the job being worked on moves out of the
+ *  queue into merchantCurrent, which is not finishing. */
+fun trackedOrders(core: JsonObject): List<JsonObject> =
+    (core["merchantQueue"].arr().mapNotNull { it.obj() } + listOfNotNull(core["merchantCurrent"].obj())).map { job ->
+        val order = job["order"].obj()
+        JsonObject(buildMap {
+            job["id"]?.let { put("id", it) }
+            if (order != null) put("order", JsonObject(mapOf("buys" to (order["buys"] ?: kotlinx.serialization.json.JsonArray(emptyList())))))
+        })
+    }
+
 fun finishedUpgradeOrders(previousQueue: List<JsonObject>, queue: List<JsonObject>): List<Done> {
     val remaining = queue.mapNotNull { it["id"].str() }.toSet()
     val finished = mutableListOf<Done>()
@@ -242,7 +258,7 @@ fun tradeDigest(notices: List<Done>): Done? {
 /** The newest message counted as an error for [name], for the alert text. */
 fun latestError(gameLogs: JsonObject?, merchantActivity: List<JsonElement>, merchantName: String?, name: String): String {
     val game = gameLogs?.get(name).arr().mapNotNull { it.obj() }.filter { isAlertableGameLogError(it["message"].str()) }
-    val merchant = if (name == merchantName) merchantActivity.mapNotNull { it.obj() }.filter { it["level"].str() == "error" } else emptyList()
+    val merchant = if (name == merchantName) merchantActivity.mapNotNull { it.obj() }.filter { isAlertableActivityError(it) } else emptyList()
     val newest = (game + merchant).maxByOrNull { it["at"].num() } ?: return ""
     return newest["message"].str().orEmpty().replace(Regex("\\s+"), " ").take(160)
 }

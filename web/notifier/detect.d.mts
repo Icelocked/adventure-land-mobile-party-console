@@ -5,7 +5,7 @@ type Core = {
   characterDetails?: Record<string, { seenAt?: number }>
   characterConnections?: { name: string; status: string }[]
 }
-type Entry = { at: number; message?: string; level?: string; type?: string; details?: Record<string, unknown> }
+type Entry = { at: number; message?: string; level?: string; type?: string; details?: Record<string, unknown> | string }
 type Settings = {
   stuckMinutes: number
   idleMinutes: number
@@ -25,6 +25,7 @@ export function characterProblems(core: Core, now: number, stuckAfterMs: number)
 export function problemTransitions(previous: Record<string, string>, current: Record<string, string>): { name: string; problem: string | null }[]
 export function isGameLogError(message: string): boolean
 export function isAlertableGameLogError(message: string): boolean
+export function isAlertableActivityError(entry: Entry): boolean
 export function errorTimes(gameLogs: Record<string, Entry[]>, merchantActivity: Entry[], merchantName: string | null): Record<string, number[]>
 export function deathTimes(combatLogs: Record<string, Entry[]>): Record<string, number[]>
 export function bursts(times: Record<string, number[]>, now: number, count: number, windowMs: number, lastAlertAt?: Record<string, number>): Record<string, number>
@@ -37,6 +38,7 @@ export function endedEvents(previous: { id: string; name?: string; live?: boolea
 export function rareIndex(allItems: unknown[]): Record<string, RareInfo>
 export function isRareDrop(info: RareInfo | undefined, rare: Settings['rare']): boolean
 export function tradeNotice(entry: Entry): { title: string; body: string } | null
+export function trackedOrders(core: Record<string, unknown>): { id: string; order?: { buys: Record<string, unknown>[] } }[]
 export function tradeDigest(notices: { title: string; body: string }[]): { title: string; body: string } | null
 export function latestError(gameLogs: Record<string, Entry[]>, merchantActivity: Entry[], merchantName: string | null, name: string): string
 export function newEntries<T extends { at: number }>(entries: T[], since: number): T[]
