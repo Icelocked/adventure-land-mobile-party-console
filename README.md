@@ -20,7 +20,7 @@ don't modify party-console; install either one next to your existing setup.
 |  | **Android app** | **PWA** (Android, iPhone, iPad) |
 |---|---|---|
 | **What it is** | A native Kotlin + Jetpack Compose app | A React web app you add to your home screen |
-| **Install** | Download the `.apk` from the [latest release](../../releases/latest) | Add one container to party-console's `compose.yaml` |
+| **Install** | Download the `.apk` from the [latest release](../../releases/latest) | On the PC running party-console: the Windows ZIP (`Start.cmd`), the Linux package, or the Docker installer, matching how you run party-console |
 | **Updates** | In-app (Settings → App updates) or [Obtainium](https://github.com/ImranR98/Obtainium) | In-app (Settings → Party Console PWA), optionally automatic |
 | **Guide** | [DEPLOYMENT.md § 3](DEPLOYMENT.md#3-android-app) | [DEPLOYMENT.md § 4](DEPLOYMENT.md#4-pwa-self-hosted-next-to-party-console) |
 
@@ -143,9 +143,10 @@ npx vitest run     # unit tests
 npx playwright test
 ```
 
-The bundle needs a server that also forwards `/party-api/*` to party-console
-(see `web/nginx.conf`); `docker build web` builds the same image the
-releases publish. For `npm run dev`, set `VITE_DEV_PROXY_TARGET` in
+The bundle needs a server that also forwards `/party-api/*` to party-console:
+`web/nginx.conf` in the Docker image, or `web/server/gateway.mjs` in the
+Windows and Linux packages (`node web/server/supervisor.mjs` runs it from a
+checkout). `docker build web` builds the same image the releases publish. For `npm run dev`, set `VITE_DEV_PROXY_TARGET` in
 `web/.env.local` to your party-console address.
 
 ### Releases
@@ -154,7 +155,8 @@ Pushing a tag like `v1.0.0` runs `.github/workflows/release.yml`: tests, the
 signed APK (from the `RELEASE_KEYSTORE_BASE64` and
 `RELEASE_KEYSTORE_PASSWORD` repository secrets), the PWA image
 `ghcr.io/icelocked/party-console-pwa` for amd64 and arm64, and a GitHub
-Release with the APK and a zip of the PWA bundle.
+Release with the APK and the PWA install packages built by
+`distribution/package.sh` (Windows ZIP, Linux tarball, Docker installers).
 
 ### Development
 

@@ -63,15 +63,65 @@ To check a download, compare its signing certificate with
 
 ## 4. PWA (self-hosted next to party-console)
 
-The PWA runs in its own container next to party-console, so the browser
-talks to one origin: it serves the app and forwards `/party-api/*` to the
-console. (party-console sends no CORS headers, so a PWA hosted anywhere else
+The PWA runs on the same machine as party-console (in Docker or as a small
+program of its own), so the browser talks to one origin: it serves the app
+and forwards `/party-api/*` to the console. (party-console sends no CORS headers, so a PWA hosted anywhere else
 can't reach it.)
 
-### 4a. Add the service
+### 4a. Install it
 
-Add these services to the **same `compose.yaml`** that runs party-console.
-The proxy expects the console's service to be called `party-console`.
+Pick the install that matches how you run party-console. Each one comes
+from the [latest release](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest),
+puts the PWA on port 8080 of this machine, and sets up its updater (4d).
+
+| party-console runs as | Download | Then |
+|---|---|---|
+| Windows ZIP (`Start.cmd`) | `party-console-companion-pwa-windows-vX.Y.Z.zip` | Extract it and double-click **`Start.cmd`** |
+| Linux terminal (`start-console.sh`) | `party-console-companion-pwa-linux-vX.Y.Z.tar.gz` | Extract it and run `./party-console-pwa/start.sh` |
+| Docker, on Windows | `party-console-companion-pwa-docker-vX.Y.Z.zip` | Extract it and double-click **`Install PWA.cmd`** |
+| Docker, on Linux or a Raspberry Pi | nothing; run the command below | |
+
+```bash
+curl -fsSL https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest/download/install-pwa-docker.sh | bash
+```
+
+Then open `http://localhost:8080` on the PC to check it works, and continue
+with 4b to reach it from your phone.
+
+**Windows and Linux packages (no Docker).** These work like party-console's
+own Windows ZIP. `Start.cmd` downloads a private Node runtime on first start
+(verified against nodejs.org's checksums), so you install nothing system-wide.
+On Linux, `start.sh` uses your Node 22.18+, the same one party-console's
+Linux launcher needs. Keep the window open while you use the PWA. Settings go
+in a `config.env` file next to the launcher (the README in the package lists
+them); `PWA_PORT` changes the port, `CONSOLE_URL` points at a party-console
+that isn't on `http://127.0.0.1:3010`. Your data is in the `data` folder.
+
+On Windows, `Start.cmd` offers to set up Tailscale Serve the first time
+(see 4c). It never changes a Serve setup that already exists.
+
+**Docker installers.** The installer finds party-console's Compose project
+and starts the PWA and its updater in it, from `compose.pwa.yaml`.
+party-console's own `compose.yaml` is not changed. Run it again at any time;
+it only updates the PWA. If you have more than one party-console, it asks
+which one. If you already added the PWA to party-console's `compose.yaml` by
+hand, it leaves that alone. To remove the PWA, run the `rm` command the
+installer prints; party-console keeps running.
+
+`compose.pwa.yaml` is also attached to each release if you'd rather run it
+yourself:
+
+```bash
+COMPOSE_IGNORE_ORPHANS=True docker compose -p adventureland-party-console -f compose.pwa.yaml up -d
+```
+
+`-p` must be party-console's project name (`docker ps` shows it as the
+first part of the container name). `COMPOSE_IGNORE_ORPHANS` stops Compose
+from suggesting `--remove-orphans`, which would remove party-console.
+
+**By hand in party-console's `compose.yaml`.** Add these services to the same
+file that runs party-console. The proxy expects the console's service to be
+called `party-console`.
 
 ```yaml
 services:
@@ -116,20 +166,21 @@ volumes:
 docker compose up -d party-console-pwa party-console-pwa-updater
 ```
 
-To stay on one version, add `PWA_VERSION=1.0.0` to the `.env` next to your
-`compose.yaml` and leave out the updater service.
+To stay on one version with Docker, add `PWA_VERSION=1.0.1` to the `.env`
+next to the compose file and leave out the updater service.
 
 ### 4b. Reach it from your phone
 
-Let Tailscale forward your tailnet address to the container:
+Let Tailscale forward your tailnet address to the PWA (for HTTPS, which
+notifications and Android's "Install app" need, use 4c instead):
 
 ```bash
 tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080
 ```
 
-Don't bind the container to the `100.x` address directly: if Tailscale
-starts after Docker (after a reboot, say), Docker can't bind it and the
-container stays down. `tailscale serve` is saved across restarts.
+Don't bind the PWA to the `100.x` address directly: if Tailscale starts
+after it (after a reboot, say), it can't bind that address and stays down.
+`tailscale serve` is saved across restarts.
 
 If the Android app reaches party-console directly, do the same for its port:
 bind it to `127.0.0.1:3010` and run
@@ -156,7 +207,7 @@ trusted certificate. The simplest way is Tailscale's own:
 The site stays private to your tailnet. Tailscale renews the certificate
 itself.
 
-Alternatively, mount a certificate into the container: create one with
+With Docker, you can alternatively mount a certificate into the container: create one with
 `tailscale cert --cert-file=tailscale.crt --key-file=tailscale.key <MagicDNS name>`,
 then mount its folder and publish 443:
 
@@ -179,18 +230,22 @@ Settings → **Party Console PWA** shows the installed version and checks
 GitHub for new releases every 6 hours. **Check now** checks immediately; it
 also reloads the app on this device when the server has a newer build.
 
-With the updater service from 4a running:
+With the updater the installers set up (4a):
 
 - **Download and install update** installs the new release now.
 - **Automatically download and install new versions when available**
   installs each release once the 6-hour check finds it.
 
-The updater pulls the release image, replaces the PWA container with the
-same settings, volumes and network, and checks that the new version starts.
-If it doesn't, it puts the previous version back and shows the error in
-Settings. The app reconnects by itself and then offers **Reload to update**.
+In Docker, the updater pulls the release image, replaces the PWA container
+with the same settings, volumes and network, and checks that the new version
+starts. The Windows and Linux packages download the release's package,
+check it against the SHA-256 digest GitHub publishes for it, unpack it into
+`versions/<version>` and restart into it, keeping the previous version.
+Either way, if the new version doesn't start, the previous one comes back
+and Settings shows the error. The app reconnects by itself and then offers
+**Reload to update**.
 
-About the updater's access: it mounts the Docker socket, which gives it full
+About the Docker updater's access: it mounts the Docker socket, which gives it full
 control of Docker on this machine (party-console's own updater works the
 same way). It has no network port. It acts only on a request file in its
 volume, and the only request it accepts is "install the latest release",
@@ -203,10 +258,11 @@ docker compose pull party-console-pwa
 docker compose up -d party-console-pwa
 ```
 
-Without the updater, Settings still tells you when a release is out.
+Without the updater, Settings still tells you when a release is out. (The
+packages' updater is part of the PWA's own process and needs no extra access.)
 
 **Building from source instead:** replace the `image:` line with
-`build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#v1.0.0:web`.
+`build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#v1.0.1:web`.
 A local build has no version, so Settings only shows update notices; update
 it the way you built it (`docker compose build --pull party-console-pwa`).
 
@@ -219,7 +275,7 @@ device** (Android 13+ asks for permission first). The app checks about every
 seconds with **Live alerts** on, which keeps an ongoing notification while
 it runs. The phone needs to reach the console when it checks (Tailscale on).
 
-**PWA:** the PWA container runs a small push notifier. It watches
+**PWA:** the PWA runs a small push notifier. It watches
 party-console the way a paired browser does and sends Web Push to phones
 that enabled notifications. Each phone picks which alerts it wants:
 
@@ -281,7 +337,7 @@ The PWA is built for this, but take it seriously:
 - Funnel only the PWA (port 8080), never party-console's own port 3010.
 - Create an invitation link only when you're about to pair a device, and
   don't share it: it works until it's used.
-- The container rate-limits each visitor, sends security headers (no
+- The PWA (container or package) rate-limits each visitor, sends security headers (no
   framing, HTTPS-only once on HTTPS), cleans game markup before showing it,
   and its notifier and updater endpoints accept only same-site requests from
   paired browsers.

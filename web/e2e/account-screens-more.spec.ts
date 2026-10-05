@@ -62,7 +62,7 @@ test('Settings: without the updater service, updates are notices only', async ({
   await expect(panel.getByText('New release available: 1.1.0')).toBeVisible()
   await expect(panel.getByRole('button', { name: 'Download and install update' })).toHaveCount(0)
   await expect(panel.getByRole('checkbox', { name: /Automatically download and install/ })).toBeDisabled()
-  await expect(panel.getByText(/needs the updater service/)).toBeVisible()
+  await expect(panel.getByText(/needs the PWA.s updater/)).toBeVisible()
 })
 
 test('WTB: placing an order fails once with a server error, then succeeds, then can be cancelled', async ({ page }) => {
