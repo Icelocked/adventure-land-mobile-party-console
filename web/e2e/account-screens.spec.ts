@@ -107,6 +107,8 @@ test('Bank: marking an item for NPC sale shows a marked indicator', async ({ pag
 
   // Bank-sourced NPC sales queue for the merchant to collect (they don't
   // vanish instantly) - the row should still be there, now marked.
+  // The sale panel (which names the item) closes once the sale is queued.
+  await expect(page.getByRole('group', { name: 'Sell to NPC' })).toHaveCount(0)
   await expect(page.getByText('Iron Ore')).toBeVisible()
   await expect(page.getByText('NPC', { exact: true })).toBeVisible()
 })

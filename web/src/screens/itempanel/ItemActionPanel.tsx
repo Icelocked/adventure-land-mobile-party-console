@@ -449,7 +449,8 @@ function InventoryActions({
             <NpcSaleSheet
               item={item}
               meta={meta}
-              location={`${isMerchant ? 'Merchant inventory' : `${characterName} inventory - the merchant will collect it`} · slot ${slot}`}
+              location={`${isMerchant ? 'Merchant inventory' : `${characterName} inventory`} · slot ${slot}`}
+              collects={!isMerchant}
               available={Number(item.q || 1)}
               onCancel={() => onExpand(null)}
               onConfirm={async (quantity, acknowledged) => {

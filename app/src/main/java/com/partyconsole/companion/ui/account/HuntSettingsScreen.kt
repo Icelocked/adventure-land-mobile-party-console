@@ -1,16 +1,20 @@
 package com.partyconsole.companion.ui.account
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -28,12 +32,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.partyconsole.companion.domain.huntBlacklistLabel
+import com.partyconsole.companion.domain.migratePassiveSettings
+import com.partyconsole.companion.model.BestiaryMonster
 import com.partyconsole.companion.model.HuntSettings
 import com.partyconsole.companion.model.farmingContext
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.characterdetail.sections.ConfigLoadingNote
+import com.partyconsole.companion.ui.components.MonsterDetail
+import com.partyconsole.companion.ui.itemdetail.ItemDetailBrowser
+import com.partyconsole.companion.network.CommandResult
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
@@ -44,6 +56,7 @@ import kotlinx.serialization.json.JsonPrimitive
  *  every control saves its own field as soon as it changes (thresholds when
  *  the field loses focus), always scoped with `character`; a character
  *  following the leader sees the leader's settings read-only. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Unit) {
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -65,6 +78,12 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
     var clearAllError by remember { mutableStateOf<String?>(null) }
     var blacklistBusy by remember { mutableStateOf(false) }
     var confirmingClearAll by remember { mutableStateOf(false) }
+    var addingToBlacklist by remember { mutableStateOf(false) }
+    var inspecting by remember { mutableStateOf<BestiaryMonster?>(null) }
+    var inspectError by remember { mutableStateOf<String?>(null) }
+    var drop by remember { mutableStateOf<String?>(null) }
+    // party-reference-panels.tsx: a drop opened from a monster's details.
+    var dropSource by remember { mutableStateOf("") }
 
     LaunchedEffect(settings.deathThreshold, settings.expirationThreshold) {
         deaths = settings.deathThreshold.toString()
@@ -93,6 +112,25 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
     }
 
     val blacklist = context.blacklist.entries.sortedBy { it.key }
+    val passive = migratePassiveSettings(
+        dynamicState.passiveHunting,
+        dynamicState.passiveRareHunts?.let { legacy ->
+            listOfNotNull(
+                "tinyp" to legacy.tinyp, "phoenix" to legacy.phoenix,
+                legacy.goldenbat?.let { "goldenbat" to it }, legacy.cutebee?.let { "cutebee" to it },
+                legacy.hen?.let { "hen" to it }, legacy.rooster?.let { "rooster" to it },
+            ).toMap()
+        }.orEmpty(),
+    )
+    suspend fun afterwards(result: ApiResult<CommandResult>): ApiResult<CommandResult> {
+        if (result is ApiResult.Success) viewModel.refreshDynamicStateNow()
+        return result
+    }
+    // connected-character-card.tsx onInspectMonster: details, or why they are unavailable.
+    fun inspectMonster(id: String) {
+        val monster = dynamicState.bestiaryCatalog.find { it.id == id }
+        if (monster != null) { inspectError = null; inspecting = monster } else inspectError = "Monster details are not available for $id yet."
+    }
 
     fun clearBlacklist(monsterId: String?) {
         scope.launch {
@@ -111,7 +149,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
     }
 
     AccountScreenScaffold("Hunt settings · ${context.owner}", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     "Configure Hunt relocation and automatic blacklisting. Blacklisted quests are skipped until you clear the entry. Normal farming selections are unaffected.",
@@ -172,13 +210,40 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
                 ConfigLoadingNote(loaded)
             }
 
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Hunt blacklist", style = MaterialTheme.typography.titleSmall)
+            Column(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                HuntSpawnSettings(
+                    viewModel = viewModel,
+                    catalog = dynamicState.monsterChoices,
+                    preferred = settings.preferredSpawns,
+                    disabled = !editable,
+                    onSave = { patch -> afterwards(viewModel.api.saveHuntSettings(name, patch)) },
+                )
+                PassiveHuntingMenu(
+                    settings = passive,
+                    catalog = dynamicState.monsterChoices,
+                    disabled = !editable,
+                    onSave = { patch -> afterwards(viewModel.api.setRareHunting(patch)) },
+                    onInspect = ::inspectMonster,
+                )
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Hunt blacklist", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                OutlinedButton(enabled = editable && !blacklistBusy, onClick = { addingToBlacklist = !addingToBlacklist }) { Text("Add") }
                 if (!confirmingClearAll) {
-                    TextButton(enabled = editable && blacklist.isNotEmpty(), onClick = { confirmingClearAll = true }) {
+                    TextButton(enabled = editable && !blacklistBusy && blacklist.isNotEmpty(), onClick = { confirmingClearAll = true }) {
                         Text("Clear all", color = MaterialTheme.colorScheme.error)
                     }
                 }
+            }
+            if (addingToBlacklist) Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                HuntBlacklistPicker(
+                    catalog = dynamicState.monsterChoices,
+                    blacklist = context.blacklist,
+                    disabled = !editable || blacklistBusy,
+                    onAdd = { id -> afterwards(viewModel.api.updateHuntBlacklist(name, "add", id)) },
+                    onInspect = ::inspectMonster,
+                )
             }
             if (confirmingClearAll) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp)) {
@@ -197,24 +262,56 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
             if (blacklist.isEmpty()) {
                 EmptyState("No monsters blacklisted.")
             } else {
-                LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(12.dp)) {
-                    items(blacklist) { (id, entry) ->
+                Column(modifier = Modifier.padding(12.dp)) {
+                    for ((id, entry) in blacklist) {
                         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                             Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                SpriteIcon(monsterById[id]?.sprite, size = 28.dp)
-                                Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                                    Text(monsterById[id]?.name ?: id, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                                    Text(
-                                        "${entry.reason} · ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(entry.at))}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                // farming-mode-control.tsx: a blacklisted monster opens its details.
+                                Row(
+                                    modifier = Modifier.weight(1f).clickable { inspectMonster(id) }.semantics { contentDescription = "Inspect ${monsterById[id]?.name ?: id}" },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    SpriteIcon(monsterById[id]?.sprite, size = 28.dp)
+                                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                                        Text(monsterById[id]?.name ?: id, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                        Text(
+                                            huntBlacklistLabel(entry).let { if (it.isNotEmpty()) "$it · " else "" } +
+                                                java.text.DateFormat.getDateTimeInstance().format(java.util.Date(entry.at)),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
-                                Button(enabled = editable && !blacklistBusy, onClick = { clearBlacklist(id) }) { Text("Clear") }
+                                OutlinedButton(enabled = editable && !blacklistBusy, onClick = { clearBlacklist(id) }) { Text("Clear") }
                             }
                         }
                     }
                 }
+            }
+            inspectError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)) }
+        }
+    }
+    inspecting?.let { monster ->
+        ModalBottomSheet(onDismissRequest = { inspecting = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                MonsterDetail(
+                    viewModel, monster,
+                    onInspectDrop = { itemId ->
+                        if (dynamicState.merchantCatalog?.allItems?.any { it.id == itemId } == true) {
+                            dropSource = "Dropped by ${monster.name}"
+                            inspecting = null
+                            drop = itemId
+                        }
+                    },
+                    onNavigated = { inspecting = null },
+                )
+            }
+        }
+    }
+    drop?.let { id ->
+        ModalBottomSheet(onDismissRequest = { drop = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                ItemDetailBrowser(rootItemId = id, rootLevel = 0, catalog = dynamicState.merchantCatalog, monsters = dynamicState.bestiaryCatalog, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext(dropSource, -1))
             }
         }
     }

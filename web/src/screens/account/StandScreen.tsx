@@ -50,6 +50,8 @@ export function StandScreen() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editingBuy, setEditingBuy] = useState<Item | null>(null)
   const [inspecting, setInspecting] = useState<Item | null>(null)
+  // stand-sheet.tsx onInspect's source label for the item-details header.
+  const [inspectSource, setInspectSource] = useState('')
   const [suggesting, setSuggesting] = useState<Item | null>(null)
   const [removeConfirmation, setRemoveConfirmation] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
@@ -137,7 +139,10 @@ export function StandScreen() {
                   const statType = liveEntry?.item.stat_type || configured.item.stat_type
                   return (
                     <div key={key} role="group" aria-label={`Sale ${name}`} className="flex flex-wrap items-center gap-3 rounded border border-amber-800 p-2">
-                      <ItemTile label={`Inspect ${name}`} className="overflow-hidden border-amber-900/70" onTap={() => setInspecting(configured.item)} onLongPress={() => setSuggesting(item)}>
+                      <ItemTile label={`Inspect ${name}`} className="overflow-hidden border-amber-900/70" onTap={() => {
+                        setInspectSource('Your merchant stand')
+                        setInspecting(configured.item)
+                      }} onLongPress={() => setSuggesting(item)}>
                         <SpriteIcon sprite={meta?.sprite ?? catalogFor(configured.item.name)?.sprite} size={58} />
                         {level > 0 && <span className="absolute left-1 top-1 z-10 rounded bg-black/80 px-1 font-mono text-[9px] font-semibold text-emerald-300">+{level}</span>}
                         {statType && <span className={`absolute right-1 top-1 z-10 rounded px-1 font-mono text-[8px] uppercase ring-1 ${statBadgeClass(String(statType))}`}>{String(statType)}</span>}
@@ -207,7 +212,10 @@ export function StandScreen() {
             const name = item?.name || id
             return (
               <div key={key} role="group" aria-label={`Buy order ${name}`} className="relative flex flex-col gap-2 rounded border border-violet-800 p-3">
-                <button type="button" onClick={() => setInspecting({ name: id, level })} className="flex items-center gap-3 pr-12 text-left">
+                <button type="button" onClick={() => {
+                  setInspectSource('Your stand buy order')
+                  setInspecting({ name: id, level })
+                }} className="flex items-center gap-3 pr-12 text-left">
                   <SpriteIcon sprite={item?.sprite || item?.meta?.sprite} size={48} />
                   <span>
                     {name} +{level}
@@ -278,7 +286,7 @@ export function StandScreen() {
       {inspecting && (
         <Sheet open onOpenChange={(value) => !value && setInspecting(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={inspecting.name} rootLevel={inspecting.level ?? 0} rootStatType={inspecting.stat_type} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={inspecting.name} rootLevel={inspecting.level ?? 0} rootStatType={inspecting.stat_type} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: inspectSource, slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}

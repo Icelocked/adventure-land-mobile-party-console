@@ -561,8 +561,11 @@ class PartyRepository(
         val slots = record.slots.mapValues { (_, value) ->
             runCatching { json.decodeFromJsonElement(EquippedEntry.serializer(), value) }.getOrNull()
         }
-        val inventorySize = record.vitals.intField("inventorySize") ?: record.items.size
-        val items = (0 until inventorySize).map { index ->
+        val inventorySize = record.vitals.intField("inventorySize")?.takeIf { it != 0 } ?: record.items.size
+        // dashboard-live.tsx (v1.3.0): native arrays can contain occupied overflow
+        // cells beyond isize. Keep them inspectable; inventorySize stays the capacity.
+        val displaySize = liveInventoryDisplaySize(record.items, inventorySize)
+        val items = (0 until displaySize).map { index ->
             record.items[index.toString()]?.let { value ->
                 runCatching { json.decodeFromJsonElement(InventoryEntry.serializer(), value) }.getOrNull()
             }
@@ -578,3 +581,10 @@ class PartyRepository(
         val CORE_ONLY_KEYS = setOf("characterDetails", "bankbois", "characters", "serverNow")
     }
 }
+
+/** dashboard-live.tsx (v1.3.0) displaySize: the bag size, extended to the
+ *  last occupied numeric slot so overflow cells beyond isize stay visible. */
+internal fun liveInventoryDisplaySize(items: JsonObject, inventorySize: Int): Int =
+    items.entries.fold(inventorySize) { length, (key, value) ->
+        if (key.isNotEmpty() && key.all { it.isDigit() } && value !is kotlinx.serialization.json.JsonNull) maxOf(length, key.toInt() + 1) else length
+    }

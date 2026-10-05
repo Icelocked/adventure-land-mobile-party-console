@@ -241,7 +241,7 @@ fun WtbScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     inspecting?.let { item ->
         ModalBottomSheet(onDismissRequest = { inspecting = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ItemDetailBrowser(rootItemId = item.name, rootLevel = item.level ?: 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel)
+                ItemDetailBrowser(rootItemId = item.name, rootLevel = item.level ?: 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext("Your active WTB order", -1))
             }
         }
     }

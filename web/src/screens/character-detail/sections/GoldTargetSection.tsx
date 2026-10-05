@@ -1,79 +1,83 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Coins, Landmark } from 'lucide-react'
+import { abbreviatedGold } from '@/lib/gold'
 import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 
-/** There is no manual "withdraw gold from the bank" action anywhere in
- *  party-console - gold moves automatically during the merchant's normal
- *  bank errands, toward whatever target each character is set to carry
- *  (POST /party-api/command type "gold-target"). This is that real
- *  mechanism, not a placeholder for a feature that doesn't exist. */
-export function GoldTargetSection({ characterName, serverTarget }: { characterName: string; serverTarget: number }) {
+/** gold-target-control.tsx (the merchant's character card): current gold,
+ *  the gold target the merchant keeps on hand ("gold-target", saved when the
+ *  field loses focus) and "Exchange gold and items with bank" - which saves
+ *  the target first, then queues a bank run. Gold otherwise moves only
+ *  during the merchant's normal bank errands. */
+export function GoldTargetSection({ characterName, serverTarget, gold }: { characterName: string; serverTarget: number; gold: number }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
-  const [dirty, setDirty] = useState(false)
-  const [value, setValue] = useState(String(serverTarget))
-  const [saving, setSaving] = useState(false)
+  const editing = useRef(false)
+  const [draft, setDraft] = useState(String(serverTarget))
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!dirty) setValue(String(serverTarget))
-  }, [serverTarget, dirty])
+    if (!editing.current) setDraft(String(serverTarget))
+  }, [serverTarget])
 
-  useEffect(() => {
-    setDirty(false)
-  }, [characterName])
+  const parsed = () => {
+    const amount = Number(draft)
+    return Number.isSafeInteger(amount) && amount >= 0 ? amount : null
+  }
+  // gold-target-control.tsx save(): only a valid amount is sent.
+  const save = async () => {
+    const amount = parsed()
+    if (amount === null) return null
+    const result = await api.sendCommand(characterName, { type: 'gold-target', amount })
+    return result.kind === 'failure' ? result.message || 'Command failed' : null
+  }
 
   return (
-    <SectionCard title="Gold target">
-      <p className="text-xs text-muted-foreground">The merchant's bank errands automatically move gold to keep this character at this amount.</p>
-      <div className="mt-2 flex gap-2">
+    <SectionCard title="Merchant's pocket money">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="flex shrink-0 items-center gap-1.5 font-mono text-sm text-amber-300" title={`${gold.toLocaleString()} gold`}>
+          <Coins className="size-4" />
+          {abbreviatedGold(gold)}
+        </span>
         <Input
-          value={value}
-          onChange={(event) => {
-            if (/^\d*$/.test(event.target.value)) {
-              setValue(event.target.value)
-              setDirty(true)
-            }
+          aria-label="Merchant's pocket money"
+          inputMode="numeric"
+          placeholder="Set target amount"
+          value={draft}
+          disabled={!configLoaded}
+          onFocus={() => {
+            editing.current = true
           }}
-          className="flex-1"
-        />
-        <Button
-          disabled={!configLoaded || !dirty || saving}
-          onClick={async () => {
-            setSaving(true)
-            setError(null)
-            const result = await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 })
-            if (result.kind === 'failure') setError(result.message || 'Command failed')
-            else setDirty(false)
+          onChange={(event) => setDraft(event.target.value.replace(/[^0-9]/g, ''))}
+          onBlur={async () => {
+            editing.current = false
+            setError(await save())
             await refreshNow()
-            setSaving(false)
           }}
-        >
-          {saving ? 'Saving...' : 'Save'}
-        </Button>
+          className="h-8 min-w-0 flex-1 font-mono text-xs"
+        />
       </div>
-      {/* gold-target-control.tsx: save the target, then have the merchant
-       *  exchange gold and items with the bank for this character. */}
       <Button
         variant="outline"
         size="sm"
         className="mt-2"
-        disabled={!configLoaded || saving}
+        disabled={!configLoaded || busy}
         onClick={async () => {
-          setSaving(true)
+          setBusy(true)
           setError(null)
-          const saved = dirty ? await api.sendCommand(characterName, { type: 'gold-target', amount: Number(value) || 0 }) : null
-          const banked = saved?.kind === 'failure' ? saved : await api.sendCommand(characterName, { type: 'bank' })
-          if (banked.kind === 'failure') setError(banked.message || 'Command failed')
-          else setDirty(false)
+          const failed = await save()
+          const banked = failed ? null : await api.sendCommand(characterName, { type: 'bank' })
+          setError(failed ?? (banked?.kind === 'failure' ? banked.message || 'Command failed' : null))
           await refreshNow()
-          setSaving(false)
+          setBusy(false)
         }}
       >
+        <Landmark className="size-4" />
         Exchange gold and items with bank
       </Button>
       {error && (

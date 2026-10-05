@@ -34,6 +34,8 @@ export function HuntSettingsScreen() {
   const [inspectError, setInspectError] = useState<string | null>(null)
   const [clearAllError, setClearAllError] = useState<string | null>(null)
   const [drop, setDrop] = useState<string | null>(null)
+  // party-reference-panels.tsx: a drop opened from a monster's details.
+  const [dropSource, setDropSource] = useState('')
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
@@ -256,6 +258,7 @@ export function HuntSettingsScreen() {
               monster={inspecting}
               onInspectDrop={(itemId) => {
                 if (dynamicState.merchantCatalog?.allItems?.some((item) => item.id === itemId)) {
+                  setDropSource(`Dropped by ${inspecting.name}`)
                   setInspecting(null)
                   setDrop(itemId)
                 }
@@ -268,7 +271,7 @@ export function HuntSettingsScreen() {
       {drop && (
         <Sheet open onOpenChange={(open) => !open && setDrop(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={drop} rootLevel={0} catalog={dynamicState.merchantCatalog} monsters={dynamicState.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={drop} rootLevel={0} catalog={dynamicState.merchantCatalog} monsters={dynamicState.bestiaryCatalog} context={{ character: dropSource, slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}

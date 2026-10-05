@@ -377,7 +377,8 @@ private fun InventoryActions(
             if (expanded == "npcsale") {
                 NpcSaleSheet(
                     item = item, meta = meta,
-                    location = "${if (isMerchant) "Merchant inventory" else "$characterName inventory - the merchant will collect it"} · slot $slot",
+                    location = "${if (isMerchant) "Merchant inventory" else "$characterName inventory"} · slot $slot",
+                    collects = !isMerchant,
                     available = item.q ?: 1,
                     onCancel = { onExpand(null) },
                     onConfirm = { quantity, acknowledged -> finish(api.markForNpcSale(characterName, item, slot, isMerchant, quantity, acknowledged)) },

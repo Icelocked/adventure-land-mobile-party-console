@@ -40,6 +40,8 @@ export function BestiaryScreen() {
   const [bonusesOpen, setBonusesOpen] = useState(false)
   const [inspecting, setInspecting] = useState<BestiaryMonster | null>(null)
   const [drop, setDrop] = useState<string | null>(null)
+  // party-reference-panels.tsx: a drop opened from a monster's details.
+  const [dropSource, setDropSource] = useState('')
   const maps = [...new Set(monsters.flatMap((monster) => (monster.spawnRecords || []).map((spawn) => spawn.map)))].sort()
   const score = (monster: BestiaryMonster) => Math.max(0, Number(achievements?.[monster.id]?.score) || 0)
   const scoreToNext = (monster: BestiaryMonster) => {
@@ -170,6 +172,7 @@ export function BestiaryScreen() {
               monster={inspecting}
               onInspectDrop={(itemId) => {
                 if (state.merchantCatalog?.allItems?.some((entry) => entry.id === itemId)) {
+                  setDropSource(`Dropped by ${inspecting.name}`)
                   setInspecting(null)
                   setDrop(itemId)
                 }
@@ -182,7 +185,7 @@ export function BestiaryScreen() {
       {drop && (
         <Sheet open onOpenChange={(open) => !open && setDrop(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={drop} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={drop} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: dropSource, slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}

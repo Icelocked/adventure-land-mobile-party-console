@@ -85,7 +85,7 @@ export function SessionControls({ name }: { name: string }) {
           disabled={disabled}
           aria-pressed={native}
           aria-label={slot?.primary ? `${name} is Steam primary` : `${destination}: ${name}`}
-          title={native ? 'Currently in Steam' : destination}
+          title={native ? 'Currently in Steam · click to go headless' : destination}
           onClick={() => !slot?.primary && ask('steam')}
           className={iconClass(native)}
         >

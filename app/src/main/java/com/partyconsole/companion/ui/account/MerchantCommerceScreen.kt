@@ -93,7 +93,8 @@ private fun orderError(result: ApiResult.Failure): String {
 }
 
 private data class BuyLine(val quantity: Int, val level: Int)
-private data class Inspecting(val id: String, val level: Int, val exchangeAdd: ExchangeAdd? = null)
+// party-merchant-commerce-dialog.tsx: the item-details header's source.
+private data class Inspecting(val id: String, val level: Int, val exchangeAdd: ExchangeAdd? = null, val source: String = "Exchange catalog")
 
 /** merchant-commerce-dialog.tsx (the PWA's MerchantCommerceScreen.tsx) as
  *  its own screen: Buy (cart with target levels and the 90%-confidence
@@ -150,7 +151,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 }
                 Text(
                     when (mode) {
-                        "craft" -> "Recipes account for materials held by the active party and the latest bank snapshot."
+                        "craft" -> "Recipes account for materials held by the active party and in the latest bank snapshot."
                         "exchange" -> "Choose exchange operations backed by the merchant inventory and latest bank snapshot."
                         else -> "Choose anything sold for gold."
                     },
@@ -160,8 +161,8 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 )
                 OutlinedTextField(search, { search = it }, placeholder = { Text("Search items...") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp))
                 when (mode) {
-                    "buy" -> BuyContent(catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }) { inspecting = Inspecting(it, 0) }
-                    "craft" -> CraftContent(catalog?.craftable.orEmpty(), buyableById, owned, search, craftCart, { craftCart = it }) { inspecting = Inspecting(it, 0) }
+                    "buy" -> BuyContent(catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }) { inspecting = Inspecting(it, 0, source = "Merchant catalog") }
+                    "craft" -> CraftContent(catalog?.craftable.orEmpty(), buyableById, owned, search, craftCart, { craftCart = it }) { inspecting = Inspecting(it, 0, source = "Crafting catalog") }
                     else -> ExchangeContent(viewModel, catalog?.exchangeable.orEmpty(), search, exchangeCart, { exchangeCart = it }) { inspecting = it }
                 }
             }
@@ -231,6 +232,7 @@ private fun InspectSheet(viewModel: PartyViewModel, target: Inspecting, onClose:
                 catalog = state.merchantCatalog,
                 monsters = state.bestiaryCatalog,
                 viewModel = viewModel,
+                context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext(target.source, -1),
                 exchangeAdd = target.exchangeAdd?.let { add -> ExchangeAdd(add.enabled) { add.onAdd(); onClose() } },
             )
         }

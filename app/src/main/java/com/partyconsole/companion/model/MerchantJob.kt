@@ -506,6 +506,8 @@ data class HuntSettings(
     val deathThreshold: Int = 1,
     val blacklistExpirations: Boolean = true,
     val expirationThreshold: Int = 1,
+    // hunt-spawn-settings.tsx: monster id -> huntSpawnKey ("" = automatic).
+    val preferredSpawns: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
 )
 
 /** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -

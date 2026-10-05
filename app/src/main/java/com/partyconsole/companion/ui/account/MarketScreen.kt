@@ -129,6 +129,8 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     var busy by remember { mutableStateOf<String?>(null) }
     var rowError by remember { mutableStateOf<Pair<String, String>?>(null) }
     var inspecting by remember { mutableStateOf<Item?>(null) }
+    // stand-sheet.tsx onInspect's source label for the item-details header.
+    var inspectSource by remember { mutableStateOf("") }
     var wtbItem by remember { mutableStateOf<Item?>(null) }
     var listing by remember { mutableStateOf<ListingDraft?>(null) }
 
@@ -218,8 +220,8 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
         }
     }
     @Composable
-    fun ItemButton(item: Item, title: String, detail: @Composable () -> Unit, modifier: Modifier = Modifier) {
-        Row(modifier = modifier.clickable { inspecting = item }, verticalAlignment = Alignment.CenterVertically) {
+    fun ItemButton(item: Item, title: String, source: String, detail: @Composable () -> Unit, modifier: Modifier = Modifier) {
+        Row(modifier = modifier.clickable { inspectSource = source; inspecting = item }, verticalAlignment = Alignment.CenterVertically) {
             SpriteIcon(catalogFor(item.name)?.sprite, size = 40.dp)
             Column(modifier = Modifier.padding(start = 12.dp)) {
                 Text(title, style = MaterialTheme.typography.bodySmall, maxLines = 1)
@@ -312,7 +314,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        ItemButton(entry.item, itemLabel(entry.item), {
+                        ItemButton(entry.item, itemLabel(entry.item), "${entry.seller}'s ALData listing", {
                             Text(
                                 "${entry.seller} · ${entry.serverRegion} ${entry.serverIdentifier} · ${entry.map} · seen ${ageLabel(age)} ago" +
                                     if (multiple) " · ${entry.quantity} available" + if (stackable) "" else " · not stackable" else "",
@@ -379,7 +381,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            ItemButton(order.item, title, {
+                            ItemButton(order.item, title, "${order.buyer}'s live WTB", {
                                 Text("${order.buyer} · ${order.serverRegion} ${order.serverIdentifier} · seen ${ageLabel(age)} ago · wants ${order.quantity}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }, Modifier.fillMaxWidth())
                             Text("WTB ${gold(order.price)}g", color = Violet, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium, modifier = Modifier.align(Alignment.CenterVertically))
@@ -424,7 +426,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        ItemButton(requested, (item?.name ?: entry.name) + if (entry.level != 0) " +${entry.level}" else "", {
+                        ItemButton(requested, (item?.name ?: entry.name) + if (entry.level != 0) " +${entry.level}" else "", "Published trade intention", {
                             Text("${owner.label ?: owner.characters.firstOrNull() ?: owner.owner} · ${entry.note ?: "Published intention"}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }, Modifier.fillMaxWidth())
                         entry.wts?.price?.takeIf { it > 0 }?.let { Text("WTS ${gold(it)}g", color = Emerald, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium, modifier = Modifier.align(Alignment.CenterVertically)) }
@@ -442,7 +444,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                     ponty?.error?.let { Text("Last refresh failed: $it", style = MaterialTheme.typography.bodySmall, modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF701A75), RoundedCornerShape(4.dp)).padding(8.dp)) }
                     if (pontyRows.isEmpty()) Text("Ponty currently has no matching items.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     for (group in pontyRows) PontyRow(group, viewModel, catalogFor, now, quantities, busy, confirming, rowError, merchantName,
-                        onInspect = { inspecting = it },
+                        onInspect = { inspectSource = "Ponty's inventory"; inspecting = it },
                         onConfirm = { rowError = null; confirming = group.key },
                         onCancel = { confirming = null },
                         onBuy = { requested -> run(group.key) { api.buyPonty(group.keys, requested, group.unitPrice).message() } },
@@ -455,7 +457,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     inspecting?.let { item ->
         ModalBottomSheet(onDismissRequest = { inspecting = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ItemDetailBrowser(rootItemId = item.name, rootLevel = item.level ?: 0, rootStatType = item.statType, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel)
+                ItemDetailBrowser(rootItemId = item.name, rootLevel = item.level ?: 0, rootStatType = item.statType, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext(inspectSource, -1))
             }
         }
     }

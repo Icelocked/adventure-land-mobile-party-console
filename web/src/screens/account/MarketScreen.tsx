@@ -86,6 +86,8 @@ export function MarketScreen() {
   const [busy, setBusy] = useState<string | null>(null)
   const [rowError, setRowError] = useState<{ key: string; message: string } | null>(null)
   const [inspecting, setInspecting] = useState<Item | null>(null)
+  // stand-sheet.tsx onInspect's source label for the item-details header.
+  const [inspectSource, setInspectSource] = useState('')
   const [wtbItem, setWtbItem] = useState<Item | null>(null)
   const [listing, setListing] = useState<{ key: string; entry: InventoryEntry; bankPack?: string; price: number; quantity: number } | null>(null)
 
@@ -258,7 +260,10 @@ export function MarketScreen() {
               const quantity = Number(quantities[key] || 1)
               return (
                 <div key={key} role="group" aria-label={`WTS ${itemLabel(entry.item)} from ${entry.seller}`} className={`flex flex-wrap items-center gap-2 rounded border border-cyan-950 p-2 ${fresh ? '' : 'opacity-65'}`}>
-                  <button type="button" onClick={() => setInspecting(entry.item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <button type="button" onClick={() => {
+                    setInspectSource(`${entry.seller}'s ALData listing`)
+                    setInspecting(entry.item)
+                  }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <SpriteIcon sprite={item?.sprite} size={40} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{itemLabel(entry.item)}</span>
@@ -336,7 +341,10 @@ export function MarketScreen() {
                 const quantity = Number(quantities[key] || 1)
                 return (
                   <div key={key} role="group" aria-label={`WTB ${itemLabel(order.item)} from ${order.buyer}`} className={`flex flex-wrap items-center gap-2 rounded border p-2 ${have ? 'border-emerald-900' : 'border-violet-950'} ${fresh ? '' : 'opacity-60'}`}>
-                    <button type="button" onClick={() => setInspecting(order.item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    <button type="button" onClick={() => {
+                      setInspectSource(`${order.buyer}'s live WTB`)
+                      setInspecting(order.item)
+                    }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                       <SpriteIcon sprite={item?.sprite} size={40} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">{`${item?.name || order.item.name}${item?.meta?.upgradeable || item?.meta?.compoundable ? ` +${Number(order.item.level) || 0}` : ''}`}</span>
@@ -407,7 +415,10 @@ export function MarketScreen() {
               const key = `${owner.owner}-${entry.name}-${index}`
               return (
                 <div key={key} role="group" aria-label={`Classified ${entry.name}`} className="flex flex-wrap items-center gap-2 rounded border border-border p-2">
-                  <button type="button" onClick={() => setInspecting(requested)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <button type="button" onClick={() => {
+                    setInspectSource('Published trade intention')
+                    setInspecting(requested)
+                  }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <SpriteIcon sprite={item?.sprite} size={40} />
                     <span>
                       <span className="block text-sm">
@@ -450,7 +461,7 @@ export function MarketScreen() {
       {inspecting && (
         <Sheet open onOpenChange={(value) => !value && setInspecting(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={inspecting.name} rootLevel={inspecting.level ?? 0} rootStatType={inspecting.stat_type} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={inspecting.name} rootLevel={inspecting.level ?? 0} rootStatType={inspecting.stat_type} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: inspectSource, slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}
@@ -480,7 +491,10 @@ export function MarketScreen() {
     const name = item?.name || group.item.name
     return (
       <div key={group.key} role="group" aria-label={`Ponty ${name}`} className="flex flex-wrap items-center gap-2 rounded border border-fuchsia-900 p-2">
-        <button type="button" onClick={() => setInspecting(group.item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <button type="button" onClick={() => {
+          setInspectSource("Ponty's inventory")
+          setInspecting(group.item)
+        }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <SpriteIcon sprite={item?.sprite} size={40} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm">

@@ -210,7 +210,7 @@ fun CharacterDetailScreen(
                     dynamicState.restockPolicies[characterName] ?: com.partyconsole.companion.model.RestockPolicy(),
                     viewModel,
                 )
-                if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, viewModel)
+                if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, vitals.gold, viewModel)
                 if (isMerchant) com.partyconsole.companion.ui.characterdetail.sections.RuleConflictsSection(viewModel)
                 AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)
                 com.partyconsole.companion.ui.characterdetail.sections.CombatLogSection(characterName, viewModel)
