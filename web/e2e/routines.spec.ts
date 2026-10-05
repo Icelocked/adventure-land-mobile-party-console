@@ -46,8 +46,8 @@ test('Routines: reordering one row changes only the priorities the move requires
 
   await expect.poll(() => server.lastRoutineSave).toBeTruthy()
   const { priorities } = server.lastRoutineSave as { priorities: Record<string, number> }
-  // The renumbering is routine-priorities-dialog.tsx's move() verbatim
-  // (unlisted keys sort as 50), so only assert it moved and the top is kept.
+  // The renumbering follows the console's move() (unlisted keys sort as 50),
+  // so only assert it moved and the top is kept.
   expect(priorities['stand maintenance']).not.toBe(40)
   expect(priorities['merchant luck']).toBe(100)
   expect(priorities).not.toHaveProperty('exchange')

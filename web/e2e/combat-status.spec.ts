@@ -17,9 +17,8 @@ test('Character detail: shows the current target, active conditions, and the par
   await server.install(page)
 
   await page.goto('/characters/Ranger1')
-  // Both the vitals header ("fighting Crabxx") and the Farming section's own
-  // combat-status line ("Fighting Crabxx") now resolve the same target name -
-  // exact+case-sensitive distinguishes the Farming section's capitalized one.
+  // The vitals header ("fighting Crabxx") and the Farming section ("Fighting
+  // Crabxx") show the same name; an exact, case-sensitive match picks the latter.
   await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
   // farming-mode-control.tsx hunt status block.
   const hunt = page.getByRole('region', { name: 'Hunt status' })
@@ -74,13 +73,11 @@ test('Character detail: a character running independently (not the leader, not f
   })
   server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
   server.leader = 'MainLeader'
-  // The account leader's OWN blacklist does NOT include crabx - if the
-  // resolver wrongly fell back to this top-level field for a non-leader,
-  // non-follower character, the blacklist flag below would never show.
+  // The leader's blacklist lacks crabx, so the flag below only shows if the
+  // resolver uses the independent character's own profile.
   server.huntBlacklist = {}
-  // Independent1 is in neither `followers` nor is it the leader - it runs
-  // its own farming independently, so resolveFarmingContext must resolve
-  // its blacklist from its OWN farmingProfiles entry, not the account's.
+  // Independent1 is neither leader nor follower, so its blacklist comes from
+  // its own farmingProfiles entry.
   server.farmingProfiles = {
     Independent1: { huntBlacklist: { crabx: { monsterId: 'crabx', at: Date.now(), deaths: 3, reason: 'deaths' } } },
   }
@@ -108,12 +105,9 @@ test('Character detail: monster focus button shows what\'s actually selected, no
 })
 
 test('Character detail: the leader\'s own focus button falls back to the flat field, not "No monsters selected"', async ({ page }) => {
-  // navigation/focus.ts's characterFocus() deliberately keeps
-  // monsterFocusByCharacter[leader] EMPTY (the leader's effective focus
-  // lives in the flat monsterFocus field instead, which is what
-  // followers/others inherit from) - a leader's own screen must fall back
-  // to that flat field, matching connected-character-card.tsx's
-  // `monsterFocusByCharacter?.[char.name] || selectedFocus`.
+  // The console keeps monsterFocusByCharacter[leader] empty and stores the
+  // leader's focus in the flat monsterFocus field, so the leader's screen
+  // must fall back to it.
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
@@ -129,13 +123,9 @@ test('Character detail: the leader\'s own focus button falls back to the flat fi
 })
 
 test('Character detail: resolves the real monster name from the live map stream, without opening one itself', async ({ page }) => {
-  // End-to-end proof the subscription/frame-parsing/resolution pipeline
-  // genuinely works: vitals.target is a per-instance id ("2951603" - a raw
-  // game entity id, confirmed string in production since a real number
-  // would crash activityLine.ts's `.trim()` call, which it doesn't), and
-  // the live map/entities feed carries that same id alongside the actual
-  // monster type (mtype) - useTargetMonsterType looks it up there instead
-  // of ever showing the raw id.
+  // vitals.target is a per-instance entity id; the map/entities feed pairs
+  // that id with the monster type, which useTargetMonsterType shows instead
+  // of the raw id.
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, target: '2951603' })
@@ -148,8 +138,8 @@ test('Character detail: resolves the real monster name from the live map stream,
     if (request.url().includes('/map-stream/')) streams.push(request.url())
   })
   await page.goto('/characters/Ranger1')
-  // Like the dashboard, nothing opens a map stream until a map is shown: an
-  // open stream makes the character POST frames to the console continuously.
+  // No map stream opens until a map is shown: an open stream makes the
+  // character POST frames to the console continuously.
   await expect(page.getByText('Fighting', { exact: true })).toBeVisible()
   expect(streams).toEqual([])
   // The live map opens it; the target name then resolves from its frames.
@@ -159,11 +149,8 @@ test('Character detail: resolves the real monster name from the live map stream,
 })
 
 test('Character detail: a numeric target does not crash the page (activityLine must never assume target is a string)', async ({ page }) => {
-  // Found while testing the above: vitals.target is never coerced
-  // server-side (characters/shared.js's publishMapFrame just does `target:
-  // character.target || null`), so if the native game field is ever a raw
-  // number instead of a string, `vitals.target?.trim()` throws - a full
-  // page crash, not a cosmetic issue. Defensive fix: String() it first.
+  // vitals.target isn't coerced server-side, so a numeric target must not
+  // crash the page (`.trim()` on a number throws).
   const pageErrors: string[] = []
   const server = new MockPartyServer()
   server.paired = true
@@ -195,12 +182,9 @@ test('Character list and vitals header never show the raw target id - resolved n
 })
 
 test('Selecting Hunt with an existing backup already configured activates it directly - no picker shown', async ({ page }) => {
-  // use-party-console.tsx's setFarmingPolicy tries Hunt directly first and
-  // only opens the picker if the server actually rejects it - showing the
-  // picker unconditionally would force re-selecting an already-configured
-  // focus every time, and (per hunt/mode.ts's setBackup) submitting a
-  // DIFFERENT selection than what's already there silently overwrites
-  // every participant's own monsterFocusByCharacter.
+  // Hunt is tried directly and the picker opens only if the server rejects
+  // it. Always showing the picker would force re-selecting the focus, and a
+  // different selection overwrites every participant's monsterFocusByCharacter.
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
@@ -219,10 +203,8 @@ test('Selecting Hunt with an existing backup already configured activates it dir
   await page.goto('/characters/Ranger1')
   await page.getByRole('button', { name: 'Hunt', exact: true }).click()
   await expect(page.getByText('Getting ready to hunt')).not.toBeVisible()
-  // `character` matters here beyond just being present in the payload -
-  // omitting it makes the server silently edit the ACCOUNT LEADER's
-  // profile instead of this character's own (http/farming-scope.ts's
-  // createScopedFarmingRoute defaults to ports.mainOwner() when absent).
+  // Without `character` the server edits the leader's profile instead of
+  // this character's (http/farming-scope.ts).
   await expect.poll(() => submittedBody).toEqual({ mode: 'hunt', character: 'Ranger1' })
 })
 
@@ -291,12 +273,8 @@ test('Route button opens the general farming-area picker and routes this charact
 })
 
 test('Selecting a farming mode sends THIS character, not silently defaulting to the account leader', async ({ page }) => {
-  // The actual bug: http/farming-scope.ts's createScopedFarmingRoute reads
-  // body.character to decide whose profile to edit, defaulting to the
-  // account leader when it's missing. Viewing an independent (non-leader)
-  // character's screen and selecting a mode previously edited the LEADER's
-  // profile instead - the viewed character's own chip never changed,
-  // because nothing had actually been sent for THEM at all.
+  // Failure mode: without body.character the server edits the leader's
+  // profile, and the viewed independent character's chip never changes.
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
@@ -316,12 +294,8 @@ test('Selecting a farming mode sends THIS character, not silently defaulting to 
 })
 
 test('An independent character (not the leader, not following) routes via character-travel, not party-monster-travel', async ({ page }) => {
-  // `canRouteToMonster` allows this (not just the leader), but the travel
-  // command type must still match: party-monster-travel is rejected
-  // server-side unless `name === state.leader` exactly (confirmed against
-  // runtime/coordinator/navigation/manual-commands.ts's partyTravel) - an
-  // independent, non-leader character needs character-travel instead, same
-  // as any other non-leader character.
+  // party-monster-travel is rejected unless `name === state.leader`, so an
+  // independent character must send character-travel.
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
@@ -367,9 +341,8 @@ test('Phoenix search order pre-fills from a previously saved order, not the comp
   ]
   server.monsterChoices = [{ id: 'phoenix', locations }]
   server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
-  // The default order (anchors in farmingAreas.ts's defaultPhoenixOrder)
-  // starts with the main(641,1803) region; a saved order reversing that
-  // should show halloween(8,631) as region 1 instead if it's actually used.
+  // The default order starts with main(641,1803); a saved reversed order
+  // must put halloween(8,631) first.
   server.phoenixRouteOrder = [
     JSON.stringify(['halloween', [8, 631]]),
     JSON.stringify(['main', [1188, -193]]),

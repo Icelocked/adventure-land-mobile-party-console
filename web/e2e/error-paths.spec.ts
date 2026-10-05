@@ -42,8 +42,7 @@ test('ItemActionPanel: a failed action shows its error and keeps the panel open'
   await page.getByRole('group', { name: 'Sell to NPC' }).getByRole('button', { name: 'Sell to NPC' }).click()
 
   await expect(page.getByText('Item is currently reserved for crafting')).toBeVisible()
-  // ItemActionPanel's run() only calls onClose() on success - confirm the
-  // sheet is genuinely still open, not just that the error text rendered.
+  // The panel only closes on success, so the sheet must still be open.
   await expect(page.getByRole('button', { name: 'Sell to NPC…', exact: true })).toBeVisible()
 })
 
@@ -56,9 +55,8 @@ test('ItemActionPanel: marking an item for upgrade shows a badge on its inventor
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
-  // Regression: marking for upgrade used to produce zero visible feedback
-  // anywhere in the app (the wire fields for pending one-time marks were
-  // never modeled) - the panel just closed and nothing changed on screen.
+  // Failure mode: marking for upgrade closes the panel with no visible
+  // change anywhere.
   await page.getByRole('button', { name: 'Mark for upgrade', exact: true }).click()
   await page.getByRole('button', { name: /^\+0 → \+1 /, exact: false }).click()
 
@@ -85,11 +83,8 @@ test('ItemActionPanel: a stale mark for an emptied/replaced slot does not badge 
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [null, { name: 'wcoat', level: 0 }] })
   server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
   server.addCatalogEntry({ id: 'ringo', name: 'Ring of Luck' })
-  // Simulate marks left over from BEFORE the inventory changed - slot 0
-  // is empty now, slot 1 holds a totally different item than when it was
-  // marked. A slot-number-only match would badge the empty slot AND the
-  // wrong item as "Deconstruction" - matching by item identity too must
-  // rule both out.
+  // Stale marks: slot 0 is now empty and slot 1 holds a different item.
+  // Matching by item as well as slot must badge neither.
   server.deconstructionMarks = [
     { id: 'stale-1', owner: 'Merchantina', slot: 0, item: { name: 'ringo', level: 0 }, quantity: 1, state: 'collecting' },
     { id: 'stale-2', owner: 'Merchantina', slot: 1, item: { name: 'ringo', level: 3 }, quantity: 1, state: 'collecting' },
@@ -106,11 +101,9 @@ test('ItemActionPanel: an auto NPC sale rule shows a badge on the merchant\'s ow
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'ironore', level: 0, q: 5 }] })
   server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
-  // The standing auto-NPC-sale rule reconciles server-side into its OWN
-  // source "merchant" npcSaleMarks entries with no `character` field at
-  // all (automatic-sales.ts's markNpcSale) - distinct from the manual
-  // "Mark for NPC Sale" action's source "character". Only checking for
-  // "character" meant an auto-marked item on the merchant never badged.
+  // The auto-NPC-sale rule creates source "merchant" npcSaleMarks with no
+  // `character` field, unlike the manual action's source "character"; both
+  // must badge.
   server.npcSaleMarks = [{ id: 'auto-1', source: 'merchant', slot: 0, item: { name: 'ironore', level: 0 }, quantity: 5 }]
   await server.install(page)
 
@@ -121,11 +114,9 @@ test('ItemActionPanel: an auto NPC sale rule shows a badge on the merchant\'s ow
 test('ItemActionPanel: marking a modified item for NPC sale from the merchant works and requires confirming the warning', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
-  // Level +3 makes this a "modified" item - the real server (npc-sale.ts's
-  // validate()) refuses to sell it without an explicit acknowledgement,
-  // AND separately refuses source "character" for the merchant's own
-  // items outright ("Unknown player character") - the client must send
-  // source "merchant" here, not "character".
+  // +3 makes this a modified item, which the server refuses to sell without
+  // an acknowledgement. The merchant's own items must use source "merchant";
+  // "character" is refused ("Unknown player character").
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'wcoat', level: 3 }] })
   server.addCatalogEntry({ id: 'wcoat', name: 'Wolf Coat' })
   await server.install(page)
@@ -212,9 +203,7 @@ test('ItemActionPanel: delivering an item to another character shows it queued o
 
   await page.goto('/characters/Merchantina')
   await page.getByTestId('inventory-slot-0').click()
-  // Renamed from "Give to..." to match the dashboard's own "Deliver to…"
-  // wording - and marking a delivery used to leave no trace anywhere
-  // once the panel closed.
+  // A marked delivery must stay visible after the panel closes.
   await page.getByRole('button', { name: 'Deliver to…' }).click()
   await page.getByRole('button', { name: /Warriorname/ }).click()
 
