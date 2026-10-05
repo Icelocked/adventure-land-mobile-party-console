@@ -1,9 +1,7 @@
 import { Crosshair, Flame, HeartPulse, Shield, Sparkles, Store, User, type LucideIcon } from 'lucide-react'
 
-/** Class icon + color, ported from ui/characterdetail/sections/
- *  VitalsHeader.kt's classLook - falls back to a generic person icon for
- *  any ctype not in this list rather than failing. Shared by the
- *  character list and detail header so both agree on the same look. */
+/** Class icon + color, shared by the character list and detail header.
+ *  Unknown classes get a generic person icon. */
 export function classLook(ctype: string | undefined | null): { Icon: LucideIcon; color: string } {
   switch ((ctype ?? '').toLowerCase()) {
     case 'warrior':

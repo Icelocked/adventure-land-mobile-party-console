@@ -1,14 +1,10 @@
 import type { Sprite } from './sprite'
 import type { ItemSuggestedPrice } from '@/lib/suggestedItemValue'
 
-/** Mirrors model/ItemDetail.kt - the full per-item reference data behind
- *  party-console's "left-click an item" details dialog (item-details.tsx/
- *  item-meta.tsx). `definition` is the raw game data record (armor/
- *  attack/tier/etc., heterogeneous value types), `properties` is the
- *  server's own already-computed current-level stat block, `scaling` is
- *  the per-level stat delta used to preview other levels (see
- *  lib/itemFormulas.ts). Confirmed against a live GET /party-api/state
- *  capture - field names and nesting match exactly. */
+/** Per-item reference data behind the item details view. `definition` is
+ *  the raw game record (mixed value types), `properties` the server's
+ *  computed current-level stats, and `scaling` the per-level delta used to
+ *  preview other levels (lib/itemFormulas.ts). */
 export interface ItemMeta {
   definition: Record<string, unknown>
   upgradeable?: boolean
@@ -33,15 +29,13 @@ export interface UsageClass {
   hands?: number | null
 }
 
-/** The "where does this fit in the game world" section of an item - each
- *  independently optional (a plain stat scroll has none of these; a
- *  craftable armor piece might have recipe + drops + usedIn all at once). */
+/** Where an item fits in the game world; every part is optional. */
 export interface ItemWorldInfo {
   recipe?: ItemRecipe | null
   set?: ItemSetInfo | null
   drops?: ItemDropSource[]
   usedIn?: ItemCraftUse[]
-  // suggested-item-value.tsx's precomputed per-source prices.
+  // Precomputed per-source prices.
   suggestedPrices?: ItemSuggestedPrice[]
 }
 
@@ -100,10 +94,9 @@ export interface ItemCraftUse {
   sprite?: Sprite | null
 }
 
-/** A merchant NPC exchange/box entry (merchant-exchange-item.tsx) - either
- *  a straight exchange (`reward`/`rewardQuantity` set: pay [required] of
- *  [id] for a fixed reward) or a randomized table (`results`: opening this
- *  item rolls one of several outcomes by `chance`). */
+/** An NPC exchange/box entry: either a fixed exchange (`reward` set: pay
+ *  [required] of [id] for the reward) or a random table (`results` rolled
+ *  by `chance`). */
 export interface MerchantExchangeItem {
   key: string
   id: string

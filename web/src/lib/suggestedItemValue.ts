@@ -1,6 +1,7 @@
 import type { InventoryEntry, MerchantBuyItem, Sprite } from '@/models'
 
-/** item-suggested-price.tsx, verbatim. */
+// Console: suggested-item-value.tsx and the helpers it imports.
+
 export type ItemSuggestedPrice = {
   monsterId: string
   monsterName: string
@@ -20,7 +21,6 @@ export type ItemSuggestedPrice = {
   luckMultiplier?: number
 }
 
-/** stand-price-history.tsx, verbatim. */
 export type StandPriceHistory = {
   lowest: number
   lowestLevel?: number
@@ -33,22 +33,20 @@ export type StandPriceHistory = {
   highestPublicWTBLevel?: number
 }
 
-/** upgrade-chances.tsx, verbatim. */
 export const UPGRADE_CHANCES: Record<number, number[]> = {
   0: [1, 0.9999999, 0.98, 0.95, 0.7, 0.6, 0.4, 0.25, 0.15, 0.07, 0.024, 0.14, 0.11],
   1: [1, 0.99998, 0.97, 0.94, 0.68, 0.58, 0.38, 0.24, 0.14, 0.066, 0.018, 0.13, 0.1],
   2: [1, 0.97, 0.94, 0.92, 0.64, 0.52, 0.32, 0.232, 0.13, 0.062, 0.015, 0.12, 0.09],
 }
 
-/** exact-level-price.tsx, verbatim. */
 export function exactLevelPrice(price: number | undefined, observedLevel: number | undefined, itemLevel: number) {
   return price && observedLevel != null && Number(observedLevel) === itemLevel ? price : undefined
 }
 
 const upgradeEstimateCache = new Map<string, { attempts: number; gold: number; scrolls: number[] }>()
 
-/** upgrade-estimate.tsx, verbatim: the 90th-percentile cost of producing
- *  `quantity` items at +target from a seeded 3000-run simulation. */
+/** The 90th-percentile cost of producing `quantity` items at +target,
+ *  from a seeded 3000-run simulation. */
 export function upgradeEstimate(item: MerchantBuyItem, quantity: number, target: number) {
   if (!target || !item.upgradeable)
     return {
@@ -116,7 +114,6 @@ export function upgradeEstimate(item: MerchantBuyItem, quantity: number, target:
   return result
 }
 
-/** suggested-item-value.tsx, verbatim. */
 export function suggestedItemValue(entry: InventoryEntry, buyable: MerchantBuyItem[]) {
   const definition = entry.meta?.definition || {}
   const defaultPrice = Math.max(1, Number(definition.g) || 1)

@@ -1,8 +1,5 @@
-/** Mirrors model/Roster.kt's RosterMember - party-console's account-wide
- *  character roster (relatively static: name/class/level/home realm),
- *  unlike the fast-changing vitals stream. Fetched once via GET
- *  /party-api/state and merged into CharacterVitals so ctype/level are
- *  always real values instead of the vitals stream's blank placeholders. */
+/** Account-wide roster entry (name/class/level/home realm). Merged into
+ *  CharacterVitals, whose live stream lacks ctype/level. */
 export interface RosterMember {
   name: string
   ctype: string
@@ -13,8 +10,7 @@ export interface RosterMember {
   server?: string
 }
 
-/** Only the roster slice this app reads out of GET /party-api/state -
- *  that endpoint returns much more; unknown fields are simply ignored. */
+/** The roster slice of GET /party-api/state; other fields are ignored. */
 export interface PartyStateRoster {
   roster: RosterMember[]
 }

@@ -36,10 +36,10 @@ const queryClient = new QueryClient()
 export default function App() {
   const [settings, setSettings] = useState<ServerSettings>(() => loadServerSettings())
   const [showOverride, setShowOverride] = useState(false)
-  // query-cache.tsx's DashboardQueries: once any party-api request reports
-  // the session is gone, drop cached data and offer a reconnect.
+  // Once any party-api request reports the session is gone, drop cached
+  // data and offer a reconnect.
   const [sessionLost, setSessionLost] = useState(false)
-  // app/page.tsx: after 10 s of healthy rendering the one-reload-per-build claim is released.
+  // After 10s of healthy rendering, release the one-reload-per-build claim.
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -69,7 +69,7 @@ export default function App() {
         <PartyDataProvider settings={settings} key={settings.baseUrl}>
           <ServerSettingsDialogContext.Provider value={() => setShowOverride(true)}>
             <BrowserRouter>
-              {/* use-party-console.tsx: the ALData auth wait runs wherever the user is. */}
+              {/* The ALData auth wait runs whichever screen the user is on. */}
               <AlDataAuthWatcher />
               <ErrorBoundary>
               <Routes>

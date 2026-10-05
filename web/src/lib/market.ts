@@ -1,6 +1,5 @@
 import type { CatalogItem, InventoryEntry, Item, MerchantBuyItem } from '@/models'
 
-/** aldata-listing.tsx. */
 export interface AlDataListing {
   key: string
   source?: 'aldata'
@@ -18,7 +17,6 @@ export interface AlDataListing {
   item: Item & { data?: unknown }
   groupedListings?: AlDataListing[]
 }
-/** aldata-buy-order.ts. */
 export interface AlDataBuyOrder {
   key: string
   source?: 'aldata'
@@ -32,7 +30,6 @@ export interface AlDataBuyOrder {
   quantity: number
   item: Item
 }
-/** ponty-listing.ts. */
 export interface PontyListing {
   key: string
   rid?: string
@@ -48,7 +45,6 @@ export interface PontyListing {
   realmLabel?: string
   minimumLot?: number
 }
-/** aldata-public-trade.ts. */
 export interface AlDataPublicTrade {
   owner: string
   label?: string
@@ -69,7 +65,7 @@ export interface BlacklistRecord {
   [field: string]: unknown
 }
 
-// stand-sheet.tsx, verbatim logic from here down.
+// Market logic below follows the console's stand-sheet.tsx.
 
 /** The value a listing is judged against: the cheapest of the farm-price
  *  sources and the vendor cost, never below the item's own value. */

@@ -6,9 +6,8 @@ import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
 
 export type { Sprite }
 
-/** Mirrors party-console's MerchantJob type (merchant-job.tsx), trimmed to
- *  what the queue widget displays. Everything optional/defaulted: a job's
- *  shape varies a lot by what kind of errand it is. */
+/** Console: merchant-job.tsx MerchantJob, trimmed to what the queue shows.
+ *  The shape varies a lot by kind of errand, so most fields are optional. */
 export interface MerchantJob {
   id?: string
   target: string
@@ -18,22 +17,18 @@ export interface MerchantJob {
   phase?: string
   realmBlockedReason?: string
   realmRetryExhausted?: boolean
-  // Surfaced by merchant-scheduling.ts's own recovery/retry loop (confirmed
-  // against a live account: these fields already reach the client via
-  // projectMerchantJob, which only ever strips aldataKey - they just
-  // weren't modeled/shown before). A climbing recoveryAttempts with the
-  // same lastDeferredReason for several minutes means the job is
-  // genuinely stuck retrying, not just normally queued - see
-  // MerchantQueueSection's stuckJob().
+  // From the server's recovery/retry loop. A climbing recoveryAttempts with
+  // the same lastDeferredReason for several minutes means the job is stuck
+  // retrying, not just queued (MerchantQueueSection's stuckJob()).
   recoveryAttempts?: number
   lastDeferredReason?: string
   firstDeferredAt?: number
-  // Read by routineFor (merchant/routines.ts) to name the job's routine.
+  // Read by routineFor to name the job's routine.
   manual?: boolean
   bidItemId?: string
   order?: unknown
   autoExchangeKeys?: string[]
-  // merchant-job.tsx fields shown by the queue/job label (M1).
+  // Shown by the queue/job label.
   operationStage?: string
   listings?: unknown[]
   seller?: string
@@ -43,15 +38,13 @@ export interface MerchantJob {
   commandReport?: unknown
 }
 
-/** One HP or MP auto-potion threshold - see restock-policy.tsx. */
+/** One HP or MP auto-potion threshold. */
 export interface RestockRange {
   min: number
   max: number
   item?: string
 }
 
-/** A character's restock policy (restock-controls.tsx) - defaults to a
- *  zeroed range rather than requiring both hp/mp. */
 export interface RestockPolicy {
   hp: RestockRange
   mp: RestockRange
@@ -62,28 +55,24 @@ export const emptyRestockPolicy = (): RestockPolicy => ({
   mp: { min: 0, max: 0 },
 })
 
-/** restock-controls.tsx's `defaults` - what the dashboard shows (and saves)
- *  for a character with no policy yet. */
+/** What is shown (and saved) for a character with no policy yet. */
 export const defaultRestockPolicy = (): RestockPolicy => ({
   hp: { min: 5, max: 20, item: 'hpot1' },
   mp: { min: 0, max: 0, item: 'mpot1' },
 })
 
-/** Shared bank vault (bank-sheet.tsx's BankSnapshot) - packs keys are pack
- *  names like "items1"/"bank_b1"; each pack is a fixed-length list of
- *  entries, same empty-slot-preserving shape as a character's inventory. */
+/** Shared bank. Pack keys are names like "items1"/"bank_b1"; each pack is a
+ *  fixed-length slot list with nulls for empty slots, like an inventory. */
 export interface BankSnapshot {
   gold: number
   packs: Record<string, (InventoryEntry | null)[]>
 }
 
-/** One bank pack's lock state (bank-unlock.ts / bank-sheet.tsx's BankVault) -
- *  every pack the account could ever have, locked or not. A pack is unlocked once
- *  it shows up as a key in BankSnapshot.packs; until then this describes what
- *  opens it: `floor === "bank"` packs open for `gold` alone once accessible, but
- *  a non-base floor's first (gold: 0) vault needs its `key` item owned and
- *  unlocked with `kind: "key"` before ANY vault on that floor (including that
- *  one) becomes accessible - see http/bank-unlock.ts's access(). */
+/** One bank pack, locked or not. A pack is unlocked once it appears in
+ *  BankSnapshot.packs; until then this describes what opens it.
+ *  `floor === "bank"` packs open for `gold` alone. On other floors the
+ *  first (gold: 0) vault must be opened with its `key` item before any
+ *  vault on that floor is accessible. */
 export interface BankVault {
   pack: string
   floor: string
@@ -102,12 +91,7 @@ export interface BestiaryDrop {
   sprite?: Sprite | null
 }
 
-/** One entry in a BestiaryMonster's spawnRecords - a real map location
- *  this monster spawns at, confirmed against a live GET /party-api/state
- *  capture (farming-area-picker.tsx's `farmingAreas()` groups these same
- *  records client-side using a separate static lib/farming-areas.ts data
- *  file this app doesn't port - picking a plain spawn record directly is
- *  simpler and uses only server-sourced data). */
+/** A map location where a monster spawns. */
 export interface MonsterSpawnRecord {
   map: string
   mapName?: string
@@ -118,7 +102,6 @@ export interface MonsterSpawnRecord {
   restrictions?: string[]
 }
 
-/** bestiary-dialog.tsx's monster reference entry. */
 export interface BestiaryMonster {
   id: string
   name: string
@@ -126,7 +109,7 @@ export interface BestiaryMonster {
   attack: number
   xp: number
   threat: number
-  // bestiary-monster.ts: attack range and the raw G.monsters definition.
+  // Attack range and the raw G.monsters definition.
   range?: number
   definition?: Record<string, unknown>
   sprite?: Sprite | null
@@ -134,7 +117,7 @@ export interface BestiaryMonster {
   spawnRecords: MonsterSpawnRecord[]
 }
 
-/** skills-dialog.tsx's per-class skill list. */
+/** A class's skill list. */
 export interface SkillClass {
   id: string
   name: string
@@ -153,7 +136,7 @@ export interface SkillEntry {
   id: string
   name: string
   sprite?: Sprite | null
-  // skill-entry.ts: the full G.skills definition.
+  // The full G.skills definition.
   definition?: SkillDefinition & Record<string, unknown>
 }
 
@@ -162,17 +145,15 @@ export interface ActivityEntry {
   at: number
   message: string
   level?: string
-  // combat-log-entry.ts: skill | kill | loot | death | item.
+  // skill | kill | loot | death | item (combat log).
   type?: string
   details?: unknown
 }
 
-/** One of the merchant's own 16 stand listing slots (stand-sheet.tsx).
- *  `slot` is the merchant's own INVENTORY slot the item occupies while
- *  listed - distinct from `tradeSlot` (the stand UI position, unused).
- *  `bankPack`/`bankSlot` are set instead of `slot` when the listing was
- *  marked directly from a bank item rather than a carried one - this is
- *  how BankScreen tells whether a given bank slot is already listed. */
+/** One of the merchant's 16 stand listings. `slot` is the merchant's
+ *  inventory slot holding the item, not `tradeSlot` (the stand position).
+ *  A listing marked straight from the bank has `bankPack`/`bankSlot`
+ *  instead; BankScreen uses them to badge listed bank slots. */
 export interface StandListing {
   id?: string
   slot?: number
@@ -186,16 +167,15 @@ export interface StandListing {
   quantity: number
 }
 
-/** One public market listing from ALData or Ponty - real listings live
- *  under `aldata.listings`/`ponty.listings`, unified into this one shape.
- *  ALData's price is already per-unit; Ponty's `price` is the TOTAL for
- *  `quantity` (its own `unitPrice` is per-unit). */
+/** One public market listing from ALData or Ponty. ALData's price is
+ *  per-unit; Ponty's `price` is the total for `quantity` (its `unitPrice`
+ *  is per-unit). */
 export interface MarketListing {
   key?: string
-  // Ponty listings can combine several underlying listings (ponty.ts).
+  // Ponty listings can combine several underlying listings.
   keys?: string[]
-  // Where the PWA got it from - neither feed tags itself reliably
-  // (Ponty listings carry no `source`), so MarketScreen sets this on merge.
+  // Neither feed tags itself reliably (Ponty listings carry no `source`),
+  // so MarketScreen sets this on merge.
   origin?: 'aldata' | 'ponty'
   source?: string
   seller?: string
@@ -205,9 +185,8 @@ export interface MarketListing {
   quantity: number
 }
 
-/** One live "someone's stand is open nearby" result from a stand search.
- *  Buying one requires echoing these exact fields back so the coordinator
- *  can re-match the same physical listing. */
+/** One open player stand found by a stand search. Buying echoes these
+ *  fields back so the coordinator can re-match the same listing. */
 export interface StandSearchListing {
   seller: string
   slot: string
@@ -231,8 +210,7 @@ export const emptyStandSearchState = (): StandSearchState => ({ status: 'idle', 
 
 export interface AlDataState {
   listings: MarketListing[]
-  // Publish/auth fields (aldata-state.tsx) - public market browsing needs neither; these only
-  // matter for the merchant publishing their own listings to ALData.
+  // Only used when publishing the merchant's own listings to ALData.
   hasKey?: boolean
   auth?: 'NO' | 'YES' | 'CORRECT' | 'WRONG'
   publishStatus?: string
@@ -243,12 +221,8 @@ export interface PontyState {
   listings: MarketListing[]
 }
 
-/** merchantCatalog.allItems - browsing (CatalogScreen), icon/display-name
- *  lookup (item.name on a live inventory/equipment entry matches `id`
- *  here, NOT `name` - the catalog's `name` is the human-readable display
- *  name, `id` is the internal identifier every live item instance
- *  actually carries as its own `.name`), and the full item-details view
- *  (components/itemdetail/ItemDetailBrowser.tsx) via `meta`. */
+/** merchantCatalog.allItems. A live item's `.name` matches `id` here, not
+ *  `name` (which is the display name). `meta` feeds the item-details view. */
 export interface CatalogItem {
   id: string
   name: string
@@ -259,9 +233,8 @@ export interface CatalogItem {
   meta?: ItemMeta | null
 }
 
-/** merchantCatalog.buyable - NPC-purchasable items, including the
- *  compound scrolls ("cscroll0".."cscroll3") whose real prices
- *  compoundPassCost (itemFormulas.ts) looks up by id. */
+/** merchantCatalog.buyable - NPC-purchasable items, including the compound
+ *  scrolls whose prices compoundPassCost looks up by id. */
 export interface MerchantBuyItem {
   id: string
   name: string
@@ -276,8 +249,7 @@ export interface MerchantBuyItem {
   scrollCosts?: number[]
 }
 
-/** merchantCatalog.craftable - recipes buyable via the merchant crafting
- *  workflow (merchant-commerce-dialog.tsx "craft" mode). */
+/** merchantCatalog.craftable - recipes the merchant can craft. */
 export interface MerchantCraftRecipe {
   id: string
   name: string
@@ -290,26 +262,21 @@ export interface MerchantCatalog {
   allItems: CatalogItem[]
   buyable: MerchantBuyItem[]
   craftable: MerchantCraftRecipe[]
-  // NPC exchange/box tables - matched against an item by id+level to
-  // build the item-details "Exchange price"/"reward"/"Reward in" sections.
+  // NPC exchange/box tables, matched by id+level for the item-details
+  // exchange sections.
   exchangeable: MerchantExchangeItem[]
 }
 
-/** One entry in `marked`/`merchantMarked` (bank/merchant hold marks) -
- *  slot-based, one specific item instance, as opposed to autoItemMarks'
- *  item-identity-keyed standing rules. `auto` distinguishes a rule-
- *  generated mark from a manual one-off mark. */
+/** One bank/merchant hold mark on a specific slot, as opposed to
+ *  autoItemMarks' standing rules. `auto` marks were generated by a rule. */
 export interface BankMark {
   slot: number
   item: Item
   auto?: boolean
 }
 
-/** One pending NPC-sale mark (state.npcSaleMarks, a FLAT account-wide
- *  list, not keyed by character - filter by `source`/`character` to find
- *  the marks relevant to one). The item-action panel always sends
- *  `source: 'character'` (bank-side NPC sales are BankScreen's own
- *  `source: 'bank'` concern instead). */
+/** One pending NPC-sale mark. state.npcSaleMarks is a flat account-wide
+ *  list; filter by `source`/`character`. */
 export interface NpcSaleMark {
   id: string
   auto?: boolean
@@ -324,12 +291,9 @@ export interface NpcSaleMark {
   retryAt?: number | null
 }
 
-/** One pending deconstruction mark (state.deconstructionMarks, also a
- *  flat account-wide list) - `state: 'complete'` means it's done and no
- *  longer worth badging, matching the dashboard's own filter. A bank-
- *  sourced mark (BankScreen's "Mark for deconstruction", not withdrawn
- *  first) has no meaningful top-level `slot` (-1) and identifies the
- *  item by `storage` instead - see bank-deconstruction.ts. */
+/** One pending deconstruction mark (also a flat account-wide list).
+ *  'complete' marks are not badged. A bank-sourced mark has `slot` -1 and
+ *  identifies the item by `storage` instead. */
 export interface DeconstructionMark {
   id: string
   owner: string
@@ -342,11 +306,9 @@ export interface DeconstructionMark {
   storage?: { pack: string; slot: number }
 }
 
-/** One pending, one-time upgrade-pass mark (state.upgrades[character]) -
- *  distinct from autoUpgradeMarks' standing per-level-range rules: this is
- *  a live in-flight upgrade attempt on one specific item instance. `slot`
- *  is a number for an inventory item, the equipment slot name (string)
- *  when `equipped` is true. */
+/** One pending upgrade on a specific item (state.upgrades[character]), as
+ *  opposed to autoUpgradeMarks' standing rules. `slot` is an inventory
+ *  index, or the equipment slot name when `equipped`. */
 export interface UpgradeMark {
   slot?: number | string
   item: Item
@@ -360,7 +322,7 @@ export interface UpgradeMark {
 export type CompoundMark = UpgradeMark
 
 /** state.compounds[character] groups the copies being compounded together
- *  under one id - see compound-group.tsx. */
+ *  under one id. */
 export interface CompoundGroup {
   id: string
   name: string
@@ -373,12 +335,10 @@ export interface StatScrollMark extends UpgradeMark {
   scroll: string
 }
 
-/** One inventory slot's accumulated upgrade-roll evidence, mirrored from
- *  runtime/lucky-slot-tracking.ts's SlotRollStatistics - the server rotates
- *  automatic upgrades through the merchant's 42 slots and records where the
- *  underlying roll landed, since a handful of AL private-server slots carry
- *  a hidden bonus to upgrade success chance ("lucky slots"). Never a
- *  verified private-server fact by itself, just evidence for comparison. */
+/** One inventory slot's accumulated upgrade-roll evidence. The server
+ *  rotates automatic upgrades through the merchant's 42 slots and records
+ *  each roll, since some slots may carry a hidden success bonus ("lucky
+ *  slots"). Evidence only, never a verified fact. */
 export interface SlotRollStatistics {
   totalRolls: number
   sumRolls: number
@@ -386,10 +346,9 @@ export interface SlotRollStatistics {
   perfectRolls: number
 }
 
-/** One evidence stream's full slot table (state.luckySlotTracking[character]
- *  is a Record of these, keyed by an opaque stream id - each client/session
- *  keeps its own durable stream so restarts and multiple clients never
- *  double-count or drop rolls; aggregateSlotTracking sums them for display). */
+/** One evidence stream's slot table. Each client keeps its own stream so
+ *  restarts and multiple clients never double-count or drop rolls;
+ *  aggregateSlotTracking sums them for display. */
 export interface LuckySlotTracking {
   version: 1
   streamId?: string
@@ -397,22 +356,17 @@ export interface LuckySlotTracking {
 }
 export type LuckySlotStreams = Record<string, LuckySlotTracking>
 
-/** One pending bank-withdrawal request, queued for a specific character
- *  (usually the merchant) to collect on their next bank visit - the wire
- *  source of truth `state.withdrawals` in the coordinator, distinct from
- *  BankMark. Requesting the SAME {pack,slot,item} again toggles it back
- *  off server-side (see transfer-commands.ts's removingWithdrawal) -
- *  there is no separate "unmark" request shape. */
+/** One pending bank withdrawal, collected by a character (usually the
+ *  merchant) on its next bank visit. Requesting the same {pack,slot,item}
+ *  again toggles it off; there is no separate "unmark" request. */
 export interface WithdrawalRequest {
   pack: string
   slot: number
   item: Item
 }
 
-/** deconstruction.ts's DeconstructionCatalog, keyed by internal item id -
- *  whether an item CAN be deconstructed at all (and, for compoundable
- *  items, that its level is > 0) is a real server-side rule, not
- *  something safe to assume for every item shown in the bank. */
+/** Keyed by internal item id. Only listed items can be deconstructed
+ *  (compoundables only above level 0). */
 export interface DeconstructionCatalogEntry {
   compound: boolean
   cost?: number
@@ -420,8 +374,8 @@ export interface DeconstructionCatalogEntry {
 }
 export type DeconstructionCatalog = Record<string, DeconstructionCatalogEntry>
 
-/** deconstruction.ts's deconstructionRewards, verbatim: recipe rolls are
- *  independent; compounded items return three items at one lower level. */
+/** Recipe rolls are independent; compounded items return three items at
+ *  one lower level. Console: deconstruction.ts. */
 export function deconstructionRewards(item: Item, catalog: DeconstructionCatalog) {
   const definition = catalog[item.name]
   if (!definition) return null
@@ -429,18 +383,15 @@ export function deconstructionRewards(item: Item, catalog: DeconstructionCatalog
   return definition.rewards?.map((reward) => ({ ...reward, level: 0 })) || null
 }
 
-/** deconstruction.ts's canDeconstruct, ported verbatim. */
 export function canDeconstruct(item: Item, catalog: DeconstructionCatalog): boolean {
   const entry = catalog[item.name]
   return !!entry && !item.l && !item.b && (!entry.compound || Number(item.level) > 0)
 }
 
-/** The rule-key format both autoItemMarks and autoUpgradeMarks use:
- *  "{item.name}@+{level or 0}" - see automatic-commerce-rule-key.ts. */
+/** Rule key for autoItemMarks and autoUpgradeMarks: "{name}@+{level or 0}". */
 export const autoMarkRuleKey = (item: Item): string => `${item.name}@+${item.level ?? 0}`
 
-/** automatic-commerce-rule-key.tsx, verbatim - the key autoStandMarks and
- *  autoNpcSales use. */
+/** Rule key for autoStandMarks and autoNpcSales. */
 export const automaticCommerceRuleKey = (item: Item): string =>
   JSON.stringify({
     name: item.name,
@@ -449,36 +400,27 @@ export const automaticCommerceRuleKey = (item: Item): string =>
     stat_type: item.stat_type || null,
   })
 
-/** Whether a mark's own carried `item` still matches what's actually in
- *  that slot right now - ported from item-identity.ts's sameMarkedItem
- *  (name+level are the two fields that matter here; a quantity change on
- *  an otherwise-unchanged stack shouldn't invalidate a mark). A mark is
- *  only as fresh as the last state poll, and slot numbers get reused once
- *  the originally-marked item moves, gets consumed, or gets replaced -
- *  matching by slot number alone can badge a completely unrelated item
- *  (or an empty slot) as "marked". */
+/** Whether a mark's `item` still matches what's in that slot. Slots get
+ *  reused when items move, so matching by slot alone can badge the wrong
+ *  item. Quantity is ignored so a stack change doesn't invalidate a mark. */
 export function sameMarkedItem(markItem: Item, liveItem: Item): boolean {
   return markItem.name === liveItem.name && (markItem.level ?? 0) === (liveItem.level ?? 0)
 }
 
-/** Parses a rule key (see autoMarkRuleKey) back into a displayable Item -
- *  used when a collection is keyed by rule string rather than holding a
- *  real Item (autoItemMarks, autoUpgradeMarks). */
+/** Parses an autoMarkRuleKey back into a displayable Item. */
 export const itemFromRuleKey = (ruleKey: string): Item => {
   const [name, level] = ruleKey.split('@+')
   const parsedLevel = level != null ? Number(level) : undefined
   return { name: name ?? ruleKey, level: parsedLevel != null && !Number.isNaN(parsedLevel) ? parsedLevel : undefined }
 }
 
-/** One entry in the flat, account-wide autoNpcSales map - `character`
- *  distinguishes a per-character rule from the merchant's own (absent
- *  character = merchant). */
+/** An autoNpcSales entry. No `character` means the merchant's own rule. */
 export interface AutoNpcSaleRule {
   item: Item
   character?: string
 }
 
-/** One entry in the flat autoStandMarks map - merchant-only. */
+/** An autoStandMarks entry (merchant-only). */
 export interface AutoStandRule {
   item: Item
   price: number
@@ -488,20 +430,17 @@ export interface AutoDeconstructionRule {
   item: Item
 }
 
-/** One entry in a character's autoCompounds list - `name` only (no level:
- *  compound rules aren't level-specific, since compounding advances an
- *  item's own level automatically toward targetTier). */
+/** Compound rules aren't level-specific: compounding advances the item
+ *  toward targetTier on its own. */
 export interface AutoCompoundRule {
   name: string
   targetTier: number
   quantity: number
 }
 
-/** One item queued to be hand-delivered to another character (state.
- *  merchantDeliveries[target], keyed by the RECIPIENT's name) - `slot` is
- *  the SENDER's inventory slot (always the merchant in practice; the
- *  item physically stays there, still visible/actionable, until the
- *  delivery actually happens), see transfer-commands.ts's `delivery()`. */
+/** An item queued for hand delivery, keyed by recipient. `slot` is the
+ *  sender's (in practice the merchant's) inventory slot; the item stays
+ *  there until delivered. */
 export interface MerchantDelivery {
   id: string
   slot: number
@@ -509,9 +448,8 @@ export interface MerchantDelivery {
   equipOnDelivery?: boolean
 }
 
-/** One preset map location the "Send to..." picker offers (travelPlaces) -
- *  `id` is the map name POST /party-api/command's character-travel
- *  command expects. */
+/** A preset "Send to..." location. `id` is the map name character-travel
+ *  expects. */
 export interface TravelPlace {
   id: string
   name: string
@@ -519,8 +457,7 @@ export interface TravelPlace {
   y: number
 }
 
-/** One selectable Adventure Land realm/server option (realm-control's
- *  realms list) - `key` is what POST /party-api/realm/switch expects. */
+/** A selectable realm. `key` is what /party-api/realm/switch expects. */
 export interface RealmOption {
   key: string
   label: string
@@ -528,7 +465,6 @@ export interface RealmOption {
   pvp: boolean
 }
 
-/** realm-character.tsx */
 export interface RealmCharacter {
   name: string
   ctype: string
@@ -536,7 +472,7 @@ export interface RealmCharacter {
   online: boolean
 }
 
-/** realm-operation.tsx - a realm switch (and optional home change) in progress. */
+/** A realm switch (and optional home change) in progress. */
 export interface RealmOperation {
   id: string
   phase: string
@@ -548,7 +484,6 @@ export interface RealmOperation {
   characters?: RealmCharacter[]
 }
 
-/** realm-control.tsx */
 export interface RealmControl {
   activeRealm?: string
   // Where the party actually is (activeRealm is where the coordinator aims it).
@@ -561,36 +496,26 @@ export interface RealmControl {
   operation?: RealmOperation | null
 }
 
-/** The slice of GET /party-api/state that changes often enough to poll
- *  (merchant errands, party formation, restock policy, bank/bestiary/
- *  skills/logs/stand/market for the account-wide screens) rather than
- *  fetch once like the roster. `followers` mirrors party-workspace.tsx's
- *  `state.followers?.[name]` map: character name -> is this character
- *  following the leader. */
+/** The polled slice of GET /party-api/state. `followers` maps character
+ *  name -> whether it follows the leader. */
 export interface PartyStateDynamic {
   merchantCurrent?: MerchantJob | null
   merchantQueue: MerchantJob[]
   leader?: string | null
   followers: Record<string, boolean>
-  // The leader's own effective monster focus (party-state.tsx's flat
-  // field) - navigation/focus.ts's characterFocus() deliberately keeps
-  // monsterFocusByCharacter[leader] empty (that's what followers/others
-  // inherit from instead), so this is the fallback CharacterDetailScreen
-  // needs for the leader's own screen - see connected-character-card.tsx's
-  // `monsterFocusByCharacter?.[char.name] || selectedFocus`.
+  // The leader's effective monster focus. monsterFocusByCharacter[leader]
+  // is deliberately left empty server-side, so the leader's screen falls
+  // back to this.
   monsterFocus?: string[]
   restockPolicies: Record<string, RestockPolicy>
   bank?: BankSnapshot | null
-  // Every bank pack the account could ever have, locked or not (see BankVault) - locked ones
-  // aren't in `bank.packs` yet.
+  // Every bank pack, locked or not; locked ones aren't in `bank.packs`.
   bankVaults: BankVault[]
   bestiaryCatalog: BestiaryMonster[]
-  // Spawn-area geometry for farmingAreas.ts (farming-area-picker.tsx's port) -
-  // a SEPARATE catalog from bestiaryCatalog's own spawnRecords (confirmed
-  // against the real coordinator source, status/catalogs.ts/public-state.ts:
-  // both are sent alongside each other, same `section=catalog` channel).
+  // Spawn-area geometry for farmingAreas.ts; a separate catalog from
+  // bestiaryCatalog's spawnRecords, sent in the same section=catalog.
   monsterChoices: MonsterLocationCatalog
-  // Saved Phoenix 5-region search order (state.phoenixRouteOrder).
+  // Saved Phoenix 5-region search order.
   phoenixRouteOrder: string[]
   skillCatalog: SkillClass[]
   combatLogs: Record<string, ActivityEntry[]>
@@ -602,113 +527,86 @@ export interface PartyStateDynamic {
   standSearch: StandSearchState
   marked: Record<string, BankMark[]>
   merchantMarked: Record<string, BankMark[]>
-  // Pending bank-withdrawal requests, keyed by the character who will
-  // collect them (usually the merchant) - see WithdrawalRequest.
+  // Keyed by the character who will collect them (usually the merchant).
   withdrawals: Record<string, WithdrawalRequest[]>
   deconstructionCatalog: DeconstructionCatalog
   // Both keyed by character, then by autoMarkRuleKey(item).
   autoItemMarks: Record<string, Record<string, string>>
   autoUpgradeMarks: Record<string, Record<string, unknown>>
-  // Pending one-time inventory marks (not standing rules) - see UpgradeMark/
-  // CompoundGroup/StatScrollMark above.
+  // Pending one-time marks (not standing rules), keyed by character.
   upgrades: Record<string, UpgradeMark[]>
   compounds: Record<string, CompoundGroup[]>
   statScrolls: Record<string, StatScrollMark[]>
-  // Flat, account-wide (not keyed by character) - see NpcSaleMark/DeconstructionMark above.
+  // Flat, account-wide lists.
   npcSaleMarks: NpcSaleMark[]
   deconstructionMarks: DeconstructionMark[]
-  // Keyed by the RECIPIENT's name - see MerchantDelivery above.
+  // Keyed by recipient.
   merchantDeliveries: Record<string, MerchantDelivery[]>
-  // Lucky-upgrade-slot evidence, both keyed by character - see
-  // SlotRollStatistics/LuckySlotTracking above. luckyUpgradeSlots holds
-  // the inferred/verified slot number once confidence is high enough.
+  // Lucky-slot evidence, keyed by character. luckyUpgradeSlots holds the
+  // slot number once confidence is high enough.
   luckyUpgradeSlots: Record<string, number>
   luckySlotTracking: Record<string, LuckySlotStreams>
   bankboiPrefix: string
-  // "Send anniversary chat message when receiving cake from a kiss" (anniversary-dialog.tsx).
   anniversaryAutoChat: boolean
   realmControl?: RealmControl | null
-  // How much gold each character should carry - the merchant's own bank
-  // errands automatically deposit the excess or withdraw the shortfall to
-  // match this during normal trips. There is no manual "withdraw gold"
-  // action anywhere in party-console itself; this target is the real,
-  // only mechanism for moving gold between a character and the bank.
+  // How much gold each character should carry. Merchant bank errands
+  // deposit the excess or withdraw the shortfall; this is the only way
+  // gold moves between a character and the bank.
   goldTargets: Record<string, number>
-  // Flat/account-wide (not nested per character). Keys are opaque
-  // identity strings never parsed (only the values matter).
+  // Account-wide. Keys are opaque identity strings; only values are read.
   autoNpcSales: Record<string, AutoNpcSaleRule>
   autoStandMarks: Record<string, AutoStandRule>
-  // Keyed by `${itemName}@${level}` (inventory-panel.tsx's autoExchangeKey) - presence alone marks the item for auto-exchange.
+  // Keyed by `${itemName}@${level}`; presence alone marks the item for auto-exchange.
   autoExchanges: Record<string, unknown>
   // Per character, then by rule key (see itemFromRuleKey).
   autoDeconstruction: Record<string, Record<string, AutoDeconstructionRule>>
   autoCompounds: Record<string, AutoCompoundRule[]>
   travelPlaces: TravelPlace[]
-  // Merchant Card Controls (merchant-card-controls.tsx): force-stand
-  // pauses all other merchant work; gatheringModes is the standing
-  // mining/fishing toggle set, each independently on or off.
+  // force-stand pauses all other merchant work; gatheringModes is the set
+  // of enabled mining/fishing modes.
   merchantForceStand: boolean
   gatheringModes: string[]
-  // Routine priorities dialog - reason -> 0-100 priority, and which
-  // AUTOMATIC routines (the ones with an enable checkbox) are on.
+  // reason -> 0-100 priority, and which automatic routines are enabled.
   merchantRoutinePriorities: Record<string, number>
   merchantAutomations: Record<string, boolean>
-  // Merchant collection settings (merchant-collection-settings.tsx).
   threshold: number
   itemCollectionThreshold: number
   bankSortMode?: 'automatic' | 'request'
-  // BankScreen's own one-shot "sort on next visit" trigger (bank-sort-control.tsx), distinct from
-  // bankSortMode's standing automatic/on-request choice - only relevant while mode is "request".
+  // One-shot "sort on next visit" trigger; only relevant in "request" mode.
   bankSortRequest?: { id: string; status: 'queued' | 'sorting' | 'retry'; message?: string } | null
-  // Farming/Hunting (farming-mode-control.tsx). `farmingPolicy` is the
-  // account-wide CURRENT mode - unlike almost everything else here,
-  // /farming-mode takes no `character` field, so this is one shared
-  // value, not per-character (confirmed against the real route source,
-  // runtime/coordinator/http/hunt-mode.ts). Monster focus IS per-
-  // character, keyed by character name.
+  // The leader's farming mode; other characters may have their own in
+  // farmingProfiles (see resolveFarmingContext).
   farmingPolicy: string
   monsterFocusByCharacter: Record<string, string[]>
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
   huntSettings?: HuntSettings | null
-  // The party's current Hunt quest (coordinator's HuntCycle) - which monster
-  // it's chasing right now and for which member. Already arrives in the same
-  // state?section=core poll this app already fetches (confirmed against the
-  // real coordinator source), just never modeled before now.
+  // The party's current Hunt quest: which monster, for which member.
   monsterHunt?: MonsterHuntCycle | null
-  // Per-character Hunt quest assignment - see MonsterHuntStatus. Keyed by character name.
+  // Per-character Hunt quest assignment, keyed by character name.
   characterHunt: Record<string, MonsterHuntStatus | null>
   farmAreaState?: FarmAreaState | null
-  // Keyed by character name - see resolveFarmingContext. There is only one
-  // account `leader`; the leader's OWN effective policy/blacklist/hunt/area
-  // are always the simple top-level fields above, never a profile entry.
-  // A character that follows the leader also uses those same top-level
-  // fields. Every OTHER character (not the leader, not following) runs
-  // independently and has its own entry here instead.
+  // Only for characters that neither lead nor follow; the leader and its
+  // followers use the top-level fields. See resolveFarmingContext.
   farmingProfiles: Record<string, FarmingProfile>
-  // Marketplace "manage WTB orders" (wtborder-dialog.tsx) - one standing
-  // buy order per item id, automatically filled up to `price`.
+  // Standing WTB orders, one per item id, filled up to `price`.
   standBids: Record<string, StandBid>
-  // Upgrade offering rules (upgrade-offering-controls.tsx) - "use a
-  // Primling/Primordial Essence/Primordial X instead of scrolls" during
-  // AUTOMATIC upgrades within a level range, independent of the item's
-  // own upgrade-mark tier.
+  // Use an offering instead of scrolls during automatic upgrades within a
+  // level range.
   upgradeOfferingRules: UpgradeOfferingRule[]
-  // The configured merchant (party-state.tsx) - config section only. Never
-  // infer the merchant from character class; bankbois are merchants too.
+  // Config section only. Never infer the merchant from character class;
+  // bankbois are merchants too.
   merchantCharacter?: string | null
-  // Shared merchant rules (inventory/shared-rules.ts's SharedRules) - when
-  // present, rules are owned by `owner` for every name in `members`.
+  // When present, rules are owned by `owner` for every name in `members`.
   merchantRules?: SharedRules | null
   // Full entries (with items) only arrive from section=bank&dashboard=1;
-  // section=core carries item-less summaries (public-state.ts bankboiSummaries).
+  // section=core carries item-less summaries.
   bankbois: Bankboi[]
   bankboiQueue?: { id: string; item: Item; state: string; bootstrap?: boolean }[]
   buyUpgradeBatchSize?: number
 
-  // ---- F6: the rest of party-state.tsx's PartyState, typed as the
-  // dashboard does where the shape is simple; `unknown` where it imports a
-  // deep runtime type - the package that renders a field ports its shape.
+  // The rest of the console's PartyState: typed where the shape is simple,
+  // `unknown` where it is a deep runtime type.
   // Roster, slots, session
   activeSlots?: ActiveSlot[]
   characterConnections?: CharacterConnection[]
@@ -758,8 +656,7 @@ export interface PartyStateDynamic {
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
 }
 
-/** inventory/shared-rules.ts's SharedRules (conflicts kept opaque until the
- *  rule-conflict panel is ported). */
+/** Merchant rules shared across characters. `conflicts` is left opaque. */
 export interface SharedRules {
   version: 1
   owner: string
@@ -768,7 +665,7 @@ export interface SharedRules {
   conflicts: unknown[]
 }
 
-/** bankboi.tsx's Bankboi. `items`/`slots` are absent on core's summaries. */
+/** `items`/`slots` are absent on core's summaries. */
 export interface Bankboi {
   name: string
   ctype?: string
@@ -782,14 +679,13 @@ export interface Bankboi {
   transaction?: { phase: string; mode: string } | null
 }
 
-/** upgrade-offerings.ts's UpgradeOfferingRule, ported verbatim. `name` is
- *  the item's internal catalog id (e.g. "coat"), not its display name. */
 export type UpgradeOffering = 'offeringp' | 'offering' | 'offeringx'
 export const UPGRADE_OFFERING_LABELS: Record<UpgradeOffering, string> = {
   offeringp: 'Primling',
   offering: 'Primordial Essence',
   offeringx: 'Primordial X',
 }
+/** `name` is the item's catalog id (e.g. "coat"), not its display name. */
 export interface UpgradeOfferingRule {
   id: string
   name: string
@@ -809,12 +705,7 @@ export interface StandBid {
   acceptHigherLevels?: boolean
 }
 
-/** hunt-blacklist-label.ts's source entry - a monster currently skipped
- *  by Hunt mode, either automatically (deaths/expirations threshold) or
- *  manually. */
-/** Minimal slice of the coordinator's HuntCycle worth showing - the full
- *  type carries a lot of internal travel/recovery bookkeeping no screen
- *  needs. */
+/** The displayable slice of the coordinator's HuntCycle. */
 export interface MonsterHuntCycle {
   target: string | null
   message?: string
@@ -828,29 +719,22 @@ export interface MonsterHuntCycle {
   turnIn?: { owner: string; phase: 'returning' | 'claiming' | 'complete' }
 }
 
-/** One character's own Hunt quest assignment - party-console's
- *  monster-hunt-status.tsx, ported. Arrives via characterDetails in the
- *  state?section=core&dashboard=1 poll (diagnosticCharacters already
- *  allowlists `monsterHunt` there - this app just wasn't requesting the
- *  dashboard-shaped payload that carries it before now). */
+/** One character's Hunt quest assignment. Arrives via characterDetails,
+ *  only in the dashboard-shaped (dashboard=1) core poll. */
 export interface MonsterHuntStatus {
   id: string | null
   count: number
   remainingMs: number | null
   server: string | null
 }
-/** farmAreaState's real shape (party-state.tsx) - was too narrow before (just `paused`). */
 export interface FarmAreaState {
   message?: string
   paused?: boolean
   active?: { map: string; x: number; y: number; monsterIds?: string[] }
 }
 
-/** state.farmingProfiles[name] - one non-leader, non-following character's
- *  own independent farming policy/blacklist/hunt/area, kept separate from
- *  the account's simple top-level fields (which only ever reflect the
- *  leader's own settings) - see resolveFarmingContext below, ported from
- *  party-console's farming-context.ts. */
+/** An independent (neither leading nor following) character's own
+ *  farming settings. See resolveFarmingContext. */
 export interface FarmingProfile {
   farmAreaState?: FarmAreaState
   farmingPolicy?: string
@@ -870,11 +754,10 @@ export interface HuntBlacklistEntry {
   lastDeathAt?: number
 }
 
-/** hunt-settings-control.tsx's config - when Hunt mode should relocate to
- *  avoid a competing party, and when a monster should get auto-
- *  blacklisted (too many character deaths or quest expirations to it). */
+/** When Hunt mode relocates away from a competing party, and when a
+ *  monster gets auto-blacklisted (too many deaths or quest expirations). */
 export interface HuntSettings {
-  // hunt/spawn-preferences.ts - preferred spawn per monster (C2).
+  // Preferred spawn per monster.
   preferredSpawns?: Record<string, string>
   relocateIfCompeting: boolean
   blacklistDeaths: boolean
@@ -883,15 +766,10 @@ export interface HuntSettings {
   expirationThreshold: number
 }
 
-/** What a character's farming setup ACTUALLY is right now - ported verbatim
- *  from party-console's farming-context.ts. The leader's own effective
- *  policy/blacklist/hunt/area always live in the simple top-level fields,
- *  and a character following the leader inherits those same top-level
- *  fields too. Everyone else (not the leader, not following) runs
- *  independently, so their effective values come from their own
- *  farmingProfiles entry instead. `savedMode` is what THIS character
- *  personally selected (or inherited by simply being the leader);
- *  `effectiveMode` is what's actually running right now. */
+/** A character's effective farming setup. The leader and its followers
+ *  use the top-level fields; everyone else uses their farmingProfiles
+ *  entry. `savedMode` is what this character selected; `effectiveMode` is
+ *  what is running. Console: farming-context.ts. */
 export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
   const followingLeader = state.leader && state.leader !== name && state.followers[name] ? state.leader : undefined
   const owner = followingLeader || name
@@ -965,9 +843,7 @@ export const emptyPartyStateDynamic = (): PartyStateDynamic => ({
   bankbois: [],
 })
 
-/** One raw in-game chat/system log line (game-log-filters.ts's GameLog) -
- *  fetched separately via ?section=logs, not part of the main dynamic-
- *  state poll. */
+/** One raw in-game chat/system log line, fetched via ?section=logs. */
 export interface GameLogEntry {
   session?: string
   seq: number
@@ -981,10 +857,8 @@ export interface PartyStateGameLogs {
   gameLogs: Record<string, GameLogEntry[]>
 }
 
-/** One character's entry in core's `characterDetails` - the allow-list in
- *  runtime/coordinator/telemetry/public-state-characters.ts
- *  (diagnosticCharacters). Only present for characters in active slots, so
- *  a missing field means "unknown", never 0. */
+/** One character's entry in core's `characterDetails`. Only present for
+ *  characters in active slots; a missing field means "unknown", never 0. */
 export interface CharacterDiagnostics {
   name?: string
   ctype?: string
@@ -1022,7 +896,6 @@ export interface CharacterDiagnostics {
   [field: string]: unknown
 }
 
-/** active-slot.tsx */
 export interface ActiveSlot {
   index: number
   kind: 'native' | 'headless'
@@ -1031,7 +904,7 @@ export interface ActiveSlot {
   state: 'empty' | 'starting' | 'online' | 'stopping' | 'offline' | 'failed'
 }
 
-/** steam-switch.tsx - a Steam handoff in progress. */
+/** A Steam handoff in progress. */
 export interface SteamSwitch {
   from: string | null
   target: string | null
@@ -1041,7 +914,6 @@ export interface SteamSwitch {
   error?: string | null
 }
 
-/** runtime/roster/connection-status.ts CharacterConnection. */
 export interface CharacterConnection {
   name: string
   primary?: boolean
@@ -1052,7 +924,7 @@ export interface CharacterConnection {
   delayed: boolean
 }
 
-/** appearance-choice.tsx - one of a class's starting looks. */
+/** One of a class's starting looks. */
 export interface AppearanceChoice {
   index: number
   html?: string | null

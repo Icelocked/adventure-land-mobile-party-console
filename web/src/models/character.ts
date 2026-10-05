@@ -1,11 +1,7 @@
 import type { Condition, EquippedEntry, InventoryEntry } from './item'
 
-/** Mirrors model/Character.kt's CharacterVitals - a mirror of
- *  party-console's `Char` type (dashboard/features/party/char.tsx).
- *  ctype/level default to blank/0 because they're NOT part of the live
- *  vitals stream at all (live-protocol.ts's LiveRecord.vitals is an
- *  untyped bag of whatever changed) - the repository overwrites these
- *  from the roster fetch (models/roster.ts) once it completes. */
+/** A character's live vitals. ctype/level are not in the live stream;
+ *  they default to blank/0 and are filled in from the roster. */
 export interface CharacterVitals {
   name: string
   ctype: string
@@ -32,15 +28,13 @@ export interface CharacterVitals {
   farmingMode?: string
   conditions?: Condition[]
   inventorySize?: number
-  // live-protocol liveFields: whether the merchant's stand is open.
+  // Whether the merchant's stand is open.
   standOpen?: boolean
-  // char.tsx luckySlotTracking: the live local evidence stream, when the record carries it.
+  // The live local lucky-slot evidence stream, when the record carries it.
   luckySlotTracking?: unknown
 }
 
-/** The character's carried items + what's equipped - arrives/updates
- *  independently from vitals (see live-protocol.ts), assembled together
- *  in the data layer, not sent as one message. */
+/** Carried items and equipment. Updates independently of vitals. */
 export interface CharacterInventory {
   items: (InventoryEntry | null)[]
   slots: Record<string, EquippedEntry | null>

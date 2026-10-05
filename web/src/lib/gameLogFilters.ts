@@ -1,4 +1,4 @@
-// runtime/game-log-filters.ts, verbatim. Filter categories inspired by Crowns3bc's Game Log Filter:
+// Console: runtime/game-log-filters.ts. Filter categories inspired by Crowns3bc's Game Log Filter:
 // https://github.com/Crowns3bc/AdventureLand/blob/main/Gui/Game%20Log%20Filter.js
 export const logFilters = [
   { id: 'kills', label: 'Kills', pattern: /killed|slain/i, enabled: false },

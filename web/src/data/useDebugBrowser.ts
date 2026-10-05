@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { usePartyApi, useServerSettings } from './PartyDataProvider'
 
-// debug-browser.tsx debugGameUrl.
 const DEBUG_GAME_PATH = '/debug-game/vnc.html?autoconnect=1&resize=scale&path=debug-game/websockify'
 
-/** debug-browser.tsx useDebugBrowser: whether this console is a debug instance (read once). */
+/** Whether this console is a debug instance (read once). */
 export function useDebugBrowser() {
   const api = usePartyApi()
   return (
