@@ -211,7 +211,11 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                 )
             }
             // The rule is created for the merchant.
-            TapRow("Auto sell to NPC…", enabled = merchant != null && item.l == null, color = Rose) { toggle("autonpc") }
+            TapRow(
+                if (state.autoNpcSales.containsKey(automaticCommerceRuleKey(item))) "Update auto sell to NPC…" else "Auto sell to NPC…",
+                enabled = merchant != null && item.l == null,
+                color = Rose,
+            ) { toggle("autonpc") }
             if (merchant != null && expanded == "autonpc") {
                 val name = (meta?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(item.name)?.name ?: item.name
                 AutoNpcSaleConfirmation(item, meta, name, merchant, onCancel = { expanded = null }, onConfirm = { confirmWith { viewModel.api.autoNpcSale(merchant, item) } })

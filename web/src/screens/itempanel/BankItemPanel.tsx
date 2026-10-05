@@ -227,7 +227,12 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
             />
           )}
           {/* The rule is created for the merchant. */}
-          <TapRow label="Auto sell to NPC…" className="text-rose-400" disabled={!merchant || !!item.l} onClick={() => toggle('autonpc')} />
+          <TapRow
+            label={state.autoNpcSales[automaticCommerceRuleKey(item)] ? 'Update auto sell to NPC…' : 'Auto sell to NPC…'}
+            className="text-rose-400"
+            disabled={!merchant || !!item.l}
+            onClick={() => toggle('autonpc')}
+          />
           {merchant && expanded === 'autonpc' && (
             <AutoNpcSaleConfirmation
               item={item}

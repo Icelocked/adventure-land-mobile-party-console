@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -33,6 +35,26 @@ class BankMailTest {
     @After fun stop() = console.close()
 
     private fun posts(path: String) = console.requests.filter { it.method == "POST" && it.path == "/party-api/$path" }.map { Json.parseToJsonElement(it.body).jsonObject }
+
+    @Test
+    fun anItemWithAnAutoNpcSaleRuleIsTaggedAndItsOptionSaysUpdate() {
+        // Failure mode: the bank showed no sign of the rule, so setting it
+        // looked like it did nothing.
+        val key = """{"name":"hpot0","level":0,"p":null,"stat_type":null}"""
+        console.override("config", mapOf("autoNpcSales" to Json.parseToJsonElement("""{${Json.encodeToString(kotlinx.serialization.json.JsonPrimitive.serializer(), JsonPrimitive(key))}:{"item":{"name":"hpot0","level":0}}}""")))
+        val viewModel = PartyViewModel(console.settings)
+        val panel = androidx.compose.runtime.mutableStateOf(false)
+        compose.setContent {
+            if (panel.value) BankItemPanel(viewModel, "items0", InventoryEntry(slot = 1, item = Item(name = "hpot0", q = 9999))) {}
+            else com.partyconsole.companion.ui.account.BankScreen(viewModel, onBack = {})
+        }
+        eventually { viewModel.dynamicState.value.autoNpcSales.isNotEmpty() && viewModel.dynamicState.value.bank != null }
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Auto NPC").assertCountEquals(1)
+        panel.value = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Update auto sell to NPC…").performScrollTo().assertExists()
+    }
 
     @Test
     fun withoutAMerchantTheMerchantOnlyBankOptionsAreListedButDisabled() {

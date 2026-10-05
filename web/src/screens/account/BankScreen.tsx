@@ -387,6 +387,9 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
   )
   const reserved = pack === 'items1' && entry.slot >= 35
   const autoStand = state.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined
+  // The merchant's account-wide auto sale rule. The dashboard's bank doesn't
+  // show it, so marking looked like it did nothing; its inventory does.
+  const autoNpc = !!state.autoNpcSales[automaticCommerceRuleKey(item)]
   const marks = [withdrawMarked && 'Withdraw', standMarked && !autoStand && 'Stand', npcMarked && 'NPC', deconstructionMarked && 'Deconstruct'].filter(Boolean) as string[]
   return (
     <button
@@ -408,6 +411,11 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
       {autoStand && (
         <span title={`Auto stand · ${Number(autoStand.price || 0).toLocaleString()}g`} className="shrink-0 rounded border border-amber-700 bg-amber-950 px-1 text-[10px] text-amber-200">
           Auto stand
+        </span>
+      )}
+      {autoNpc && (
+        <span title="Auto NPC sale: matching items the merchant receives are sold" className="shrink-0 rounded border border-rose-800 bg-rose-950 px-1 text-[10px] text-rose-200">
+          Auto NPC
         </span>
       )}
       {marks.map((label) => (
