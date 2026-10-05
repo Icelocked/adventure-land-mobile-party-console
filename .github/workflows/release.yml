@@ -114,5 +114,7 @@ jobs:
           files: |
             party-console-companion-${{ github.ref_name }}.apk
             party-console-companion-pwa-${{ github.ref_name }}.zip
+          # The fixed "which one do I want?" intro, then the generated notes.
+          body_path: .github/release-intro.md
           generate_release_notes: true
           prerelease: ${{ steps.image.outputs.prerelease }}
