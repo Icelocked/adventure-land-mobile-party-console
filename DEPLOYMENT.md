@@ -79,13 +79,32 @@ services:
   party-console-pwa:
     build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
-      - "100.64.1.5:8080:80"   # replace with YOUR Tailscale IP
+      - "127.0.0.1:8080:80"   # this machine only; Tailscale forwards to it (below)
     restart: unless-stopped
+    logging:                 # cap container logs, like party-console's own compose
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 ```
 
 ```bash
 docker compose up -d party-console-pwa
 ```
+
+Then let Tailscale forward your tailnet address to it. Don't bind the
+container to the `100.x` Tailscale IP directly: if Tailscale isn't up yet
+when Docker starts (after a reboot, say), Docker can't bind that address
+and the container stays down. Tailscale's own forwarding starts whenever
+Tailscale does and is saved across restarts:
+
+```bash
+tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080
+```
+
+Do the same for party-console's port if you reach it directly (the
+Android app does): bind it to `127.0.0.1:3010` and run
+`tailscale serve --bg --tcp 3010 tcp://127.0.0.1:3010`.
 
 **To update later:** check the [Releases page](https://github.com/Icelocked/adventure-land-mobile-party-console/releases)
 for the newest tag, bump `PWA_VERSION` in `.env` to match, then:
@@ -159,8 +178,8 @@ existing service from section 3b:
   party-console-pwa:
     build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
-      - "100.64.1.5:8080:80"    # replace with YOUR Tailscale IP
-      - "100.64.1.5:8443:443"   # same IP, HTTPS port
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"   # forward it too: tailscale serve --bg --tcp 8443 tcp://127.0.0.1:8443
     volumes:
       - "C:/tailscale-certs:/etc/nginx/tailscale-certs:ro"   # replace with wherever you put the cert files (forward slashes even on Windows - YAML treats backslash as an escape character)
     restart: unless-stopped
