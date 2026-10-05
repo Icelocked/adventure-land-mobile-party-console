@@ -223,8 +223,12 @@ function ItemRow({
   )
 }
 
-function CartRow({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 border-t border-border py-2 first:border-t-0">{children}</div>
+function CartRow({ cartKey, children }: { cartKey: string; children: ReactNode }) {
+  return (
+    <div data-cart-key={cartKey} className="flex flex-wrap items-center gap-2 border-t border-border py-2 first:border-t-0">
+      {children}
+    </div>
+  )
 }
 
 function SubmitBar({ label, disabled, submitting, error, onSubmit }: { label: string; disabled: boolean; submitting: boolean; error: string | null; onSubmit: () => void }) {
@@ -241,18 +245,37 @@ function SubmitBar({ label, disabled, submitting, error, onSubmit }: { label: st
 
 /** The cart, pinned to the bottom of the screen so an added item shows at
  *  once while the list scrolls above it. Adding something opens it and
- *  scrolls to the newest line; the header folds it to a summary. */
-function CartDock({ title, lines, units, summary, submit, children }: { title: string; lines: number; units: number; summary?: ReactNode; submit: ReactNode; children: ReactNode }) {
+ *  scrolls to that item's line; the header folds it to a summary. `footer`
+ *  stays visible above the submit button. */
+function CartDock({
+  title,
+  quantities,
+  summary,
+  footer,
+  submit,
+  children,
+}: {
+  title: string
+  quantities: Record<string, number>
+  summary?: ReactNode
+  footer?: ReactNode
+  submit: ReactNode
+  children: ReactNode
+}) {
   const [open, setOpen] = useState(true)
   const body = useRef<HTMLDivElement>(null)
-  const previousUnits = useRef(units)
+  const previous = useRef(quantities)
+  const lines = Object.values(quantities).filter((quantity) => quantity > 0).length
   useEffect(() => {
-    if (units > previousUnits.current) {
-      setOpen(true)
-      requestAnimationFrame(() => body.current?.scrollTo({ top: body.current.scrollHeight }))
-    }
-    previousUnits.current = units
-  }, [units])
+    const added = Object.keys(quantities).find((key) => (quantities[key] ?? 0) > (previous.current[key] ?? 0))
+    previous.current = quantities
+    if (!added) return
+    setOpen(true)
+    requestAnimationFrame(() => {
+      const row = body.current?.querySelector<HTMLElement>(`[data-cart-key="${CSS.escape(added)}"]`)
+      if (row && body.current) body.current.scrollTo({ top: row.offsetTop - body.current.offsetTop - 8 })
+    })
+  }, [quantities])
   return (
     <section aria-label={title} className="sticky bottom-0 z-10 mt-3 border-t border-border bg-background shadow-[0_-6px_16px_rgba(0,0,0,0.45)]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex w-full items-center gap-2 px-3 py-2 text-left">
@@ -264,10 +287,11 @@ function CartDock({ title, lines, units, summary, submit, children }: { title: s
         {open ? <ChevronDown className={summary ? 'size-4' : 'ml-auto size-4'} /> : <ChevronUp className={summary ? 'size-4' : 'ml-auto size-4'} />}
       </button>
       {open && (
-        <div ref={body} className="max-h-[40vh] overflow-y-auto px-3 pb-2">
+        <div ref={body} className="relative max-h-[40vh] overflow-y-auto px-3 pb-2">
           {children}
         </div>
       )}
+      {footer}
       {submit}
     </section>
   )
@@ -331,8 +355,7 @@ function BuyScreen({
 
       <CartDock
         title="Cart"
-        lines={selected.length}
-        units={selected.reduce((sum, item) => sum + cart[item.id].quantity, 0)}
+        quantities={Object.fromEntries(Object.entries(cart).map(([id, line]) => [id, line.quantity]))}
         summary={`Gold${hasEstimatedGold ? ' (est)' : ''}: ${goldTotal.toLocaleString()}g`}
         submit={<SubmitBar label="Buy all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />}
       >
@@ -340,7 +363,7 @@ function BuyScreen({
           {selected.map((item) => {
             const line = cart[item.id]
             return (
-              <CartRow key={item.id}>
+              <CartRow key={item.id} cartKey={item.id}>
                 <SpriteIcon sprite={item.sprite} size={28} />
                 <span className="min-w-0 flex-1 truncate text-xs">{item.name}</span>
                 <Input
@@ -449,6 +472,14 @@ function CraftScreen({
   // Per-recipe canAddRecipe only guards the +1 tap; a quantity typed into
   // the cart bypasses it, so submit needs its own aggregate check across
   // every material's running total.
+  const [showIngredients, setShowIngredients] = useState(false)
+  const missingMaterials = Object.entries(requirements)
+    .filter(([key, requirement]) => requirement.quantity > (owned[key] ?? 0) && !canPurchaseMaterial(requirement.material))
+    .map(([, requirement]) => requirement.material.name + (requirement.material.level ? ` +${requirement.material.level}` : ''))
+  const ingredientsToBuy = Object.entries(requirements).reduce(
+    (sum, [key, requirement]) => sum + (canPurchaseMaterial(requirement.material) ? Math.max(0, requirement.quantity - (owned[key] ?? 0)) : 0),
+    0,
+  )
   const materialsAvailable = Object.entries(requirements).every(
     ([key, requirement]) => requirement.quantity <= (owned[key] ?? 0) || canPurchaseMaterial(requirement.material),
   )
@@ -515,14 +546,33 @@ function CraftScreen({
 
       <CartDock
         title="Craft list"
-        lines={selected.length}
-        units={selected.reduce((sum, item) => sum + cart[item.id], 0)}
+        quantities={cart}
         summary={`Gold: ${goldTotal.toLocaleString()}g`}
+        footer={
+          selected.length ? (
+            <button
+              type="button"
+              aria-expanded={showIngredients}
+              onClick={() => setShowIngredients((value) => !value)}
+              className="flex w-full items-center gap-2 border-t border-border px-3 py-1.5 text-left font-mono text-[11px]"
+            >
+              {missingMaterials.length ? (
+                <span className="min-w-0 flex-1 truncate text-destructive">Missing: {missingMaterials.join(', ')}</span>
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                  Ingredients: {Object.keys(requirements).length}
+                  {ingredientsToBuy ? ` · buy ${ingredientsToBuy}` : ' · all owned'}
+                </span>
+              )}
+              <span className="shrink-0 text-muted-foreground">{showIngredients ? 'Hide' : 'Show'}</span>
+            </button>
+          ) : null
+        }
         submit={<SubmitBar label="Craft" disabled={!selected.length || !materialsAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />}
       >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => (
-            <CartRow key={item.id}>
+            <CartRow key={item.id} cartKey={item.id}>
               <SpriteIcon sprite={item.sprite} size={28} />
               <span className="min-w-0 flex-1 truncate text-xs">{item.name}</span>
               <Input
@@ -536,7 +586,7 @@ function CraftScreen({
               </Button>
             </CartRow>
           ))}
-          <div className="mt-2 border-t border-border pt-2">
+          {showIngredients && selected.length > 0 && <div className="mt-2 border-t border-border pt-2">
             <p className="mb-1 font-mono text-[10px] uppercase text-muted-foreground">Ingredient totals</p>
             {Object.entries(requirements).map(([key, requirement]) => {
               const available = owned[key] ?? 0
@@ -555,7 +605,7 @@ function CraftScreen({
                 </div>
               )
             })}
-          </div>
+          </div>}
       </CartDock>
     </AccountScreenScaffold>
   )
@@ -747,13 +797,12 @@ function ExchangeScreen({
 
       <CartDock
         title="Exchange cart"
-        lines={selected.length}
-        units={selected.reduce((sum, item) => sum + cart[item.key], 0)}
+        quantities={cart}
         submit={<SubmitBar label="Exchange all" disabled={!selected.length || !exchangesAvailable} submitting={submitting} error={error} onSubmit={onSubmit} />}
       >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => (
-            <CartRow key={item.key}>
+            <CartRow key={item.key} cartKey={item.key}>
               <SpriteIcon sprite={item.sprite} size={28} />
               <span className="min-w-0 flex-1 truncate text-xs">
                 {item.name}

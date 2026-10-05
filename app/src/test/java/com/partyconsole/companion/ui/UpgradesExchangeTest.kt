@@ -1,5 +1,6 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -165,6 +166,37 @@ class UpgradesExchangeTest {
         // The header folds the cart away.
         compose.onNodeWithContentDescription("Fold Cart").performClick()
         compose.onNode(hasContentDescription("Item 35 quantity")).assertDoesNotExist()
+    }
+
+    @Test
+    fun theCraftCartKeepsTheAddedRecipeInViewAndSummarisesIngredients() {
+        // Failure mode: the cart scrolled to its bottom (the ingredient
+        // totals), pushing the recipe just added out of view.
+        val catalog = console.sections.getValue("catalog")["merchantCatalog"]!!.jsonObject
+        val mats = listOf("ironore", "goldore", "leather", "spidersilk", "batwing", "frog", "seashell", "gemfragment")
+        val buyable = mats.joinToString(",") { """{"id":"$it","name":"$it","cost":50,"seller":"basics"}""" }
+        val recipes = (0 until 12).joinToString(",") { i ->
+            val materials = (0..2).joinToString(",") { k -> """{"id":"${mats[(i + k) % 8]}","name":"${mats[(i + k) % 8]}","quantity":${2 + k}}""" }
+            """{"id":"r$i","name":"Recipe ${i.toString().padStart(2, '0')}","cost":100,"materials":[$materials]}"""
+        }
+        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + mapOf(
+            "buyable" to Json.parseToJsonElement("[$buyable]"),
+            "craftable" to Json.parseToJsonElement("[$recipes]"),
+        ))))
+        val viewModel = PartyViewModel(console.settings)
+        compose.setContent { MerchantCommerceScreen(viewModel, "craft", onBack = {}) }
+        eventually { viewModel.dynamicState.value.merchantCatalog?.craftable?.size == 12 }
+        compose.waitForIdle()
+        val inCart = hasAnyAncestor(hasContentDescription("Craft list"))
+        for (i in listOf(0, 3, 6, 9)) {
+            compose.onAllNodes(hasText("Add") and hasClickAction())[i].performScrollTo().performClick()
+            compose.waitForIdle()
+            compose.onNode(hasContentDescription("Recipe ${i.toString().padStart(2, '0')} quantity") and inCart).assertIsDisplayed()
+        }
+        compose.onNode(hasText("Ingredients: 8", substring = true) and inCart).assertIsDisplayed()
+        compose.onNode(hasText("INGREDIENT TOTALS") and inCart).assertDoesNotExist()
+        compose.onNode(hasText("Show") and inCart).performClick()
+        compose.onNode(hasText("INGREDIENT TOTALS") and inCart).assertExists()
     }
 
     @Test
