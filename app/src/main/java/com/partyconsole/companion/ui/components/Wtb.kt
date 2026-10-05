@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui.components
 
+import com.partyconsole.companion.ui.DomainInterest
+import com.partyconsole.companion.data.Domain
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -238,6 +240,7 @@ fun WtbDialog(
     existing: StandBid?,
     onClose: () -> Unit,
 ) {
+    DomainInterest(viewModel, Domain.MARKET)
     val scope = rememberCoroutineScope()
     var price by remember { mutableStateOf(if (existing != null && (existing.minimumQuality ?: 0) == (item.level ?: 0)) existing.price.toString() else "") }
     var quantity by remember { mutableStateOf(existing?.quantity?.toString() ?: "1") }

@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui.components
 
+import com.partyconsole.companion.ui.DomainInterest
+import com.partyconsole.companion.data.Domain
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,6 +80,7 @@ fun StandListingForm(
     onSubmit: suspend (StandListingDraft) -> String?,
     onCancel: (() -> Unit)? = null,
 ) {
+    DomainInterest(viewModel, Domain.MARKET)
     val state by viewModel.dynamicState.collectAsState()
     val scope = rememberCoroutineScope()
     // The item's value (definition.g), at least 1.

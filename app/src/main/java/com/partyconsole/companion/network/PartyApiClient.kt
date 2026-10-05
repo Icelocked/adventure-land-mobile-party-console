@@ -57,6 +57,7 @@ fun buildHttpClient(settings: ServerSettings): OkHttpClient =
         .followRedirects(false)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
+        .apply { HttpCache.cache?.let { cache(it) } }
         .build()
 
 /** For the SSE stream: no read/call timeout since it stays open

@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui.account
 
+import com.partyconsole.companion.ui.DomainInterest
+import com.partyconsole.companion.data.Domain
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -109,6 +111,7 @@ private fun Confirm(title: String, text: String, busy: Boolean, error: String?, 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () -> Unit, onOpenSettings: () -> Unit, onOpenSetup: () -> Unit) {
+    DomainInterest(viewModel, Domain.MARKET)
     val state by viewModel.dynamicState.collectAsState()
     val characters by viewModel.characters.collectAsState()
     val diagnostics by viewModel.characterDetails.collectAsState()
