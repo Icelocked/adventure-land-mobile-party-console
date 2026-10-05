@@ -127,6 +127,15 @@ fun AppNavigation(store: ServerConfigStore) {
             }
             val viewModel: PartyViewModel = viewModel(factory = PartyViewModelFactory(active))
             LaunchedEffect(viewModel) { viewModel.navigationRequests.collect { route -> navController.navigate(route) } }
+            // A tapped notification's screen, once the party view is up.
+            LaunchedEffect(viewModel) {
+                com.partyconsole.companion.notify.PendingRoute.route.collect { route ->
+                    if (route != null) {
+                        com.partyconsole.companion.notify.PendingRoute.route.value = null
+                        navController.navigate(route)
+                    }
+                }
+            }
             CharacterListScreen(
                 viewModel = viewModel,
                 onSelectCharacter = { name -> navController.navigate(Routes.characterDetail(name)) },

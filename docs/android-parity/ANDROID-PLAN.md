@@ -357,7 +357,30 @@ and a 411x891dp phone.
 - Not here: Web Push notifications and the PWA's own app-update button
   (A11 decides the APK's notifications; the APK updates through releases).
 
-Next: A11 (native map, notifications).
+### A11 status: notifications done, native map next
+
+- Notifications by polling (no push server, no FCM): `notify/Detect.kt` is
+  the PWA notifier's detect.mjs ported verbatim (stuck/offline, no actions,
+  repeated deaths, error bursts, inventory full, bank full, rule done,
+  buy-and-upgrade order done, event ended, rare drops, trading, mail);
+  `notify/Notifier.kt` is server.mjs's poll with the watch state kept on the
+  phone (same section reads and cadence: config every 4th tick, logs and
+  bags every 2nd, bank and mail every 4th; the first read only marks where
+  history ends).
+- Delivery: a WorkManager job every 15 minutes (Android's minimum), or the
+  optional "Live alerts" foreground service polling every 15 s like the
+  notifier. A tap opens the notice's screen (character, bank, mail,
+  settings). A lost pairing posts "Notifications paused" once.
+- Settings → Notifications mirrors NotificationsSection.tsx: alert groups
+  with inline limits, the rare-drop rule, quiet hours (character health
+  still comes through), muted characters, test notification, enable / turn
+  off. Everything is stored on the phone (the PWA keeps limits on its
+  notifier; here there is none).
+- Unverified on a device: Robolectric covers the detection, a polling run
+  against the fake console, and the settings section.
+
+Next: A11 native map (C6 live map, Cave floor map, farming-area preview,
+the live target's monster type).
 
 ### Packages
 

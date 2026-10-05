@@ -1,5 +1,6 @@
 package com.partyconsole.companion
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,6 +15,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.partyconsole.companion.network.PartyCookies
+import com.partyconsole.companion.notify.AlertNotifications
+import com.partyconsole.companion.notify.NotifierControl
+import com.partyconsole.companion.notify.PendingRoute
 import com.partyconsole.companion.network.ServerConfigStore
 import com.partyconsole.companion.ui.AppForeground
 import com.partyconsole.companion.ui.AppNavigation
@@ -29,6 +33,9 @@ class MainActivity : ComponentActivity() {
         CrashReport.install(applicationContext)
         PartyCookies.init(applicationContext)
         AppForeground.observe()
+        AlertNotifications.ensureChannels(applicationContext)
+        NotifierControl.apply(applicationContext)
+        if (savedInstanceState == null) PendingRoute.from(intent)
         val store = ServerConfigStore(applicationContext)
         val lastCrash = if (savedInstanceState == null) CrashReport.take(applicationContext) else null
         setContent {
@@ -43,5 +50,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // A notification tapped while the app is already open.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        PendingRoute.from(intent)
     }
 }
