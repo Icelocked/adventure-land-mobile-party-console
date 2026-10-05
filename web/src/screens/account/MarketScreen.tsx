@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { useClock } from '@/lib/duration'
 import {
@@ -66,6 +66,7 @@ function Confirm({ title, text, busy, error, onYes, onCancel }: { title: string;
  *  "List" at the WTB price when stale), classifieds' Add to WTB / Add to
  *  stand, and Ponty's grouped lots. Every row inspects its item. */
 export function MarketScreen() {
+  useDomainInterest('market')
   const api = usePartyApi()
   const state = useDynamicState()
   const characters = useCharacters()

@@ -3,7 +3,7 @@ import { Info, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SpriteIcon } from '@/components/SpriteIcon'
-import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useDomainInterest, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { abbreviatedGold } from '@/lib/gold'
 import { npcSaleValue } from '@/lib/itemFormulas'
 import { exactLevelPrice, suggestedItemValue, type StandPriceHistory } from '@/lib/suggestedItemValue'
@@ -223,6 +223,7 @@ export function WtbDialog({
   existing?: StandBid
   onClose: () => void
 }) {
+  useDomainInterest('market')
   const api = usePartyApi()
   const [price, setPrice] = useState(() => (existing && Number(existing.minimumQuality || 0) === Number(item.level || 0) ? String(existing.price) : ''))
   const [quantity, setQuantity] = useState(() => (existing ? String(existing.quantity) : '1'))

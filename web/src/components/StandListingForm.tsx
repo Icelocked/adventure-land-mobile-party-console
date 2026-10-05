@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StandPriceButton, pontyPrice } from '@/components/Wtb'
-import { useDynamicState } from '@/data/PartyDataProvider'
+import { useDomainInterest, useDynamicState } from '@/data/PartyDataProvider'
 import { abbreviatedGold } from '@/lib/gold'
 import { npcSaleValue } from '@/lib/itemFormulas'
 import { exactLevelPrice, type StandPriceHistory } from '@/lib/suggestedItemValue'
@@ -46,6 +46,8 @@ export function StandListingForm({
   onSubmit: (draft: StandListingDraft) => Promise<string | null | void> | void
   onCancel?: () => void
 }) {
+  // Price presets read the market section (stand price history, listings).
+  useDomainInterest('market')
   const state = useDynamicState()
   // The item's value (definition.g), at least 1.
   const defaultPrice = Math.max(1, Number(meta?.definition.g) || 1)

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -36,6 +36,7 @@ export function useStandMerchant(): StandMerchant | undefined {
  *  the WTB dialog, native batch, priority, Auto, Use stand, Really cancel?).
  *  Tapping a row inspects it; a long press shows the suggested price. */
 export function StandScreen() {
+  useDomainInterest('market')
   const api = usePartyApi()
   const state = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()
