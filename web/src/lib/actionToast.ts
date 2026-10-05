@@ -1,12 +1,7 @@
-/** A tiny module-level pub/sub for "a command was just sent" feedback -
- *  not React state, because the thing that needs to trigger it
- *  (PartyApiClient.post(), a plain class with no React context access)
- *  isn't a component. Instrumenting the API client's one shared post()
- *  method here means every mutating action gets this feedback for free,
- *  with no per-button changes anywhere - added after a bad-network
- *  session where taps looked like they did nothing for 10-15 seconds,
- *  so people tapped the same button repeatedly with no way to tell
- *  whether the first tap had actually gone through. */
+/** Module-level pub/sub for "command sent" feedback. Not React state
+ *  because the trigger, PartyApiClient.post(), is a plain class. On a bad
+ *  network a tap can take 10-15s to land; without this, nothing visibly
+ *  happens and people tap again. */
 export type ActionToastStatus = 'sending' | 'sent' | 'failed'
 export interface ActionToastEntry {
   id: string

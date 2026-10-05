@@ -1,14 +1,13 @@
 import type { Bankboi, BankSnapshot, InventoryEntry, Item } from '@/models'
 
-/** same.tsx (party-console v1.2.0), verbatim: every field the marked item
- *  carries (except quantity) matches the current one. */
+/** Every field the marked item carries (except quantity) matches. */
 export const same = (current: Item, marked: Item): boolean =>
   Object.keys(marked)
     .filter((key) => key !== 'q')
     .every((key) => JSON.stringify(current[key as keyof Item]) === JSON.stringify(marked[key as keyof Item]))
 
-/** bank-sale-copies.ts, verbatim: every unlocked copy of the selected item
- *  across bank packs and bankboi inventories - "Sell all to NPC" sells each. */
+/** Every unlocked copy of the item across bank packs and bankboi
+ *  inventories, for "Sell all to NPC". */
 export function bankSaleCopies(bank: BankSnapshot | null | undefined, workers: Bankboi[], selected: InventoryEntry) {
   const packs = [
     ...Object.entries(bank?.packs || {}),

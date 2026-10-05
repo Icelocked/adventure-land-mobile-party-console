@@ -1,5 +1,5 @@
-/** runtime/dungeons/contracts.ts - the wire shapes GET/POST /daily-dungeons
- *  returns (DungeonView), copied for the fields the dashboard reads. */
+/** GET/POST /daily-dungeons response shapes (DungeonView), limited to the
+ *  fields that are read. */
 export interface PriestRecoveryAssignment {
   id: string
   run: string

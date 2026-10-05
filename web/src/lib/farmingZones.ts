@@ -1,8 +1,6 @@
-/** Ported verbatim from party-console's dashboard/lib/farming-zones.ts -
- *  pure geometry, no framework dependency. Computes/compares the spawn
- *  "shapes" (rectangles or polygons) a monster's known locations occupy,
- *  used by farmingAreas.ts to cluster multiple monsters' spawn areas into
- *  shared farming zones. */
+/** Spawn-shape geometry (rectangles or polygons) that farmingAreas.ts uses
+ *  to cluster several monsters' spawns into shared farming zones.
+ *  Console: dashboard/lib/farming-zones.ts. */
 export interface Point {
   x: number
   y: number

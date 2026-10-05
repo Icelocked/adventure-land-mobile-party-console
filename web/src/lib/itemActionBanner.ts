@@ -1,6 +1,6 @@
-/** item-action-banner.ts, verbatim: the one banner an item tile shows -
- *  a rule conflict first, then manual marks, automatic rules, delivery,
- *  bank, merchant and merchant weapon. */
+/** The one banner an item tile shows, by priority: rule conflict, manual
+ *  marks, automatic rules, delivery, bank, merchant, merchant weapon.
+ *  Console: item-action-banner.ts. */
 export type ItemActionBanner = { label: string; colors: string; border: string; title?: string }
 type Action = 'conflict' | 'upgrade' | 'compound' | 'npc' | 'stand' | 'exchange' | 'deconstruction' | 'delivery' | 'bank' | 'merchant' | 'weapon' | 'stat'
 export type BannerCandidate = { action: Action; label: string; automatic?: boolean; title?: string }
@@ -38,7 +38,6 @@ export function itemActionBanner(candidates: (BannerCandidate | false | null | u
   return { label: choice.label, colors, border, title: choice.title }
 }
 
-/** stat-badge-class.tsx, verbatim. */
 export function statBadgeClass(statType?: string) {
   switch (statType?.toLowerCase()) {
     case 'int':
@@ -54,12 +53,11 @@ export function statBadgeClass(statType?: string) {
   }
 }
 
-/** equipment-slots.tsx, verbatim - the fixed slot order. */
+/** Fixed equipment slot order. */
 export const equipmentSlots = ['helmet', 'amulet', 'earring1', 'earring2', 'cape', 'chest', 'mainhand', 'offhand', 'ring1', 'ring2', 'belt', 'pants', 'gloves', 'shoes', 'orb'] as const
 
-/** compact-inventory.tsx (v1.3.0), verbatim: a tracker or supercomputer in
- *  the bag's last usable slot stays pinned there; occupied overflow cells
- *  beyond the bag size follow it. */
+/** A tracker or supercomputer in the bag's last usable slot stays pinned
+ *  there; occupied overflow cells beyond the bag size follow it. */
 export const compactInventory = <T extends { slot: number; item: { name: string } }>(items: (T | null)[], size = items.length) => {
   const occupied = items.filter((entry): entry is T => entry !== null)
   const pinned = occupied.find((entry) => entry.slot === size - 1 && ['tracker', 'supercomputer'].includes(entry.item.name))
@@ -71,7 +69,6 @@ export const compactInventory = <T extends { slot: number; item: { name: string 
   return [...occupied, ...Array<null>(Math.max(0, items.length - occupied.length)).fill(null)]
 }
 
-/** lucky-upgrade-slot.tsx physicalInventory / validLuckySlot, verbatim. */
 export function physicalInventory<T extends { slot: number }>(items: (T | null)[], size = 42) {
   const slots: (T | null)[] = Array(Math.max(size, items.length)).fill(null)
   for (const entry of items) if (entry && Number.isInteger(entry.slot) && entry.slot >= 0 && entry.slot < slots.length) slots[entry.slot] = entry

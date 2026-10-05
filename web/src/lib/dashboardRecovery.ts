@@ -1,7 +1,6 @@
-/** dashboard/lib/dashboard-recovery.ts (party-console v1.2.0) - the
- *  reconnect/backoff state machine behind the "couldn't render" screen,
- *  ported verbatim. Only the probe differs (see probePwa): the PWA has no
- *  /__dashboard supervisor, so it checks that its own page is served. */
+/** Reconnect/backoff state machine behind the "couldn't render" screen.
+ *  Console: dashboard/lib/dashboard-recovery.ts. The probe differs: the
+ *  PWA has no /__dashboard supervisor, so it checks its own page instead. */
 export type RecoveryStatus = { seconds: number; checking: boolean; blocked: boolean }
 export const recoveryStoragePrefix = 'party-dashboard-recovery:'
 

@@ -1,10 +1,9 @@
 type Entry = { item?: { name?: string; level?: number; q?: number } | null } | null | undefined
 type Inventory = { name: string; items?: Entry[] }
 
-/** lib/account-inventory.ts's inventoryCounts, verbatim: owned quantity per
- *  item (or item+level when [byLevel]) across characters, the bank snapshot
- *  and bankbois. Persisted storage-worker snapshots supersede their stale
- *  online inventories. */
+/** Owned quantity per item (or item+level when [byLevel]) across
+ *  characters, the bank and bankbois. Persisted storage-worker snapshots
+ *  supersede their stale online inventories. */
 export function inventoryCounts(
   characters: Inventory[] = [],
   bank: { packs?: Record<string, Entry[] | undefined> } | null | undefined = null,

@@ -1,7 +1,7 @@
 /** How recently a character last reported (status seenAt or a map frame's
- *  `at`, both on the server's clock). Not a dashboard feature: added so a
- *  stuck character is visible from the phone. `live` matches the 10 s
- *  online window (useCharacterOnline); past a minute it may be hung. */
+ *  `at`, both on the server's clock), so a stuck character is visible from
+ *  the phone. `live` matches the 10s online window (useCharacterOnline);
+ *  past a minute it may be hung. */
 export type Freshness = { level: 'live' | 'slow' | 'stale'; label: string }
 
 export function ageLabel(ms: number): string {
