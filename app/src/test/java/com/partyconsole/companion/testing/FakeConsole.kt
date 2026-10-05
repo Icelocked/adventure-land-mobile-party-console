@@ -40,6 +40,8 @@ class FakeConsole : AutoCloseable {
     )
     val requests = CopyOnWriteArrayList<Request>()
     @Volatile var unpaired = false
+    /** Extra GET responses by path (e.g. "/console-debug"), checked first. */
+    val gets = java.util.concurrent.ConcurrentHashMap<String, String>()
     /** GET /party-api/daily-dungeons (a DungeonView), when a test sets one. */
     @Volatile var dailyDungeon: String? = null
     @Volatile var postStatus = 200
@@ -58,6 +60,7 @@ class FakeConsole : AutoCloseable {
                     return json(postBody).setResponseCode(postStatus)
                 }
                 val url = request.requestUrl!!
+                gets[url.encodedPath]?.let { return json(it) }
                 return when (url.encodedPath) {
                     "/party-api/state" -> {
                         val name = url.queryParameter("section").orEmpty()

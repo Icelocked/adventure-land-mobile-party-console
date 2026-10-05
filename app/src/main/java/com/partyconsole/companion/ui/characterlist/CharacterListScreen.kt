@@ -147,6 +147,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 12.dp)) {
             if (!connected) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
             if (sessionLost) item { SessionLostCard(onReconnect) }
+            item { DebugBrowserBanner(viewModel) }
             // party-workspace.tsx: the dungeon panel heads the party while a visit runs.
             item { com.partyconsole.companion.ui.dungeon.DungeonPanel(viewModel) }
             if (names.isNotEmpty() || pending.isNotEmpty()) item { PartyControls(viewModel) }
@@ -359,5 +360,18 @@ private fun PendingCharacterCard(viewModel: PartyViewModel, entry: PendingCharac
                 if (entry.delayed) Text(pendingHelp(entry.status), color = Color(0xFFF59E0B), style = MaterialTheme.typography.labelSmall)
             }
         }
+    }
+}
+
+/** debug-browser.tsx DebugBrowserBanner: on a debug instance, a banner with the game client link. */
+@Composable
+private fun DebugBrowserBanner(viewModel: PartyViewModel) {
+    val debug by viewModel.debugBrowser.collectAsState()
+    if (!debug) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Debug instance · god party · unlimited Cave visits", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFFCFFAFE))
+        OutlinedButton(onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(viewModel.debugGameUrl))) } }) { Text("Open game client") }
+        Text("View and control the running browser. Closing its viewer keeps the party running.", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color(0xFFCBD5E1))
     }
 }

@@ -366,6 +366,8 @@ private fun ComposeSection(viewModel: PartyViewModel, draft: MailDraft?, catalog
                             error = result.message.ifBlank { "Mail could not be queued" }
                             confirming = false
                         } else {
+                            // use-party-console.tsx: the ALData auth mail starts the pending-auth poll.
+                            if (recipient.trim() == "earthiverse" && subject.trim() == "aldata_auth") viewModel.aldataAuthPending.value = true
                             viewModel.refreshDynamicStateNow()
                             onClose()
                         }

@@ -327,7 +327,37 @@ and a 411x891dp phone.
 - C6 and the Cave full map (waypoint placement) need the map canvas and
   stream: A11.
 
-Next: A10 (X1, I9, C9, S2, S3 reference, settings and logs).
+### A10 status: done
+
+- X1: bestiary - map filter, search, eight sorts with direction, Tracktrix
+  bonuses popover and scores / milestones per card (or "Tracktrix
+  required"); the shared monster details (`ui/components/MonsterDetail.kt`)
+  with G.monsters id, Navigate (the farming-area picker, Phoenix patrol,
+  tinyp disabled), achievements, recorded spawns, the definition grid, and
+  monster plus zone & world drops through formatDropRate. Item details'
+  monster drill-in uses it too.
+- C9: skills - the full G.skills definition, sprite grid per class, range
+  label (skill-range-label.tsx), details sheet with the definition grid.
+- I9: equipment catalog - equipment only, search by name / id / set, 25
+  sorts with the sorted stat, type and class filters, Exclusive gear,
+  result line, lazy rows; item details' "From catalog" starts a comparison
+  (A + up to three) with the comparison table (preview levels, stat
+  scrolls, deltas vs A, abilities).
+- S3: logs - Game logs with persisted category toggles (game-log-filters.ts)
+  and Dashboard logs (combat, merchant, anniversary) with a source filter,
+  character filter, status line, latest 1,000 in order, auto-follow.
+- S2: settings in the PWA's order - state import (preview, digest, backup)
+  and export through the system file picker, realm, characters (create,
+  member grid with appearances and empty slots, bankboi name), ALData
+  (stored key loaded for Copy, Prepare mail opening the composer with the
+  draft, the 15 s pending-verification poll app-wide after the auth mail),
+  hosting (pairing, Load setup), console updates with the debug instance,
+  change server, Steam recovery; the debug-instance banner on the party
+  screen and the debug-browser link replacing session controls.
+- Not here: Web Push notifications and the PWA's own app-update button
+  (A11 decides the APK's notifications; the APK updates through releases).
+
+Next: A11 (native map, notifications).
 
 ### Packages
 

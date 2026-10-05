@@ -100,6 +100,9 @@ data class ItemDropSource(
     val sourceType: String? = null,
     val acquisitionPath: List<String> = emptyList(),
     val sprite: Sprite? = null,
+    // indirect-bestiary-drops.tsx: the map of a zone drop.
+    val mapId: String? = null,
+    val mapName: String? = null,
 )
 
 @Serializable
