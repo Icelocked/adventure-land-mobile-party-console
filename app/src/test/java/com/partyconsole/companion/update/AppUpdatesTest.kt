@@ -71,6 +71,16 @@ class AppUpdatesTest {
     }
 
     @Test
+    fun aboutCreditsPartyConsoleAndShowsItsLicense() {
+        // Failure mode: the app shipped party-console-derived code without its
+        // MIT notice or any credit.
+        compose.setContent { com.partyconsole.companion.ui.account.AboutSection() }
+        compose.onNodeWithText("by Ryan Haines and contributors", substring = true).assertExists()
+        compose.onNodeWithText("Show party-console license").performClick()
+        compose.onNodeWithText("Copyright (c) 2026 Adventure Land Party Console contributors", substring = true).assertExists()
+    }
+
+    @Test
     fun comparesStableVersionsOnly() {
         assertTrue(AppUpdates.newer("1.10.0", "1.9.9"))
         assertFalse(AppUpdates.newer("1.0.0", "1.0.0"))

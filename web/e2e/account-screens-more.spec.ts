@@ -188,3 +188,18 @@ test('Settings: switching realm updates immediately (no stale data until the nex
 
   await expect(page.getByText('Current: US II · Home: US I')).toBeVisible()
 })
+
+test('Settings: About credits party-console and shows its license', async ({ page }) => {
+  // Failure mode: the app shipped party-console-derived code without its
+  // MIT notice or any credit.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  await server.install(page)
+  await page.goto('/settings')
+  const about = page.getByRole('region', { name: 'About' })
+  await expect(about.getByRole('link', { name: 'Adventureland Party Console' })).toHaveAttribute('href', 'https://github.com/Ryan-Haines/adventureland-party-console')
+  await expect(about.getByText(/by Ryan Haines and contributors/)).toBeVisible()
+  await about.getByRole('button', { name: 'Show party-console license' }).click()
+  await expect(about.getByText(/Copyright \(c\) 2026 Adventure Land Party Console contributors/)).toBeVisible()
+})

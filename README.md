@@ -4,9 +4,13 @@
 
 [![Download latest release](https://img.shields.io/github/v/release/Icelocked/adventure-land-mobile-party-console?label=Download&style=for-the-badge)](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest)
 
+> **Requires [Adventureland Party Console](https://github.com/Ryan-Haines/adventureland-party-console)**
+> by Ryan Haines and contributors. This is a companion to it: install and run
+> party-console first; these apps connect to it and do nothing on their own.
+
 A phone companion for
-[Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console):
-a native **Android app**, and a self-hosted **PWA** that also works on
+[Adventureland Party Console](https://github.com/Ryan-Haines/adventureland-party-console):
+a native **Android app**, and a self-hosted **PWA** that works on Android and
 iPhone. Both talk to the same API as party-console's own web dashboard
 (`/party-api/*`, with `/party-api/dashboard-stream` for live updates). They
 don't modify party-console; install either one next to your existing setup.
@@ -169,6 +173,19 @@ start from the matching code in party-console's
 `dashboard/features/party/` rather than guessing field names or command
 shapes.
 
+## Credits
+
+- [Adventureland Party Console](https://github.com/Ryan-Haines/adventureland-party-console)
+  by Ryan Haines and contributors, which these apps are built for. Parts of both
+  apps are adapted from its dashboard under its MIT License.
+- [Crowns3bc](https://github.com/Crowns3bc/AdventureLand) for the game log
+  filter categories.
+- [Adventure Land](https://adventure.land) by Kaan Soral. Not affiliated with or
+  endorsed by Adventure Land.
+
+Full notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Portions adapted from Adventureland Party Console remain under its
+MIT License; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

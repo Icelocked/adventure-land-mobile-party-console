@@ -1,9 +1,13 @@
 # Installing Party Console Companion
 
+**Requires [Adventureland Party Console](https://github.com/Ryan-Haines/adventureland-party-console)**
+by Ryan Haines and contributors. The companion apps are clients of it and do
+nothing on their own.
+
 This guide gets the companion onto your phone: the Android app, the PWA, or
 both. It assumes party-console already runs on your PC and its dashboard
-works in a browser there. Installing party-console itself is covered by
-[Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console).
+works in a browser there; installing party-console itself is covered by its
+own README.
 
 The tested setup is party-console on a home PC, reached from the phone
 through [Tailscale](https://tailscale.com).
