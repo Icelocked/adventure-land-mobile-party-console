@@ -336,7 +336,7 @@ private fun ItemPicker(catalog: List<CatalogItem>, onCancel: () -> Unit, onPick:
                 Text("Choose an item", style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = onCancel) { Text("Close") }
             }
-            OutlinedTextField(search, { search = it }, placeholder = { Text("Search items...") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            OutlinedTextField(search, { search = it }, placeholder = { Text("Search every item…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             for (item in filtered) {
                 Row(modifier = Modifier.fillMaxWidth().clickable { onPick(item.id) }.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     SpriteIcon(item.sprite, size = 28.dp)

@@ -28,15 +28,35 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # Debug-signed, not a dedicated release key - fine for direct
-      # sideload install (Android just needs SOME signature, not a
-      # specific one, unless you're upgrading in place from a build
-      # signed by a different key/machine - see README's install notes).
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      # Signed with the project's permanent release key (repository
+      # secrets), so each release installs over the previous one. The
+      # version comes from the tag: v1.2.3 -> versionName 1.2.3,
+      # versionCode 10203.
+      - name: Write release signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::RELEASE_KEYSTORE_BASE64 and RELEASE_KEYSTORE_PASSWORD secrets are required"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=companion"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+          } > keystore.properties
+
+      - name: Unit and UI tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Build signed release APK
+        run: ./gradlew assembleRelease -PappVersion=${{ github.ref_name }} --stacktrace
 
       - name: Rename APK for the release asset
-        run: cp app/build/outputs/apk/debug/app-debug.apk party-console-companion-${{ github.ref_name }}.apk
+        run: cp app/build/outputs/apk/release/app-release.apk party-console-companion-${{ github.ref_name }}.apk
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

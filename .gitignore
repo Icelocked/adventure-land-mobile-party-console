@@ -11,6 +11,9 @@ app/build/
 app/release/
 *.keystore
 *.jks
+# Release signing secrets (see app/build.gradle.kts).
+keystore.properties
+*.base64
 build-log.txt
 
 # Personal local-deployment helper (serves the debug APK over this

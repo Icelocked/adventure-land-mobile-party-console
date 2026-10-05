@@ -389,8 +389,8 @@ private fun MonsterFocusForm(
 
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)).padding(8.dp).semantics { contentDescription = "Monster focus" }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedTextField(value = search, onValueChange = { search = it }, placeholder = { Text("Search monsters...") }, singleLine = true, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { choose(emptyList()) }) { Text("Clear all") }
+            OutlinedTextField(value = search, onValueChange = { search = it }, placeholder = { Text("Search monsters…") }, singleLine = true, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { choose(emptyList()) }, modifier = Modifier.semantics { contentDescription = "Clear all monster focus" }) { Text("Clear all") }
         }
         Column(modifier = Modifier.fillMaxWidth().heightIn(max = 256.dp).verticalScroll(rememberScrollState())) {
             for ((id, label, sprite) in filtered) {

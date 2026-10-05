@@ -47,11 +47,11 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByText('Warriorname').click()
   await expect(page).toHaveURL(/\/characters\/Warriorname/)
   await page.getByRole('button', { name: 'No monsters selected' }).click()
-  await expect(page.getByPlaceholder('Search monsters...')).toBeVisible()
+  await expect(page.getByPlaceholder('Search monsters…')).toBeVisible()
 
   await page.getByRole('button', { name: /^Priestname/ }).click()
   await expect(page).toHaveURL(/\/characters\/Priestname/)
-  await expect(page.getByPlaceholder('Search monsters...')).not.toBeVisible()
+  await expect(page.getByPlaceholder('Search monsters…')).not.toBeVisible()
 
   // 3. On Priestname, mark the carried item for auto-sell.
   await page.getByTestId('inventory-slot-0').click()
@@ -108,7 +108,7 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await page.getByRole('button', { name: /Manage WTB orders/ }).click()
   await expect(page).toHaveURL(/\/wtb/)
   await page.getByRole('button', { name: 'New WTB order' }).click()
-  await page.getByPlaceholder('Search items...').fill('Iron Ore')
+  await page.getByPlaceholder('Search every item…').fill('Iron Ore')
   await page.getByText('Iron Ore').click()
   await page.getByLabel('Maximum price').fill('50')
   await page.getByRole('button', { name: 'Place WTB' }).click()

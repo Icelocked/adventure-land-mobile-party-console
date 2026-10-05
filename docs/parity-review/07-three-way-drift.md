@@ -32,10 +32,10 @@ scratchpad: `drift.py`, `drift_ap.py`, `drift_api.py`).
 | 8 | S2 | Item-details caption | dashboard captions every view "{source} · slot {n}" (Equipment catalog, Dropped by X, Ponty's inventory, X's ALData listing, X's live WTB, Published trade intention, Your merchant stand, Your stand buy order, Your active WTB order, Merchant/Crafting/Exchange catalog, Mail attachment, cave shop) | **Fixed** both |
 | 9 | S2 | Crafting description | "…held by the active party and in the latest bank snapshot." | **Fixed** both |
 | 10 | S3 | Steam tooltip (PWA) | "Currently in Steam · click to go headless" | **Fixed** |
-| 11 | S3 | Fallback error text | ~35 dashboard fallback messages (shown only when the server sends none) differ, e.g. "Could not cancel merchant job", "Stand update failed", "Spawn failed" | Open |
-| 12 | S3 | aria-labels / tooltips | e.g. "Hunt blacklist monsters", "Clear all monster focus", "Show item details", "Close skill details"; Android has no hover tooltips | Open (APK tooltips: platform) |
-| 13 | S3 | Dead client code | `standSearch` / `buyFromStand` (PWA), `standSearch` / `buyFromStand` (APK) | Open |
-| 14 | S2 | Donation | dashboard dialog title "Donate gold for merchant XP"; clients use an inline form under "Donate gold" | Open (layout) |
+| 11 | S3 | Fallback error text | ~35 dashboard fallbacks are `error instanceof Error ? error.message : "…"`; the dashboard's request helper always throws an Error with the server's message, so users see the server text in all three. The one reachable case, "Generate an ALData key first" (Prepare mail with no stored key), opened an empty auth mail in both clients | **Fixed** (that case); the rest are unreachable |
+| 12 | S3 | Labels and placeholders | "Clear all monster focus", "Search monsters…", "Search items…", WTB "Search every item…" | **Fixed** both; lucky-slot "Show item details" is the Item details option (ground rule); Android has no hover tooltips (platform) |
+| 13 | S3 | Dead client code | `standSearch` / `buyFromStand` in both API clients | **Removed** (the `standSearch` state field stays: it is in the dashboard's state) |
+| 14 | S2 | Donation | dashboard dialog title "Donate gold for merchant XP" | **Fixed** both (title on the inline form) |
 
 Not drift (checked): Escape / "Escape — exit dungeon", sell-all-to-NPC (dead
 in the dashboard too), stand-full guard, drop sort, Compare picker,

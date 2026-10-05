@@ -26,7 +26,7 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   await expect(page.getByText('No active orders.')).toBeVisible()
 
   await page.getByRole('button', { name: 'New WTB order' }).click()
-  await page.getByPlaceholder('Search items...').fill('Iron Ore')
+  await page.getByPlaceholder('Search every item…').fill('Iron Ore')
   await page.getByText('Iron Ore').click()
   await page.getByLabel('Maximum price').fill('500')
 

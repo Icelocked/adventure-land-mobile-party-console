@@ -215,7 +215,17 @@ stays pinned to whatever version it last updated to):
 
 ## 3e. Phone notifications (Android and iOS)
 
-The PWA container also runs a small push notifier (`web/notifier`). It
+**Android app:** no setup on the server. The app checks your
+party-console itself: open Settings → Notifications, pick the alerts and
+tap "Enable notifications on this device" (Android 13+ asks for permission
+first). It checks about every 15 minutes in the background (Android's
+shortest interval), or every 15 seconds with **Live alerts** on, which
+keeps an ongoing notification while it runs. The alerts, limits, rare-drop
+rule, quiet hours and muted characters are the same as below, stored on
+the phone. The phone needs a path to the console when it checks
+(Tailscale on).
+
+**PWA:** the PWA container also runs a small push notifier (`web/notifier`). It
 watches your party-console the same way a paired browser does and sends
 Web Push to phones that enabled notifications. Each phone picks which
 alerts it wants:

@@ -184,6 +184,8 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
   const [error, setError] = useState<string | null>(null)
   return (
     <div className="flex flex-col gap-2 py-1 pl-3">
+      {/* party-reference-panels.tsx's donation dialog title. */}
+      <p className="text-sm font-semibold">Donate gold for merchant XP</p>
       <p className="text-xs text-muted-foreground">{merchant || 'The merchant'} will withdraw any shortage, travel to the XP frog, and donate this amount.</p>
       <div className="flex items-end gap-2">
         <label className="flex-1 text-xs text-muted-foreground">

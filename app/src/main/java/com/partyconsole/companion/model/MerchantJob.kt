@@ -221,7 +221,7 @@ data class MarketListing(
  *  a different, more transient source than ALData/Ponty's aggregated
  *  market snapshots (player-stand-market-dialog.tsx). Buying one requires
  *  echoing these exact fields back so the coordinator can re-match the
- *  same physical listing (see PartyApiClient.buyFromStand). */
+ *  same physical listing (the dashboard never renders this search). */
 @Serializable
 data class StandSearchListing(
     val seller: String,

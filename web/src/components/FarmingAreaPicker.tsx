@@ -194,7 +194,7 @@ export function FarmingAreaPicker({
               Clear all
             </Button>
           </div>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters..." className="mb-2" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters…" className="mb-2" />
           <div className="max-h-40 overflow-y-auto">
             {monsterOptions.map((monster) =>
               // monster-focus-picker.tsx: Fairy has no verified regular spawn route.

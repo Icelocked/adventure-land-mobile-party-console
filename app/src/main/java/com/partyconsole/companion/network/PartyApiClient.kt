@@ -1134,30 +1134,4 @@ class PartyApiClient(
         )
         return post("merchant/ponty-order", body)
     }
-
-    /** POST /party-api/merchant/stand-search (manual-market-orders.ts) -
-     *  starts a live search for a specific item across nearby players'
-     *  open stands; results land in GET /party-api/state's `standSearch`
-     *  field (polled - see PartyRepository), not this call's own response. */
-    suspend fun standSearch(itemId: String): ApiResult<CommandResult> =
-        post("merchant/stand-search", JsonObject(mapOf("itemId" to JsonPrimitive(itemId))))
-
-    /** POST /party-api/merchant/stand-order - buys one live player-stand
-     *  listing. The server re-matches by seller+slot+rid+item.name+price,
-     *  so this echoes those exact fields back from the search result
-     *  rather than re-deriving them, per manual-market-orders.ts. */
-    suspend fun buyFromStand(listing: com.partyconsole.companion.model.StandSearchListing, buyQuantity: Int): ApiResult<CommandResult> {
-        val entry = buildMap {
-            put("seller", JsonPrimitive(listing.seller))
-            put("slot", JsonPrimitive(listing.slot))
-            listing.rid?.let { put("rid", JsonPrimitive(it)) }
-            put("itemName", JsonPrimitive(listing.item.name))
-            put("price", JsonPrimitive(listing.price))
-            put("buyQuantity", JsonPrimitive(buyQuantity))
-        }
-        val body = JsonObject(
-            mapOf("listings" to kotlinx.serialization.json.JsonArray(listOf(JsonObject(entry)))),
-        )
-        return post("merchant/stand-order", body)
-    }
 }

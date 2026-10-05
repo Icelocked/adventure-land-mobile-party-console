@@ -263,8 +263,9 @@ function ALDataSection() {
             const result = key ? { kind: 'success' as const, value: key } : await api.revealAlDataKey()
             // use-party-console.tsx: Prepare mail opens the mail composer
             // with the earthiverse / aldata_auth draft (postage shown there).
-            if (result.kind === 'success') navigate('/mail', { state: { draft: { recipient: 'earthiverse', subject: 'aldata_auth', message: result.value } } })
-            else setError(result.message)
+            // use-party-console.tsx aldataAction('send'): no stored key -> "Generate an ALData key first".
+            if (result.kind === 'success' && result.value) navigate('/mail', { state: { draft: { recipient: 'earthiverse', subject: 'aldata_auth', message: result.value } } })
+            else setError(result.kind === 'failure' ? result.message : 'Generate an ALData key first')
             setBusy(false)
           }}
         >

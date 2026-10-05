@@ -78,11 +78,18 @@ not a scaled-down subset.
 - **Account-wide screens** (reachable from any character via the hamburger
   menu): Mail (inbox, compose, collect attachments), Catalog (browse and
   inspect every known item), Bestiary (monsters and their drop tables),
-  Skills (per-class skill reference), Inspect Stand, View Market (ALData/
-  Ponty listings plus a live player-stand search, with buying), Inspect
+  Skills (per-class skill reference), Inspect Stand, View Market (ALData,
+  Ponty and live WTB orders, with buying and selling), WTB orders, Inspect
   Bank (shared vault, gold breakdown, withdraw/sell/deconstruct), Logs
-  (combat, merchant activity, raw in-game chat/system log), and Settings
-  (pairing, bankboi prefix, realm switching, roster).
+  (combat, merchant activity, raw in-game chat/system log), Hunt settings
+  (blacklist, preferred spawns, passive hunting), merchant shopping,
+  crafting and exchange, events and the Cave of Many Dreams, and Settings
+  (state import/export, realm, roster, ALData, console updates).
+- **Live map** - each character's map with the party, monsters and
+  targets; the Cave's full floor map with waypoints; farming-area previews.
+- **Phone notifications** - stuck or idle characters, deaths, errors, full
+  bags and bank, finished rules and orders, ended events, rare drops,
+  sales and mail (DEPLOYMENT.md section 3e).
 
 ## Architecture
 
@@ -200,11 +207,16 @@ it - you'll need to allow "install unknown apps" for whatever app you
 download it with (Chrome, Files, etc.), since this isn't distributed
 through the Play Store.
 
-It's a debug-signed build, not signed with a dedicated release key -
-perfectly fine for sideloading, but if you ever uninstall and reinstall
-from a build signed by a different machine, Android will ask you to
-uninstall the old one first (it treats them as different apps for
-upgrade purposes even though they're the same app).
+Releases from 0.8.0 on are signed with the project's permanent release
+key, so each new APK installs over the previous one and keeps your server,
+pairing and notification settings. Builds up to 0.7.1 were debug-signed
+with a different key per build: if you have one of those installed,
+uninstall it once before installing 0.8.0 or later (Android refuses to
+upgrade across signing keys).
+
+Release key certificate (SHA-256), to check a download with
+`apksigner verify --print-certs`:
+`02:2B:51:59:59:FC:35:EC:63:28:0D:C8:CE:05:4A:6D:2D:35:37:C9:46:03:3B:B9:BD:16:9B:5D:41:9F:2D:28`
 
 On first launch, the connection screen asks for your party-console
 server's address - see "Connection security model" above for what to
@@ -230,6 +242,22 @@ an Android SDK containing `platform-tools`, `platforms;android-35`, and
 ```
 
 Output APK: `app/build/outputs/apk/debug/app-debug.apk`.
+
+**Signed release build:** put a `keystore.properties` (gitignored) in the
+project root:
+
+```
+storeFile=/path/to/release.jks
+storePassword=...
+keyAlias=companion
+keyPassword=...
+```
+
+then `./gradlew assembleRelease -PappVersion=1.0.0`. The version code is
+derived from the version (1.0.0 → 10000) so releases always upgrade in
+place. Tagged releases are built by `.github/workflows/release.yml` from
+the `RELEASE_KEYSTORE_BASE64` and `RELEASE_KEYSTORE_PASSWORD` repository
+secrets.
 
 **A real gotcha worth knowing about on any machine with a nearly-full
 system drive:** Gradle's cache and temp directories default to the system

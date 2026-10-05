@@ -172,7 +172,7 @@ fun FarmingAreaPicker(
                 Text("${ids.size}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, modifier = Modifier.semantics { contentDescription = "Selected monster count" })
                 OutlinedButton(enabled = ids.isNotEmpty(), onClick = { onIdsChange(emptyList()) }) { Text("Clear all") }
             }
-            OutlinedTextField(search, { search = it }, placeholder = { Text("Search monsters...") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            OutlinedTextField(search, { search = it }, placeholder = { Text("Search monsters…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             Column(modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
                 for (monster in monsterOptions) {
                     // monster-focus-picker.tsx: Fairy has no verified regular spawn route.

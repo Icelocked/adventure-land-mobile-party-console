@@ -1,4 +1,4 @@
-import type { Item, MarketListing, RestockPolicy, StandListing, StandSearchListing } from '@/models'
+import type { Item, MarketListing, RestockPolicy, StandListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 import { PARTY_ACTION_EVENT, type PartyActionDetail } from '@/data/queryActions'
@@ -1009,29 +1009,5 @@ export class PartyApiClient {
   async buyPonty(listing: { key?: string; keys?: string[]; quantity: number; unitPrice?: number }): Promise<ApiResult<CommandResult>> {
     // use-party-console.tsx buyPontyListing: the whole listing.
     return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
-  }
-
-  /** POST /party-api/merchant/stand-search - starts a live search for a
-   *  specific item across nearby players' open stands; results land in
-   *  GET /party-api/state's `standSearch` field (polled), not this call's
-   *  own response. */
-  async standSearch(itemId: string): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/stand-search', { itemId })
-  }
-
-  /** POST /party-api/merchant/stand-order - buys one live player-stand
-   *  listing. The server re-matches by seller+slot+rid+item.name+price,
-   *  so this echoes those exact fields back from the search result
-   *  rather than re-deriving them. */
-  async buyFromStand(listing: StandSearchListing, buyQuantity: number): Promise<ApiResult<CommandResult>> {
-    const entry: Record<string, unknown> = {
-      seller: listing.seller,
-      slot: listing.slot,
-      itemName: listing.item.name,
-      price: listing.price,
-      buyQuantity,
-    }
-    if (listing.rid) entry.rid = listing.rid
-    return this.post('merchant/stand-order', { listings: [entry] })
   }
 }
