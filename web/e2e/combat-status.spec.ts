@@ -128,7 +128,7 @@ test('Character detail: the leader\'s own focus button falls back to the flat fi
   await expect(page.getByText('No monsters selected')).not.toBeVisible()
 })
 
-test('Character detail: resolves the real monster name via the live map/entities stream', async ({ page }) => {
+test('Character detail: resolves the real monster name from the live map stream, without opening one itself', async ({ page }) => {
   // End-to-end proof the subscription/frame-parsing/resolution pipeline
   // genuinely works: vitals.target is a per-instance id ("2951603" - a raw
   // game entity id, confirmed string in production since a real number
@@ -143,7 +143,17 @@ test('Character detail: resolves the real monster name via the live map/entities
   await server.install(page)
   server.setMapFrameEntities('Ranger1', [{ id: '2951603', mtype: 'crabx' }])
 
+  const streams: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/map-stream/')) streams.push(request.url())
+  })
   await page.goto('/characters/Ranger1')
+  // Like the dashboard, nothing opens a map stream until a map is shown: an
+  // open stream makes the character POST frames to the console continuously.
+  await expect(page.getByText('Fighting', { exact: true })).toBeVisible()
+  expect(streams).toEqual([])
+  // The live map opens it; the target name then resolves from its frames.
+  await page.getByRole('button', { name: 'Expand live map' }).click()
   await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
   await expect(page.getByText('fighting Crabxx', { exact: true })).toBeVisible()
 })
