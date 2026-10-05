@@ -10,7 +10,7 @@ test('Character header: doll portrait opens the stats, presence and ping, cave m
     level: 60,
     map: 'zone_ab12_3',
     diagnostics: {
-      characterDollHtml: '<span data-testid="doll">doll</span>',
+      characterDollHtml: '<span data-testid="doll">doll<img src="x" onerror="window.__xss=1"></span>',
       ping: 87.4,
       primaryStat: 'dex',
       banking: true,
@@ -25,7 +25,10 @@ test('Character header: doll portrait opens the stats, presence and ping, cave m
   await server.install(page)
 
   await page.goto('/characters/Ranger1')
-  await expect(page.getByTestId('doll')).toBeAttached()
+  // The doll markup is sanitized (lib/safeHtml.ts): it renders, the injected handler never runs.
+  await expect(page.getByText('doll', { exact: true })).toBeAttached()
+  await page.waitForTimeout(300)
+  expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined()
   await expect(page.getByLabel('Online')).toBeVisible()
   await expect(page.getByText(/· 87ms/)).toBeVisible()
   await expect(page.getByText(/^Cave of Many Dreams \(/)).toBeVisible()

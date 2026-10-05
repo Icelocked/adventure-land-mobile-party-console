@@ -1,3 +1,4 @@
+import { sanitizeDollHtml } from '@/lib/safeHtml'
 import type { DollLayer, MapDefinition, MapFrame, MapPlacement } from './mapTypes'
 
 // map-render-buffer.ts, verbatim.
@@ -89,13 +90,14 @@ export function croppedTile(image: HTMLImageElement, url: string, x: number, y: 
   return tile
 }
 
-// doll-layers.tsx, verbatim.
+// doll-layers.tsx, with the markup sanitized first (lib/safeHtml.ts): it can
+// come from any player in view, and innerHTML would run an inline handler.
 const dollLayerCache = new Map<string, DollLayer[]>()
 export function dollLayers(html: string) {
   const cached = dollLayerCache.get(html)
   if (cached) return cached
   const host = document.createElement('div')
-  host.innerHTML = html
+  host.innerHTML = sanitizeDollHtml(html)
   const layers = Array.from(host.querySelectorAll('img')).map((img) => {
     const parent = img.parentElement as HTMLElement
     const px = (value: string) => Number.parseFloat(value || '0') || 0

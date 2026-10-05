@@ -47,8 +47,9 @@ const load = (name, fallback) => {
     return fallback
   }
 }
+// Owner-only: subscriptions hold each device's console pairing credential.
 const save = (name, value) => {
-  writeFileSync(file(name) + '.tmp', JSON.stringify(value, null, 2))
+  writeFileSync(file(name) + '.tmp', JSON.stringify(value, null, 2), { mode: 0o600 })
   renameSync(file(name) + '.tmp', file(name))
 }
 const log = (...args) => console.log(new Date().toISOString(), '[notifier]', ...args)
@@ -309,8 +310,10 @@ const send = (res, status, value) => {
 /** Only browsers the console accepts may manage notifications: the request's
  *  own cookie must read the console. */
 async function authorized(req) {
+  const cookie = partyCookie(req.headers.cookie)
+  if (!cookie) return false // no console request for unpaired callers
   try {
-    await consoleGet('/party-api/escape', req.headers.cookie || '')
+    await consoleGet('/party-api/escape', cookie)
     return true
   } catch {
     return false
@@ -322,6 +325,23 @@ const cleanQuiet = (value) =>
     ? { start: String(value.start), end: String(value.end), offsetMinutes: Math.max(-900, Math.min(900, Number(value.offsetMinutes) || 0)) }
     : null
 const cleanMuted = (value) => (Array.isArray(value) ? value.map(String).slice(0, 50) : [])
+/** Only the console's pairing cookie, never the rest of the browser's cookies. */
+const partyCookie = (header) => {
+  const value = /(?:^|;\s*)party=([^;]+)/.exec(String(header || ''))?.[1]
+  return value ? `party=${value}` : ''
+}
+/** Mutations must come from this app's own pages (the pairing cookie is
+ *  SameSite=Strict too; this is the second lock, as the PWA can be public). */
+const sameOrigin = (req) => {
+  const origin = req.headers.origin
+  if (!origin) return true
+  try {
+    return new URL(origin).host === req.headers.host
+  } catch {
+    return false
+  }
+}
+const MAX_DEVICES = 50
 const status = (device) => (device ? { subscribed: true, alerts: device.alerts, quiet: device.quiet, muted: device.muted, paused: watch.credentialFailed } : { subscribed: false })
 
 createServer(async (req, res) => {
@@ -329,6 +349,7 @@ createServer(async (req, res) => {
     const url = new URL(req.url || '/', 'http://notifier')
     const path = url.pathname.replace(/^\/notify/, '')
     if (req.method === 'GET' && path === '/config') return send(res, 200, { publicKey: vapid.publicKey, alerts: ALERTS })
+    if (req.method === 'POST' && !sameOrigin(req)) return send(res, 403, { error: 'Cross-site request refused' })
     if (!(await authorized(req))) return send(res, 401, { error: 'Pair this browser with Party Console first.' })
     const body = req.method === 'POST' ? await readBody(req) : {}
     const endpoint = String(body.subscription?.endpoint || body.endpoint || url.searchParams.get('endpoint') || '')
@@ -347,10 +368,13 @@ createServer(async (req, res) => {
         alerts: cleanAlerts(body.alerts) ?? [...ALERTS],
         quiet: cleanQuiet(body.quiet),
         muted: cleanMuted(body.muted),
-        cookie: req.headers.cookie || '',
+        cookie: partyCookie(req.headers.cookie),
         subject: /^https:\/\//.test(origin) ? origin : 'mailto:party-console@localhost',
         createdAt: Date.now(),
       }
+      // Bound the store: drop the oldest subscriptions past the limit.
+      const ordered = Object.entries(devices).sort(([, a], [, b]) => a.createdAt - b.createdAt)
+      for (const [old] of ordered.slice(0, Math.max(0, ordered.length - MAX_DEVICES))) delete devices[old]
       watch.credentialFailed = false
       persist()
       return send(res, 200, status(devices[endpoint]))
