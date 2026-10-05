@@ -4,7 +4,7 @@ import { conflictingItems, describeRule } from '@/lib/ruleConflicts'
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
 
-/** shared-rule-conflicts.tsx: with shared merchant rules, members' rules
+/** With shared merchant rules, members' rules
  *  that disagree are paused until one owner's value is chosen; rules that
  *  would both act on the same item (NPC sale / stand / deconstruction /
  *  processing) are flagged too. Shown on the merchant only. */

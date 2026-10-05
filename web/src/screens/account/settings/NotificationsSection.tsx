@@ -41,7 +41,7 @@ function LimitInput({ label, value, onSave, width = 'w-16' }: { label: string; v
   )
 }
 
-/** Phone notifications (this app's own feature, not part of the dashboard):
+/** Phone notifications (specific to this app):
  *  enable push on this device, choose alerts, limits, quiet hours and muted characters. */
 export function NotificationsSection() {
   const server = useServerSettings()

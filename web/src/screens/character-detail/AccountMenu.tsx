@@ -4,13 +4,9 @@ import { useMail, useDynamicState } from '@/data/PartyDataProvider'
 import { occupiedStandSlots } from '@/lib/standInspection'
 import { useStandMerchant } from '@/screens/account/StandScreen'
 
-/** The account-wide tools menu, reachable from any character's hamburger
- *  icon - the web equivalent of the Android app's hamburger drawer
- *  (mobile-redesign plan's "Account" group): Mail, Catalog, Bestiary,
- *  Skills, Inspect Stand, View Market, Inspect Bank, Logs, Settings.
- *  Equipment/Inventory management stays inline on the character screen
- *  itself here, unlike Android's separate per-topic screens, since the
- *  web layout already shows everything in one scroll. */
+/** The account-wide tools menu behind any character's hamburger icon:
+ *  Mail, Catalog, Bestiary, Skills, Inspect Stand, View Market, Inspect
+ *  Bank, Logs, Settings. */
 const ITEMS: { label: string; path: string }[] = [
   { label: 'Mail', path: '/mail' },
   { label: 'Catalog', path: '/catalog' },
@@ -27,9 +23,9 @@ const ITEMS: { label: string; path: string }[] = [
 
 export function AccountMenu({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
-  // mail-count.tsx: "Mail (N)" while the inbox has messages.
+  // "Mail (N)" while the inbox has messages.
   const mailCount = useMail().count
-  // party-header.tsx: "Inspect stand · N/16" (stand-count.tsx occupiedStandSlots).
+  // "Inspect stand · N/16" (occupied stand slots).
   const state = useDynamicState()
   const standCount = occupiedStandSlots(state.standListings, state.nativeStand, useStandMerchant())
   return (

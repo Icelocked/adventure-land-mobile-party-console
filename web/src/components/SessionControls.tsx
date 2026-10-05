@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 
 type Action = 'logout' | 'headless' | 'steam'
 
-/** character-session-controls.tsx: Steam (become primary / join Steam),
+/** Steam (become primary / join Steam),
  *  Headless (leave Steam, keep running) and Log out - each confirmed, and
  *  refused if the character's session or the Steam primary changed while
  *  the confirmation was open. */
@@ -20,7 +20,7 @@ export function SessionControls({ name }: { name: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitting = useRef(false)
-  // character-session-controls.tsx: a debug instance offers its game browser instead.
+  // A debug instance offers its game browser instead.
   const debugBrowser = useDebugBrowser()
   const debugGameUrl = useDebugGameUrl()
   const native = slot?.kind === 'native'
@@ -47,7 +47,6 @@ export function SessionControls({ name }: { name: string }) {
     submitting.current = true
     setBusy(true)
     setError(null)
-    // use-party-console.tsx logout / moveSteamToHeadless / joinOrPromoteSteam.
     const result =
       action === 'logout'
         ? native

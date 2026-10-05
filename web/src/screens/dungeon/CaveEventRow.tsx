@@ -4,11 +4,10 @@ import { useClock } from '@/lib/duration'
 import { dungeonEntryLabel, useDungeons } from '@/data/useDailyDungeon'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 
-// dungeon-settings.tsx dungeonButton.
 export const dungeonButton =
   'rounded border border-slate-500 bg-slate-950 px-3 py-2 text-emerald-50 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-emerald-300 disabled:cursor-not-allowed disabled:opacity-50'
 
-/** dungeon-settings.tsx CaveEventRow: the Cave of Many Dreams row at the
+/** The Cave of Many Dreams row at the
  *  top of the Events list, with its settings as a sheet (manual entry,
  *  resume, event protection, release). */
 export function CaveEventRow() {

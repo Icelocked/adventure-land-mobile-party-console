@@ -19,10 +19,10 @@ import type { CraftMaterial, MerchantBuyItem, MerchantCraftRecipe, MerchantExcha
 type Mode = 'buy' | 'craft' | 'exchange'
 const MODES: Mode[] = ['buy', 'craft', 'exchange']
 
-/** merchant-commerce-dialog.tsx ported as its own screen (a dialog with a
- *  cart doesn't fit a phone the way it fits a desktop popup). */
+/** Merchant buy/craft/exchange, as a full screen since a cart doesn't fit
+ *  a phone-sized dialog. Console: merchant-commerce-dialog.tsx. */
 
-// merchant-commerce-dialog.tsx: quantities are capped at 9999.
+// Quantities are capped at 9999.
 const capQuantity = (value: string) => Math.min(9999, Math.max(0, Number(value.replace(/[^0-9]/g, '')) || 0))
 
 type Inventories = { name: string; items?: ({ item?: { name?: string; level?: number; q?: number } | null } | null)[] }[]
@@ -32,7 +32,7 @@ function inventories(characters: ReturnType<typeof useCharacters>, filter: (stat
     .map(([name, state]) => ({ name, items: state.inventory?.items ?? [] }))
 }
 
-/** merchant-commerce-dialog.tsx submit's catch: the message plus each 409 `missing` entry. */
+/** The error message plus each 409 `missing` entry. */
 function orderError(result: Extract<ApiResult<unknown>, { kind: 'failure' }>) {
   const missing = Array.isArray(result.body?.missing) ? (result.body.missing as { id: string; level?: number; required: number; available: number }[]) : []
   return (result.message || 'Could not queue order') + missing.map((item) => ` · ${item.id} +${item.level || 0}: ${item.required} required, ${item.available} available`).join('')
@@ -46,7 +46,6 @@ export function MerchantCommerceScreen() {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const catalog = dynamicState.merchantCatalog
-  // party-merchant-commerce-dialog.tsx: usePanelModel(base, { inventory: true, bank: true }).
   useDomainInterest('bank')
 
   const [search, setSearch] = useState('')
@@ -60,7 +59,7 @@ export function MerchantCommerceScreen() {
   const buyableById = useMemo(() => Object.fromEntries((catalog?.buyable ?? []).map((item) => [item.id, item])), [catalog])
 
   const setModeParam = (next: Mode) => {
-    // merchant-commerce-dialog.tsx: switching mode clears the search.
+    // Switching mode clears the search.
     if (next !== mode) setSearch('')
     navigate(`/merchant/${next}`, { replace: true })
   }
@@ -188,9 +187,9 @@ function ItemRow({
   addLabel = 'Add',
   source = 'Merchant catalog',
 }: {
-  /** party-merchant-commerce-dialog.tsx: the item-details header's source. */
+  /** The item-details header's source. */
   source?: string
-  /** merchant-commerce-dialog.tsx: tapping a catalog tile opens its item details. */
+  /** Tapping a catalog tile opens its item details. */
   itemId?: string
   name: string
   sprite?: { url: string; tileSize: number; columns: number; rows: number; x: number; y: number } | null
@@ -239,7 +238,6 @@ function SubmitBar({ label, disabled, submitting, error, onSubmit }: { label: st
   )
 }
 
-// ---------------------------------------------------------------- Buy ----
 
 function BuyScreen({
   search,
@@ -264,7 +262,6 @@ function BuyScreen({
 }) {
   const filtered = catalog.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()))
   const selected = catalog.filter((item) => (cart[item.id]?.quantity ?? 0) > 0)
-  // merchant-commerce-dialog.tsx: estimates, hasEstimatedGold, goldTotal and the submitted lines.
   const estimates = Object.fromEntries(selected.map((item) => [item.id, upgradeEstimate(item, cart[item.id].quantity, cart[item.id]?.level || 0)]))
   const hasEstimatedGold = selected.some((item) => (cart[item.id]?.level || 0) > 0 && item.upgradeable)
   const goldTotal = selected.reduce((sum, item) => sum + estimates[item.id].gold, 0)
@@ -298,7 +295,7 @@ function BuyScreen({
         </div>
       )}
 
-      {/* merchant-commerce-dialog.tsx: the cart panel is always shown. */}
+      {/* The cart panel is always shown. */}
       {(
         <div className="mt-3 border-t border-border px-3 pt-3">
           <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Cart</p>
@@ -351,7 +348,6 @@ function BuyScreen({
   )
 }
 
-// -------------------------------------------------------------- Craft ----
 
 function CraftScreen({
   search,
@@ -402,7 +398,6 @@ function CraftScreen({
       return needed <= (owned[key] ?? 0) || canPurchaseMaterial(material)
     })
 
-  // merchant-commerce-dialog.tsx: ingredientPurchaseCost and additionalRecipeCost.
   const ingredientPurchaseCost = Object.entries(requirements).reduce((sum, [key, requirement]) => {
     const missing = Math.max(0, requirement.quantity - (owned[key] || 0))
     return sum + missing * (buyableById[requirement.material.id]?.cost || 0)
@@ -419,10 +414,9 @@ function CraftScreen({
 
   const selected = recipes.filter((item) => (cart[item.id] ?? 0) > 0)
   const goldTotal = selected.reduce((sum, item) => sum + item.cost * cart[item.id], 0) + ingredientPurchaseCost
-  // Per-recipe canAddRecipe only guards the incremental +1 tap - typing a
-  // quantity directly into the cart Input bypasses it entirely, so the
-  // submit button needs its own aggregate check across every material's
-  // running total, matching the dashboard's materialsAvailable gate.
+  // Per-recipe canAddRecipe only guards the +1 tap; a quantity typed into
+  // the cart bypasses it, so submit needs its own aggregate check across
+  // every material's running total.
   const materialsAvailable = Object.entries(requirements).every(
     ([key, requirement]) => requirement.quantity <= (owned[key] ?? 0) || canPurchaseMaterial(requirement.material),
   )
@@ -449,7 +443,7 @@ function CraftScreen({
                   disabled={!enabled}
                   onAdd={() => setCart((old) => ({ ...old, [recipe.id]: (old[recipe.id] ?? 0) + 1 }))}
                 />
-                {/* The dashboard's hover preview; a phone has no hover, so it toggles inline. */}
+                {/* A phone has no hover, so the recipe preview toggles inline. */}
                 <Button variant="link" size="xs" className="self-start text-violet-300" aria-expanded={open} onClick={() => setPreviewing(open ? null : recipe.id)}>
                   {open ? 'Hide recipe' : 'Complete recipe'}
                 </Button>
@@ -487,7 +481,7 @@ function CraftScreen({
         </div>
       )}
 
-      {/* merchant-commerce-dialog.tsx: the cart panel is always shown. */}
+      {/* The cart panel is always shown. */}
       {(
         <div className="mt-3 border-t border-border px-3 pt-3">
           <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Craft list</p>
@@ -535,9 +529,8 @@ function CraftScreen({
   )
 }
 
-// ----------------------------------------------------------- Exchange ----
 
-/** merchant-commerce-dialog.tsx displayedItems: every exchange with a fixed
+/** Every exchange with a fixed
  *  `reward` groups under one synthetic currency tile with `choices`; box
  *  and table pulls stay their own tiles. UI-only, hence the local type. */
 type GroupedExchangeItem = MerchantExchangeItem & { choices?: MerchantExchangeItem[] }
@@ -599,7 +592,7 @@ function ExchangeScreen({
   const api = usePartyApi()
   const state = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()
-  // merchant-commerce-dialog.tsx exchangeOwned: merchant-class characters, the bank and bankbois.
+  // Owned counts span merchant-class characters, the bank and bankbois.
   const exchangeOwned = useMemo(
     () => inventoryCounts(inventories(characters, (entry) => entry.vitals?.ctype === 'merchant'), bank, bankbois, true),
     [characters, bank, bankbois],
@@ -628,7 +621,6 @@ function ExchangeScreen({
     setDrafts({})
     setMarkError(null)
   }
-  // party-merchant-commerce-dialog.tsx onSaveExchangeMarks.
   async function saveDrafts(list: { id: string; level: number; mode: ExchangeMarkMode }[]) {
     const character = state.merchantCharacter
     if (!character) throw new Error('No merchant is assigned')
@@ -721,7 +713,7 @@ function ExchangeScreen({
         </div>
       )}
 
-      {/* merchant-commerce-dialog.tsx: the cart panel is always shown. */}
+      {/* The cart panel is always shown. */}
       {(
         <div className="mt-3 border-t border-border px-3 pt-3">
           <p className="mb-1 font-mono text-xs uppercase text-muted-foreground">Exchange cart</p>

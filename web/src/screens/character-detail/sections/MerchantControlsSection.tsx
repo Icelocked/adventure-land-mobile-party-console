@@ -11,14 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 
-/** Ports merchant-card-controls.tsx's Buy/Craft/Exchange navigation,
- *  Force stand, Mining/Fishing, Send to party, Donate, Join giveaway,
- *  Clear job queue, Clear stale orders, Clear activity history, and the
- *  Merchant collection settings (bank-sort mode, collect thresholds) -
- *  the rest of the merchant character's card that wasn't just the job
- *  queue widget (MerchantQueueSection) or Routines (its own screen, too
- *  big for an inline form). Only ever rendered for the merchant
- *  character. */
+/** Merchant-only controls: Buy/Craft/Exchange navigation, Force stand,
+ *  Mining/Fishing, Send to party, Donate, Join giveaway, Clear job queue,
+ *  Clear stale orders, Clear activity history, and the Merchant collection
+ *  settings. */
 export function MerchantControlsSection({ forceStand, gatheringModes }: { forceStand: boolean; gatheringModes: string[] }) {
   const api = usePartyApi()
   const navigate = useNavigate()
@@ -29,9 +25,9 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
   const now = useClock()
   const merchantDetails = useCharacterDiagnostics(state.merchantCharacter ?? '')
   const groups = merchantPartyGroups(state, Object.keys(characters))
-  // party-reference-panels.tsx: the merchant's own XP-per-gold rate, 3.2 until known.
+  // The merchant's own XP-per-gold rate, 3.2 until known.
   const xpPerGold = Number(merchantDetails?.donationXpPerGold) || 3.2
-  // merchant-card-controls.tsx readiness: the later of the merchant's and the party's cooldowns.
+  // Ready at the later of the merchant's and the party's cooldowns.
   const readiness = (mode: 'fishing' | 'mining') => {
     const ownCooldowns = merchantDetails?.gatheringCooldowns as Record<string, number> | undefined
     const remaining = Math.max(0, Math.max(Number(ownCooldowns?.[mode] || 0), Number(state.gatheringCooldowns?.[mode] || 0)) - now)
@@ -48,7 +44,7 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
   const [confirmingClear, setConfirmingClear] = useState(false)
   const toggle = (key: string) => setExpanded((current) => (current === key ? null : key))
 
-  // send-to-party-control.tsx: one request at a time, controls disabled while it runs.
+  // One request at a time, controls disabled while it runs.
   const [sendingToParty, setSendingToParty] = useState(false)
   const sendingRef = useRef(false)
   const sendToParty = async (group?: string) => {
@@ -112,7 +108,7 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
           {sendingToParty ? 'Sending…' : 'Send to party'}
         </Button>
         {expanded === 'party' && (
-          // send-to-party-control.tsx: pick a party group when there's more than one.
+          // Pick a party group when there's more than one.
           <div className="flex flex-col gap-1 py-1 pl-3">
             <p className="text-xs text-muted-foreground">Select party group</p>
             {groups.map((group) => (
@@ -133,7 +129,7 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
         </Button>
         {expanded === 'giveaway' && (
           <GiveawayForm
-            // connected-character-card.tsx onGiveaway: the merchant's current realm, else the first.
+            // Default to the merchant's current realm, else the first.
             initialRealm={(() => {
               const current = state.merchantCharacter ? characters[state.merchantCharacter]?.vitals?.server : undefined
               return current ? `SR_${current}` : state.giveawayRealms?.[0]?.key || ''
@@ -184,7 +180,7 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
   const [error, setError] = useState<string | null>(null)
   return (
     <div className="flex flex-col gap-2 py-1 pl-3">
-      {/* party-reference-panels.tsx's donation dialog title. */}
+      {/* Donation dialog title. */}
       <p className="text-sm font-semibold">Donate gold for merchant XP</p>
       <p className="text-xs text-muted-foreground">{merchant || 'The merchant'} will withdraw any shortage, travel to the XP frog, and donate this amount.</p>
       <div className="flex items-end gap-2">
@@ -195,7 +191,6 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
         <Button
           size="sm"
           onClick={() => {
-            // use-party-console.tsx donateGold
             const value = Number(amount)
             if (!Number.isSafeInteger(value) || value < 1) return setError('Enter a positive whole-number donation')
             setError(null)
@@ -214,7 +209,7 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
 }
 
 
-/** party-management-panels.tsx "Join giveaway": pick a realm, then a
+/** "Join giveaway": pick a realm, then a
  *  player online there (searchable). */
 function GiveawayForm({
   realms,
@@ -274,7 +269,6 @@ function GiveawayForm({
       <Button
         size="sm"
         onClick={() => {
-          // use-party-console.tsx joinGiveaway
           if (!realm.trim() || !seller.trim()) return setError('Enter both a server realm and merchant name')
           setError(null)
           onJoin(realm.trim(), seller.trim())

@@ -2,9 +2,8 @@ import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { probePwa, recoveryStoragePrefix, startRecovery, type RecoveryStatus } from '@/lib/dashboardRecovery'
 
-/** global-error.tsx's "couldn't render" screen for the PWA: a render error
- *  no longer blanks the app - it shows the reconnect countdown with
- *  Retry now / Reload now, driven by the ported recovery state machine. */
+/** "Couldn't render" fallback: instead of a blank app, shows the reconnect
+ *  countdown with Retry now / Reload now, driven by the recovery state machine. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
 

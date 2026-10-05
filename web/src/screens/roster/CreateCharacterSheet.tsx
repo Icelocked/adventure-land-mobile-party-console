@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CharacterPortrait } from '@/components/CharacterPortrait'
 
-/** create-character.tsx + use-party-console.tsx createCharacter: name
- *  (4-12 letters, numbers, underscores), class, one of the class's
+/** Name (4-12 letters, numbers, underscores), class, one of the class's
  *  official starting looks, then create and spawn. */
 export function CreateCharacterSheet({ onClose }: { onClose: () => void }) {
   const api = usePartyApi()

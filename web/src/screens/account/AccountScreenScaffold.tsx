@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
 
 /** Shared shell for every account-wide screen (mail/bestiary/skills/
- *  stand/market/bank/logs/settings/catalog) - ported from ui/account/
- *  AccountScreenScaffold.kt: same title bar + back + optional refresh
- *  button, so each screen only supplies its own list/content body. */
+ *  stand/market/bank/logs/settings/catalog): title bar, back and an optional
+ *  refresh button, so each screen only supplies its content body. */
 export function AccountScreenScaffold({ title, onRefresh, children }: { title: string; onRefresh?: () => void; children: ReactNode }) {
   const navigate = useNavigate()
   return (

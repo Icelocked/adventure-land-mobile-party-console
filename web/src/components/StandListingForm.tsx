@@ -14,7 +14,7 @@ export interface StandListingDraft {
   markAll: boolean
 }
 
-/** level-price-history.ts: only observations recorded at this exact level. */
+/** Only observations recorded at this exact level. */
 export function levelPriceHistory(history: StandPriceHistory | undefined, level: number) {
   return {
     lowest: exactLevelPrice(history?.lowest, history?.lowestLevel, level),
@@ -24,7 +24,7 @@ export function levelPriceHistory(history: StandPriceHistory | undefined, level:
   }
 }
 
-/** party-management-panels.tsx's stand dialog, inline: buy-from-NPC and
+/** Stand listing form: buy-from-NPC and
  *  current market count, the price with its 13 presets (Market low −5 %
  *  disabled below the NPC price), quantity for stacks, "Mark all for stand",
  *  the automatic variant ("Set one fixed price…", prefilled from the rule),
@@ -47,7 +47,7 @@ export function StandListingForm({
   onCancel?: () => void
 }) {
   const state = useDynamicState()
-  // use-party-console.tsx: the item's value (definition.g), at least 1.
+  // The item's value (definition.g), at least 1.
   const defaultPrice = Math.max(1, Number(meta?.definition.g) || 1)
   const [price, setPrice] = useState(String(existing?.price || defaultPrice))
   const [quantity, setQuantity] = useState(String(existing?.quantity || item.q || 1))
@@ -59,7 +59,7 @@ export function StandListingForm({
   const marketReference = observed.marketLow || observed.lowest || 0
   const npcSale = npcSaleValue(level, !!item.gift, item.expires, meta ?? undefined)
   const ponty = pontyPrice(item, meta)
-  // use-panel-model.ts standMarketCount: fresh, non-PVP ALData listings of this exact item.
+  // Fresh, non-PVP ALData listings of this exact item.
   const freshAfter = Date.now() - 120000
   const marketCount = ((state.aldata?.listings ?? []) as unknown as { seenAt?: number; serverIdentifier?: string; quantity?: number; item: Item }[])
     .filter(

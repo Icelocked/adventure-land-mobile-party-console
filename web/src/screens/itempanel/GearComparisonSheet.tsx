@@ -12,7 +12,7 @@ import type { EquippedEntry, Item, ItemMeta, ItemSetInfo } from '@/models'
 type Props = Record<string, string | number | boolean>
 type Stats = Record<string, number>
 
-/** gear-comparison-dialog.tsx: the character's projected totals (HP, MP,
+/** The character's projected totals (HP, MP,
  *  attack, speeds, armor, resistance, attributes, combat stats) with the
  *  current item and with this one, each side's level and stat-scroll
  *  preview, the character doll, and set changes (GAINED / LOST). The base
@@ -226,7 +226,7 @@ export function GearComparisonSheet({
     return (
       <section aria-label={proposed ? 'With this item' : 'Currently equipped'} className={`rounded-lg border p-3 ${proposed ? 'border-cyan-800' : 'border-border'}`}>
         <div className="mb-3 flex items-center gap-3">
-          {/* gear-comparison-dialog.tsx renders the game's own character doll markup. */}
+          {/* The game's own character doll markup. */}
           <div className="h-20 w-16 shrink-0 overflow-hidden" dangerouslySetInnerHTML={diagnostics.characterDollHtml ? { __html: sanitizeDollHtml(diagnostics.characterDollHtml) } : undefined} />
           <div className="min-w-0">
             <p className="font-semibold">{proposed ? name : equipped ? `${nameOf(equipped.item, equippedMeta)} +${leftLevel}` : 'Empty slot'}</p>

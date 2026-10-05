@@ -7,16 +7,14 @@ import { itemMaximumLevel } from '@/lib/itemFormulas'
 import { UPGRADE_OFFERING_LABELS } from '@/models'
 import type { Item, ItemMeta, UpgradeOffering, UpgradeOfferingRule } from '@/models'
 
-// runtime/upgrade-offerings.ts, verbatim.
+// Console: runtime/upgrade-offerings.ts.
 export const upgradeOfferings = UPGRADE_OFFERING_LABELS
 export function offeringOverlap(rules: readonly UpgradeOfferingRule[], next: UpgradeOfferingRule) {
   return rules.find((rule) => rule.id !== next.id && rule.name === next.name && rule.floor < next.ceiling && next.floor < rule.ceiling)
 }
-// runtime/upgrade-preview.ts previewOptions.
 const previewOptions = ['none', 'offeringp', 'offering', 'offeringx'] as const
 type PreviewResult = { preview: { chance: number }; observedAt: number } | { reason: string }
 
-/** upgrade-offering-controls.tsx's OfferingSource. */
 export type OfferingSource = { slot: number | string; equipped?: boolean }
 
 function OfferingIcon({ name }: { name: string }) {
@@ -29,7 +27,7 @@ function OfferingIcon({ name }: { name: string }) {
   )
 }
 
-/** upgrade-offering-controls.tsx OfferingDialog, inline: with a source it
+/** Offering dialog: with a source it
  *  confirms a one-tier upgrade with that offering ("Confirm upgrade");
  *  without, it adds or edits a standing rule (range, offering, Required /
  *  Only if available) with the overlap and destination checks. Rules and
@@ -43,7 +41,7 @@ export function OfferingDialog({
   rule: existing,
   onClose,
 }: {
-  // upgrade-offering-controls.tsx provider `character`: the item's owner (the merchant for rules lists).
+  // The item's owner (the merchant for rules lists).
   character: string
   item: Item
   meta?: ItemMeta | null
@@ -160,7 +158,7 @@ export function OfferingDialog({
   )
 }
 
-/** upgrade-preview-panel.tsx: the merchant's stored server preview for the
+/** The merchant's stored server preview for the
  *  next attempt (no offering and each offering), polled every 2 s, with
  *  "Refresh chances" to queue a new one. Only for the merchant's own
  *  inventory items. */
@@ -258,7 +256,7 @@ export function UpgradePreviewPanel({ item, source, character }: { item: Item; s
   )
 }
 
-/** upgrade-actions.tsx's offering rows under Mark for upgrade: "Upgrade with
+/** Offering rows under Mark for upgrade: "Upgrade with
  *  X" (needs stock and a source) and, beside them, the server preview. */
 export function OfferingRows({
   character,
@@ -296,7 +294,7 @@ export function OfferingRows({
   )
 }
 
-/** upgrade-actions.tsx's "Add upgrade rule" under Auto mark for upgrade. */
+/** "Add upgrade rule" under Auto mark for upgrade. */
 export function AddUpgradeRule({ character, item, meta, enabled = true }: { character: string; item: Item; meta?: ItemMeta | null; enabled?: boolean }) {
   const [open, setOpen] = useState(false)
   return (

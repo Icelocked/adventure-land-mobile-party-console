@@ -4,7 +4,7 @@ import { usePartyApi, useServerSettings } from '@/data/PartyDataProvider'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import { Button } from '@/components/ui/button'
 
-/** hosting-settings.tsx HostingSettings: the pairing requirement and the setup link. */
+/** The pairing requirement and the setup link. */
 export function HostingSettings() {
   const api = usePartyApi()
   const settings = useServerSettings()
@@ -60,7 +60,7 @@ export function HostingSettings() {
   )
 }
 
-/** console-updates.tsx ConsoleUpdateSettings (with DebugInstanceSettings). */
+/** Console updates, with the debug instance settings. */
 export function ConsoleUpdateSettings() {
   const api = usePartyApi()
   const { state, error: readError } = useConsoleUpdates()
@@ -141,7 +141,6 @@ export function ConsoleUpdateSettings() {
 
 type DebugState = { phase: string; message: string; error?: string; port?: number; token?: string; project?: string; insideDebug?: boolean }
 
-/** debug-instance.tsx DebugInstanceSettings. */
 function DebugInstanceSettings() {
   const api = usePartyApi()
   const settings = useServerSettings()
