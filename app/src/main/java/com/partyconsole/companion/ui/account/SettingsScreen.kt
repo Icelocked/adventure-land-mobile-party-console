@@ -144,6 +144,7 @@ fun SettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenMail: ()
             ConsoleUpdateSettings(viewModel)
             NotificationsSection(viewModel)
             AppUpdateSection()
+            AboutSection()
             SettingsCard("App connection") {
                 Text("App connection", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
                 Text("Where this app fetches party data from. Changing it forgets this server and its pairing.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

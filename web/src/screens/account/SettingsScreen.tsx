@@ -7,6 +7,7 @@ import { ConsoleUpdateSettings, HostingSettings } from './settings/ConsoleSettin
 import { AccountMembers } from './settings/AccountMembers'
 import { NotificationsSection } from './settings/NotificationsSection'
 import { PwaUpdateSettings } from './settings/PwaUpdates'
+import { About } from './settings/About'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { Copy, Eye, EyeOff } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending, useAlDataAuthStatus } from '@/data/PartyDataProvider'
@@ -118,6 +119,8 @@ export function SettingsScreen() {
         </div>
 
         <PwaUpdateSettings />
+
+        <About />
 
         {dynamicState.steamSwitch?.phase === 'failed' && (
           // Offered while a Steam handoff has failed.
