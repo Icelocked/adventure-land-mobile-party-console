@@ -11,7 +11,7 @@ plugins {
 // .github/workflows/release.yml); local builds use the fallback. versionCode
 // is derived from it so every release upgrades in place:
 // major * 10000 + minor * 100 + patch.
-val appVersion = (findProperty("appVersion") as String?)?.removePrefix("v") ?: "1.0.0"
+val appVersion = (findProperty("appVersion") as String?)?.removePrefix("v") ?: "1.0.1"
 val appVersionCode = appVersion.split(".").map { it.takeWhile(Char::isDigit).ifEmpty { "0" }.toInt() }
     .let { (it.getOrElse(0) { 0 } * 10000) + (it.getOrElse(1) { 0 } * 100) + it.getOrElse(2) { 0 } }
 

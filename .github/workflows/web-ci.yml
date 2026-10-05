@@ -5,11 +5,13 @@ on:
     branches: [main, dev]
     paths:
       - "web/**"
+      - "distribution/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "web/**"
+      - "distribution/**"
       - ".github/workflows/web-ci.yml"
 
 jobs:
@@ -34,8 +36,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Build
         run: npm run build
+
+      # The same packaging the release does, so a break shows up before a tag.
+      - name: Package PWA installs
+        working-directory: .
+        run: distribution/package.sh 0.0.0 "$RUNNER_TEMP/packages"
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

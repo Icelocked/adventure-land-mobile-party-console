@@ -1,7 +1,7 @@
 name: Release
 
-# Pushing a tag like "v0.2.0" builds the signed APK and the PWA bundle and
-# attaches both to a new GitHub Release.
+# Pushing a tag like "v0.2.0" builds the signed APK, the PWA image and the
+# PWA install packages, and attaches them to a new GitHub Release.
 on:
   push:
     tags:
@@ -64,16 +64,17 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # Just the dist/ output; it still needs nginx.conf (or equivalent)
-      # in front of it to proxy /party-api/.
       - name: Build PWA
         working-directory: web
         run: |
           npm ci
           npm run build
 
-      - name: Zip PWA build
-        run: (cd web/dist && zip -r ../../party-console-companion-pwa-${{ github.ref_name }}.zip .)
+      # The no-Docker packages (Windows ZIP, Linux tarball) and the Docker
+      # installers; see distribution/. The packages' updater finds its
+      # package on the release by name and checks GitHub's asset digest.
+      - name: Package PWA installs
+        run: distribution/package.sh "${GITHUB_REF_NAME#v}" release-assets
 
       # The PWA image the in-app updater installs (web/updater/agent.mjs).
       # Pushed before the release exists, so the updater never sees a
@@ -117,7 +118,7 @@ jobs:
         with:
           files: |
             party-console-companion-${{ github.ref_name }}.apk
-            party-console-companion-pwa-${{ github.ref_name }}.zip
+            release-assets/*
           # The fixed "which one do I want?" intro, then the generated notes.
           body_path: ${{ runner.temp }}/release-intro.md
           generate_release_notes: true

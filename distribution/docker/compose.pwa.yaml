@@ -1,0 +1,44 @@
+# Party Console Companion PWA, added to an existing party-console Docker
+# install (the installers next to this file run it for you). It joins
+# party-console's Compose project, so it shares its network; party-console's
+# own compose.yaml is not changed.
+#
+#   docker compose -p adventureland-party-console -f compose.pwa.yaml up -d
+name: adventureland-party-console
+
+services:
+  party-console-pwa:
+    image: ghcr.io/icelocked/party-console-pwa:${PWA_VERSION:-latest}
+    ports:
+      # This machine only; Tailscale Serve forwards your phone to it.
+      # PWA_HOST=0.0.0.0 opens it to your local network directly.
+      - "${PWA_HOST:-127.0.0.1}:${PWA_PORT:-8080}:80"
+    volumes:
+      - pwa-notifier:/data/notifier
+      - pwa-updates:/data/updates
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Installs PWA updates from the app's Settings. It mounts the Docker socket
+  # but has no port; see DEPLOYMENT.md, "Updates".
+  party-console-pwa-updater:
+    image: ghcr.io/icelocked/party-console-pwa:${PWA_VERSION:-latest}
+    command: ["node", "/opt/updater/agent.mjs"]
+    user: root
+    volumes:
+      - pwa-updates:/data/updates
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"
+
+volumes:
+  pwa-notifier:
+  pwa-updates:

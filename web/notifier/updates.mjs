@@ -1,7 +1,8 @@
 // PWA self-updates. The notifier checks GitHub for new releases (every 6 hours
-// and on demand) and owns the preferences. Installing needs Docker, so it is
-// done by the separate updater container (web/updater/agent.mjs), which only
-// ever installs the latest official release. The two talk through files in a
+// and on demand) and owns the preferences. Installing is done by a separate
+// updater: the updater container in Docker (web/updater/agent.mjs), or the
+// supervisor of the Windows and Linux packages (web/server/supervisor.mjs).
+// Either only ever installs the latest official release. The two talk through files in a
 // shared volume; neither listens to the other over the network.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -24,7 +25,8 @@ export function newer(candidate, current) {
   return false
 }
 
-// The package.json version the image was built from (see the Dockerfile).
+// The package.json version the image or package was built from (see the
+// Dockerfile and distribution/package.sh).
 function builtFrom() {
   try {
     return readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'base-version.txt'), 'utf8').trim()
@@ -108,7 +110,7 @@ export function createUpdates({ dir = process.env.UPDATES_DIR || '/data/updates'
       notes: available() ? release.notes : undefined,
       checkedAt: release?.checkedAt,
       automatic: !!preferences.automatic,
-      // Installs need the updater container and a release image (not a local build).
+      // Installs need an updater and a release build (not a local build).
       managed: !!worker && !!installed(),
       updater: !!worker,
       phase: checking ? 'checking' : worker?.phase && worker.phase !== 'idle' ? worker.phase : available() ? 'available' : 'idle',
@@ -128,7 +130,7 @@ export function createUpdates({ dir = process.env.UPDATES_DIR || '/data/updates'
       return [200, status()]
     }
     if (path === '/update/install') {
-      if (!agent()) return [409, { error: 'Installing needs the updater service. See DEPLOYMENT.md, "Automatic updates".' }]
+      if (!agent()) return [409, { error: "Installing needs the PWA's updater, which the installers set up. See DEPLOYMENT.md, 'Updates'." }]
       if (!installed()) return [409, { error: 'This PWA was built from source; update it the way you built it.' }]
       if (!available()) return [409, { error: 'Already up to date.' }]
       requestInstall()
