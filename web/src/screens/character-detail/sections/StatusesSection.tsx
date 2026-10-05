@@ -7,7 +7,7 @@ import { durationStat } from '@/lib/itemFormulas'
 import { displayValue, durationSignature, reconcileDurations, statusRemaining, type StatusDuration } from '@/lib/statusDuration'
 import type { Condition } from '@/models'
 
-/** active-statuses.tsx: a collapsed "Active status" with the count; open,
+/** A collapsed "Active status" with the count; open,
  *  each status shows its sprite, a ticking countdown over a depleting bar,
  *  and stacks, and opens its Condition details. Shown for every class. */
 export function StatusesSection({ characterName, conditions }: { characterName: string; conditions: Condition[] }) {
@@ -17,7 +17,7 @@ export function StatusesSection({ characterName, conditions }: { characterName: 
   const [durations, setDurations] = useState<Record<string, StatusDuration | undefined>>({})
   const signature = durationSignature(conditions)
   useEffect(() => {
-    // Anchor newly observed telemetry at commit time (active-statuses.tsx).
+    // Anchor newly observed telemetry at commit time.
     setDurations((previous) => reconcileDurations(signature, previous, Date.now()))
   }, [signature])
 
@@ -65,7 +65,7 @@ export function StatusesSection({ characterName, conditions }: { characterName: 
   )
 }
 
-/** condition-details.tsx: the status's name, owner and duration, its
+/** The status's name, owner and duration, its
  *  explanation, and every definition/live field (durations formatted). */
 function ConditionDetailsSheet({ characterName, condition, onClose }: { characterName: string; condition: Condition; onClose: () => void }) {
   const merged = { ...(condition.definition ?? {}), ...(condition.live ?? {}) }

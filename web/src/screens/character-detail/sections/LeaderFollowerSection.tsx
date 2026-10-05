@@ -10,10 +10,9 @@ import { Chip } from '@/components/Chip'
 import { SectionCard } from '../SectionCard'
 import type { PartyStateDynamic } from '@/models'
 
-/** Ports party-workspace.tsx's leader RadioGroup + per-card follow
- *  Checkbox into two independent tap targets on POST /party-api/formation.
- *  "Leader" sends only {leader} (a radio - tapping the current leader does
- *  nothing, as on the dashboard); "Follow" sends only {character, follow}. */
+/** Two independent tap targets on POST /party-api/formation. "Leader" sends
+ *  only {leader} (a radio: tapping the current leader does nothing);
+ *  "Follow" sends only {character, follow}. */
 export function LeaderFollowerSection({ characterName, dynamicState }: { characterName: string; dynamicState: PartyStateDynamic }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -63,8 +62,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
   )
 }
 
-/** event-selection-control.tsx: the "Events (n)" popover as an inline
- *  list. Followers use their leader's events (the server 409s for them). */
+/** The "Events (n)" selection as an inline list. Followers use their leader's events (the server 409s for them). */
 function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name: string }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()

@@ -3,7 +3,7 @@ import { useMapDefinition } from '@/data/useMapFrames'
 import type { FarmingArea } from '@/lib/farmingAreas'
 import { MapCanvas } from './MapCanvas'
 
-/** farming-area-preview.tsx: the area's map, scaled to fit the spawn
+/** The area's map, scaled to fit the spawn
  *  boundary and hunt radius, with the area overlay and waypoint. */
 export function FarmingAreaPreview({ area, radius }: { area: FarmingArea; radius: number }) {
   const query = useMapDefinition(area.map)

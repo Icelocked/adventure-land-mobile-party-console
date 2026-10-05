@@ -1,11 +1,8 @@
 import { useLatencyMs } from '@/data/PartyDataProvider'
 
-/** A visible round-trip-time reading for the party header - added after a
- *  session where bad-network lag made it impossible to tell whether the
- *  app was even working ("is it stuck, or just slow?"). Thresholds are a
- *  rough feel for a phone poking a self-hosted server over Tailscale/
- *  guest wifi, not a formal SLA: comfortable, noticeable, and "expect real
- *  delay before anything you tap visibly reacts". */
+/** Round-trip time for the party header, so a slow network can be told
+ *  apart from a stuck app. Thresholds are a rough feel for a phone reaching
+ *  a self-hosted server over Tailscale/guest wifi, not a formal SLA. */
 export function LatencyBadge() {
   const latencyMs = useLatencyMs()
   if (latencyMs == null) return null

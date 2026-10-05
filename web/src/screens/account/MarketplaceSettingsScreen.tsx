@@ -20,7 +20,7 @@ interface StrikeRecord {
   updatedAt?: number
 }
 
-/** stand-sheet.tsx "Marketplace settings": auto-fill empty stand slots with
+/** "Marketplace settings": auto-fill empty stand slots with
  *  the highest priority buy order, the merchant blacklist toggle, a manual
  *  block (minutes, -1 = forever), every strike record with Clear, and a
  *  two-step Clear all. */

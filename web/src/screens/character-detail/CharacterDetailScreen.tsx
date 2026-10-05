@@ -28,10 +28,9 @@ import { SessionControls } from '@/components/SessionControls'
 import { PartyGold } from '@/components/PartyGold'
 import { ItemActionPanel, type ItemActionTarget } from '@/screens/itempanel/ItemActionPanel'
 
-/** Character focus screen: a sticky vitals header (never scrolls out of
- *  view) over a scrollable body of section cards - ported from
- *  ui/characterdetail/CharacterDetailScreen.kt. Item taps (equipment/
- *  inventory) open the bottom item-action panel. */
+/** Character focus screen: a sticky vitals header over a scrollable body of
+ *  section cards. Item taps (equipment/inventory) open the bottom
+ *  item-action panel. */
 export function CharacterDetailScreen() {
   const { name = '' } = useParams()
   const navigate = useNavigate()
@@ -103,10 +102,10 @@ export function CharacterDetailScreen() {
             slots={state?.inventory?.slots ?? {}}
             online={online}
           />
-          {/* connected-character-card.tsx: the live map sits under the card header. */}
+          {/* The live map sits under the card header. */}
           <MapSection name={name} map={vitals.map} x={vitals.x} y={vitals.y} />
           <div className="flex-1 pb-6">
-            {/* connected-character-card.tsx: statuses sit under HP/MP for every class. */}
+            {/* Statuses sit under HP/MP for every class. */}
             <StatusesSection characterName={name} conditions={vitals.conditions ?? []} />
             <LeaderFollowerSection characterName={name} dynamicState={dynamicState} />
             <TravelSection
@@ -125,17 +124,11 @@ export function CharacterDetailScreen() {
                 followingLeader={farming.followingLeader}
                 isLeader={dynamicState.leader === name}
                 farmArea={farming.farmArea}
-                // connected-character-card.tsx: `monsterFocusByCharacter?.[char.name] || selectedFocus`
-                // (selectedFocus falling back to the flat state.monsterFocus) -
-                // not just a leader-specific case. The SERVER deliberately keeps
-                // monsterFocusByCharacter[leader] empty (navigation/focus.ts's
-                // characterFocus() writes the leader's own focus into the flat
-                // monsterFocus field and deletes their per-character entry, since
-                // that's what followers/others inherit from) - reading only
-                // monsterFocusByCharacter here meant the leader's screen always
-                // showed "No monsters selected" even with a real focus configured.
-                // An explicitly empty [] entry is kept (`||`, as on the dashboard),
-                // and selectedFocus is use-party-console.tsx's verbatim.
+                // Per-character focus, falling back to the flat state.monsterFocus.
+                // The server keeps monsterFocusByCharacter[leader] empty: the
+                // leader's focus lives in the flat field, which others inherit
+                // (navigation/focus.ts characterFocus()). An explicitly empty []
+                // entry is kept (`||`, not `??`).
                 monsterFocus={dynamicState.monsterFocusByCharacter[name] || (Array.isArray(dynamicState.monsterFocus) ? dynamicState.monsterFocus : [dynamicState.monsterFocus || 'goo'])}
                 monsterSearchRadius={dynamicState.monsterSearchRadiusByCharacter[name] ?? 400}
                 bestiaryCatalog={dynamicState.bestiaryCatalog}
@@ -167,7 +160,7 @@ export function CharacterDetailScreen() {
               slots={state?.inventory?.slots ?? {}}
               upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => mark.equipped)}
               statScrollMarks={dynamicState.statScrolls[name] ?? []}
-              // equipment.tsx: the class, not the configured merchant role.
+              // The class, not the configured merchant role.
               isMerchant={vitals.ctype === 'merchant'}
               catalogFor={catalogFor}
               onSlotTap={(slotName, entry) => setActionTarget({ kind: 'equipment', slotName, item: entry.item })}

@@ -5,8 +5,7 @@ import { SectionCard } from '../SectionCard'
 import { sameMarkedItem } from '@/models'
 import type { CatalogItem, EquippedEntry, StatScrollMark, UpgradeMark } from '@/models'
 
-/** equipment.tsx + equip-slot.tsx: the 15 fixed slots in the dashboard's
- *  order (then any other non-stand slot), "Empty" tiles, the slot label,
+/** The 15 fixed slots in the console's order (then any other non-stand slot), "Empty" tiles, the slot label,
  *  +level / stat / mluck badges, set progress current/total, and the
  *  upgrade / stat-scroll banner. A merchant's trade1..N slots are its
  *  stand, not gear. */

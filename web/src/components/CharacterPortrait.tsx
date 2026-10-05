@@ -2,8 +2,8 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import type { Sprite } from '@/models'
 import { sanitizeDollHtml } from '@/lib/safeHtml'
 
-/** character-portrait.tsx: the coordinator's own rendered character doll
- *  (characterDollHtml), else the character sprite, else the skin name. */
+/** The coordinator's rendered character doll (characterDollHtml), else the
+ *  character sprite, else the skin name. */
 export function CharacterPortrait({ html, sprite, skin, className = '' }: { html?: string | null; sprite?: unknown; skin?: string | null; className?: string }) {
   return (
     <span aria-hidden="true" className={`pointer-events-none relative block select-none overflow-hidden [&_img]:max-w-none ${className}`}>

@@ -24,7 +24,7 @@ const sortOptions = [
   { value: 'next', label: 'Score to next' },
 ]
 
-/** bestiary-dialog.tsx as a screen: map filter, search, sort with
+/** Bestiary: map filter, search, sort with
  *  direction, Tracktrix bonuses and scores; a monster opens its details. */
 export function BestiaryScreen() {
   const state = useDynamicState()
@@ -40,7 +40,7 @@ export function BestiaryScreen() {
   const [bonusesOpen, setBonusesOpen] = useState(false)
   const [inspecting, setInspecting] = useState<BestiaryMonster | null>(null)
   const [drop, setDrop] = useState<string | null>(null)
-  // party-reference-panels.tsx: a drop opened from a monster's details.
+  // A drop opened from a monster's details.
   const [dropSource, setDropSource] = useState('')
   const maps = [...new Set(monsters.flatMap((monster) => (monster.spawnRecords || []).map((spawn) => spawn.map)))].sort()
   const score = (monster: BestiaryMonster) => Math.max(0, Number(achievements?.[monster.id]?.score) || 0)

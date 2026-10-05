@@ -21,12 +21,12 @@ interface TileDetails {
   npcSaleDetails: string | null
 }
 
-/** inventory-panel.tsx's inventory grid: a collapsible header with the
+/** Inventory grid: a collapsible header with the
  *  occupied/total counter, the merchant's physical 42-slot layout (with the
  *  lucky upgrade slot outlined) or a compact list for everyone else, and
  *  per tile the sprite (or name), operation overlay, +level, stat badge,
  *  quantity, mluck clover and the one item-action banner. A long press
- *  shows what the dashboard's hover tooltip does. */
+ *  shows the tooltip details. */
 export function InventorySection({
   characterName,
   isMerchant,
@@ -54,7 +54,7 @@ export function InventorySection({
   const [details, setDetails] = useState<TileDetails | null>(null)
   const [luckyMenu, setLuckyMenu] = useState<{ slot: number } | null>(null)
 
-  // connected-inventory.tsx: missing inventory is still loading, not an empty bag.
+  // Missing inventory is still loading, not an empty bag.
   if (!loaded)
     return (
       <section aria-label="Inventory" className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">
@@ -78,7 +78,7 @@ export function InventorySection({
   const freeSlots = Math.max(0, totalSlots - occupiedSlots)
   const capacityColor = freeSlots < 5 ? 'text-rose-400' : freeSlots <= 10 ? 'text-orange-400' : 'text-muted-foreground'
   const luckyUpgradeSlot = state.luckyUpgradeSlots[characterName]
-  // connected-inventory.tsx: merge the character's live local stream.
+  // Merge the character's live local stream.
   const localLuckyStream = (localLucky ? normalizeSlotTracking(localLucky) : undefined) as Parameters<typeof aggregateSlotTracking>[1]
   const nextUpgradeSlot = validLuckySlot(luckyUpgradeSlot) ? luckyUpgradeSlot : luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName] ?? {}, localLuckyStream)).nextSlot
   const luckySlotLabel = validLuckySlot(luckyUpgradeSlot) ? 'Verified lucky upgrade slot' : 'Next upgrade will test for lucky upgrade'
@@ -187,7 +187,7 @@ export function InventorySection({
                 testId={`inventory-slot-${i}`}
                 label={itemName}
                 className={`${lucky ? 'overflow-visible' : 'overflow-hidden'} ${banner?.border || 'border-border'}`}
-                // Tap is the dashboard's item menu; on the lucky slot it also offers the lucky slot data.
+                // Tap opens the item menu; on the lucky slot it also offers the lucky slot data.
                 onTap={() => onItemTap(entry, lucky)}
                 onLongPress={tileDetails ? () => setDetails(tileDetails) : undefined}
               >

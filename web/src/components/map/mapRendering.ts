@@ -1,7 +1,7 @@
 import { sanitizeDollHtml } from '@/lib/safeHtml'
 import type { DollLayer, MapDefinition, MapFrame, MapPlacement } from './mapTypes'
 
-// map-render-buffer.ts, verbatim.
+// Console: map-render-buffer.ts, cropped-tile.ts, marker-style.ts, dreams-gate.ts.
 export type MapRenderBuffer = {
   frame: MapFrame | null
   previous: MapFrame | null
@@ -49,7 +49,7 @@ export function visibleTiles(p: PreparedPlacement, left: number, top: number, ri
   }
 }
 
-// map-images.ts / game-image-url.ts: on a debug instance, game images come from its local copy.
+// On a debug instance, game images come from its local copy.
 let debugAssetsBase: string | null = null
 export function setLocalDebugAssets(base: string | null) {
   debugAssetsBase = base
@@ -58,7 +58,6 @@ function gameImageUrl(url: string) {
   if (debugAssetsBase === null || !url.startsWith('https://adventure.land/images/')) return url
   return `${debugAssetsBase}/debug-assets${url.slice('https://adventure.land'.length)}`
 }
-// cached-map-image.tsx.
 const mapImages = new Map<string, HTMLImageElement>()
 export function cachedMapImage(source: string) {
   const url = gameImageUrl(source)
@@ -71,7 +70,6 @@ export function cachedMapImage(source: string) {
   return image
 }
 
-// cropped-tile.ts, verbatim.
 const croppedTileCache = new Map<string, HTMLCanvasElement>()
 export function croppedTile(image: HTMLImageElement, url: string, x: number, y: number, width: number, height: number) {
   const key = `${url}:${x}:${y}:${width}:${height}`
@@ -90,8 +88,8 @@ export function croppedTile(image: HTMLImageElement, url: string, x: number, y: 
   return tile
 }
 
-// doll-layers.tsx, with the markup sanitized first (lib/safeHtml.ts): it can
-// come from any player in view, and innerHTML would run an inline handler.
+// The doll markup is sanitized first (lib/safeHtml.ts): it can come from any
+// player in view, and innerHTML would run an inline handler.
 const dollLayerCache = new Map<string, DollLayer[]>()
 export function dollLayers(html: string) {
   const cached = dollLayerCache.get(html)
@@ -118,7 +116,6 @@ export function dollLayers(html: string) {
   return layers
 }
 
-// runtime/combat/marker-style.ts, verbatim.
 export interface Marker {
   role?: string
   state?: string
@@ -129,7 +126,7 @@ export function markerStyle(marker: Marker, index = 0) {
   return { color: role === 'current' ? 0xef4444 : 0xfacc15, css: role === 'current' ? '#ef4444' : '#facc15', double: role === 'third' }
 }
 
-// dreams-gate.ts, verbatim: the native dreams_gate composite at 120 ms cadence.
+// The native dreams_gate composite at 120 ms cadence.
 export function drawDreamsGate(ctx: CanvasRenderingContext2D, tilesets: Record<string, { file: string }>, now: number) {
   const piece = (sheet: string, sx: number, sy: number, w: number, h: number, x: number, y: number) => {
     const image = cachedMapImage(tilesets[sheet]?.file || '')

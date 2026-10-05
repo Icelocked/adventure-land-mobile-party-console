@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 
-/** gold-target-control.tsx (the merchant's character card): current gold,
- *  the gold target the merchant keeps on hand ("gold-target", saved when the
- *  field loses focus) and "Exchange gold and items with bank" - which saves
- *  the target first, then queues a bank run. Gold otherwise moves only
+/** Merchant only: current gold, the gold target the merchant keeps on hand
+ *  ("gold-target", saved when the field loses focus) and "Exchange gold and
+ *  items with bank", which saves the target first, then queues a bank run. Gold otherwise moves only
  *  during the merchant's normal bank errands. */
 export function GoldTargetSection({ characterName, serverTarget, gold }: { characterName: string; serverTarget: number; gold: number }) {
   const api = usePartyApi()
@@ -29,7 +28,7 @@ export function GoldTargetSection({ characterName, serverTarget, gold }: { chara
     const amount = Number(draft)
     return Number.isSafeInteger(amount) && amount >= 0 ? amount : null
   }
-  // gold-target-control.tsx save(): only a valid amount is sent.
+  // Only a valid amount is sent.
   const save = async () => {
     const amount = parsed()
     if (amount === null) return null

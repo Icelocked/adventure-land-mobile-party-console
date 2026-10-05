@@ -35,7 +35,7 @@ import type { InventoryEntry, Item } from '@/models'
 type Tab = 'wts' | 'wtb' | 'classifieds' | 'ponty'
 const ageLabel = (age: number) => (age < 3600 ? `${age}s` : `${Math.floor(age / 3600)}h`)
 
-/** Inline Yes/Cancel confirmation (the dashboard's confirm dialogs). */
+/** Inline Yes/Cancel confirmation. */
 function Confirm({ title, text, busy, error, onYes, onCancel }: { title: string; text: string; busy: boolean; error?: string | null; onYes: () => void; onCancel: () => void }) {
   return (
     <div role="group" aria-label={title} className="w-full rounded-md border border-cyan-700/60 p-2.5">
@@ -58,7 +58,7 @@ function Confirm({ title, text, busy, error, onYes, onCancel }: { title: string;
   )
 }
 
-/** stand-sheet.tsx's market: ALData/Ponty status, Live WTS / Live WTB /
+/** Market: ALData/Ponty status, Live WTS / Live WTB /
  *  Classifieds / Ponty tabs with counts, one search, the WTS filters (deals,
  *  bad deals, affordable with bank gold, blacklisted), grouped listings with
  *  deal colouring and stale dimming, confirmed buys split across grouped
@@ -86,7 +86,7 @@ export function MarketScreen() {
   const [busy, setBusy] = useState<string | null>(null)
   const [rowError, setRowError] = useState<{ key: string; message: string } | null>(null)
   const [inspecting, setInspecting] = useState<Item | null>(null)
-  // stand-sheet.tsx onInspect's source label for the item-details header.
+  // Source label for the item-details header.
   const [inspectSource, setInspectSource] = useState('')
   const [wtbItem, setWtbItem] = useState<Item | null>(null)
   const [listing, setListing] = useState<{ key: string; entry: InventoryEntry; bankPack?: string; price: number; quantity: number } | null>(null)
@@ -132,7 +132,7 @@ export function MarketScreen() {
     setConfirming(null)
     await refreshNow()
   }
-  // stand-sheet.tsx purchase confirmation: split the quantity across the grouped listings.
+  // Split the purchase quantity across the grouped listings.
   const buyGrouped = async (entry: AlDataListing, quantity: number) => {
     let remaining = quantity
     for (const physical of entry.groupedListings || [entry]) {

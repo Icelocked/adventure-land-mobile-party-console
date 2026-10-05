@@ -10,7 +10,7 @@ const COLORS: Record<string, string> = {
   item: 'text-emerald-400',
 }
 
-/** connected-combat-log.tsx + combat-log.tsx: a collapsed "Combat log" that,
+/** A collapsed "Combat log" that,
  *  while open, keeps the logs domain fresh and lists the last 50 events
  *  (newest first, coloured by type) with Clear history. */
 export function CombatLogSection({ characterName }: { characterName: string }) {

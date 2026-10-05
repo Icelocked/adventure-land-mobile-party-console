@@ -7,7 +7,7 @@ import type { RealmControl } from '@/models'
 const running = (control: RealmControl) => !!control.operation && !['complete', 'failed'].includes(control.operation.phase)
 const labelFor = (control: RealmControl, key?: string | null) => control.realms.find((realm) => realm.key === key)?.label || key || 'Unknown'
 
-/** party-inventory-panels.tsx's Realm panel: where the party actually is
+/** Realm panel: where the party actually is
  *  (or "Mixed realms" with each character's realm), home realm, every realm
  *  with its population (PVP shown but disabled), the "Switch realm?"
  *  confirmation, and a running switch's progress. */

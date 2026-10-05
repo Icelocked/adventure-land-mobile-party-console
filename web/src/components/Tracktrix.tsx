@@ -2,8 +2,7 @@ import { useCharacterDiagnosticsMap } from '@/data/PartyDataProvider'
 
 type TracktrixData = { active?: boolean; bonuses?: Record<string, number> | null }
 
-/** tracktrix-bonuses.tsx SharedTracktrixBonuses: the newest active
- *  character's reported bonuses (diagnostics `tracktrix`). */
+/** The newest active character's reported bonuses (diagnostics `tracktrix`). */
 export function SharedTracktrixBonuses({ names }: { names: string[] }) {
   const diagnostics = useCharacterDiagnosticsMap()
   const data = names
@@ -15,7 +14,6 @@ export function SharedTracktrixBonuses({ names }: { names: string[] }) {
   return <TracktrixBonusList data={data && { ...data, active: true }} title="Current bonuses for holding a tracktrix" theme="rose" />
 }
 
-/** tracktrix-bonuses.tsx TracktrixBonusList. */
 export function TracktrixBonusList({ data, title = 'Current Tracktrix bonuses', theme = 'violet' }: { data?: TracktrixData; title?: string; theme?: 'violet' | 'rose' }) {
   const bonuses = Object.entries(data?.bonuses || {}).filter(([, value]) => Number.isFinite(value) && value !== 0)
   return (

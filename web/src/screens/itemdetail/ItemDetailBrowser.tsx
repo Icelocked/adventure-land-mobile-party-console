@@ -44,12 +44,10 @@ import type {
   Sprite,
 } from '@/models'
 
-/** Mobile take on party-console's "left-click an item" details dialog
- *  (item-details.tsx) - ported from ui/itemdetail/ItemDetailBrowser.kt,
- *  same underlying data (ItemMeta via the merchant catalog), redesigned
- *  as a header + a row of chips for only the sections that apply to THIS
- *  item. Tapping a related item/material/set-piece/exchange result or a
- *  drop's monster drills into ITS details with a back button. */
+/** Item details: a header plus chips for only the sections that apply to
+ *  this item (ItemMeta via the merchant catalog). Tapping a related
+ *  item/material/set-piece/exchange result or a drop's monster drills into
+ *  its details with a back button. */
 type DetailTarget = { kind: 'item'; id: string; level: number } | { kind: 'monster'; id: string }
 
 export function ItemDetailBrowser({
@@ -73,13 +71,13 @@ export function ItemDetailBrowser({
   rootStatType?: string
   rootGift?: boolean
   rootExpires?: unknown
-  // The live instance's meta, merged over the catalog's (use-party-console.tsx detailMeta).
+  // The live instance's meta, merged over the catalog's.
   rootMeta?: ItemMeta | null
-  // item-details.tsx header: whose item and where ("Ranger1 · slot 3").
+  // Header: whose item and where ("Ranger1 · slot 3").
   context?: { character: string; slot: number }
-  // item-details.tsx "Add to stand": only for the merchant's inventory or the bank.
+  // "Add to stand": only for the merchant's inventory or the bank.
   onAddStand?: () => void
-  // item-details.tsx: the exchange catalog's "Add" for the inspected exchange.
+  // The exchange catalog's "Add" for the inspected exchange.
   exchangeAdd?: { enabled: boolean; onAdd: () => void }
   className?: string
 }) {
@@ -155,17 +153,14 @@ function ItemDetailContent({
 }) {
   const catalogItem = useMemo(() => catalog?.allItems.find((item) => item.id === target.id), [catalog, target.id])
   const [previewLevel, setPreviewLevel] = useState(target.level)
-  // This component isn't remounted when navigating to a related item (tapping
-  // a craft material, set-bonus piece, exchange result, etc. - onNavigateItem
-  // just changes `target` in place) - without this reset, previewLevel keeps
-  // whatever value it had for the PREVIOUS item, feeding a wrong stat preview
-  // and NPC sale price into the newly-navigated item. Matches the Kotlin
-  // app's `remember(target.id, target.level)` for the same state.
+  // Navigating to a related item changes `target` in place without a
+  // remount, so previewLevel must reset or the previous item's level would
+  // feed a wrong stat preview and NPC sale price.
   useEffect(() => {
     setPreviewLevel(target.level)
   }, [target.id, target.level])
 
-  // item-details.tsx: the exchange sections follow the preview-level slider.
+  // The exchange sections follow the preview-level slider.
   const exchanges = useMemo(() => exchangeSections(target.id, previewLevel, catalog?.exchangeable ?? []), [catalog, target.id, previewLevel])
 
   const meta = isRoot ? detailMeta(catalogItem?.meta, rootMeta) : (catalogItem?.meta ?? undefined)
@@ -177,7 +172,6 @@ function ItemDetailContent({
   const [comparePicker, setComparePicker] = useState<string | null | false>(false)
   const [comparing, setComparing] = useState<{ character: string; slot?: string } | null>(null)
   const navigate = useNavigate()
-  // stand-capacity.tsx standIsFull.
   const standFull = standIsFull(state.standListings, state.standBids)
   const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
   const comparable = isEquipment(meta?.definition)
@@ -264,7 +258,7 @@ function ItemDetailContent({
                       <span className="font-mono text-[10px] uppercase text-muted-foreground">{characters[name]?.vitals?.ctype}</span>
                     </button>
                   ))}
-                  {/* item-details.tsx "From catalog": this item at the preview level becomes A. */}
+                  {/* "From catalog": this item at the preview level becomes A. */}
                   <button
                     type="button"
                     onClick={() => {
@@ -557,7 +551,7 @@ function IngredientInSection({ usedIn, onNavigateItem }: { usedIn: ItemCraftUse[
 
 const NON_INSPECTABLE_KINDS = new Set(['empty', 'gold', 'shells', 'cx', 'cxbundle'])
 
-/** item-exchange-details.tsx: price, rewards (as reward tiles) and sources. */
+/** Exchange details: price, rewards (as reward tiles) and sources. */
 function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; box: boolean; exchanges: ExchangeSections; onNavigateItem: (id: string, level: number) => void }) {
   return (
     <div className="flex flex-col gap-3">
@@ -640,7 +634,7 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
 }
 
 function DropsSection({ drops, onNavigateMonster }: { drops: ItemDropSource[]; onNavigateMonster: (id: string) => void }) {
-  // item-details.tsx: sort by percentage (default) or name; ties by name.
+  // Sort by percentage (default) or name; ties by name.
   const [dropSort, setDropSort] = useState<'name' | 'percentage'>('percentage')
   const sorted = useMemo(
     () => [...drops].sort((a, b) => (dropSort === 'percentage' ? effectiveDropRate(b) - effectiveDropRate(a) : 0) || a.monsterName.localeCompare(b.monsterName)),

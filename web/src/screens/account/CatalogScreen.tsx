@@ -11,7 +11,7 @@ import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { CatalogComparison } from './CatalogComparison'
 import type { CatalogItem } from '@/models'
 
-// equipment-catalog-dialog.tsx: rows render in bounded batches as the list scrolls.
+// Rows render in bounded batches as the list scrolls.
 const ROW_BATCH = 120
 
 const SORTS = [
@@ -44,8 +44,7 @@ const SORTS = [
 
 const chip = (selected: boolean) => `rounded-full border px-3 py-1 text-xs ${selected ? 'border-cyan-400 bg-cyan-950 text-cyan-100' : 'border-slate-600 text-slate-200'}`
 
-/** equipment-catalog-dialog.tsx + party-equipment-catalog-dialog.tsx as a
- *  screen. Opened with a comparison source (item details' "From catalog"),
+/** Equipment catalog. Opened with a comparison source (item details' "From catalog"),
  *  it collects up to three alternatives and shows the catalog comparison. */
 export function CatalogScreen() {
   const state = useDynamicState()
@@ -65,11 +64,11 @@ export function CatalogScreen() {
   const [inspecting, setInspecting] = useState<CatalogItem | null>(null)
   const [entries, setEntries] = useState<CatalogComparisonEntry[]>(() => (source ? [comparisonEntry(source)] : []))
   const [viewComparison, setViewComparison] = useState(false)
-  // party-equipment-catalog-dialog.tsx: a new comparison source restarts the comparison.
+  // A new comparison source restarts the comparison.
   const [previousSource, setPreviousSource] = useState(source)
   if (previousSource !== source) {
     setPreviousSource(source)
-    // party-item-details.tsx onCompareCatalog: the details close as the comparison starts.
+    // The item details close as the comparison starts.
     setInspecting(null)
     setEntries(source ? [comparisonEntry(source)] : [])
     setViewComparison(false)

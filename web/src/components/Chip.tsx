@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-/** A toggleable pill button - the web equivalent of Material3's
- *  FilterChip, used throughout (formation toggles, item-detail tabs,
- *  stat-scroll picks). */
+/** A toggleable pill button, the web equivalent of Material3's FilterChip. */
 export function Chip({ selected, onClick, children, disabled }: { selected: boolean; onClick: () => void; children: ReactNode; disabled?: boolean }) {
   return (
     <button

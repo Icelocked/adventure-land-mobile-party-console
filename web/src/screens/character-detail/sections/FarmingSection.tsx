@@ -14,9 +14,8 @@ import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
 import type { Catalog } from '@/lib/farmingZones'
 import type { BestiaryMonster, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 
-/** monster-focus-picker.tsx's own trigger-button label, ported verbatim -
- *  shows what's actually selected right now (names, or a count for "all"),
- *  not a static "open this to find out" label. */
+/** Trigger-button label showing the current selection (names, or a count
+ *  for "all"). */
 function focusSummary(monsterFocus: string[], bestiaryCatalog: BestiaryMonster[]): string {
   if (monsterFocus.includes('all')) return 'All monsters'
   if (!monsterFocus.length) return 'No monsters selected'
@@ -30,22 +29,14 @@ const MODES: { id: 'auto' | 'default' | 'scatter' | 'hunt'; label: string; descr
   { id: 'hunt', label: 'Hunt', description: 'One quest at a time: leader first, then the next member if its monster is blacklisted' },
 ]
 
-/** farming-mode-control.tsx ported, scoped down from its full scope:
- *  the mode selector + effective-mode/follow indicator, hunt status, and
- *  this character's own monster focus. Passive/rare hunting rules, the
- *  visual radius-map preview, and Phoenix's 5-region patrol ordering are
- *  NOT ported - all niche/advanced sub-features on top of the core "what
- *  should this character farm" control that this section exists for. Hunt
- *  settings + the blacklist viewer are their own screen (RoutinesScreen-
- *  sized, not an inline card).
+/** The mode selector with effective-mode/follow indicator, hunt status, and
+ *  this character's monster focus. Hunt settings and the blacklist are
+ *  their own screen.
  *
- *  `farmingPolicy`/`monsterHunt`/`huntBlacklist` here are already resolved
- *  (CharacterDetailScreen's resolveFarmingContext call) - /farming-mode
- *  itself takes no `character` field (selecting a mode is always account-
- *  wide), but what's actually EFFECTIVE for a given character can differ
- *  from the raw account-wide fields when they run their own independent
- *  farming setup (not the leader, not following) - see models/state.ts's
- *  resolveFarmingContext. */
+ *  `farmingPolicy`/`monsterHunt`/`huntBlacklist` arrive already resolved
+ *  (models/state.ts resolveFarmingContext): /farming-mode is account-wide
+ *  and takes no `character`, but an independent character (not leader, not
+ *  following) can have a different effective setup. */
 export function FarmingSection({
   characterName,
   farmingPolicy,
@@ -67,7 +58,7 @@ export function FarmingSection({
   showModes = true,
   showFocus: showFocusPicker = true,
 }: {
-  /** connected-character-card.tsx: the mode control is for non-merchant classes,
+  /** The mode control is for non-merchant classes,
    *  the monster focus picker for everyone but the configured merchant. */
   showModes?: boolean
   showFocus?: boolean
@@ -75,13 +66,9 @@ export function FarmingSection({
   farmingPolicy: string
   effectiveMode: string
   followingLeader?: string
-  /** dynamicState.leader === characterName - distinct from `!followingLeader`,
-   *  which is also true for an independent (not leader, not following)
-   *  character. The server's own party-monster-travel command requires
-   *  the REAL leader specifically (confirmed against use-party-console.tsx's
-   *  startFarmingArea: `state.leader === character ? "party-monster-travel"
-   *  : "character-travel"`) - anyone else, including an independent
-   *  character, needs character-travel instead. */
+  /** dynamicState.leader === characterName. Distinct from `!followingLeader`,
+   *  which is also true for an independent character: party-monster-travel
+   *  requires the actual leader; anyone else uses character-travel. */
   isLeader: boolean
   farmArea?: FarmAreaState | null
   monsterFocus: string[]
@@ -105,19 +92,19 @@ export function FarmingSection({
   const diagnostics = useCharacterDiagnosticsMap()
   const characters = useCharacters()
   const inherited = !!followingLeader
-  // connected-character-card.tsx effectiveMode: the live mode, not the saved policy.
+  // The live mode, not the saved policy.
   const liveMode =
     (characters[characterName]?.vitals?.farmingMode as string | undefined) ||
     (diagnostics[characterName] as { farmingMode?: string } | undefined)?.farmingMode ||
     (state as { partyFarmingMode?: string }).partyFarmingMode ||
     'default'
-  // monster-route-button.tsx: only the leader or a non-follower can route.
+  // Only the leader or a non-follower can route.
   const canRoute = canRouteToMonster({ leader: state.leader, followers: state.followers }, characterName)
   const routeDescription = canRoute ? 'Find selected monster' : FOLLOWER_ROUTE_MESSAGE
-  // connected-character-card.tsx: the focus header shows the leader's (effective) radius.
+  // The focus header shows the leader's (effective) radius.
   const effectiveRadius = state.monsterSearchRadiusByCharacter[state.leader || characterName] || 400
   const [showFocus, setShowFocus] = useState(false)
-  // monster-focus-picker.tsx: the route button routes the picker's current (unsaved) selection.
+  // The route button routes the picker's current (unsaved) selection.
   const [focusDraft, setFocusDraft] = useState<string[] | null>(null)
   const routeFocus = showFocus && focusDraft ? focusDraft : monsterFocus
   const [pickingBackup, setPickingBackup] = useState(false)
@@ -127,17 +114,10 @@ export function FarmingSection({
   const configLoaded = useConfigLoaded()
   const [error, setError] = useState<string | null>(null)
 
-  // CharacterDetailScreen's route has no per-character `key`, so switching
-  // characters via the switcher row re-renders this same component instance
-  // rather than remounting it (App.tsx routes /characters/:name to one
-  // element). Without this, MonsterFocusForm's own `selected` state - seeded
-  // once from `monsterFocus` at mount - keeps showing the PREVIOUS
-  // character's focus selection while `characterName` has already moved on;
-  // hitting Save then overwrites the new character's farming focus with the
-  // old one's edited list. Closing the form on switch (matching
-  // RestockSection/GoldTargetSection's dirty-state reset for the same
-  // underlying non-remount issue) forces a fresh mount, seeded correctly,
-  // next time it's reopened.
+  // Switching characters re-renders this instance instead of remounting it
+  // (one route element for /characters/:name), so MonsterFocusForm would keep
+  // the previous character's selection and Save would write it to the new
+  // one. Closing the form on switch forces a freshly seeded mount.
   useEffect(() => {
     setShowFocus(false)
     setFocusDraft(null)
@@ -145,12 +125,8 @@ export function FarmingSection({
     setPickingArea(false)
   }, [characterName])
 
-  // Matches use-party-console.tsx's setFarmingPolicy: try Hunt directly
-  // first (the common case once a backup is already configured - no picker
-  // shown at all), and only open it when the server actually rejects for
-  // missing/invalid backup, not unconditionally on every click.
-  // use-party-console.tsx setFarmingPolicy, verbatim: Hunt needs a backup focus and
-  // location; without both the setup picker opens before anything is posted.
+  // Hunt needs a backup focus and location; without both, the setup picker
+  // opens before anything is posted.
   const selectMode = async (mode: (typeof MODES)[number]['id']) => {
     setError(null)
     const profile = (state.farmingProfiles as Record<string, { monsterFocus?: string[]; farmingPolicy?: string; location?: unknown; monsterHunt?: { returnLocation?: unknown } }> | undefined)?.[characterName]
@@ -183,7 +159,7 @@ export function FarmingSection({
       <LiveCombatStatus target={target} resolvedTargetType={resolvedTargetType} bestiaryCatalog={bestiaryCatalog} />
       {showModes && (
       <>
-      {/* farming-mode-control.tsx badge: "Copy leader" or the saved policy, with the live mode. */}
+      {/* Badge: "Copy leader" or the saved policy, with the live mode. */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase text-muted-foreground">Farming settings</span>
         <span className="rounded border border-cyan-700 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan-400">
@@ -243,9 +219,9 @@ export function FarmingSection({
           bestiaryCatalog={bestiaryCatalog}
           ids={routeFocus.filter((id) => id !== 'all')}
           character={position}
-          // party-workspace.tsx: prefer the character's saved waypoint, else the party's.
+          // Prefer the character's saved waypoint, else the party's.
           waypoint={state.characterLocations?.[characterName] || state.partyLocation}
-          // party-workspace.tsx: the leader's radius when there is one.
+          // The leader's radius when there is one.
           radius={effectiveRadius}
           busy={busy}
           savedPhoenixOrder={phoenixRouteOrder}
@@ -330,7 +306,7 @@ export function FarmingSection({
 }
 
 /** The character's current target ("Fighting X"); the Hunt lines live in
- *  HuntStatusBlock, as in farming-mode-control.tsx. */
+ *  HuntStatusBlock. */
 function LiveCombatStatus({ target, resolvedTargetType, bestiaryCatalog }: { target?: string; resolvedTargetType?: string | null; bestiaryCatalog: BestiaryMonster[] }) {
   const targetMonster = target ? bestiaryCatalog.find((m) => m.id === (resolvedTargetType ?? target)) : undefined
   if (!target) return null
@@ -344,12 +320,11 @@ function LiveCombatStatus({ target, resolvedTargetType, bestiaryCatalog }: { tar
   )
 }
 
-// monster-choice.tsx's MonsterChoice - the server's monsterChoices carry a
+// The server's monsterChoices carry a
 // display name and sprite alongside the spawn geometry farmingZones reads.
 type MonsterChoice = Catalog[number] & { name?: string; sprite?: Sprite | null }
 
-/** monster-focus-picker.tsx + monster-radius-control.tsx's rules in this
- *  screen's form: "All monsters" is its own row (picking a monster drops
+/** Monster focus and radius form: "All monsters" is its own row (picking a monster drops
  *  it), an empty selection is saved as [] (never ['all']), Fairy can't be
  *  picked, and the radius is only sent when changed. */
 function MonsterFocusForm({
@@ -380,7 +355,7 @@ function MonsterFocusForm({
     setSelectedState(next)
     onDraftChange?.(next)
   }
-  // monster-focus-picker.tsx: an untouched draft follows the server's saved focus.
+  // An untouched draft follows the server's saved focus.
   const focusKey = monsterFocus.join(',')
   const [seenFocusKey, setSeenFocusKey] = useState(focusKey)
   if (focusKey !== seenFocusKey) {
@@ -392,7 +367,7 @@ function MonsterFocusForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fairyExplanation, setFairyExplanation] = useState(false)
-  // monster-focus-picker.tsx: per-monster target priority, 0–1000, default 50, higher wins.
+  // Per-monster target priority, 0–1000, default 50, higher wins.
   const [priorityDrafts, setPriorityDrafts] = useState<Record<string, string>>({})
   const priorityOf = (id: string) => priorityDrafts[id] ?? String(priorities[id] ?? 50)
   const prioritiesChanged = Object.keys(priorityDrafts).length > 0
@@ -501,7 +476,7 @@ function MonsterFocusForm({
   )
 }
 
-/** farming-mode-control.tsx's hunt status: shown while Hunt is the effective
+/** Hunt status: shown while Hunt is the effective
  *  policy or a Hunt (party or own) exists - stage and message, the backup
  *  batch countdown per member (or the quest owner), the Daisy turn-in wait,
  *  the target, and this character's own quest with its blacklist flag. */

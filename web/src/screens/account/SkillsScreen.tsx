@@ -9,7 +9,7 @@ import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { SkillEntry } from '@/models'
 import { skillRangeLabel } from '@/lib/skillRange'
 
-/** skills-dialog.tsx as a screen: search across class and skill, a sprite
+/** Skills: search across class and skill, a sprite
  *  grid per class, and the selected skill's full definition in a sheet. */
 export function SkillsScreen() {
   const dynamicState = useDynamicState()

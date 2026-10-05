@@ -12,7 +12,7 @@ import type { Sprite } from '@/models'
 export type MonsterChoiceEntry = { id: string; name?: string; sprite?: Sprite | null; locations?: Catalog[number]['locations'] }
 const nameOf = (monster: MonsterChoiceEntry) => monster.name || monster.id
 
-/** hunt-blacklist-picker.tsx: any monster, searchable, added to this
+/** Any monster, searchable, added to this
  *  character's Hunt blacklist ("Added" once it is). */
 export function HuntBlacklistPicker({ catalog, blacklist, disabled, onAdd, onInspect }: { catalog: MonsterChoiceEntry[]; blacklist: Record<string, unknown>; disabled?: boolean; onAdd: (id: string) => Promise<ApiResult<CommandResult>>; onInspect?: (id: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -83,7 +83,7 @@ export function HuntBlacklistPicker({ catalog, blacklist, disabled, onAdd, onIns
   )
 }
 
-/** hunt-spawn-settings.tsx: for each monster with more than one spawn,
+/** For each monster with more than one spawn,
  *  Automatic (default) or a specific spawn; saved as preferredSpawns. */
 export function HuntSpawnSettings({
   catalog,
@@ -100,7 +100,7 @@ export function HuntSpawnSettings({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState('')
-  // hunt-spawn-settings.tsx: the expanded monster's (or focused spawn's) area on the map.
+  // The expanded monster's (or focused spawn's) area on the map.
   const [preview, setPreview] = useState<Zone | null>(null)
   const monsters = useMemo(
     () =>
@@ -201,7 +201,7 @@ export function HuntSpawnSettings({
   )
 }
 
-/** passive-hunting-menu.tsx: the field-generator toggle and the per-monster
+/** Passive hunting: the field-generator toggle and the per-monster
  *  table (attack on sight, keep moving, max level -1 = any, priority 0–1000). */
 export function PassiveHuntingMenu({
   settings,

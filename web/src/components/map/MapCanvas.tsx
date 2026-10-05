@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import type { MapDefinition, MapFrame } from './mapTypes'
 import { cachedMapImage, croppedTile, dollLayers, drawDreamsGate, drawDue, markerStyle, prepareMap, visibleTiles, type MapRenderBuffer, type PreparedPlacement } from './mapRendering'
 
-/** map-canvas.tsx, verbatim apart from imports: the 2D canvas renderer for
+/** Console: map-canvas.tsx. The 2D canvas renderer for
  *  a map definition plus the buffered live frame (terrain, layered
  *  entities with interpolation, target-queue markers, HP/MP bars, names and
  *  hit/heal floaters when detailed, farming-area overlay and pins). */
