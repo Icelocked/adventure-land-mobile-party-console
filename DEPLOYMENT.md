@@ -1,75 +1,73 @@
-# Connecting your phone to party-console via Tailscale
+# Installing Party Console Companion
 
-The setup this project has actually been built and used against: party-
-console running on your own gaming PC, reached from your phone anywhere
-via [Tailscale](https://tailscale.com). This is the one path documented
-here because it's the one that's actually been run, end to end, not just
-read about - both for the Android app and the PWA.
+This guide gets the companion onto your phone: the Android app, the PWA, or
+both. It assumes party-console already runs on your PC and its dashboard
+works in a browser there. Installing party-console itself is covered by
+[Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console).
 
-This guide does **not** cover installing party-console itself - that's
-[Ryan-Haines/adventureland-party-console](https://github.com/Ryan-Haines/adventureland-party-console)'s
-own job to document, and duplicating it here risks drifting out of sync
-with it. Install and set up party-console on your PC first, following
-its own README, until its web dashboard works normally in a browser on
-that same PC. Then come back here for the "reach it from my phone" part.
+The tested setup is party-console on a home PC, reached from the phone
+through [Tailscale](https://tailscale.com).
 
 ## 1. Install Tailscale on both devices
 
-- On your PC: [download Tailscale](https://tailscale.com/download) and
-  sign in (a free personal account is enough).
-- On your phone: install the Tailscale app from the Play Store/App Store
-  and sign into the **same** account.
+- On your PC: [download Tailscale](https://tailscale.com/download) and sign
+  in (a free personal account is enough).
+- On your phone: install the Tailscale app and sign in to the **same**
+  account.
 
-Both devices now show up in your [Tailscale admin
-console](https://login.tailscale.com/admin/machines) and can reach each
-other directly, wherever they actually are - your phone doesn't need to
-be on the same WiFi as your PC anymore.
+Both devices now reach each other wherever they are, without opening any
+ports on your router.
 
-## 2. Find your PC's Tailscale address
+## 2. Find your PC's Tailscale name
 
-Run `tailscale ip` on your PC (or open the Tailscale app and look at "This
-device") - it's an address starting with `100.`. That's what your phone
-will use instead of your PC's normal LAN address.
+Run `tailscale status` on the PC. Your PC is listed with an address starting
+with `100.` and a MagicDNS name like `desktop-abc123.tailXXXXXX.ts.net`.
+Either works; the name is needed for HTTPS (sections 3c and 5).
 
-## 3a. Android app
+## 3. Android app
 
-On the app's connection screen, enter:
+1. Download `party-console-companion-v1.0.0.apk` (or newer) from the
+   [latest release](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest)
+   and open it. Android asks you to allow installs from your browser or file
+   manager once.
+2. On the connection screen, enter `<your PC's Tailscale address>:3010` and
+   choose **Plain HTTP**: Tailscale already encrypts the connection.
+3. Pair the app: scan the pairing QR code from party-console's dashboard on
+   your PC, or paste the pairing link.
 
-```
-<your-pc's-tailscale-ip>:3010
-```
+If you installed a build older than 1.0.0, uninstall it once first. Those
+builds were signed with a different key, and Android refuses to update
+across signing keys. From 1.0.0 on, every release installs over the last
+one and keeps your server, pairing and notification settings.
 
-(`3010` is party-console's default port - check what port your own setup
-actually uses if you changed it). Choose the **Plain HTTP (Cleartext)**
-trust mode - Tailscale's own tunnel is already encrypted, so there's no
-need for a second layer of TLS on top of it.
+To check a download, compare its signing certificate with
+`apksigner verify --print-certs`. Release key (SHA-256):
+`02:2B:51:59:59:FC:35:EC:63:28:0D:C8:CE:05:4A:6D:2D:35:37:C9:46:03:3B:B9:BD:16:9B:5D:41:9F:2D:28`
 
-## 3b. PWA (self-hosted alongside party-console)
+### Keeping the app up to date
 
-Unlike the Android app, the PWA **can't** just be pointed at
-`<tailscale-ip>:3010` from a publicly-hosted page - party-console's
-coordinator sends no `Access-Control-Allow-Origin` header at all (a
-browser security check with no native-app equivalent), so a page loaded
-from anywhere else is blocked from talking to it. The fix: the PWA is
-served *from* the same place, alongside party-console itself, so it's
-never cross-origin in the first place - `web/Dockerfile` + `web/
-nginx.conf` build exactly that (static files + an nginx proxy for
-`/party-api/*`), verified this session against the real container.
+- **In the app:** Settings → App updates shows your version, checks for new
+  releases every 6 hours (with a notification when one is out) and has
+  **Check now** and **Download and install update**. Android asks you to
+  confirm each install; the first time, it also asks you to allow "Install
+  unknown apps" for this app.
+- **With [Obtainium](https://github.com/ImranR98/Obtainium):** a free app
+  that watches GitHub releases and updates sideloaded apps. Add
+  `https://github.com/Icelocked/adventure-land-mobile-party-console` as a
+  source; it picks up the `.apk` from each release. Turn off the in-app
+  check if you'd rather Obtainium do it.
 
-Add it as a second service in the **same `compose.yaml`** you already
-run party-console from (the service name `party-console` in the proxy
-config below must match whatever your `services:` block actually calls
-it - `party-console` is what this project's own local install uses).
+## 4. PWA (self-hosted next to party-console)
 
-**This is pinned to a specific version by default, on purpose** - nothing
-about your setup changes until *you* decide to update, by changing one
-line and rebuilding. Add a `.env` file next to your `compose.yaml`:
+The PWA runs in its own container next to party-console, so the browser
+talks to one origin: it serves the app and forwards `/party-api/*` to the
+console. (party-console sends no CORS headers, so a PWA hosted anywhere else
+can't reach it.)
 
-```
-PWA_VERSION=v0.2.0
-```
+### 4a. Add the service
 
-and reference it in the service itself:
+Add these services to the **same `compose.yaml`** that runs party-console.
+The proxy expects the console's service to be called `party-console`.
 
 ```yaml
 services:
@@ -77,177 +75,149 @@ services:
     # ... your existing party-console service, unchanged ...
 
   party-console-pwa:
-    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
+    image: ghcr.io/icelocked/party-console-pwa:${PWA_VERSION:-latest}
     ports:
-      - "127.0.0.1:8080:80"   # this machine only; Tailscale forwards to it (below)
+      - "127.0.0.1:8080:80"     # this machine only; Tailscale forwards to it
+    volumes:
+      - pwa-notifier:/data/notifier
+      - pwa-updates:/data/updates
     restart: unless-stopped
-    logging:                 # cap container logs, like party-console's own compose
+    logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Optional: installs PWA updates from Settings (section 4d).
+  party-console-pwa-updater:
+    image: ghcr.io/icelocked/party-console-pwa:${PWA_VERSION:-latest}
+    command: ["node", "/opt/updater/agent.mjs"]
+    user: root
+    volumes:
+      - pwa-updates:/data/updates
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"
+
+volumes:
+  pwa-notifier:
+  pwa-updates:
 ```
 
 ```bash
-docker compose up -d party-console-pwa
+docker compose up -d party-console-pwa party-console-pwa-updater
 ```
 
-Then let Tailscale forward your tailnet address to it. Don't bind the
-container to the `100.x` Tailscale IP directly: if Tailscale isn't up yet
-when Docker starts (after a reboot, say), Docker can't bind that address
-and the container stays down. Tailscale's own forwarding starts whenever
-Tailscale does and is saved across restarts:
+To stay on one version, add `PWA_VERSION=1.0.0` to the `.env` next to your
+`compose.yaml` and leave out the updater service.
+
+### 4b. Reach it from your phone
+
+Let Tailscale forward your tailnet address to the container:
 
 ```bash
 tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080
 ```
 
-Do the same for party-console's port if you reach it directly (the
-Android app does): bind it to `127.0.0.1:3010` and run
+Don't bind the container to the `100.x` address directly: if Tailscale
+starts after Docker (after a reboot, say), Docker can't bind it and the
+container stays down. `tailscale serve` is saved across restarts.
+
+If the Android app reaches party-console directly, do the same for its port:
+bind it to `127.0.0.1:3010` and run
 `tailscale serve --bg --tcp 3010 tcp://127.0.0.1:3010`.
 
-**To update later:** check the [Releases page](https://github.com/Icelocked/adventure-land-mobile-party-console/releases)
-for the newest tag, bump `PWA_VERSION` in `.env` to match, then:
+On the phone, open `http://<your PC's Tailscale address>:8080/` and use the
+browser's **Add to Home Screen**.
 
-```bash
-docker compose build --pull party-console-pwa
-docker compose up -d --force-recreate party-console-pwa
-```
+- **iPhone:** this is a fully working home-screen app.
+- **Android:** Chrome only offers a real "Install app" over HTTPS. Over
+  plain HTTP you get a shortcut that opens a browser tab. Section 4c fixes
+  that.
 
-If you'd rather always build whatever's newest on `main` instead of a
-specific tag (accepting that "newest" can occasionally mean "not yet
-released"), set `PWA_VERSION=main` instead - same rebuild command applies
-whenever you want to pick up new commits, since Compose doesn't do this
-on its own. See section 3d below if you'd like that check to happen
-automatically instead of by hand.
+### 4c. Optional: HTTPS
 
-Then on your phone, open `http://<your-pc's-tailscale-ip>:8080/` in the
-browser and use its "Add to Home Screen" (Chrome/Safari) - no address to
-type into the app itself, since it's already talking to the party-
-console instance it's deployed next to.
+Notifications (section 5) and Chrome's "Install app" need HTTPS with a
+trusted certificate. The simplest way is Tailscale's own:
 
-**This gets you a fully working PWA on iPhone.** Safari's "Add to Home
-Screen" never required HTTPS or a service worker - just the manifest and
-icons, which this setup already serves correctly. **On Android, though,
-it's a smaller win than it could be:** Chrome only offers its full
-"Install app" experience (a real standalone window, not just a bookmark)
-to pages served over HTTPS with a registered service worker - and plain
-`http://<tailscale-ip>` doesn't qualify (browsers only treat `localhost`
-as a secure context, not Tailscale's `100.x` addresses). Without it,
-Chrome falls back to "Create shortcut," which just opens the site in an
-ordinary browser tab. The next section fixes that.
+1. In the [Tailscale admin console → DNS](https://login.tailscale.com/admin/dns),
+   turn on **HTTPS Certificates**.
+2. Run `tailscale serve --bg 8080` on the PC.
+3. Open `https://<machine>.<tailnet>.ts.net` on the phone.
 
-## 3c. Optional: real HTTPS for full Android installability
+The site stays private to your tailnet. Tailscale renews the certificate
+itself.
 
-Tailscale can issue actual, browser-trusted TLS certificates for your
-tailnet's own MagicDNS name (`<machine>.<tailnet>.ts.net`) via `tailscale
-cert` - still never exposed publicly (only reachable over Tailscale), but
-genuine HTTPS, which is what unlocks Chrome's real "Install app" flow on
-Android. `web/Dockerfile` already ships support for this: it's inert by
-default (nothing changes unless you opt in) and activates automatically
-the moment a cert is mounted at the right path - verified this session by
-building the image and confirming both cases (no cert mounted → still
-plain HTTP-only on :80 exactly as before; cert mounted → :443 comes up
-serving the identical app over real TLS, `/party-api/*` proxying included).
-
-**One-time: enable HTTPS Certificates for your tailnet.** In the
-[Tailscale admin console → DNS](https://login.tailscale.com/admin/dns),
-turn on "HTTPS Certificates" (off by default). This is an account setting
-you have to do yourself in the admin console - nothing here can do it for
-you.
-
-**Find your machine's MagicDNS name** with `tailscale status` (look for
-your own device's `DNSName`, e.g. `desktop-abc123.tailXXXXXX.ts.net`).
-
-**Issue the certificate**, on the same machine that runs party-console:
-
-```bash
-tailscale cert --cert-file=tailscale.crt --key-file=tailscale.key desktop-abc123.tailXXXXXX.ts.net
-```
-
-This writes `tailscale.crt`/`tailscale.key` into your current directory -
-put them somewhere durable, e.g. `C:\tailscale-certs\`. **They expire
-(~90 days)** - re-run the same command periodically to renew (it's
-idempotent, same filenames), then recreate the container so it picks up
-the new files.
-
-**Mount them into the PWA container and publish 443**, alongside the
-existing service from section 3b:
+Alternatively, mount a certificate into the container: create one with
+`tailscale cert --cert-file=tailscale.crt --key-file=tailscale.key <MagicDNS name>`,
+then mount its folder and publish 443:
 
 ```yaml
   party-console-pwa:
-    build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#${PWA_VERSION}:web
     ports:
       - "127.0.0.1:8080:80"
-      - "127.0.0.1:8443:443"   # forward it too: tailscale serve --bg --tcp 8443 tcp://127.0.0.1:8443
+      - "127.0.0.1:8443:443"    # tailscale serve --bg --tcp 8443 tcp://127.0.0.1:8443
     volumes:
-      - "C:/tailscale-certs:/etc/nginx/tailscale-certs:ro"   # replace with wherever you put the cert files (forward slashes even on Windows - YAML treats backslash as an escape character)
-    restart: unless-stopped
+      - "C:/tailscale-certs:/etc/nginx/tailscale-certs:ro"   # forward slashes, even on Windows
 ```
+
+The container turns on HTTPS when it finds the certificate. These
+certificates expire after about 90 days: re-run `tailscale cert` and restart
+the container to renew.
+
+### 4d. Updates
+
+Settings → **Party Console PWA** shows the installed version and checks
+GitHub for new releases every 6 hours. **Check now** checks immediately; it
+also reloads the app on this device when the server has a newer build.
+
+With the updater service from 4a running:
+
+- **Download and install update** installs the new release now.
+- **Automatically download and install new versions when available**
+  installs each release once the 6-hour check finds it.
+
+The updater pulls the release image, replaces the PWA container with the
+same settings, volumes and network, and checks that the new version starts.
+If it doesn't, it puts the previous version back and shows the error in
+Settings. The app reconnects by itself and then offers **Reload to update**.
+
+About the updater's access: it mounts the Docker socket, which gives it full
+control of Docker on this machine (party-console's own updater works the
+same way). It has no network port. It acts only on a request file in its
+volume, and the only request it accepts is "install the latest release",
+whose version it looks up on GitHub itself. The PWA can only set that
+request, and only for paired browsers. If you'd rather not give any
+container that access, leave the updater out and update by hand:
 
 ```bash
-docker compose up -d --force-recreate party-console-pwa
+docker compose pull party-console-pwa
+docker compose up -d party-console-pwa
 ```
 
-Then, **from your phone, open `https://<the-MagicDNS-name>:8443/`** -
-using the MagicDNS name, not the raw `100.x` IP, since the certificate is
-issued for that name specifically and a browser will warn if you use the
-IP instead. Chrome should now offer a real "Install app" prompt, not just
-"Create shortcut."
+Without the updater, Settings still tells you when a release is out.
 
-## 3d. Optional: automatic updates
+**Building from source instead:** replace the `image:` line with
+`build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#v1.0.0:web`.
+A local build has no version, so Settings only shows update notices; update
+it the way you built it (`docker compose build --pull party-console-pwa`).
 
-By default (3b/3c above), your PWA container is **pinned** to whatever
-`PWA_VERSION` you set - it will run that exact version forever until you
-manually bump it and rebuild. That's deliberate: nobody's code should
-change on your machine without you choosing it.
+## 5. Phone notifications
 
-If you'd rather not think about it and just always run the latest
-release, [`scripts/update-pwa.sh`](scripts/update-pwa.sh) automates the
-"check for a new release, bump `PWA_VERSION`, rebuild, restart" steps from
-the previous section. It only touches anything if a newer release
-actually exists - run it any time to check by hand:
+**Android app:** nothing to set up on the server. Open Settings →
+Notifications, pick the alerts and tap **Enable notifications on this
+device** (Android 13+ asks for permission first). The app checks about every
+15 minutes in the background (Android's shortest interval), or every 15
+seconds with **Live alerts** on, which keeps an ongoing notification while
+it runs. The phone needs to reach the console when it checks (Tailscale on).
 
-```bash
-curl -fsSLo update-pwa.sh https://raw.githubusercontent.com/Icelocked/adventure-land-mobile-party-console/main/scripts/update-pwa.sh
-chmod +x update-pwa.sh
-./update-pwa.sh
-```
-
-(run it from the same directory as your `compose.yaml`/`.env`, same as
-the manual update commands above)
-
-**To have that check happen on its own**, schedule it - entirely your
-call, and easy to undo (just remove the scheduled entry; your `.env`
-stays pinned to whatever version it last updated to):
-
-- **Linux/macOS (cron)** - `crontab -e`, add a line to check daily at 3am:
-  ```
-  0 3 * * * cd /path/to/your/compose/dir && ./update-pwa.sh >> update-pwa.log 2>&1
-  ```
-- **Windows (Task Scheduler)** - create a daily task running:
-  ```
-  bash.exe -c "cd /path/to/your/compose/dir && ./update-pwa.sh >> update-pwa.log 2>&1"
-  ```
-  (`bash.exe` from Git for Windows or WSL - whichever you already have;
-  Docker Desktop itself doesn't ship one)
-
-## 3e. Phone notifications (Android and iOS)
-
-**Android app:** no setup on the server. The app checks your
-party-console itself: open Settings → Notifications, pick the alerts and
-tap "Enable notifications on this device" (Android 13+ asks for permission
-first). It checks about every 15 minutes in the background (Android's
-shortest interval), or every 15 seconds with **Live alerts** on, which
-keeps an ongoing notification while it runs. The alerts, limits, rare-drop
-rule, quiet hours and muted characters are the same as below, stored on
-the phone. The phone needs a path to the console when it checks
-(Tailscale on).
-
-**PWA:** the PWA container also runs a small push notifier (`web/notifier`). It
-watches your party-console the same way a paired browser does and sends
-Web Push to phones that enabled notifications. Each phone picks which
-alerts it wants:
+**PWA:** the PWA container runs a small push notifier. It watches
+party-console the way a paired browser does and sends Web Push to phones
+that enabled notifications. Each phone picks which alerts it wants:
 
 | Group | Alert | When |
 |---|---|---|
@@ -264,83 +234,59 @@ alerts it wants:
 | Trading and mail | Sales and orders filled | Stand sales, WTB fills, Ponty and ALData purchases |
 | | New mail | A new message arrives |
 
-The limits and the rare-drop rule are shared by every phone and are
-changed in Settings → Notifications next to each alert. Each phone also
-has its own quiet hours (Character health alerts still arrive) and can
-mute individual characters.
+The limits and the rare-drop rule are shared by every phone and are set in
+Settings → Notifications next to each alert. Each phone also has its own
+quiet hours (Character health alerts still arrive) and can mute individual
+characters. The Android app has the same alerts, stored on the phone.
 
-Requirements:
+Requirements for the PWA:
 
-- **HTTPS with a trusted certificate.** Android and iOS only allow push for
-  pages opened over HTTPS with a trusted certificate. Plain `http://`
-  addresses and self-signed certificates never work. Notifications are
-  delivered by Google's (Android) and Apple's (iOS) push services, not
-  through your server, so any of these options gets them to the phone
-  anywhere, on mobile data and with Tailscale off:
-  1. **Tailscale Serve (recommended).** Private to your tailnet. In the
-     Tailscale admin console, open DNS and enable "HTTPS Certificates".
-     Then run `tailscale serve --bg 8080` on the PC and open the app at
-     `https://<machine>.<tailnet>.ts.net`. Tapping a notification opens the
-     app, which needs Tailscale connected.
-  2. **Tailscale Funnel.** Same address, also reachable without Tailscale
-     (from any network, e.g. a work network that blocks Tailscale):
-     `tailscale funnel --bg 8080`. The app is then on the public internet:
-     - Keep "Require secure pairing" on in Settings. Every console
-       request then needs this browser's pairing cookie (a random 256-bit
-       token); without it nothing but the sign-in pages is served.
-     - Expose only the PWA (port 8080) through Funnel, never
-       party-console's own port 3010.
-     - Invitation links work until used: create one only when you are
-       about to pair a device, and don't share it.
-     - The PWA container is built for this: rate limits per visitor,
-       security headers (no framing, HTTPS-only once on HTTPS), relative
-       redirects, sanitized game markup, and a notifier that accepts only
-       same-site requests from paired browsers.
-  3. **The Tailscale certificate inside the PWA container** (section 3c).
-  4. **Your own domain** behind a reverse proxy with a real certificate
-     (Caddy or nginx with Let's Encrypt, or a Cloudflare Tunnel).
+- **HTTPS with a trusted certificate** (section 4c). Phones only allow push
+  for HTTPS pages with a trusted certificate. Notifications travel through
+  Google's (Android) or Apple's (iOS) push service, so they reach the phone
+  anywhere, even with Tailscale off. Tapping one opens the app, which then
+  needs Tailscale (unless you use Funnel, below).
+- **The `pwa-notifier` volume** from 4a, so its keys and subscriptions
+  survive updates.
+- **iOS 16.4 or later.** Add the app to the Home Screen and open it from
+  there before enabling notifications.
 
-  Without HTTPS the app still works, but Settings → Notifications explains
-  that push needs HTTPS and the notifier stays idle.
-- **A volume for the notifier's data.** Mount one at `/data/notifier` so
-  its keys and subscriptions survive rebuilds:
+Turn them on in Settings → Notifications on each phone. The notifier reads
+the console with that browser's pairing. If the pairing stops working, it
+sends one "Notifications paused" message; enable notifications again to
+reconnect.
 
-  ```yaml
-  party-console-pwa:
-    volumes:
-      - pwa-notifier:/data/notifier
-  volumes:
-    pwa-notifier:
-  ```
-- **iOS 16.4 or later.** Add the app to the Home Screen
-  (Share → Add to Home Screen) and open it from there before enabling.
-- **Android.** Chrome works installed or not.
+Optional environment variables for `party-console-pwa`:
 
-To turn notifications on, open Settings → Notifications on each phone,
-choose the alerts and tap "Enable notifications on this device".
-The notifier uses that browser's pairing to read the console. If the
-pairing stops working, it sends one "Notifications paused" message; enable
-notifications again to reconnect.
-
-Optional environment variables:
-
-- `CONSOLE_URL`: where to reach party-console. Default
-  `http://party-console:3010`.
+- `CONSOLE_URL`: where to reach party-console. Default `http://party-console:3010`.
 - `POLL_MS`: how often the notifier checks the console. Default 15000.
 
-Each alert that is sent is logged (`docker logs party-console-pwa`).
+Each alert sent is logged (`docker compose logs party-console-pwa`).
+
+## 6. Reaching the PWA without Tailscale (Funnel)
+
+Some networks (a work network, for example) block Tailscale. **Tailscale
+Funnel** publishes the PWA at the same `https://<machine>.<tailnet>.ts.net`
+address on the public internet: `tailscale funnel --bg 8080`.
+
+The PWA is built for this, but take it seriously:
+
+- Keep **Require secure pairing** on in Settings. Every console request then
+  needs this browser's pairing cookie (a random 256-bit token); without it,
+  nothing but the sign-in pages is served.
+- Funnel only the PWA (port 8080), never party-console's own port 3010.
+- Create an invitation link only when you're about to pair a device, and
+  don't share it: it works until it's used.
+- The container rate-limits each visitor, sends security headers (no
+  framing, HTTPS-only once on HTTPS), cleans game markup before showing it,
+  and its notifier and updater endpoints accept only same-site requests from
+  paired browsers.
 
 ## Why not a domain or a public IP?
 
-Those are real options in general (any self-hosted app can be put behind
-a domain+reverse-proxy, or exposed on a raw port), and the Android app's
-connection screen supports them (see the README's "Connection security
-model"). They're just not documented step-by-step here, because doing so
-correctly - the right reverse-proxy config, the right firewall rules, an
-actual authentication layer in front of an API that has none of its own -
-is real, easy-to-get-subtly-wrong work that hasn't actually been done and
-verified for this project. Tailscale sidesteps all of it: nothing is ever
-publicly reachable, so there's no exposure to get wrong.
-
-If you set one of those paths up yourself and want to contribute a
-verified, tested guide for it, a PR is welcome.
+Both are possible, and the Android app's connection screen supports a real
+domain with HTTPS or a pinned self-signed certificate (see the README's
+"Connection security"). They aren't documented step by step because doing
+them correctly (reverse-proxy config, firewall rules, certificates) hasn't
+been set up and tested for this project. Tailscale avoids all of it. A
+tested guide for another setup is a welcome PR.
