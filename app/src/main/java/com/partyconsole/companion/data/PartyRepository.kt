@@ -82,6 +82,10 @@ class PartyRepository(
     private val httpClient = buildHttpClient(settings)
     private val sseClient = buildSseHttpClient(settings)
     val api = PartyApiClient(httpClient, settings) { path, body -> onAction(path, body) }
+    /** Per-character live map frames (useMapFrames.ts). */
+    val mapStreams = com.partyconsole.companion.network.MapStreams(sseClient, settings.apiBase)
+    /** core's referenceRevision ("0" before the first core read) - keys map definitions. */
+    val referenceRevision: String get() = lastReferenceRevision ?: "0"
 
     private val _characters = MutableStateFlow<Map<String, CharacterState>>(emptyMap())
     val characters: StateFlow<Map<String, CharacterState>> = _characters.asStateFlow()

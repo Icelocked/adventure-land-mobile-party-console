@@ -115,6 +115,7 @@ fun CharacterDetailScreen(
         // The configured merchant, never the class (bankbois are merchants too).
         val isMerchant = characterName == dynamicState.merchantCharacter
         val farming = dynamicState.farmingContext(characterName)
+        val resolvedTargetType = com.partyconsole.companion.ui.map.rememberTargetMonsterType(viewModel, characterName, vitals.targetId)
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
@@ -123,8 +124,7 @@ fun CharacterDetailScreen(
                 vitals = vitals,
                 accountGold = accountGold,
                 bestiaryCatalog = dynamicState.bestiaryCatalog,
-                // The live target's monster type comes from the map stream (A11).
-                resolvedTargetType = null,
+                resolvedTargetType = resolvedTargetType,
                 diagnostics = diagnostics[characterName],
                 slots = state.inventory?.slots.orEmpty(),
                 online = diagnostics[characterName]?.online(now) == true,
@@ -132,6 +132,8 @@ fun CharacterDetailScreen(
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
             ) {
+                // connected-character-card.tsx: the live map sits under the card header.
+                com.partyconsole.companion.ui.characterdetail.sections.MapSection(viewModel, characterName, vitals.map, vitals.x, vitals.y)
                 // connected-character-card.tsx: statuses sit under HP/MP for every class.
                 StatusesSection(characterName, vitals.conditions)
                 LeaderFollowerSection(characterName, dynamicState, viewModel, onOpenAnniversary = { onNavigate(Routes.ANNIVERSARY) })
@@ -157,7 +159,7 @@ fun CharacterDetailScreen(
                         phoenixRouteOrder = dynamicState.phoenixRouteOrder,
                         position = com.partyconsole.companion.model.MapLocation(vitals.map, vitals.x, vitals.y),
                         target = vitals.targetId,
-                        resolvedTargetType = null,
+                        resolvedTargetType = resolvedTargetType,
                         monsterHunt = farming.hunt,
                         characterHunt = dynamicState.characterHunt[characterName],
                         huntBlacklist = farming.blacklist,

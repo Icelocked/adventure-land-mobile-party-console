@@ -357,7 +357,7 @@ and a 411x891dp phone.
 - Not here: Web Push notifications and the PWA's own app-update button
   (A11 decides the APK's notifications; the APK updates through releases).
 
-### A11 status: notifications done, native map next
+### A11 status: done
 
 - Notifications by polling (no push server, no FCM): `notify/Detect.kt` is
   the PWA notifier's detect.mjs ported verbatim (stuck/offline, no actions,
@@ -379,8 +379,28 @@ and a 411x891dp phone.
 - Unverified on a device: Robolectric covers the detection, a polling run
   against the fake console, and the settings section.
 
-Next: A11 native map (C6 live map, Cave floor map, farming-area preview,
-the live target's monster type).
+- Native map (`ui/map/`): map-canvas.tsx's renderer ported to an Android
+  Canvas - terrain and default-tile background (water past the world's
+  edges), y-sorted groups, decorations (the dreams gate), entities with
+  interpolation, doll layers, sprites with walk frames, weapons and stands,
+  target-queue markers, HP/MP bars, names and hit/heal floaters when
+  detailed, the farming-area overlay and labelled pins. Definitions are
+  fetched per reference revision (one retry for transient failures);
+  `network/MapStreams.kt` shares one map stream per character between
+  subscribers (a late one starts from the latest frame) and reconnects
+  like EventSource. Debug instances load images from their local copy.
+- C6: the collapsible live map under the character header (20 fps while
+  open and visible, freshness badge, native-size full-screen view); caves
+  take their definition from the stream.
+- The live target's monster type now resolves from the map stream (vitals
+  activity line and the farming section's live status).
+- The farming-area picker shows the area preview and "Enlarge map"; the
+  Cave panel has "View full map" (party, room and waypoint pins, fit /
+  native size, tap to place and set a waypoint).
+- Unverified on a device; Robolectric covers the renderer's pixels (native
+  graphics), decoding, the streams and the three screens.
+
+Next: release.
 
 ### Packages
 

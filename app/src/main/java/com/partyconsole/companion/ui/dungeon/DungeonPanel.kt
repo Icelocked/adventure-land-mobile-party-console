@@ -50,8 +50,8 @@ import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
 import kotlinx.coroutines.launch
 
-private val PanelBackground = Color(0xFF101C1A)
-private val Emerald50 = Color(0xFFECFDF5)
+internal val PanelBackground = Color(0xFF101C1A)
+internal val Emerald50 = Color(0xFFECFDF5)
 private val Red = Color(0xFFEF4444)
 private val Green = Color(0xFF22C55E)
 private val Orange = Color(0xFFF97316)
@@ -71,7 +71,7 @@ private val RECOVERY_LABELS = mapOf(
 )
 
 @Composable
-private fun DungeonButton(label: String, enabled: Boolean = true, border: Color = Color(0xFF64748B), modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun DungeonButton(label: String, enabled: Boolean = true, border: Color = Color(0xFF64748B), modifier: Modifier = Modifier, onClick: () -> Unit) {
     OutlinedButton(enabled = enabled, onClick = onClick, border = BorderStroke(if (border == Color(0xFF64748B)) 1.dp else 2.dp, border), modifier = modifier) {
         Text(label, color = Emerald50)
     }
@@ -81,8 +81,8 @@ private fun DungeonButton(label: String, enabled: Boolean = true, border: Color 
  *  run controls at the top of the party screen while a visit is underway -
  *  exit with confirmation, retry / recover, floor, timer, funds, members,
  *  automatic exploration, priest recovery and "Call Nera", room moves, the
- *  encounter vote (paid votes confirmed) and the cave shop. The full floor
- *  map comes with the native map (A11). */
+ *  encounter vote (paid votes confirmed), the cave shop and the full
+ *  floor map (CaveMap.kt). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DungeonPanel(viewModel: PartyViewModel) {
@@ -156,6 +156,9 @@ fun DungeonPanel(viewModel: PartyViewModel) {
             style = MaterialTheme.typography.bodySmall,
         )
         Text(current.members.joinToString(" · ") { it.name + if (it.fresh) "" else " — awaiting connection" }, color = Slate300, style = MaterialTheme.typography.bodySmall)
+        if (cave != null) androidx.compose.runtime.key(cave.run + ":" + cave.floor) {
+            CaveMap(viewModel, current.state.participants, cave, actionError) { body -> query.action(mapOf("run" to cave.run) + body) }
+        }
         if (current.state.phase == "active") {
             Text(current.state.progress?.message ?: "Continue through the cave toward the next floor.", color = Color(0xFFE2E8F0), style = MaterialTheme.typography.bodySmall)
             DungeonButton(if (travelling) "Stop travel" else "Start automatic exploration", enabled = !busy && cave?.paused != true) { action("action" to "progress", "enabled" to !travelling) }

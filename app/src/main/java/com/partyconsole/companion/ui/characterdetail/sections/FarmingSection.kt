@@ -211,6 +211,7 @@ fun FarmingSection(
 
         if (pickingBackup) {
             FarmingAreaPicker(
+                viewModel = viewModel,
                 catalog = monsterChoices,
                 bestiaryCatalog = bestiaryCatalog,
                 ids = backupFocus,
@@ -239,6 +240,7 @@ fun FarmingSection(
         if (pickingArea) {
             val ids = routeFocus.filter { it != "all" }
             FarmingAreaPicker(
+                viewModel = viewModel,
                 catalog = monsterChoices,
                 bestiaryCatalog = bestiaryCatalog,
                 ids = ids,
