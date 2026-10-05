@@ -128,6 +128,9 @@ data class BestiaryMonster(
     val attack: Long = 0,
     val xp: Long = 0,
     val threat: Double = 0.0,
+    // bestiary-monster.ts: attack range and the raw G.monsters definition.
+    val range: Double? = null,
+    val definition: kotlinx.serialization.json.JsonObject? = null,
     val sprite: Sprite? = null,
     val drops: List<BestiaryDrop> = emptyList(),
     val spawnRecords: List<MonsterSpawnRecord> = emptyList(),
@@ -141,24 +144,13 @@ data class SkillClass(
     val skills: List<SkillEntry> = emptyList(),
 )
 
-/** Only the human-readable fields this app's Skills screen shows - the
- *  real `definition` object varies a lot per skill (buffs/summons/etc
- *  carry very different fields), these are the ones common enough to be
- *  worth a fixed field each. */
-@Serializable
-data class SkillDefinition(
-    val explanation: String? = null,
-    val range: Double? = null,
-    val mp: Int? = null,
-    val cooldown: Long? = null,
-    val level: Int? = null,
-)
-
 @Serializable
 data class SkillEntry(
     val id: String,
     val name: String,
-    val definition: SkillDefinition? = null,
+    val sprite: Sprite? = null,
+    // skill-entry.ts: the full G.skills definition.
+    val definition: kotlinx.serialization.json.JsonObject? = null,
 )
 
 /** One activity-feed line (merchant-activity or combat log) - shared shape

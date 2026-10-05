@@ -5,6 +5,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -124,6 +126,7 @@ fun AppNavigation(store: ServerConfigStore) {
                 return@composable
             }
             val viewModel: PartyViewModel = viewModel(factory = PartyViewModelFactory(active))
+            LaunchedEffect(viewModel) { viewModel.navigationRequests.collect { route -> navController.navigate(route) } }
             CharacterListScreen(
                 viewModel = viewModel,
                 onSelectCharacter = { name -> navController.navigate(Routes.characterDetail(name)) },
@@ -165,7 +168,9 @@ fun AppNavigation(store: ServerConfigStore) {
             val active = settings ?: return@composable
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
-            MailScreen(viewModel, onBack = { navController.popBackStack() })
+            // ALData's "Prepare mail" hands its draft over once.
+            val draft = remember { viewModel.mailDraft.value.also { viewModel.mailDraft.value = null } }
+            MailScreen(viewModel, onBack = { navController.popBackStack() }, initialDraft = draft)
         }
         composable(Routes.ACCOUNT_CATALOG) { backStackEntry ->
             val active = settings ?: return@composable
@@ -231,7 +236,14 @@ fun AppNavigation(store: ServerConfigStore) {
             val active = settings ?: return@composable
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
-            SettingsScreen(viewModel, onBack = { navController.popBackStack() })
+            val scope = rememberCoroutineScope()
+            SettingsScreen(
+                viewModel,
+                onBack = { navController.popBackStack() },
+                onOpenMail = { navController.navigate(Routes.ACCOUNT_MAIL) },
+                // Forgetting the server sends the party screen back to the connection screen.
+                onChangeServer = { scope.launch { store.clear() } },
+            )
         }
         composable(
             Routes.MERCHANT_COMMERCE,

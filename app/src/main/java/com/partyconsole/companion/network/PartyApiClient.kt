@@ -133,6 +133,9 @@ class PartyApiClient(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** The console's own address (setup and debug links open from it). */
+    val baseUrl: String get() = settings.baseUrl
+
     /** GET against the party-api base - used for one-shot reads like
      *  /party-api/state (roster, merchant queue) that don't belong on the
      *  SSE stream (live-protocol.ts's LiveRecord is vitals/items/slots
@@ -223,6 +226,54 @@ class PartyApiClient(
             ApiResult.Failure(e.message ?: "network error")
         }
     }
+
+    /** A party-api request whose failures keep the server's {error} text or
+     *  raw body (partyApi.ts textWithError); POSTs acknowledge with a toast. */
+    private suspend fun textWithError(method: String, path: String, body: String? = null, headers: Map<String, String> = emptyMap()): ApiResult<String> {
+        val toast = if (method == "POST") ActionToasts.begin() else null
+        val result = withContext(Dispatchers.IO) {
+            val builder = Request.Builder().url(settings.apiBase.trimEnd('/') + "/" + path.trimStart('/'))
+            headers.forEach { (name, value) -> builder.header(name, value) }
+            if (method == "POST") builder.post((body ?: "").toRequestBody((headers["Content-Type"] ?: "text/plain;charset=UTF-8").toMediaType())) else builder.get()
+            try {
+                client.newBuilder().readTimeout(if (method == "POST") 120 else 30, TimeUnit.SECONDS).build().newCall(builder.build()).execute().use { response ->
+                    val text = response.body?.string().orEmpty()
+                    when {
+                        sessionLost(response.code) -> ApiResult.Failure(SESSION_EXPIRED, "session_expired", response.code)
+                        response.isSuccessful -> ApiResult.Success(text)
+                        else -> {
+                            val message = runCatching { (json.parseToJsonElement(text) as? JsonObject)?.get("error")?.let { (it as JsonPrimitive).content } }.getOrNull() ?: text
+                            ApiResult.Failure(message.ifEmpty { "HTTP ${response.code} ${response.message}".trim() }, status = response.code)
+                        }
+                    }
+                }
+            } catch (e: java.io.IOException) {
+                ApiResult.Failure(e.message ?: "network error")
+            }
+        }
+        toast?.let { ActionToasts.resolve(it, result is ApiResult.Success) }
+        return result
+    }
+
+    /** GET /party-api/dashboard-state - the import source paths and size limit. */
+    suspend fun dashboardStateInfo(): ApiResult<String> = textWithError("GET", "dashboard-state")
+
+    /** GET /party-api/dashboard-state/export - the settings JSON (settings-export.ts). */
+    suspend fun dashboardStateExport(): ApiResult<String> = textWithError("GET", "dashboard-state/export")
+
+    /** POST /party-api/dashboard-state/{preview,import} - the raw file as
+     *  text/plain; an import repeats the preview's digest in X-State-Preview. */
+    suspend fun dashboardStateRequest(action: String, source: String, digest: String? = null): ApiResult<String> =
+        textWithError("POST", "dashboard-state/$action", source, buildMap {
+            put("Content-Type", "text/plain;charset=UTF-8")
+            digest?.let { put("X-State-Preview", it) }
+        })
+
+    /** GET /console-debug - the debug instance state (debug-instance.tsx). */
+    suspend fun consoleDebug(): ApiResult<String> = getRoot("console-debug")
+
+    /** POST /console-debug/{start,stop}. */
+    suspend fun consoleDebugAction(name: String): ApiResult<String> = postRoot("console-debug/$name", JsonObject(emptyMap()))
 
     suspend fun postRoot(path: String, body: JsonObject): ApiResult<String> {
         val toast = ActionToasts.begin()

@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /** Whether the app is in the foreground - polling pauses in the background
  *  like the dashboard's queries (the PWA's document.hidden). */
@@ -66,6 +68,50 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     val characterDetails: StateFlow<Map<String, CharacterDiagnostics>> = repository.characterDetails
     val serverOffset: StateFlow<Long> = repository.serverOffset
     val api get() = repository.api
+    /** Item details' "From catalog": the comparison source the catalog opens
+     *  with (the PWA passes it as navigation state). */
+    val catalogComparison = MutableStateFlow<com.partyconsole.companion.domain.ComparisonSource?>(null)
+
+    /** Routes a component asks to open (the PWA's useNavigate inside shared
+     *  components); the navigation shell follows them. */
+    val navigationRequests = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+    fun navigate(route: String) { navigationRequests.tryEmit(route) }
+
+    /** ALData's "Prepare mail": the draft the mail composer opens with. */
+    val mailDraft = MutableStateFlow<com.partyconsole.companion.ui.account.MailDraft?>(null)
+
+    /** use-party-console.tsx aldataAuthPending: set once the ALData auth mail
+     *  is sent; while set, /aldata/auth is re-read every 15 s app-wide until
+     *  CORRECT (AlDataAuthWatcher.tsx). [aldataAuthStatus] is the last read. */
+    val aldataAuthPending = MutableStateFlow(false)
+    val aldataAuthStatus = MutableStateFlow<String?>(null)
+
+    /** debug-browser.tsx useDebugBrowser: whether this console is a debug instance (read once). */
+    val debugBrowser = MutableStateFlow(false)
+    val debugGameUrl: String get() = api.baseUrl.trimEnd('/') + "/debug-game/vnc.html?autoconnect=1&resize=scale&path=debug-game/websockify"
+
+    init {
+        viewModelScope.launch {
+            (api.consoleDebug() as? com.partyconsole.companion.network.ApiResult.Success)?.let { result ->
+                debugBrowser.value = runCatching { (kotlinx.serialization.json.Json.parseToJsonElement(result.value) as kotlinx.serialization.json.JsonObject)["insideDebug"].toString() == "true" }.getOrDefault(false)
+            }
+        }
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(aldataAuthPending, AppForeground.visible) { pending, visible -> pending && visible }.collectLatest { active ->
+                while (active) {
+                    when (val result = api.checkAlDataAuth()) {
+                        is com.partyconsole.companion.network.ApiResult.Success -> {
+                            aldataAuthStatus.value = result.value
+                            if (result.value == "CORRECT") aldataAuthPending.value = false
+                        }
+                        is com.partyconsole.companion.network.ApiResult.Failure -> aldataAuthStatus.value = "unknown"
+                    }
+                    kotlinx.coroutines.delay(15_000)
+                }
+            }
+        }
+    }
+
     // dungeon-query.ts: the Cave of Many Dreams state, polled while a screen shows it.
     val dungeons = com.partyconsole.companion.data.DungeonQuery(repository.api, viewModelScope, AppForeground.visible)
 

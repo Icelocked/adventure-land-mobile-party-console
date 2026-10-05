@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.domain.standIsFull
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.itempanel.GearComparisonSheet
+import com.partyconsole.companion.ui.components.TracktrixBonusList
 import kotlinx.serialization.json.JsonObject
 import com.partyconsole.companion.model.BestiaryMonster
 import com.partyconsole.companion.model.CatalogItem
@@ -119,10 +120,12 @@ fun ItemDetailBrowser(
                 onNavigateItem = { id, level -> trail = trail + DetailTarget.ItemTarget(id, level) },
                 onNavigateMonster = { id -> trail = trail + DetailTarget.MonsterTarget(id) },
             )
-            is DetailTarget.MonsterTarget -> MonsterDetailContent(
-                monster = monsters.find { it.id == target.id },
-                onNavigateItem = { id, level -> trail = trail + DetailTarget.ItemTarget(id, level) },
-            )
+            is DetailTarget.MonsterTarget -> {
+                val monster = monsters.find { it.id == target.id }
+                if (monster != null && viewModel != null) {
+                    com.partyconsole.companion.ui.components.MonsterDetail(viewModel, monster, onInspectDrop = { id -> trail = trail + DetailTarget.ItemTarget(id, 0) })
+                } else MonsterDetailContent(monster = monster, onNavigateItem = { id, level -> trail = trail + DetailTarget.ItemTarget(id, level) })
+            }
         }
         if (exchangeAdd != null && trail.size == 1) {
             androidx.compose.material3.Button(
@@ -242,6 +245,17 @@ private fun ItemDetailContent(
                             Text(ctype.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    // item-details.tsx "From catalog": this item at the preview level becomes A.
+                    OutlinedButton(
+                        onClick = {
+                            comparePicker = null
+                            val item = com.partyconsole.companion.model.Item(name = target.id, level = previewLevel, statType = if (isRoot) rootStatType?.ifEmpty { null } else null)
+                            val properties = propertiesAtLevel(meta, item, previewLevel, item.statType).mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }
+                            viewModel?.catalogComparison?.value = com.partyconsole.companion.domain.ComparisonSource(context?.slot ?: -1, item, meta?.copy(properties = properties))
+                            viewModel?.navigate("account/catalog")
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    ) { Text("From catalog", color = Color(0xFFCFFAFE)) }
                 } else {
                     TextButton(onClick = { comparePicker = "" }) { Text("← $picking · Choose equipment slot", style = MaterialTheme.typography.labelSmall) }
                     for (slot in comparisonSlotsFor(meta, characters[picking]?.vitals?.ctype.orEmpty())) {
@@ -309,33 +323,6 @@ private fun ItemDetailContent(
             slot = comparison.second,
             onClose = { comparing = null },
         )
-    }
-}
-
-/** tracktrix-bonuses.tsx TracktrixBonusList. */
-@Composable
-private fun TracktrixBonusList(data: JsonObject?, title: String = "Current Tracktrix bonuses") {
-    val active = (data?.get("active") as? JsonPrimitive)?.content == "true"
-    val rawBonuses = data?.get("bonuses")
-    val bonuses = (rawBonuses as? JsonObject)?.mapNotNull { (stat, value) -> (value as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it.isFinite() && it != 0.0 }?.let { stat to it } }.orEmpty()
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).border(1.dp, Color(0xFF6D28D9), RoundedCornerShape(4.dp)).padding(12.dp)) {
-        Text(title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-        when {
-            data == null || (active && (rawBonuses == null || rawBonuses is kotlinx.serialization.json.JsonNull)) -> Text("Waiting for Tracktrix data.", style = MaterialTheme.typography.bodySmall)
-            !active -> Text("Inactive — this character is not receiving Tracktrix bonuses.", style = MaterialTheme.typography.bodySmall)
-            bonuses.isEmpty() -> Text("No stat bonuses unlocked yet.", style = MaterialTheme.typography.bodySmall)
-            else -> for ((stat, value) in bonuses) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stat.replace('_', ' ').uppercase(), style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        (if (value > 0) "+" else "") + if (value % 1.0 == 0.0) "%,d".format(value.toLong()) else value.toString(),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF34D399),
-                    )
-                }
-            }
-        }
     }
 }
 

@@ -11,6 +11,8 @@ import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,6 +55,16 @@ fun SessionControls(viewModel: PartyViewModel, name: String) {
         confirmation = SessionSnapshot(action, slot.index, slot.kind, slot.state, primaryCharacter, slot.primary)
     }
 
+    // character-session-controls.tsx: a debug instance offers its game browser instead.
+    val debugBrowser by viewModel.debugBrowser.collectAsState()
+    if (debugBrowser) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        androidx.compose.material3.TextButton(
+            onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(viewModel.debugGameUrl))) } },
+            modifier = androidx.compose.ui.Modifier.semantics { contentDescription = "$name · Debug browser ${if (slot?.primary == true) "primary" else "companion"}" },
+        ) { Text("Debug browser" + if (slot?.primary == true) " · primary" else "") }
+        return
+    }
     Row {
         FilledTonalIconToggleButton(checked = native, enabled = !disabled, onCheckedChange = { if (slot?.primary != true) ask("steam") }) {
             Icon(Icons.Filled.Monitor, contentDescription = if (slot?.primary == true) "$name is Steam primary" else "$destination: $name")
