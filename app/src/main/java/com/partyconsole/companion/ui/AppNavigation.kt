@@ -48,6 +48,7 @@ internal object Routes {
     const val MARKET_SETTINGS = "market/settings"
     const val ACCOUNT_BANK = "account/bank"
     const val ACCOUNT_LOGS = "account/logs"
+    const val ANNIVERSARY = "anniversary"
     const val ACCOUNT_SETTINGS = "account/settings"
     const val MERCHANT_COMMERCE = "merchant/{mode}"
     const val ROUTINES = "routines"
@@ -213,6 +214,12 @@ fun AppNavigation(store: ServerConfigStore) {
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             BankScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ANNIVERSARY) { backStackEntry ->
+            val active = settings ?: return@composable
+            val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
+            val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
+            com.partyconsole.companion.ui.account.AnniversaryScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable(Routes.ACCOUNT_LOGS) { backStackEntry ->
             val active = settings ?: return@composable

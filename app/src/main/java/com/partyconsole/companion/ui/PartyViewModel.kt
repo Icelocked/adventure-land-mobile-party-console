@@ -66,6 +66,8 @@ class PartyViewModel(settings: ServerSettings) : ViewModel() {
     val characterDetails: StateFlow<Map<String, CharacterDiagnostics>> = repository.characterDetails
     val serverOffset: StateFlow<Long> = repository.serverOffset
     val api get() = repository.api
+    // dungeon-query.ts: the Cave of Many Dreams state, polled while a screen shows it.
+    val dungeons = com.partyconsole.companion.data.DungeonQuery(repository.api, viewModelScope, AppForeground.visible)
 
     suspend fun refreshDynamicStateNow() = repository.refreshDynamicStateNow()
     fun registerInterest(domain: Domain): () -> Unit = repository.registerInterest(domain)

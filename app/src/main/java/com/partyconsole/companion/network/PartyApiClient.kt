@@ -967,6 +967,10 @@ class PartyApiClient(
     suspend fun setBankboiPrefix(prefix: String): ApiResult<CommandResult> =
         post("dashboard-preferences", JsonObject(mapOf("bankboiPrefix" to JsonPrimitive(prefix))))
 
+    /** POST /party-api/formation {character, eventSelections} - event-selection-control.tsx. */
+    suspend fun setEventSelections(character: String, eventSelections: List<String>): ApiResult<CommandResult> =
+        post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventSelections" to kotlinx.serialization.json.JsonArray(eventSelections.map { JsonPrimitive(it) }))))
+
     /** POST /party-api/dashboard-preferences - "Send anniversary chat message
      *  when receiving cake from a kiss" (anniversary-dialog.tsx's autoChat toggle). */
     suspend fun setAnniversaryAutoChat(enabled: Boolean): ApiResult<CommandResult> =

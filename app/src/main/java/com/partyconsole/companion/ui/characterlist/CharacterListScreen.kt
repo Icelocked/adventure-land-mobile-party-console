@@ -45,6 +45,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -145,6 +147,8 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 12.dp)) {
             if (!connected) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
             if (sessionLost) item { SessionLostCard(onReconnect) }
+            // party-workspace.tsx: the dungeon panel heads the party while a visit runs.
+            item { com.partyconsole.companion.ui.dungeon.DungeonPanel(viewModel) }
             if (names.isNotEmpty() || pending.isNotEmpty()) item { PartyControls(viewModel) }
             if (names.isEmpty() && pending.isEmpty()) {
                 item {
@@ -235,6 +239,12 @@ private fun PartyControls(viewModel: PartyViewModel) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var townError by remember { mutableStateOf<String?>(null) }
+    // escape-control.tsx: inside a dungeon, Escape exits the dungeon instead.
+    val dungeon = com.partyconsole.companion.ui.dungeon.rememberDungeons(viewModel)
+    val dungeonView by dungeon.view.collectAsState()
+    val dungeonBusy by dungeon.busy.collectAsState()
+    val dungeonError by dungeon.actionError.collectAsState()
+    val inDungeon = dungeonView != null && dungeonView?.state?.phase !in setOf("idle", "held")
 
     val current = escape
     val running = current != null && current.stage !in listOf("complete", "failed-hold", "released")
@@ -257,6 +267,10 @@ private fun PartyControls(viewModel: PartyViewModel) {
             Button(
                 onClick = {
                     scope.launch {
+                        if (inDungeon) {
+                            dungeon.action(mapOf("action" to "exit"))
+                            return@launch
+                        }
                         busy = true
                         error = null
                         (viewModel.api.triggerEscape() as? ApiResult.Failure)?.let { error = it.message }
@@ -264,15 +278,16 @@ private fun PartyControls(viewModel: PartyViewModel) {
                         busy = false
                     }
                 },
-                enabled = !busy && !running,
+                enabled = if (inDungeon) !dungeonBusy else !busy && !running,
                 colors = if (failed) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors(),
                 modifier = Modifier.weight(1f),
             ) {
-                if (busy || running) CircularProgressIndicator(modifier = Modifier.size(14.dp).padding(end = 6.dp), strokeWidth = 2.dp)
-                Text(label)
+                if (if (inDungeon) dungeonBusy else busy || running) CircularProgressIndicator(modifier = Modifier.size(14.dp).padding(end = 6.dp).semantics { contentDescription = "Escape in progress" }, strokeWidth = 2.dp)
+                Text(if (inDungeon) "Escape — exit dungeon" else label)
             }
         }
         (townError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        if (inDungeon && dungeonError.isNotEmpty()) Text(dungeonError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     }
 }
 
