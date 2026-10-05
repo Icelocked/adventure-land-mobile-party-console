@@ -1,17 +1,68 @@
 import { test, expect } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
-test('Settings: App updates section can check for an update without erroring', async ({ page }) => {
+type UpdateState = { current: string; available?: string; notes?: string; checkedAt?: number; automatic: boolean; managed: boolean; updater: boolean; phase: string; error?: string }
+
+async function mockUpdates(page: import('@playwright/test').Page, state: UpdateState) {
+  const calls: { path: string; body: unknown }[] = []
+  await page.route('**/notify/update**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname.replace('/notify/update', '')
+    if (request.method() === 'POST') {
+      const body = request.postDataJSON() as Record<string, unknown>
+      calls.push({ path, body })
+      if (path === '/check') Object.assign(state, { available: '1.1.0', notes: 'https://github.com/x/y/releases/tag/v1.1.0', checkedAt: Date.now(), phase: 'available' })
+      if (path === '/install') state.phase = 'installing'
+      if (path === '/preferences') state.automatic = body.automatic === true
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state) })
+  })
+  return calls
+}
+
+test('Settings: PWA updates check, install and toggle automatic installs', async ({ page }) => {
+  // Failure modes: Check now doesn't reach the updater; Install is offered
+  // without the updater service; the automatic checkbox doesn't persist.
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
   await server.install(page)
+  const calls = await mockUpdates(page, { current: '1.0.0', automatic: false, managed: true, updater: true, phase: 'idle', checkedAt: Date.now() })
 
   await page.goto('/settings')
-  // An installed app has no browser chrome to force-refresh, so this button
-  // is the way out of a stuck service worker.
-  await page.getByRole('button', { name: 'Check for updates' }).click()
-  await expect(page.getByRole('button', { name: /Checking…|Up to date/ })).toBeVisible()
+  const panel = page.getByRole('region', { name: 'Party Console PWA' })
+  await expect(panel.getByText('Installed version: 1.0.0')).toBeVisible()
+  await expect(panel.getByRole('status')).toHaveText('Up to date.')
+  await expect(panel.getByRole('button', { name: 'Download and install update' })).toHaveCount(0)
+
+  await panel.getByRole('button', { name: 'Check now' }).click()
+  await expect(panel.getByText('New release available: 1.1.0')).toBeVisible()
+  await expect(panel.getByRole('link', { name: 'Release notes' })).toHaveAttribute('href', /releases\/tag\/v1\.1\.0$/)
+
+  await panel.getByRole('checkbox', { name: /Automatically download and install/ }).check()
+  await expect(panel.getByRole('checkbox', { name: /Automatically download and install/ })).toBeChecked()
+
+  await panel.getByRole('button', { name: 'Download and install update' }).click()
+  await expect(panel.getByRole('status')).toContainText('Installing')
+  // Settings stay locked while an install runs.
+  await expect(panel.getByRole('checkbox', { name: /Automatically download and install/ })).toBeDisabled()
+  expect(calls.map((call) => call.path)).toEqual(['/check', '/preferences', '/install'])
+  expect(calls[1].body).toEqual({ automatic: true })
+})
+
+test('Settings: without the updater service, updates are notices only', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  await server.install(page)
+  await mockUpdates(page, { current: '1.0.0', available: '1.1.0', automatic: false, managed: false, updater: false, phase: 'available', checkedAt: Date.now() })
+
+  await page.goto('/settings')
+  const panel = page.getByRole('region', { name: 'Party Console PWA' })
+  await expect(panel.getByText('New release available: 1.1.0')).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Download and install update' })).toHaveCount(0)
+  await expect(panel.getByRole('checkbox', { name: /Automatically download and install/ })).toBeDisabled()
+  await expect(panel.getByText(/needs the updater service/)).toBeVisible()
 })
 
 test('WTB: placing an order fails once with a server error, then succeeds, then can be cancelled', async ({ page }) => {
