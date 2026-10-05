@@ -51,10 +51,24 @@ class AppUpdatesTest {
         AppUpdates.releasesUrl = server.url("/releases/latest").toString()
         androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(context)
         AppUpdates.resetForTests()
+        AppUpdates.devBuildOverride = false
         UpdatePrefs(context).automaticChecks = true
     }
 
-    @After fun stop() = server.shutdown()
+    @After fun stop() {
+        server.shutdown()
+        AppUpdates.devBuildOverride = null
+    }
+
+    @Test
+    fun devBuildsNeitherScheduleChecksNorOfferInstalls() {
+        AppUpdates.devBuildOverride = true
+        UpdateControl.apply(context)
+        assertTrue(androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWork("app-update-check").get().none { !it.state.isFinished })
+        compose.setContent { AppUpdateSection() }
+        compose.onNodeWithText("Development build", substring = true).assertExists()
+        compose.onNodeWithText("Check now").assertDoesNotExist()
+    }
 
     @Test
     fun comparesStableVersionsOnly() {

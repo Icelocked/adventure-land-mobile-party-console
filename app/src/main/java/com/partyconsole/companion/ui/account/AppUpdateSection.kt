@@ -63,6 +63,10 @@ fun AppUpdateSection() {
     ) {
         Text("Party Console Companion", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
         Text("Installed version: ${installed.ifEmpty { "unknown" }}", style = MaterialTheme.typography.bodySmall)
+        if (AppUpdates.isDevBuild(context)) {
+            Text("Development build: it installs next to the release app and is updated by installing a newer build of your own.", color = Amber200, style = MaterialTheme.typography.labelSmall)
+            return@Column
+        }
         if (release != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("New release available: ${release.version}", color = Emerald200, style = MaterialTheme.typography.bodySmall)

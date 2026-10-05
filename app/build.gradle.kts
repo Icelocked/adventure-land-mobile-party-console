@@ -47,6 +47,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Installs next to the release app, so development builds can be
+            // tried on the same phone without replacing it.
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
         release {
             // R8 stays off until a shrunk build has been tested on a device
             // (kotlinx.serialization and Compose reflection need keep rules).
