@@ -206,11 +206,31 @@ export function isRareDrop(info, rare) {
 export function tradeNotice(entry) {
   const message = String(entry?.message || '')
   if (entry?.level === 'error') return null
+  // NPC sales are the merchant's own automatic selling, not a trade.
+  if (/\bto NPC\b/i.test(message)) return null
   if (/^Sold .+ at stand/.test(message)) return { title: 'Stand sale', body: message }
   if (/^WTB filled for /.test(message)) return { title: 'WTB order filled', body: message }
   if (/^Bought /.test(message)) return { title: 'Purchase completed', body: message }
   if (entry?.level === 'success' && /\bsold\b/i.test(message)) return { title: 'Sale completed', body: message }
   return null
+}
+
+/** One push for every trade found in a poll, so a busy stand doesn't send a burst. */
+export function tradeDigest(notices) {
+  if (notices.length <= 1) return notices[0] || null
+  const shown = notices.slice(0, 3).map((notice) => notice.body)
+  if (notices.length > 3) shown.push(`…and ${notices.length - 3} more`)
+  return { title: `${notices.length} trades`, body: shown.join('\n') }
+}
+
+/** The newest message counted as an error for `name`, for the alert text. */
+export function latestError(gameLogs, merchantActivity, merchantName, name) {
+  const entries = [
+    ...((gameLogs || {})[name] || []).filter((entry) => isAlertableGameLogError(entry.message)),
+    ...(name === merchantName ? (merchantActivity || []).filter((entry) => entry.level === 'error') : []),
+  ]
+  const newest = entries.reduce((best, entry) => (!best || Number(entry.at) > Number(best.at) ? entry : best), null)
+  return newest ? String(newest.message).replace(/\s+/g, ' ').slice(0, 160) : ''
 }
 
 /** Entries newer than `since` (the latest `at` already handled). */

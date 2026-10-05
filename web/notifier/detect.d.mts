@@ -24,6 +24,7 @@ export function liveCharacters(core: Core): string[]
 export function characterProblems(core: Core, now: number, stuckAfterMs: number): Record<string, string>
 export function problemTransitions(previous: Record<string, string>, current: Record<string, string>): { name: string; problem: string | null }[]
 export function isGameLogError(message: string): boolean
+export function isAlertableGameLogError(message: string): boolean
 export function errorTimes(gameLogs: Record<string, Entry[]>, merchantActivity: Entry[], merchantName: string | null): Record<string, number[]>
 export function deathTimes(combatLogs: Record<string, Entry[]>): Record<string, number[]>
 export function bursts(times: Record<string, number[]>, now: number, count: number, windowMs: number, lastAlertAt?: Record<string, number>): Record<string, number>
@@ -36,6 +37,8 @@ export function endedEvents(previous: { id: string; name?: string; live?: boolea
 export function rareIndex(allItems: unknown[]): Record<string, RareInfo>
 export function isRareDrop(info: RareInfo | undefined, rare: Settings['rare']): boolean
 export function tradeNotice(entry: Entry): { title: string; body: string } | null
+export function tradeDigest(notices: { title: string; body: string }[]): { title: string; body: string } | null
+export function latestError(gameLogs: Record<string, Entry[]>, merchantActivity: Entry[], merchantName: string | null, name: string): string
 export function newEntries<T extends { at: number }>(entries: T[], since: number): T[]
 export function newMail<T extends { id?: string | number }>(messages: T[], seenIds: Set<string>): T[]
 export function inQuietHours(quiet: Device['quiet'], date: Date): boolean

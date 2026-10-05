@@ -197,7 +197,7 @@ class Notifier(
         // Trading notices from the merchant activity log; the first read only marks where history ends.
         val latest = activity.maxOfOrNull { it["at"].num().toLong() }?.coerceAtLeast(0) ?: 0
         val merchantSince = next.merchantSince ?: latest
-        for (entry in newEntries(activity, merchantSince)) tradeNotice(entry)?.let { push("trading", Notice(it.title, it.body, "trade-${entry["at"].num().toLong()}", "/")) }
+        tradeDigest(newEntries(activity, merchantSince).mapNotNull { tradeNotice(it) })?.let { push("trading", Notice(it.title, it.body, "trade-$latest", "/")) }
         // Rare drops from new loot entries.
         val combatEntries = combatLogs.flatMap { (name, entries) -> entries.arr().mapNotNull { it.obj() }.map { JsonObject(it + ("name" to JsonPrimitive(name))) } }
         val latestCombat = combatEntries.maxOfOrNull { it["at"].num().toLong() }?.coerceAtLeast(0) ?: 0
@@ -223,7 +223,8 @@ class Notifier(
         val errorAlertAt = next.errorAlertAt.toMutableMap()
         for ((name, count) in bursts(errorTimes(gameLogs, activity, next.merchant), now, limits.errors.count, limits.errors.minutes * 60_000L, next.errorAlertAt)) {
             errorAlertAt[name] = now
-            push("errors", Notice("$name: repeated errors", "$count errors in the last ${limits.errors.minutes} minutes.", "errors-$name", if (name == next.merchant) "/" else characterUrl(name)), name)
+            val last = latestError(gameLogs, activity, next.merchant, name)
+            push("errors", Notice("$name: repeated errors", "$count errors in the last ${limits.errors.minutes} minutes." + if (last.isNotEmpty()) " Latest: $last" else "", "errors-$name", if (name == next.merchant) "/" else characterUrl(name)), name)
         }
         next = next.copy(
             merchantSince = maxOf(merchantSince, latest),

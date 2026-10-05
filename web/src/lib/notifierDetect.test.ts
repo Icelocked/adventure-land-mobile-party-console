@@ -23,6 +23,8 @@ import {
   recipients,
   selectedEventIds,
   tradeNotice,
+  tradeDigest,
+  latestError,
 } from '../../notifier/detect.mjs'
 
 const now = 1_000_000_000
@@ -143,6 +145,22 @@ describe('push notifier: progress, loot and trading', () => {
     expect(tradeNotice({ at: 1, message: 'Bought 2 × bow from Seller on US I', level: 'success' })?.title).toBe('Purchase completed')
     expect(tradeNotice({ at: 1, message: 'Banked 12 items', level: 'info' })).toBeNull()
     expect(tradeNotice({ at: 1, message: 'Skipped unavailable Ponty listing: bow', level: 'error' })).toBeNull()
+    // Failure mode: the merchant's automatic NPC selling sent a "Sale completed" burst.
+    expect(tradeNotice({ at: 1, message: 'Sold 3 × hpamulet to NPC for 1,200 gold', level: 'success' })).toBeNull()
+  })
+
+  it('combines the trades from one poll into one push', () => {
+    const sale = (n: number) => ({ title: 'Stand sale', body: `Sold ${n} × bow at stand` })
+    expect(tradeDigest([])).toBeNull()
+    expect(tradeDigest([sale(1)])).toEqual(sale(1))
+    expect(tradeDigest([1, 2, 3, 4, 5].map(sale))).toEqual({ title: '5 trades', body: 'Sold 1 × bow at stand\nSold 2 × bow at stand\nSold 3 × bow at stand\n…and 2 more' })
+  })
+
+  it('names the newest counted error for the alert text, skipping failed rolls', () => {
+    const logs = { Merchy: [{ at: 1, message: 'Route rejected' }, { at: 3, message: 'Item upgrade failed' }, { at: 2, message: 'Movement failed: blocked' }] }
+    expect(latestError(logs, [], 'Merchy', 'Merchy')).toBe('Movement failed: blocked')
+    expect(latestError(logs, [{ at: 4, message: 'Exchange failed', level: 'error' }], 'Merchy', 'Merchy')).toBe('Exchange failed')
+    expect(latestError(logs, [], 'Merchy', 'Folla')).toBe('')
   })
 
   it('only reports entries and mail that are new', () => {
