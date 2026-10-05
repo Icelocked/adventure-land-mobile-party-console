@@ -84,6 +84,8 @@ dependencies {
     // pinned certificate fingerprint if the server uses a self-signed cert).
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    // Background alert checks (notify/): the 15-minute periodic job.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Item/monster sprite icons load directly from adventure.land's own
     // hosted sprite sheets (Coil handles caching so the same sheet isn't
