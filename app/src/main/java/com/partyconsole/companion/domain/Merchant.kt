@@ -83,8 +83,8 @@ fun merchantJobLabel(job: MerchantJob, catalog: List<CatalogItem> = emptyList())
     return if (routine in setOf("manual marketplace purchases", "stand bid purchases")) (listOf(label) + purchaseDetails(job, catalog)).joinToString(" · ") else label
 }
 
-/** format-duration.ts formatDuration + duration-label.tsx durationLabel
- *  (party-console v1.2.0), verbatim. */
+/** Durations as the dashboard writes them ("1h 2m 3.5s").
+ *  Console: format-duration.ts, duration-label.tsx. */
 fun formatDurationMs(ms: Double): String {
     if (!ms.isFinite()) return "Unknown"
     if (ms <= 0) return "0s"
@@ -109,9 +109,9 @@ fun durationLabel(ms: Long?): String = when {
 
 data class PartyGroup(val id: String, val members: List<String>)
 
-/** runtime/party-groups.ts (party-console v1.2.0), verbatim: the groups the
- *  merchant can be sent to - a leader with its followers, plus each
- *  independent character - never the merchant or bankbois. */
+/** The groups the merchant can be sent to: a leader with its followers,
+ *  plus each independent character, never the merchant or bankbois.
+ *  Console: runtime/party-groups.ts. */
 fun merchantPartyGroups(state: PartyStateDynamic, names: List<String>): List<PartyGroup> {
     val groups = linkedMapOf<String, MutableList<String>>()
     val storage = state.bankbois.map { it.name }.toSet()
@@ -126,8 +126,8 @@ fun merchantPartyGroups(state: PartyStateDynamic, names: List<String>): List<Par
     }
 }
 
-/** automatic-commerce-rule-key.tsx, verbatim: the key the server stores
- *  automatic NPC-sale / stand / deconstruction rules under. */
+/** The key the server stores automatic NPC-sale, stand and deconstruction
+ *  rules under, so it must match the console byte for byte. */
 fun automaticCommerceRuleKey(item: Item): String = buildJsonObject {
     put("name", item.name)
     put("level", maxOf(0, item.level ?: 0))
@@ -135,8 +135,8 @@ fun automaticCommerceRuleKey(item: Item): String = buildJsonObject {
     put("stat_type", item.statType?.ifEmpty { null }?.let { JsonPrimitive(it) } ?: JsonNull)
 }.toString()
 
-// runtime/coordinator/inventory/item-identity.ts sameMarkedItem, verbatim:
-// marks are partial identities; a changing stack quantity doesn't count.
+// Marks are partial identities; a changing stack quantity doesn't count.
+// Console: runtime/coordinator/inventory/item-identity.ts (sameMarkedItem).
 private val TRANSIENT = setOf("q", "price", "rid", "b", "giveaway")
 private fun itemObject(item: Item): JsonObject = itemJson.encodeToJsonElement(Item.serializer(), item).jsonObject
 private fun sameIdentity(first: JsonObject, second: JsonObject): Boolean =

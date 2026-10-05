@@ -137,6 +137,7 @@ dependencies {
     // JVM tests against a mock server serving the shared fixtures, and
     // Compose screens through Robolectric without an emulator.
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("androidx.work:work-testing:2.9.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation(composeBom)

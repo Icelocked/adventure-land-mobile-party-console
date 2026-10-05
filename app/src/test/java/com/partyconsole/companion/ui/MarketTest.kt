@@ -105,7 +105,7 @@ class MarketTest {
         eventually { posts("merchant/aldata-order").size == 2 }
         val bodies = posts("merchant/aldata-order")
         assertEquals(listOf("a" to "3", "b" to "3"), bodies.map { (it["listing"] as JsonObject).text("key") to it.text("buyQuantity") })
-        // use-party-console.tsx buyALDataListing: the listing as received.
+        // The order carries the listing exactly as received.
         assertEquals("Seller1", (bodies[0]["listing"] as JsonObject).text("seller"))
     }
 
