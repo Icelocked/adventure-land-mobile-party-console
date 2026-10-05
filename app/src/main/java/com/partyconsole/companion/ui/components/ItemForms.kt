@@ -266,11 +266,12 @@ fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character
         )
         Column(modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, Orange.copy(alpha = 0.3f)), RoundedCornerShape(4.dp)).padding(8.dp)) {
             Text("$name${item.level?.takeIf { it > 0 }?.let { " +$it" } ?: ""}", fontWeight = FontWeight.SemiBold)
-            Text("You will receive ${"%,d".format(npcSaleValue(item.level ?: 0, item.gift == true, item.expires, meta))}g per sale.", color = Amber, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+            Text("You will receive ${"%,d".format(npcSaleValue(item.level ?: 0, item.gift == true, item.expires, meta))}g per sale.", color = Color(0xFFFDE68A), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
             Text("The rule matches this exact +level, stat type, and special property.", style = MaterialTheme.typography.labelSmall)
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
             Button(enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = Orange), onClick = {
                 scope.launch {
                     busy = true
@@ -279,7 +280,6 @@ fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character
                     busy = false
                 }
             }) { Text("Enable auto sale", color = Color.Black) }
-            OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
         }
     }
 }

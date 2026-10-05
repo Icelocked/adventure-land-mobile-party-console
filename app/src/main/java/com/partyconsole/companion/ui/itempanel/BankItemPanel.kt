@@ -1,5 +1,6 @@
 package com.partyconsole.companion.ui.itempanel
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,6 +48,8 @@ import kotlinx.serialization.json.Json
  *  acting through the configured merchant: Item details, withdrawal (one /
  *  all), stand (mark / unmark, auto), upgrade (mark via withdrawal / auto),
  *  deconstruction (mark / auto), NPC sale (sell / auto), Clear all marks. */
+private val Rose = Color(0xFFFB7185)
+
 @Composable
 fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry, onClose: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
@@ -54,7 +57,7 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
     val catalogFor = rememberCatalogLookup(state.merchantCatalog)
     val merchant = state.merchantCharacter
     val item = entry.item
-    val meta = catalogFor(item.name)?.meta
+    val meta = entry.meta ?: catalogFor(item.name)?.meta
     val level = item.level ?: 0
     var expanded by remember(entry) { mutableStateOf<String?>(null) }
     var showingDetails by remember(entry) { mutableStateOf(false) }
@@ -130,12 +133,8 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
 
             TapRow("Item details") { showingDetails = true }
 
-            if (merchant != null) {
-                TapRow(if (withdrawMarked) "Unmark withdrawal" else "Mark for withdrawal", enabled = confirmingWithdraw == null) { withdraw(false) }
-                TapRow("Mark all for withdrawal", enabled = confirmingWithdraw == null) { withdraw(true) }
-            } else {
-                Text("No merchant is configured.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(vertical = 8.dp))
-            }
+            TapRow(if (withdrawMarked) "Unmark withdrawal" else "Mark for withdrawal", enabled = merchant != null && confirmingWithdraw == null) { withdraw(false) }
+            TapRow("Mark all for withdrawal", enabled = merchant != null && confirmingWithdraw == null) { withdraw(true) }
             confirmingWithdraw?.let { (markAll, tiers) ->
                 Column(modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Remove automatic bank mark?", style = MaterialTheme.typography.titleSmall)
@@ -161,7 +160,7 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                     onSubmit = { draft -> confirmWith { viewModel.api.markForStand(item, entry.slot, bankPack = pack, price = draft.price, quantity = draft.quantity, markAll = draft.markAll, id = standListing?.id) } },
                 )
             }
-            if (merchant != null && item.l == null) TapRow("Auto mark for stand…") { toggle("autostand") }
+            TapRow("Auto mark for stand…", enabled = merchant != null && item.l == null) { toggle("autostand") }
             if (expanded == "autostand") {
                 val rule = state.autoStandMarks[automaticCommerceRuleKey(item)]
                 StandListingForm(
@@ -188,20 +187,22 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                 }
             }
 
-            if (merchant != null && canDeconstruct(item, state.deconstructionCatalog)) {
-                TapRow("Mark for deconstruction") { toggle("decon") }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            if (canDeconstruct(item, state.deconstructionCatalog)) {
+                TapRow("Mark for deconstruction", enabled = merchant != null) { toggle("decon") }
                 if (expanded == "decon") {
                     DeconstructionConfirmation(item, auto = false, catalog = state.deconstructionCatalog, catalogFor = catalogFor, onCancel = { expanded = null },
                         onConfirm = { confirmWith { viewModel.api.markBankItemForDeconstruction(item, pack, entry.slot, false) } })
                 }
-                TapRow("Auto mark for deconstruction") { toggle("autodecon") }
+                TapRow("Auto mark for deconstruction", enabled = merchant != null) { toggle("autodecon") }
                 if (expanded == "autodecon") {
                     DeconstructionConfirmation(item, auto = true, catalog = state.deconstructionCatalog, catalogFor = catalogFor, onCancel = { expanded = null },
-                        onConfirm = { confirmWith { viewModel.api.autoDeconstruct(merchant, item) } })
+                        onConfirm = { confirmWith { viewModel.api.autoDeconstruct(merchant!!, item) } })
                 }
             }
 
-            TapRow("Sell to NPC…") { toggle("npcsale") }
+            TapRow("Sell to NPC…", color = Rose) { toggle("npcsale") }
             if (expanded == "npcsale") {
                 NpcSaleSheet(
                     item = item, meta = meta, location = "Bank · $pack · slot ${entry.slot}", available = item.q ?: 1,
@@ -210,20 +211,21 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                 )
             }
             // The rule is created for the merchant.
-            if (merchant != null && item.l == null) TapRow("Auto sell to NPC…") { toggle("autonpc") }
+            TapRow("Auto sell to NPC…", enabled = merchant != null && item.l == null, color = Rose) { toggle("autonpc") }
             if (merchant != null && expanded == "autonpc") {
                 val name = (meta?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(item.name)?.name ?: item.name
                 AutoNpcSaleConfirmation(item, meta, name, merchant, onCancel = { expanded = null }, onConfirm = { confirmWith { viewModel.api.autoNpcSale(merchant, item) } })
             }
 
-            if (merchant != null) {
-                TapRow("Clear all marks") {
+            Text(CLEAR_MARKS_TITLE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            kotlin.run {
+                TapRow("Clear all marks", enabled = merchant != null, color = MaterialTheme.colorScheme.error) {
                     run {
                         viewModel.api.post(
                             "command",
                             JsonObject(
                                 mapOf(
-                                    "character" to JsonPrimitive(merchant),
+                                    "character" to JsonPrimitive(merchant!!),
                                     "type" to JsonPrimitive("clear-item-marks"),
                                     "pack" to JsonPrimitive(pack),
                                     "slot" to JsonPrimitive(entry.slot),

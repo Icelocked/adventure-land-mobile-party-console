@@ -62,9 +62,10 @@ export function NpcSaleSheet({
         Quantity
         <Input aria-label="Sale quantity" inputMode="numeric" value={quantity} disabled={busy || all} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} className="mt-1" />
       </label>
-      <p className="text-sm">
-        You will receive: {(each * Math.max(0, Number(quantity) || 0)).toLocaleString()}g <span className="text-xs text-muted-foreground">({each.toLocaleString()}g each)</span>
-      </p>
+      <div className="rounded border border-amber-800 bg-amber-950/20 p-3 font-mono text-sm text-amber-200">
+        You will receive: {(each * Math.max(0, Number(quantity) || 0)).toLocaleString()}g
+        <span className="ml-2 text-[10px] text-amber-100/55">({each.toLocaleString()}g each)</span>
+      </div>
       {modified && (
         <label className="flex items-start gap-2 text-xs text-destructive">
           <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} className="mt-0.5 size-4 shrink-0" />
@@ -73,11 +74,11 @@ export function NpcSaleSheet({
       )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
-        <Button size="sm" variant="destructive" disabled={busy} onClick={() => void confirm()}>
-          {busy ? 'Queueing…' : all ? 'Sell all to NPC' : 'Sell to NPC'}
-        </Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel
+        </Button>
+        <Button size="sm" disabled={busy} className="bg-rose-600 text-white hover:bg-rose-500" onClick={() => void confirm()}>
+          {busy ? 'Queueing…' : all ? 'Sell all to NPC' : 'Sell to NPC'}
         </Button>
       </div>
     </div>

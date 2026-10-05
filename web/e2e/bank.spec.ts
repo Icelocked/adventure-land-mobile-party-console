@@ -193,3 +193,19 @@ test('Bank: an empty bank tells you how to load the snapshot', async ({ page }) 
   await page.goto('/bank')
   await expect(page.getByText('No snapshot yet. Send a character to the bank once to load it.')).toBeVisible()
 })
+
+test('Bank without a merchant: merchant-only options stay listed but disabled, like the dashboard', async ({ page }) => {
+  // Failure mode: hiding these rows makes the list differ from the
+  // dashboard's bank menu, which shows them disabled.
+  const server = bankServer()
+  server.merchantCharacter = null
+  await server.install(page)
+
+  await page.goto('/bank')
+  await page.getByRole('button', { name: /Iron Ore x5/ }).click()
+  for (const name of ['Mark for withdrawal', 'Mark all for withdrawal', 'Auto mark for stand…', 'Auto sell to NPC…', 'Clear all marks']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeDisabled()
+  }
+  await expect(page.getByRole('button', { name: 'Sell to NPC…', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Sell to NPC…', exact: true })).toHaveClass(/text-rose-400/)
+})

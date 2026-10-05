@@ -11,7 +11,7 @@ import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/component
 import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type InventoryEntry } from '@/models'
-import { TapRow, UpgradeTierPicker } from './ItemActionPanel'
+import { CLEAR_MARKS_TITLE, TapRow, UpgradeTierPicker } from './ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 
 /** The options list for one bank item, all acting through the configured
@@ -26,7 +26,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   const catalogFor = useCatalogLookup(state.merchantCatalog)
   const merchant = state.merchantCharacter ?? null
   const { item } = entry
-  const meta = catalogFor(item.name)?.meta ?? undefined
+  const meta = entry.meta || catalogFor(item.name)?.meta || undefined
   const level = item.level ?? 0
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showingDetails, setShowingDetails] = useState(false)
@@ -105,14 +105,8 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
 
           <TapRow label="Item details" onClick={() => setShowingDetails(true)} />
 
-          {merchant ? (
-            <>
-              <TapRow label={withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'} disabled={!!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(false)} />
-              <TapRow label="Mark all for withdrawal" disabled={!!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(true)} />
-            </>
-          ) : (
-            <p className="py-2 text-xs text-muted-foreground">No merchant is configured.</p>
-          )}
+          <TapRow label={withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'} disabled={!merchant || !!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(false)} />
+          <TapRow label="Mark all for withdrawal" disabled={!merchant || !!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(true)} />
           {confirmingWithdraw && (
             <div role="group" aria-label="Remove automatic bank mark?" className="my-1.5 flex flex-col gap-2 rounded-md border border-border p-2.5 pl-4">
               <p className="text-sm font-medium">Remove automatic bank mark?</p>
@@ -155,7 +149,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               onSubmit={({ price, quantity, markAll }) => confirmWith(() => api.markForStand(item, entry.slot, price, { id: standListing?.id, bankPack: pack, quantity, markAll }))}
             />
           )}
-          {merchant && !item.l && <TapRow label="Auto mark for stand…" onClick={() => toggle('autostand')} />}
+          <TapRow label="Auto mark for stand…" disabled={!merchant || !!item.l} onClick={() => toggle('autostand')} />
           {expanded === 'autostand' && (
             <StandListingForm
               auto
@@ -186,10 +180,11 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               )}
             </>
           )}
+          <div className="my-1 border-t border-border" />
 
-          {canDeconstruct(item, state.deconstructionCatalog) && merchant && (
+          {canDeconstruct(item, state.deconstructionCatalog) && (
             <>
-              <TapRow label="Mark for deconstruction" onClick={() => toggle('decon')} />
+              <TapRow label="Mark for deconstruction" disabled={!merchant} onClick={() => toggle('decon')} />
               {expanded === 'decon' && (
                 <DeconstructionConfirmation
                   item={item}
@@ -200,7 +195,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
                   onConfirm={() => confirmWith(() => api.markBankItemForDeconstruction(item, pack, entry.slot, false))}
                 />
               )}
-              <TapRow label="Auto mark for deconstruction" onClick={() => toggle('autodecon')} />
+              <TapRow label="Auto mark for deconstruction" disabled={!merchant} onClick={() => toggle('autodecon')} />
               {expanded === 'autodecon' && (
                 <DeconstructionConfirmation
                   item={item}
@@ -208,13 +203,13 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
                   catalog={state.deconstructionCatalog}
                   catalogFor={catalogFor}
                   onCancel={() => setExpanded(null)}
-                  onConfirm={() => confirmWith(() => api.autoDeconstruct(merchant, item))}
+                  onConfirm={() => confirmWith(() => api.autoDeconstruct(merchant!, item))}
                 />
               )}
             </>
           )}
 
-          <TapRow label="Sell to NPC…" onClick={() => toggle('npcsale')} />
+          <TapRow label="Sell to NPC…" className="text-rose-400" onClick={() => toggle('npcsale')} />
           {expanded === 'npcsale' && (
             <NpcSaleSheet
               item={item}
@@ -232,7 +227,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
             />
           )}
           {/* The rule is created for the merchant. */}
-          {merchant && !item.l && <TapRow label="Auto sell to NPC…" onClick={() => toggle('autonpc')} />}
+          <TapRow label="Auto sell to NPC…" className="text-rose-400" disabled={!merchant || !!item.l} onClick={() => toggle('autonpc')} />
           {merchant && expanded === 'autonpc' && (
             <AutoNpcSaleConfirmation
               item={item}
@@ -244,12 +239,13 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
             />
           )}
 
-          {merchant && (
-            <TapRow
-              label="Clear all marks"
-              onClick={() => void run(() => api.post('command', { character: merchant, type: 'clear-item-marks', pack, slot: entry.slot, item }))}
-            />
-          )}
+          <TapRow
+            label="Clear all marks"
+            title={CLEAR_MARKS_TITLE}
+            className="mt-2 text-red-500"
+            disabled={!merchant}
+            onClick={() => void run(() => api.post('command', { character: merchant, type: 'clear-item-marks', pack, slot: entry.slot, item }))}
+          />
         </SheetContent>
       </Sheet>
       {showingDetails && (
