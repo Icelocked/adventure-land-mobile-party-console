@@ -1,3 +1,5 @@
+<p align="center"><img src="web/public/icons/icon-192.png" width="128" height="128" alt="Party Console Companion icon"></p>
+
 # Party Console Companion
 
 [![Download latest release](https://img.shields.io/github/v/release/Icelocked/adventure-land-mobile-party-console?label=Download&style=for-the-badge)](https://github.com/Icelocked/adventure-land-mobile-party-console/releases/latest)

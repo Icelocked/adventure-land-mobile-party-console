@@ -108,6 +108,10 @@ jobs:
           tags: ${{ steps.image.outputs.tags }}
           push: true
 
+      # The intro loads the icon from this tag, so it always matches the release.
+      - name: Release notes intro
+        run: sed "s/{{TAG}}/${GITHUB_REF_NAME}/g" .github/release-intro.md > "$RUNNER_TEMP/release-intro.md"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -115,6 +119,6 @@ jobs:
             party-console-companion-${{ github.ref_name }}.apk
             party-console-companion-pwa-${{ github.ref_name }}.zip
           # The fixed "which one do I want?" intro, then the generated notes.
-          body_path: .github/release-intro.md
+          body_path: ${{ runner.temp }}/release-intro.md
           generate_release_notes: true
           prerelease: ${{ steps.image.outputs.prerelease }}

@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/Icelocked/adventure-land-mobile-party-console/{{TAG}}/web/public/icons/icon-192.png" width="96" height="96" align="right" alt="Party Console Companion icon">
+
 ## Which one do I want?
 
 - **Android phone:** download the `.apk` below and open it on your phone. After that, the app checks for updates itself (Settings → App updates), or you can follow releases with [Obtainium](https://github.com/ImranR98/Obtainium).
