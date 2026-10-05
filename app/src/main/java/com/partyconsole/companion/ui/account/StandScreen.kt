@@ -79,13 +79,12 @@ private val Amber = Color(0xFFF59E0B)
 private val Violet = Color(0xFFA78BFA)
 private val Rose = Color(0xFFF43F5E)
 
-/** stand-sheet.tsx "Inspect stand" (the PWA's StandScreen.tsx): items for
- *  sale reconciled against the live trade slots (Live / Paused, read-only
- *  unmanaged rows, a separate "Queued sales for stand"), each with its
- *  price (opens the stand form) and a two-step Remove; then the buy orders
- *  on the stand (N wanted, price via the WTB dialog, native batch,
- *  priority, Auto, Use stand, Really cancel?). Tapping a row inspects it;
- *  a long press shows the suggested price. */
+/** "Inspect stand": items for sale reconciled against the live trade slots
+ *  (Live / Paused, read-only unmanaged rows, a separate "Queued sales for
+ *  stand"), each with its price (opens the stand form) and a two-step Remove;
+ *  then the buy orders on the stand (N wanted, price via the WTB dialog,
+ *  native batch, priority, Auto, Use stand, Really cancel?). Tapping a row
+ *  inspects it; a long press shows the suggested price. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
@@ -105,7 +104,7 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<String?>(null) }
     var editingBuy by remember { mutableStateOf<Item?>(null) }
     var inspecting by remember { mutableStateOf<Item?>(null) }
-    // stand-sheet.tsx onInspect's source label for the item-details header.
+    // Source label for the item-details header.
     var inspectSource by remember { mutableStateOf("") }
     var suggesting by remember { mutableStateOf<Item?>(null) }
     var removeConfirmation by remember { mutableStateOf<String?>(null) }
@@ -250,7 +249,7 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                                 }
                             }
                             if (editing == row.key) {
-                                // party-inventory-panels.tsx onStandEdit: same listing (id, bank source), current price and quantity.
+                                // Same listing (id, bank source), current price and quantity.
                                 StandListingForm(
                                     viewModel, configured.item, catalogFor(configured.item.name)?.meta,
                                     existingId = configured.id, existingPrice = configured.price, existingQuantity = configured.quantity,

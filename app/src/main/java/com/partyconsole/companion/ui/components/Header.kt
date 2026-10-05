@@ -46,9 +46,8 @@ import kotlinx.serialization.json.Json
 private val Amber = Color(0xFFF59E0B)
 private val Emerald = Color(0xFF10B981)
 
-/** party-gold.tsx: bank gold (abbreviated) and "(X total)" with what the
- *  active party carries; "—" while any balance is unknown. Tap for the exact
- *  figures (the dashboard's hover title). */
+/** Bank gold (abbreviated) and "(X total)" with what the active party
+ *  carries; "—" while any balance is unknown. Tap for the exact figures. */
 @Composable
 fun PartyGold(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -73,8 +72,8 @@ fun PartyGold(viewModel: PartyViewModel) {
     }
 }
 
-/** The round trip of the smallest request - added after a session where lag
- *  made it impossible to tell "stuck" from "slow" (LatencyBadge.tsx). */
+/** The round trip of the smallest request, so lag reads as "slow" rather than
+ *  "stuck". */
 @Composable
 fun LatencyBadge(viewModel: PartyViewModel) {
     val latency by viewModel.latencyMs.collectAsState()
@@ -87,7 +86,7 @@ fun LatencyBadge(viewModel: PartyViewModel) {
     Text("${ms}ms", color = color, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
 }
 
-/** A ticking clock for relative times (lib/duration.ts useClock). */
+/** A ticking clock for relative times. */
 @Composable
 fun rememberClock(periodMs: Long = 1_000): Long {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -116,7 +115,7 @@ fun FreshnessBadge(viewModel: PartyViewModel, at: Long, subject: String = "updat
     }
 }
 
-/** tools/update/contracts.ts UpdateStatus - the fields the app reads. */
+/** The update service's status - only the fields the app reads. */
 @Serializable
 data class ConsoleUpdateStatus(
     val current: String? = null,
@@ -132,8 +131,7 @@ data class ConsoleUpdateStatus(
     val updateAvailable: Boolean get() = available?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { value -> value != "false" && value.isNotBlank() } } == true
 }
 
-/** console-updates.tsx useUpdates: the update service's status, re-read
- *  every 3s while shown. */
+/** The update service's status, re-read every 3s while shown. */
 @Composable
 fun rememberConsoleUpdates(viewModel: PartyViewModel): ConsoleUpdateStatus? {
     var status by remember { mutableStateOf<ConsoleUpdateStatus?>(null) }
@@ -149,8 +147,8 @@ fun rememberConsoleUpdates(viewModel: PartyViewModel): ConsoleUpdateStatus? {
     return status
 }
 
-/** character-portrait.tsx: the coordinator's own rendered character doll
- *  (characterDollHtml), else the character sprite, else the skin name. */
+/** The coordinator's own rendered character doll (characterDollHtml), else
+ *  the character sprite, else the skin name. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CharacterPortrait(html: String?, sprite: Sprite?, skin: String?, modifier: Modifier = Modifier) {

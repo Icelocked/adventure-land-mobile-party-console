@@ -90,20 +90,19 @@ private class RuleEntry(
     val onRemove: Action,
 )
 
-/** upgrade-rule-quantity.tsx, verbatim: -1 unless the rule carries a safe-integer quantity. */
+/** -1 unless the rule carries a safe-integer quantity. */
 private fun upgradeRuleQuantity(rule: JsonElement?): Int =
     ((rule as? JsonObject)?.get("quantity") as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it == Math.floor(it) && kotlin.math.abs(it) <= 9007199254740991.0 }?.toInt() ?: -1
 
 private val Rose = Color(0xFFFB7185)
 private val Emerald = Color(0xFF34D399)
 
-/** inventory-panel.tsx's automatic sections (the PWA's AutoMarksSection.tsx,
- *  merchant only): NPC sales, deconstruction, stand, upgrades, upgrade
- *  offering rules, compounds, merchant marks and bank marks - each with a
- *  two-tap clear, two-tap remove per entry, inline target/remaining edits
- *  for upgrade and compound rules, and Retry for a blocked deconstruction.
- *  Every action surfaces its error; tapping an entry's tile opens its item
- *  details. */
+/** The merchant's automatic sections: NPC sales, deconstruction, stand,
+ *  upgrades, upgrade offering rules, compounds, merchant marks and bank marks
+ *  - each with a two-tap clear, two-tap remove per entry, inline
+ *  target/remaining edits for upgrade and compound rules, and Retry for a
+ *  blocked deconstruction. Every action surfaces its error; tapping an
+ *  entry's tile opens its item details. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AutoMarksSection(
@@ -121,7 +120,7 @@ fun AutoMarksSection(
     var viewing by remember { mutableStateOf<Item?>(null) }
 
     val merchant = state.merchantCharacter ?: characterName
-    // connected-inventory.tsx ruleName: shared rules live under the merchant.
+    // Shared rules live under the merchant.
     val ruleName = if (state.merchantRules != null) merchant else characterName
     val autoItemMarks = state.autoItemMarks[ruleName].orEmpty()
     suspend fun perform(action: Action) {
@@ -392,8 +391,8 @@ private fun AutoRuleGroup(
     }
 }
 
-/** upgrade-offering-controls.tsx UpgradeOfferingRules: the standing rules
- *  with Edit / Remove, and a two-tap clear of them all. */
+/** The standing upgrade-offering rules with Edit / Remove, and a two-tap
+ *  clear of them all. */
 @Composable
 private fun UpgradeOfferingRules(
     characterName: String,

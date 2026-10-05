@@ -39,9 +39,8 @@ import com.partyconsole.companion.ui.components.rememberClock
 import kotlinx.coroutines.launch
 
 /** The "Send to..." / "Return to leader" (every character) and "Travel to
- *  place..." / "Go home" / "Send merchant to..." (merchant) controls from
- *  inventory-panel.tsx (the PWA's TravelSection.tsx). "Send to..." opens
- *  character-travel-dialog.tsx inline: a known area or exact coordinates. */
+ *  place..." / "Go home" / "Send merchant to..." (merchant) controls. "Send
+ *  to..." opens the travel form inline: a known area or exact coordinates. */
 @Composable
 fun TravelSection(
     characterName: String,
@@ -56,12 +55,12 @@ fun TravelSection(
     var showPlaces by remember(characterName) { mutableStateOf(false) }
     var showVisits by remember(characterName) { mutableStateOf(false) }
     var visitMessage by remember(characterName) { mutableStateOf<String?>(null) }
-    // merchant-visit-control.tsx: "Queuing visit…" and no repeat sends while one is in flight.
+    // "Queuing visit…" and no repeat sends while one is in flight.
     var queuingVisit by remember { mutableStateOf(false) }
     var error by remember(characterName) { mutableStateOf<String?>(null) }
-    // merchant-visit-control.tsx: online (seen in the last 10s) non-merchant characters.
+    // Online (seen in the last 10s) non-merchant characters.
     val eligible = diagnostics.filter { (name, detail) -> name != state.merchantCharacter && detail.ctype != "merchant" && (detail.seenAt ?: 0) > 0 && now - (detail.seenAt ?: 0) < 10_000 }.keys.toList()
-    // inventory-panel.tsx leaderOnline: a different leader, seen recently.
+    // A different leader, seen recently.
     val leader = state.leader
     val leaderOnline = leader != null && leader != characterName && now - (diagnostics[leader]?.seenAt ?: 0) < 10_000
     fun report(action: suspend () -> ApiResult<*>) = scope.launch {
@@ -73,7 +72,7 @@ fun TravelSection(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { showPlaces = !showPlaces }) { Text(if (isMerchant) "Travel to place…" else "Send to…") }
             if (isMerchant) {
-                // manual-commands.ts goHome: home spot and home realm.
+                // Home spot and home realm.
                 Button(onClick = { report { viewModel.api.goHome(characterName) } }) { Text("Go home") }
             } else {
                 Button(enabled = leaderOnline, onClick = { report { viewModel.api.returnToLeader(characterName) } }) { Text("Return to leader") }
@@ -96,7 +95,7 @@ fun TravelSection(
                                 visitMessage = null
                                 scope.launch {
                                     try {
-                                        // merchant-visit-control.tsx: queue a merchant visit to that character.
+                                        // Queue a merchant visit to that character.
                                         when (val result = viewModel.api.sendCommand(name, mapOf("type" to "bank"))) {
                                             is ApiResult.Failure -> error = result.message
                                             is ApiResult.Success -> {
@@ -120,9 +119,9 @@ fun TravelSection(
     }
 }
 
-/** character-travel-dialog.tsx, inline: a known area fills the exact map
- *  and coordinates (default main -174, 121), which can also be typed; the
- *  label is the area's name or "map [x, y]", and errors stay in the form. */
+/** The travel form, inline: a known area fills the exact map and coordinates
+ *  (default main -174, 121), which can also be typed; the label is the area's
+ *  name or "map [x, y]", and errors stay in the form. */
 @Composable
 private fun CharacterTravelForm(characterName: String, places: List<TravelPlace>, viewModel: PartyViewModel, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()

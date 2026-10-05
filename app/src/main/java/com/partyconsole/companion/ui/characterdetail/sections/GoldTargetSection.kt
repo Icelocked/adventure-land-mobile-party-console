@@ -33,11 +33,10 @@ import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
-/** gold-target-control.tsx (the merchant's character card; the PWA's
- *  GoldTargetSection): current gold, the gold target the merchant keeps on
- *  hand ("gold-target", saved when the field loses focus) and "Exchange
- *  gold and items with bank" - which saves the target first, then queues a
- *  bank run. Gold otherwise moves only during the merchant's bank errands. */
+/** The merchant's gold: current gold, the gold target the merchant keeps on
+ *  hand ("gold-target", saved when the field loses focus) and "Exchange gold
+ *  and items with bank" - which saves the target first, then queues a bank
+ *  run. Gold otherwise moves only during the merchant's bank errands. */
 @Composable
 fun GoldTargetSection(characterName: String, serverTarget: Long, gold: Long, viewModel: PartyViewModel) {
     val loaded by viewModel.stateLoaded.collectAsState()
@@ -48,7 +47,7 @@ fun GoldTargetSection(characterName: String, serverTarget: Long, gold: Long, vie
     LaunchedEffect(serverTarget) { if (!editing) draft = serverTarget.toString() }
     val scope = rememberCoroutineScope()
 
-    // gold-target-control.tsx save(): only a valid amount is sent.
+    // Only a valid amount is sent.
     suspend fun save(): String? {
         val amount = draft.toLongOrNull()?.takeIf { it >= 0 } ?: return null
         return (viewModel.api.sendCommand(characterName, mapOf("type" to "gold-target", "amount" to amount)) as? ApiResult.Failure)?.message?.ifBlank { "Command failed" }

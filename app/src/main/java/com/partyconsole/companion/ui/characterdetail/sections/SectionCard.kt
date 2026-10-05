@@ -24,20 +24,17 @@ fun SectionCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** "No data yet" for inside a [SectionCard] - the account screens' own
- *  EmptyState (bodyLarge + 24dp padding) is sized for a whole empty screen
- *  and looks out of place inside one card on an already-dense character
- *  detail screen; this is the shared, lighter equivalent for that context,
- *  used by EquipmentSection/InventorySection instead of each rolling its
- *  own near-identical Text call. */
+/** "No data yet" inside a [SectionCard]. The account screens' EmptyState
+ *  (bodyLarge + 24dp padding) is sized for a whole empty screen and looks out
+ *  of place inside one card. */
 @Composable
 fun SectionEmptyState(message: String) {
     Text(message, style = MaterialTheme.typography.bodySmall)
 }
 
-/** Shown beside any control seeded from server settings until the first
- *  state arrives - the control stays disabled until then so it can't save
- *  defaults over the server's real values (the PWA's ConfigLoadingNote). */
+/** Shown beside any control seeded from server settings until the first state
+ *  arrives - the control stays disabled until then so it can't save defaults
+ *  over the server's real values. */
 @Composable
 fun ConfigLoadingNote(loaded: Boolean) {
     if (!loaded) Text("Loading settings…", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))

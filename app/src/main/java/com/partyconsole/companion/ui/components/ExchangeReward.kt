@@ -62,12 +62,11 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** exchange-mark-controls.tsx ExchangeMarkMode. */
 data class ExchangeMarkMode(val action: String, val targetLevel: Int? = null) // bank | stand | npc | upgrade
 
 private val MARK_BORDERS = mapOf("bank" to Color(0xFFFACC15), "stand" to Color(0xFF38BDF8), "upgrade" to Color(0xFFA78BFA), "npc" to Color(0xFFFB7185))
 
-/** exchange-mark-controls.tsx, verbatim labels and gating. */
+/** Bulk exchange mark controls, with the dashboard's labels and gating. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExchangeMarkControls(enabled: Boolean, mode: ExchangeMarkMode?, saving: Boolean, onMode: (ExchangeMarkMode) -> Unit) {
@@ -93,7 +92,6 @@ fun ExchangeMarkControls(enabled: Boolean, mode: ExchangeMarkMode?, saving: Bool
     }
 }
 
-/** exchange-reward-tile.tsx ExchangeRewardTileData. */
 data class ExchangeRewardTileData(
     val id: String,
     val level: Int,
@@ -112,14 +110,14 @@ data class ExchangeRewardTileData(
 
 private val PASSIVE_KINDS = setOf("empty", "gold", "shells", "cx", "cxbundle", "open")
 
-/** upgrade-rule-quantity.tsx: -1 unless the rule carries a safe-integer quantity. */
+/** -1 unless the rule carries a safe-integer quantity. */
 private fun upgradeRuleQuantity(rule: kotlinx.serialization.json.JsonElement?): Int =
     ((rule as? JsonObject)?.get("quantity") as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it == Math.floor(it) }?.toInt() ?: -1
 
-/** exchange-reward-tile.tsx: a prospective reward with its automatic-rule
- *  banner. Tapping opens its options list (Item details first, then the
- *  automatic actions the dashboard puts in the tile's context menu); while
- *  marking multiple, tapping stages the chosen bulk rule instead. */
+/** A prospective reward with its automatic-rule banner. Tapping opens its
+ *  options list (Item details first, then the automatic actions the dashboard
+ *  puts in the tile's context menu); while marking multiple, tapping stages
+ *  the chosen bulk rule instead. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExchangeRewardTile(viewModel: PartyViewModel, reward: ExchangeRewardTileData) {
@@ -206,8 +204,8 @@ fun ExchangeRewardTile(viewModel: PartyViewModel, reward: ExchangeRewardTileData
     }
 }
 
-/** automatic-item-actions.tsx for a prospective reward (slot -1), as this
- *  app's options rows with inline sub-lists and confirmations. */
+/** Automatic item actions for a prospective reward (slot -1), as this app's
+ *  options rows with inline sub-lists and confirmations. */
 @Composable
 private fun AutomaticItemActions(
     viewModel: PartyViewModel,
@@ -257,7 +255,7 @@ private fun AutomaticItemActions(
             TapRow("Auto mark for upgrade" + if (upgradeTiers != 0) " · $upgradeTiers tier${if (upgradeTiers == 1) "" else "s"}" else "") { toggle("upgrade") }
             if (expanded == "upgrade") {
                 UpgradeTierPicker(meta, level, current = upgradeTiers) { tiers -> command("auto-upgrade-mark", null, mapOf("slot" to JsonPrimitive(-1), "tiers" to JsonPrimitive(tiers))) }
-                // party-merchant-commerce-dialog.tsx wraps rewards in the merchant's UpgradeOfferingProvider.
+                // Rewards use the merchant's upgrade offerings.
                 AddUpgradeRule(viewModel, merchant, item, meta)
             }
         }

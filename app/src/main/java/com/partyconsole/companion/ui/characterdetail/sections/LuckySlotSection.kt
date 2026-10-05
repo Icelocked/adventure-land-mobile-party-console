@@ -36,10 +36,10 @@ import kotlinx.serialization.json.JsonElement
 private fun nextLine(verified: Int?, nextSlot: Int) =
     if (verified != null) "Verified slot: $verified." else "Next upgrade will test for lucky upgrade · slot $nextSlot (inventory position ${nextSlot + 1})."
 
-/** lucky-slot-tracker.tsx (the PWA's LuckySlotSection.tsx): where the
- *  merchant's automatic upgrades are testing for the lucky inventory slot,
- *  and the per-slot evidence sheet. [open] is controlled so the inventory's
- *  lucky slot can open it too ("Show lucky slot data"). */
+/** Lucky slot tracking: where the merchant's automatic upgrades are testing
+ *  for the lucky inventory slot, and the per-slot evidence sheet. [open] is
+ *  controlled so the inventory's lucky slot can open it too ("Show lucky slot
+ *  data"). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LuckySlotSection(

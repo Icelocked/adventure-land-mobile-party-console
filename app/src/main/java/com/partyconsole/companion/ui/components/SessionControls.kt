@@ -26,12 +26,12 @@ import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
-/** What the session looked like when a confirmation opened - any change
- *  while it is open refuses the action (character-session-controls.tsx). */
+/** What the session looked like when a confirmation opened - any change while
+ *  it is open refuses the action. */
 private data class SessionSnapshot(val action: String, val slot: Int, val kind: String, val state: String, val primary: String?, val isPrimary: Boolean)
 
-/** character-session-controls.tsx: Steam (become primary / join Steam),
- *  Headless (leave Steam, keep running) and Log out - each confirmed. */
+/** Steam (become primary / join Steam), Headless (leave Steam, keep running)
+ *  and Log out - each confirmed. */
 @Composable
 fun SessionControls(viewModel: PartyViewModel, name: String) {
     val state by viewModel.dynamicState.collectAsState()
@@ -55,7 +55,7 @@ fun SessionControls(viewModel: PartyViewModel, name: String) {
         confirmation = SessionSnapshot(action, slot.index, slot.kind, slot.state, primaryCharacter, slot.primary)
     }
 
-    // character-session-controls.tsx: a debug instance offers its game browser instead.
+    // A debug instance offers its game browser instead.
     val debugBrowser by viewModel.debugBrowser.collectAsState()
     if (debugBrowser) {
         val context = androidx.compose.ui.platform.LocalContext.current
@@ -109,7 +109,6 @@ fun SessionControls(viewModel: PartyViewModel, name: String) {
                     scope.launch {
                         busy = true
                         error = null
-                        // use-party-console.tsx logout / moveSteamToHeadless / joinOrPromoteSteam.
                         val result = when (action) {
                             "logout" -> if (native) viewModel.api.steamAction(target.character, "logout") else viewModel.api.logoutSlot(target.index)
                             "headless" -> viewModel.api.steamAction(name, "headless")

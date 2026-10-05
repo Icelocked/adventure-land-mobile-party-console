@@ -14,10 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.CharacterState
 
-/** Lets you jump straight to another character's focus without backing
- *  out to the party list first - the "way to change which slot you're
- *  viewing" from the mobile-redesign plan. Pinned just under the top bar,
- *  above the sticky vitals header. */
+/** Jumps straight to another character's focus without backing out to the
+ *  party list. Pinned just under the top bar, above the sticky vitals header. */
 @Composable
 fun CharacterSwitcherRow(
     characters: Map<String, CharacterState>,

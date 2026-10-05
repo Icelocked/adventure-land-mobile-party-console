@@ -43,10 +43,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.Json
 
-/** The options list for one bank item (the PWA's BankItemPanel.tsx,
- *  bank-sheet.tsx's context menu in order, all acting through the
- *  configured merchant): Item details, withdrawal (one / all), stand
- *  (mark / unmark, auto), upgrade (mark via withdrawal / auto),
+/** The options list for one bank item, in the dashboard's order and all
+ *  acting through the configured merchant: Item details, withdrawal (one /
+ *  all), stand (mark / unmark, auto), upgrade (mark via withdrawal / auto),
  *  deconstruction (mark / auto), NPC sale (sell / auto), Clear all marks. */
 @Composable
 fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry, onClose: () -> Unit) {
@@ -62,7 +61,7 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
     var error by remember(entry) { mutableStateOf<String?>(null) }
     fun toggle(key: String) { expanded = if (expanded == key) null else key }
 
-    // bank-sheet.tsx: the same identity checks the dashboard badges with.
+    // The same identity checks the bank tile badges use.
     val withdrawMarked = merchant != null && state.withdrawals[merchant].orEmpty().any { it.pack == pack && it.slot == entry.slot && sameMarkedItem(it.item, item) }
     val standListing = state.standListings.find { it.bankPack == pack && it.bankSlot == entry.slot && sameMarkedItem(it.item, item) }
     val standFull = standIsFull(state.standListings, state.standBids)
@@ -84,8 +83,8 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
         }
     }
 
-    // bank-withdrawal.tsx: in-flight guard (withdraw is a server toggle) and
-    // the "Remove automatic bank mark?" consent on auto_bank_confirmation_required.
+    // In-flight guard (withdraw is a server toggle) and the "Remove automatic
+    // bank mark?" consent on auto_bank_confirmation_required.
     var withdrawing by remember { mutableStateOf(false) }
     var confirmingWithdraw by remember(entry) { mutableStateOf<Pair<Boolean, Int?>?>(null) }
     var confirmError by remember(entry) { mutableStateOf<String?>(null) }
@@ -177,7 +176,7 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                 // bank "Mark for upgrade" withdraws the item to the merchant to upgrade it.
                 if (expanded == "upgrade") {
                     UpgradeTierPicker(meta, level) { tiers -> withdraw(false, tiers) }
-                    // bank-upgrade-actions.tsx has no offering provider: these stay disabled.
+                    // The bank has no offering provider, so these stay disabled.
                     com.partyconsole.companion.ui.components.OfferingRows(viewModel, merchant!!, item, meta, enabled = false)
                 }
                 TapRow("Auto mark for upgrade") { toggle("autoupgrade") }
@@ -210,7 +209,7 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                     onConfirm = { quantity, acknowledged -> confirmWith { viewModel.api.sellBankItemToNpc(item, pack, entry.slot, quantity, acknowledged) } },
                 )
             }
-            // party-inventory-panels.tsx onBankAutoNpcSale: the rule is created for the merchant.
+            // The rule is created for the merchant.
             if (merchant != null && item.l == null) TapRow("Auto sell to NPC…") { toggle("autonpc") }
             if (merchant != null && expanded == "autonpc") {
                 val name = (meta?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(item.name)?.name ?: item.name

@@ -59,7 +59,7 @@ private val Rose300 = Color(0xFFFDA4AF)
 private val Slate300 = Color(0xFFCBD5E1)
 private val Slate400 = Color(0xFF94A3B8)
 
-// anniversary-dialog.tsx: rewards green, failures red, routine bookkeeping neutral.
+// Rewards green, failures red, routine bookkeeping neutral.
 private fun activityColor(level: String?, message: String): Color = when {
     Regex("\\band received [^·]+ Slice$", RegexOption.IGNORE_CASE).containsMatchIn(message) -> Emerald300
     level == "error" -> Rose300
@@ -76,8 +76,7 @@ private fun Panel(label: String, border: Color, content: @Composable () -> Unit)
     Column(modifier = Modifier.fillMaxWidth().border(1.dp, border, RoundedCornerShape(4.dp)).padding(12.dp).semantics { contentDescription = label }) { content() }
 }
 
-/** anniversary-dialog.tsx (the PWA's AnniversaryScreen.tsx) as its own
- *  screen, opened from the anniversary event's settings button: the chat
+/** The anniversary event, opened from the event's settings button: the chat
  *  toggle, the live round / next round with the farming-return failsafe and
  *  each character's ticket stage, cake slices, the chat advertisement, and
  *  the activity log. */

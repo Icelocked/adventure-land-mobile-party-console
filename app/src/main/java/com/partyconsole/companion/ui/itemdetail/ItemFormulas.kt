@@ -12,34 +12,30 @@ import kotlinx.serialization.json.doubleOrNull
 import java.math.BigDecimal
 import java.math.MathContext
 
-/** Faithful Kotlin ports of party-console's item-detail math (calculated-
- *  level-properties.tsx, npc-sale-value.tsx, item-maximum-level.tsx,
- *  format-duration.ts, item-detail-property-order.tsx) - pure functions,
- *  no UI, so ui/itemdetail/ItemDetailBrowser.kt can stay purely
- *  presentational. Every game-balance constant here (grade thresholds,
- *  stat-scroll multipliers, upgrade/compound tier multipliers) is copied
- *  verbatim from the web dashboard's own source rather than re-derived. */
+/** party-console's item-detail math as pure functions, so ItemDetailBrowser
+ *  stays presentational. Game-balance constants (grade thresholds,
+ *  stat-scroll and upgrade/compound tier multipliers) are copied from the
+ *  dashboard rather than re-derived. */
 
 private fun JsonElement.asDoubleOrNull(): Double? = (this as? JsonPrimitive)?.doubleOrNull
 private fun JsonElement.asBooleanOrNull(): Boolean? = (this as? JsonPrimitive)?.booleanOrNull
 private fun JsonElement.asStringOrNull(): String? = (this as? JsonPrimitive)?.content
 
-// Matches the game server's can_equip_item types (item-actions.ts). Elixirs are consumed effects, not equipment.
+// The game server's can_equip_item types. Elixirs are consumed effects, not equipment.
 private val equipmentTypes = setOf("helmet", "pants", "chest", "weapon", "amulet", "earring", "shoes", "gloves", "ring", "shield", "belt", "source", "orb", "quiver", "cape", "misc_offhand", "tool")
 fun isEquipment(definition: Map<String, JsonElement>?): Boolean = equipmentTypes.contains(definition?.get("type")?.asStringOrNull() ?: "")
 
-/** item-actions.ts isUsable, verbatim. */
+/** Whether the item can be used (elixirs, licences, spawners, or anything that `gives`). */
 fun isUsable(definition: Map<String, JsonElement>?): Boolean =
     (definition?.get("type") as? kotlinx.serialization.json.JsonPrimitive)?.content in setOf("elixir", "licence", "spawner") || definition?.get("gives") is kotlinx.serialization.json.JsonArray
 
-/** upgrade-rule-tiers.tsx, verbatim: a rule is its tier count or {tiers}. */
+/** A rule is its tier count or {tiers}. */
 fun upgradeRuleTiers(rule: JsonElement?): Int = when (rule) {
     is kotlinx.serialization.json.JsonObject -> (rule["tiers"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.toInt() ?: 0
     is kotlinx.serialization.json.JsonPrimitive -> rule.content.toDoubleOrNull()?.toInt() ?: 0
     else -> 0
 }
 
-/** comparisonSlotLabel (itemFormulas.ts). */
 fun comparisonSlotLabel(slot: String): String = when (slot) {
     "mainhand" -> "Main hand"
     "offhand" -> "Off hand"
@@ -50,8 +46,7 @@ fun comparisonSlotLabel(slot: String): String = when (slot) {
     else -> slot
 }
 
-// comparison-slots.tsx ported verbatim - which equip slot(s) a given item type could
-// replace, for gear-comparison-dialog.tsx's "Compare with equipped".
+// Which equip slot(s) a given item type could replace, for "Compare with equipped".
 private val comparisonSlots = mapOf(
     "weapon" to listOf("mainhand"),
     "shield" to listOf("offhand"),
@@ -71,9 +66,8 @@ private val comparisonSlots = mapOf(
     "earring" to listOf("earring1", "earring2"),
 )
 
-/** comparison-slots-for.tsx ported verbatim - a 1-handed weapon can replace either hand,
- *  matching the wielding character's own class (a 2-handed weapon only ever replaces
- *  mainhand). */
+/** A 1-handed weapon can replace either hand, depending on the wielding
+ *  character's class; a 2-handed weapon only ever replaces mainhand. */
 fun comparisonSlotsFor(meta: ItemMeta?, characterCtype: String): List<String> {
     val type = meta?.definition?.get("type")?.asStringOrNull() ?: ""
     if (type == "weapon") {
@@ -95,8 +89,8 @@ private fun JsonElement.isTruthy(): Boolean = when (this) {
 }
 
 /** The subset of a definition/scaling record that represents a numeric
- *  in-game stat (item-property-keys.tsx) - everything else (name, skin,
- *  type, grades, ...) is metadata, not a stat to preview at other levels. */
+ *  in-game stat - everything else (name, skin, type, grades, ...) is
+ *  metadata, not a stat to preview at other levels. */
 private val ITEM_PROPERTY_KEYS = setOf(
     "gold", "luck", "xp", "int", "str", "dex", "vit", "for", "charisma", "cuteness", "awesomeness",
     "bling", "hp", "mp", "attack", "range", "armor", "incdmgamp", "resistance", "pnresistance",
@@ -106,9 +100,9 @@ private val ITEM_PROPERTY_KEYS = setOf(
     "mp_reduction", "output", "courage", "mcourage", "pcourage",
 )
 
-/** stat-scrolls.tsx's per-stat multiplier, used when a generic "stat"
- *  scaling value needs to redirect into the specific stat a stat-scroll-
- *  marked item's `stat_type` names. */
+/** Per-stat multiplier, used when a generic "stat" scaling value needs to
+ *  redirect into the specific stat a stat-scroll- marked item's `stat_type`
+ *  names. */
 private val STAT_SCROLL_MULTIPLIER = mapOf(
     "str" to 1.0, "int" to 1.0, "dex" to 1.0, "vit" to 1.0, "for" to 1.0,
     "evasion" to 0.325, "reflection" to 0.15, "gold" to 0.5, "luck" to 1.0, "xp" to 0.5,
@@ -122,10 +116,10 @@ private val NO_ROUND_KEYS = setOf(
     "critdamage", "breaks",
 )
 
-/** Recomputes an item's stat block AT [level] from its base definition
- *  plus per-level scaling deltas - upgrade/compound tiers apply different
+/** Recomputes an item's stat block AT [level] from its base definition plus
+ *  per-level scaling deltas - upgrade/compound tiers apply different
  *  multipliers at specific breakpoints (tier 7+ for upgrades, 5+ for
- *  compounds), matching the game's own progression curve exactly. */
+ *  compounds), matching the game's own progression curve. */
 fun calculatedLevelProperties(meta: ItemMeta?, statType: String?, level: Int): Map<String, Double> {
     val definition = meta?.definition.orEmpty()
     val scaling = meta?.scaling.orEmpty()
@@ -172,8 +166,7 @@ fun calculatedLevelProperties(meta: ItemMeta?, statType: String?, level: Int): M
  *  current-level `properties` (authoritative - covers anything the client
  *  formula above doesn't model) adjusted by the DELTA between the formula
  *  evaluated at the preview level vs. the actual level, rather than the
- *  formula's raw output - mirrors item-details.tsx's `previewProperties`
- *  exactly so a "no scaling data" stat doesn't silently vanish. */
+ *  formula's raw output, so a "no scaling data" stat doesn't silently vanish. */
 fun previewProperties(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?): Map<String, Double> {
     val current = calculatedLevelProperties(meta, statType, actualLevel)
     val preview = calculatedLevelProperties(meta, statType, previewLevel)
@@ -194,10 +187,9 @@ fun itemMaximumLevel(meta: ItemMeta?): Int {
     return if (meta?.compoundable == true) 7 else if (meta?.upgradeable == true) 13 else 0
 }
 
-/** upgrade-scroll-cost.tsx ported verbatim, including its hardcoded
- *  scroll-price fallback (not the live catalog price - this function has
- *  no catalog access at its call site in the dashboard either, so the
- *  approximation is intentional, not a bug to "fix" here). */
+/** Upgrade scroll cost with a hardcoded scroll-price fallback rather than the
+ *  live catalog price. The dashboard has no catalog access at this call site
+ *  either, so the approximation is intentional. */
 fun upgradeScrollCost(meta: ItemMeta?, startLevel: Int, tiers: Int): Long {
     val grades = meta?.definition?.get("grades")?.asIntListOrNull() ?: listOf(9, 10, 11, 12)
     val scrollCosts = listOf(1_000L, 40_000L, 1_600_000L, 64_000_000L)
@@ -216,9 +208,8 @@ fun upgradeScrollCost(meta: ItemMeta?, startLevel: Int, tiers: Int): Long {
 
 data class CompoundCost(val gold: Long, val scrolls: Long)
 
-/** lib/compound-cost.ts's compoundPassCost ported verbatim - minimum
- *  scroll spend to build one target item entirely from +0 copies, using
- *  real compound-scroll ("cscroll0".."cscroll3") prices from the live
+/** Minimum scroll spend to build one target item entirely from +0 copies,
+ *  using real compound-scroll ("cscroll0".."cscroll3") prices from the live
  *  merchant catalog rather than a hardcoded approximation. */
 fun compoundPassCost(grades: List<Int>?, targetLevel: Int, buyable: List<com.partyconsole.companion.model.MerchantBuyItem>): CompoundCost? {
     val thresholds = grades ?: listOf(9, 10, 11, 12)
@@ -238,9 +229,8 @@ fun compoundPassCost(grades: List<Int>?, targetLevel: Int, buyable: List<com.par
     return CompoundCost(gold, scrolls)
 }
 
-/** stat-scrolls.tsx's table - `purchasable` stats (str/int/dex/vit) are
- *  bought outright for gold; the rest require already owning the scroll
- *  (stat-scroll-quantity.tsx/primary-stat-scroll-cost.tsx). */
+/** Stat scrolls: `purchasable` stats (str/int/dex/vit) are bought outright
+ *  for gold; the rest require already owning the scroll. */
 data class StatScrollOption(val stat: String, val scroll: String, val label: String, val purchasable: Boolean)
 
 val STAT_SCROLLS = listOf(
@@ -268,8 +258,8 @@ val STAT_SCROLLS = listOf(
     StatScrollOption("output", "outputscroll", "Output", false),
 )
 
-/** stat-scroll-quantity.tsx ported verbatim - how many scrolls of a stat
- *  type a mark at this item's current level requires. */
+/** How many scrolls of a stat type a mark at this item's current level
+ *  requires. */
 fun statScrollQuantity(meta: ItemMeta?, level: Int): Int {
     val grades = meta?.definition?.get("grades")?.asIntListOrNull() ?: listOf(9, 10, 11, 12)
     val lvl = maxOf(0, level)
@@ -284,8 +274,8 @@ fun statScrollQuantity(meta: ItemMeta?, level: Int): Int {
 
 fun primaryStatScrollCost(meta: ItemMeta?, level: Int): Long = statScrollQuantity(meta, level) * 8_000L
 
-/** npc-sale-value.tsx ported verbatim - the exact upgrade/compound grade-
- *  tier gold curve the game itself uses, not an approximation. */
+/** NPC sale value, using the game's own upgrade/compound grade-tier gold
+ *  curve. */
 fun npcSaleValue(level: Int, gift: Boolean, expires: JsonElement?, meta: ItemMeta?): Long {
     val definition = meta?.definition.orEmpty()
     if (gift) return 1L
@@ -354,8 +344,8 @@ fun durationStat(key: String, value: Double, definitionType: String?): String? {
     return formatDuration(ms)
 }
 
-/** item-detail-property-order.tsx's display order for the "Item stats"
- *  table - anything not listed sorts after, alphabetically. */
+/** Display order for the "Item stats" table - anything not listed sorts
+ *  after, alphabetically. */
 private val ITEM_DETAIL_PROPERTY_ORDER = listOf(
     "equip_slot", "stackable", "max_stack_size", "tier", "scroll", "stat", "str", "dex", "int", "vit",
     "for", "hp", "mp", "attack", "frequency", "range", "armor", "resistance", "apiercing", "rpiercing",
@@ -365,9 +355,9 @@ private val ITEM_DETAIL_PROPERTY_ORDER = listOf(
 )
 val ITEM_DETAIL_PROPERTY_RANK = ITEM_DETAIL_PROPERTY_ORDER.withIndex().associate { (i, k) -> k to i }
 
-/** item-details.tsx `ignored`: keys never shown in the stats table -
- *  shown elsewhere already (name, explanation, level, g/buy price), purely
- *  internal, or `type`, which is shown as the derived equip slot instead. */
+/** Keys never shown in the stats table - shown elsewhere already (name,
+ *  explanation, level, g/buy price), purely internal, or `type`, which is
+ *  shown as the derived equip slot instead. */
 private val IGNORED_STAT_KEYS = setOf(
     "skin", "skin_a", "skin_c", "skin_r", "name", "explanation", "type", "g", "s", "grades", "upgrade",
     "compound", "level", "set",
@@ -375,16 +365,16 @@ private val IGNORED_STAT_KEYS = setOf(
 
 data class StatRow(val key: String, val value: JsonElement)
 
-/** Builds the "Item stats" table exactly as item-details.tsx does: the raw
- *  definition, with [previewProperties] (already-scaled current/preview
- *  stat values) overlaid on top, plus a derived stackable/max_stack_size
- *  pair, ignored keys stripped, and sorted by display rank. */
+/** Builds the "Item stats" table: the raw definition, with
+ *  [previewProperties] (already-scaled current/preview stat values) overlaid
+ *  on top, plus a derived stackable/max_stack_size pair, ignored keys
+ *  stripped, and sorted by display rank. */
 fun buildStatRows(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?): List<StatRow> {
     val definition = meta?.definition.orEmpty()
     val preview = previewProperties(meta, actualLevel, previewLevel, statType)
     val display = LinkedHashMap<String, JsonElement>(definition)
     for ((key, value) in preview) display[key] = JsonPrimitive(value)
-    // item-details.tsx: equipment shows where it goes instead of its type.
+    // Equipment shows where it goes instead of its type.
     val type = definition["type"]?.asStringOrNull().orEmpty()
     comparisonSlots[type]?.takeIf { it.isNotEmpty() }?.let { slots ->
         display["equip_slot"] = JsonPrimitive(
@@ -401,9 +391,8 @@ fun buildStatRows(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType
         .sortedWith(compareBy({ ITEM_DETAIL_PROPERTY_RANK[it.key] ?: Int.MAX_VALUE }, { it.key }))
 }
 
-/** Renders one stat value the way item-details.tsx's `<dd>` does: a
- *  duration-shaped key/value becomes "1h 30m", arrays join with commas,
- *  everything else is just its plain string form. */
+/** Renders one stat value: a duration-shaped key/value becomes "1h 30m",
+ *  arrays join with commas, everything else is just its plain string form. */
 fun formatStatValue(key: String, value: JsonElement, definitionType: String?): String {
     if (value is JsonPrimitive && value.doubleOrNull != null) {
         val num = value.doubleOrNull!!
@@ -436,12 +425,12 @@ internal fun exchangeTarget(reward: String): Pair<String, Int> {
     return id to level
 }
 
-/** item-exchange-details.tsx's three groupings, matched against the whole
- *  exchangeable table by [id]+[level]: what it costs to buy this item from
- *  an exchange NPC ([prices]), what an exchange/box keyed by this item
- *  itself gives back ([rewards]), and - for a base (+0) item only - every
- *  box/table this item can be pulled out of as a random result ([sources],
- *  "Reward in" on desktop). */
+/** Three exchange groupings, matched against the whole exchangeable table by
+ *  [id]+[level]: what it costs to buy this item from an exchange NPC
+ *  ([prices]), what an exchange/box keyed by this item itself gives back
+ *  ([rewards]), and - for a base (+0) item only - every box/table this item
+ *  can be pulled out of as a random result ([sources], "Reward in" on
+ *  desktop). */
 fun exchangeSections(id: String, level: Int, exchanges: List<MerchantExchangeItem>): ExchangeSections {
     val prices = exchanges.filter { it.reward != null && exchangeTarget(it.reward!!) == (id to level) }
     val rewards = exchanges.filter { it.id == id && it.level == level }
@@ -459,23 +448,20 @@ fun exchangeSections(id: String, level: Int, exchanges: List<MerchantExchangeIte
 
 fun rewardPercentage(chance: Double): String = when {
     chance > 0 && chance < 0.00000001 -> "<0.000001%"
-    // toPrecision (6 significant figures, matching itemFormulas.ts and this
-    // file's own formatDropRate below) - NOT decimal-place rounding, which
-    // printed far more digits than intended for anything above ~1% and
-    // disagreed with formatDropRate's percent() for the same input.
+    // toPrecision (6 significant figures, like formatDropRate below), not
+    // decimal-place rounding, so both print the same value for the same input.
     else -> "${toPrecision(chance * 100, 6)}%"
 }
 
-/** drop-rate.ts's `effectiveDropRate` - a direct monster kill retains its
- *  original chance even when the DISPLAYED rate was capped (e.g. by a
- *  luck multiplier elsewhere), but a multi-step acquisition path (a drop
- *  found by opening a box that's itself a drop) shows the actual chance. */
+/** A direct monster kill retains its original chance even when the DISPLAYED
+ *  rate was capped (e.g. by a luck multiplier elsewhere), but a multi-step
+ *  acquisition path (a drop found by opening a box that's itself a drop)
+ *  shows the actual chance. */
 fun effectiveDropRate(drop: ItemDropSource): Double =
     if (drop.sourceType == "monster" && drop.acquisitionPath.size <= 1) drop.originRate ?: drop.rate else drop.rate
 
-/** drop-rate.ts's `formatDropRate` ported verbatim - rates above 100%
- *  (guaranteed multi-drops) split into a guaranteed count plus a
- *  fractional remainder chance. */
+/** Rates above 100% (guaranteed multi-drops) split into a guaranteed count
+ *  plus a fractional remainder chance. */
 fun formatDropRate(drop: ItemDropSource): String {
     val rate = maxOf(0.0, effectiveDropRate(drop))
     val quantity = maxOf(1, drop.quantity)
@@ -494,18 +480,17 @@ private fun toPrecision(value: Double, sigFigs: Int): String {
     }.getOrDefault(value.toString())
 }
 
-/** use-party-console.tsx detailMeta: catalog meta with the live instance's
- *  meta over it (keeping the catalog's world info when the live one has none). */
+/** Catalog meta with the live instance's meta over it (keeping the catalog's
+ *  world info when the live one has none). */
 fun detailMeta(known: ItemMeta?, live: ItemMeta?): ItemMeta? = when {
     known == null -> live
     live == null -> known
     else -> live.copy(world = live.world ?: known.world, sprite = live.sprite ?: known.sprite)
 }
 
-/** itemFormulas.ts propertiesAtLevel: the item's reported properties moved
- *  by the formula delta between its actual level/stat and the preview's.
- *  Non-numeric reported properties (flags) are left out - only the numbers
- *  feed the comparison. */
+/** The item's reported properties moved by the formula delta between its
+ *  actual level/stat and the preview's. Non-numeric reported properties
+ *  (flags) are left out - only the numbers feed the comparison. */
 fun propertiesAtLevel(meta: ItemMeta?, item: com.partyconsole.companion.model.Item, level: Int, statType: String?): Map<String, Double> {
     val actualCalculated = calculatedLevelProperties(meta, item.statType, maxOf(0, item.level ?: 0))
     val previewCalculated = calculatedLevelProperties(meta, statType, level)

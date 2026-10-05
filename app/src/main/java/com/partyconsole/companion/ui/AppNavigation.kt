@@ -34,8 +34,7 @@ import com.partyconsole.companion.ui.connection.PairingScreen
 import com.partyconsole.companion.ui.connection.PairingViewModel
 
 /** Every screen shares one PartyViewModel (one live SSE connection) via
- *  getBackStackEntry(CHARACTER_LIST) scoping - see the comment on the
- *  detail route below, which explains why this matters. */
+ *  getBackStackEntry(CHARACTER_LIST) scoping. */
 internal object Routes {
     const val CONNECTION = "connection"
     const val PAIRING = "pairing"
@@ -67,15 +66,11 @@ fun AppNavigation(store: ServerConfigStore) {
     val navController = rememberNavController()
     val settings by store.settings.collectAsState(initial = null)
 
-    // A returning user with an already-saved server shouldn't see the
-    // connection screen again - jump straight to the pairing gate (which
-    // itself passes straight through to the party view once it confirms
-    // this phone is already paired - see PairingViewModel) the first time
-    // settings resolves to a real (non-null) value while we're still
-    // sitting on the connection screen. Reading a fresh DataStore Flow
-    // always completes quickly (local disk, no network), so the brief
-    // connection-screen flash before this fires is not worth a separate
-    // splash screen for a v1.
+    // A returning user with a saved server skips the connection screen: the
+    // first time settings resolves to a real value while still on it, jump to
+    // the pairing gate (which passes straight through once this phone is
+    // paired). The DataStore read is local and fast, so the brief
+    // connection-screen flash isn't worth a splash screen.
     LaunchedEffect(settings) {
         if (settings != null && navController.currentDestination?.route == Routes.CONNECTION) {
             navController.navigate(Routes.PAIRING) {
@@ -149,11 +144,9 @@ fun AppNavigation(store: ServerConfigStore) {
         ) { backStackEntry ->
             val active = settings ?: return@composable
             val name = backStackEntry.arguments?.getString("name") ?: return@composable
-            // Shares the character-list screen's ViewModel (and therefore
-            // its already-live SSE connection) instead of opening a second
-            // one from scratch - every other route below does the same,
-            // for the same reason (see this session's "isn't reporting in"
-            // bug this fixed originally).
+            // Shares the character-list screen's ViewModel (and its live SSE
+            // connection) instead of opening a second connection; every other
+            // route below does the same.
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.CHARACTER_LIST) }
             val viewModel: PartyViewModel = viewModel(parentEntry, factory = PartyViewModelFactory(active))
             CharacterDetailScreen(

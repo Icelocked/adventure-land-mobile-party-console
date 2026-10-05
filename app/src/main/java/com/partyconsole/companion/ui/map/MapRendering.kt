@@ -15,10 +15,9 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
-// The PWA's components/map/mapRendering.ts (map-render-buffer.ts,
-// cropped-tile.ts, doll-layers.tsx, marker-style.ts), ported.
+// PWA: web/src/components/map/mapRendering.ts.
 
-/** map-render-buffer.ts: the latest frame and the one before it (same map). */
+/** The latest frame and the one before it (same map). */
 class MapRenderBuffer {
     @Volatile var frame: MapFrame? = null
     @Volatile var previous: MapFrame? = null
@@ -27,7 +26,7 @@ class MapRenderBuffer {
     fun clear() { frame = null; previous = null; receivedAt = 0 }
 }
 
-/** receiveMapFrame: keep the previous frame's recent events (1.1 s) and at most 80. */
+/** Keeps the previous frame's recent events (1.1 s), at most 80. */
 fun receiveMapFrame(buffer: MapRenderBuffer, next: MapFrame, receivedAt: Long, now: Long) {
     val previous = buffer.frame?.takeIf { it.map == next.map }
     val events = (previous?.events.orEmpty().filter { now - it.at < 1100 } + next.events).takeLast(80)
@@ -69,7 +68,7 @@ fun visibleTiles(p: PreparedPlacement, left: Double, top: Double, right: Double,
     )
 }
 
-/** marker-style.ts: explicit roles keep scatter targets red and preserve invisible grouped ranks. */
+/** Explicit roles keep scatter targets red and preserve invisible grouped ranks. */
 data class MarkerStyle(val color: Int, val double: Boolean)
 
 fun markerStyle(role: String?, state: String?, index: Int = 0): MarkerStyle {
@@ -77,7 +76,7 @@ fun markerStyle(role: String?, state: String?, index: Int = 0): MarkerStyle {
     return MarkerStyle(if (resolved == "current") 0xFFEF4444.toInt() else 0xFFFACC15.toInt(), resolved == "third")
 }
 
-/** doll-layers.tsx: each <img> of a character doll and its clipping parent. */
+/** Each image layer of a character doll and its clipping parent. */
 data class DollLayer(
     val url: String,
     val left: Float,
@@ -123,10 +122,9 @@ fun dollLayers(html: String): List<DollLayer> = synchronized(dollCache) {
     }
 }
 
-/** cached-map-image.tsx + cropped-tile.ts: game images loaded once (through
- *  Coil) and kept for the session; [version] ticks as each one arrives so
- *  the canvas redraws. On a debug instance, adventure.land images come
- *  from its local copy (game-image-url.ts). */
+/** Game images loaded once (through Coil) and kept for the session; [version]
+ *  ticks as each one arrives so the canvas redraws. On a debug instance,
+ *  adventure.land images come from its local copy. */
 object MapImages {
     @Volatile var debugAssetsBase: String? = null
     val version = MutableStateFlow(0)

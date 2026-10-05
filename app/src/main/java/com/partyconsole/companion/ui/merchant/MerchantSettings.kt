@@ -74,10 +74,8 @@ private fun SettingBox(title: String? = null, error: String?, content: @Composab
 @Composable
 private fun Help(text: String) = Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-/** merchant-collection-settings.tsx's "Merchant settings" (the PWA's
- *  screens/merchant/MerchantSettings.tsx): bank sorting, upgrade buy batch,
- *  stand location, delivery/withdrawal trips, and the gold and item
- *  collection thresholds. */
+/** Merchant settings: bank sorting, upgrade buy batch, stand location,
+ *  delivery/withdrawal trips, and the gold and item collection thresholds. */
 @Composable
 fun MerchantSettings(viewModel: PartyViewModel) {
     Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -90,7 +88,7 @@ fun MerchantSettings(viewModel: PartyViewModel) {
     }
 }
 
-/** bank-sort-control.tsx (settings mode). */
+/** Bank sorting (settings mode). */
 @Composable
 private fun BankSortSetting(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -107,7 +105,7 @@ private fun BankSortSetting(viewModel: PartyViewModel) {
     }
 }
 
-/** buy-upgrade-batch-setting.tsx */
+/** Upgrade buy batch. */
 @Composable
 private fun BuyUpgradeBatchSetting(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -130,7 +128,7 @@ private fun BuyUpgradeBatchSetting(viewModel: PartyViewModel) {
     }
 }
 
-/** merchant-stand-location-setting.tsx */
+/** Stand location. */
 @Composable
 private fun StandLocationSetting(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -158,7 +156,7 @@ private fun StandLocationSetting(viewModel: PartyViewModel) {
     }
 }
 
-/** delivery-trip-setting.tsx / withdrawal-trip-setting.tsx */
+/** Delivery / withdrawal trips. */
 @Composable
 private fun TripSetting(viewModel: PartyViewModel, kind: String) {
     val state by viewModel.dynamicState.collectAsState()
@@ -171,7 +169,7 @@ private fun TripSetting(viewModel: PartyViewModel, kind: String) {
             if (kind == "withdrawals") pendingChecked = next
             run({ viewModel.api.saveRoutinePriorities(emptyMap(), mapOf(kind to next)) }, { pendingChecked = null })
         }
-        // The label toggles too, like the dashboard's <label>.
+        // The label toggles too.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.toggleable(value = checked, enabled = !setting.busy, role = Role.Checkbox, onValueChange = ::change),
@@ -192,8 +190,8 @@ private fun TripSetting(viewModel: PartyViewModel, kind: String) {
     }
 }
 
-/** merchant-collection-settings.tsx's two thresholds, with
- *  use-party-console.tsx's validation and re-sync while untouched. */
+/** The gold and item collection thresholds, validated and re-synced from the
+ *  server while untouched. */
 @Composable
 private fun ThresholdSettings(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()

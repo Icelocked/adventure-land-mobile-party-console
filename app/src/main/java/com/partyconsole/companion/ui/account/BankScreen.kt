@@ -60,10 +60,9 @@ private val Amber = Color(0xFFF59E0B)
 private val Emerald = Color(0xFF10B981)
 private val Fuchsia = Color(0xFFE879F9)
 
-/** Shared bank browse (the PWA's BankScreen.tsx, bank-sheet.tsx's action
- *  set): gold breakdown, sort-on-next-visit, additional storage, search,
- *  collapsible packs with free counts, per-item marks, and the bankbois.
- *  Tap an item for its options (BankItemPanel). */
+/** Shared bank browser: gold breakdown, sort-on-next-visit, additional
+ *  storage, search, collapsible packs with free counts, per-item marks, and
+ *  the bankbois. Tap an item for its options (BankItemPanel). */
 @Composable
 fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     DomainInterest(viewModel, Domain.BANK)
@@ -75,7 +74,7 @@ fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var search by remember { mutableStateOf("") }
     var collapsed by remember { mutableStateOf(setOf<String>()) }
     val query = search.trim().lowercase()
-    // bank-sheet.tsx matchesSearch: item id or name; non-matches are dimmed.
+    // Search matches item id or name; non-matches are dimmed.
     fun matches(entry: InventoryEntry) = query.isEmpty() || listOf(entry.item.name, catalogFor(entry.item.name)?.name).any { it.orEmpty().lowercase().contains(query) }
     val bank = state.bank
 
@@ -111,7 +110,7 @@ fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
             } else {
                 for ((packName, entries) in bank.packs) {
                     val filled = entries.filterNotNull()
-                    // items1's last 7 slots are reserved and never usable (bank-sheet.tsx usableItems).
+                    // items1's last 7 slots are reserved and never usable.
                     val usable = if (packName == "items1") entries.take(35) else entries
                     val free = usable.size - usable.count { it != null }
                     val expanded = packName !in collapsed
@@ -144,8 +143,8 @@ fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     opened?.let { (pack, entry) -> BankItemPanel(viewModel, pack, entry) { opened = null } }
 }
 
-/** bank-sort-control.tsx's one-shot "Sort on next visit" toggle - only shown
- *  while the standing mode is "request". */
+/** One-shot "Sort on next visit" toggle, shown only while the standing mode
+ *  is "request". */
 @Composable
 private fun BankSortToggle(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -189,10 +188,10 @@ private fun BankSortToggle(viewModel: PartyViewModel) {
 
 private val FLOOR_NAMES = mapOf("bank" to "Main bank", "bank_b" to "Bank basement", "bank_u" to "Bank underground")
 
-/** bank-sheet.tsx "Additional bank storage": each floor, whether it's
- *  accessible (or which key unlocks it, and how many are owned), and the
- *  purchasable vaults on accessible floors - every unlock confirmed first
- *  and sent through the configured merchant. */
+/** "Additional bank storage": each floor, whether it's accessible (or which
+ *  key unlocks it, and how many are owned), and the purchasable vaults on
+ *  accessible floors - every unlock confirmed first and sent through the
+ *  configured merchant. */
 @Composable
 private fun AdditionalStorageSection(viewModel: PartyViewModel) {
     val state by viewModel.dynamicState.collectAsState()
@@ -205,7 +204,7 @@ private fun AdditionalStorageSection(viewModel: PartyViewModel) {
     var error by remember { mutableStateOf<String?>(null) }
     if (vaults.isEmpty()) return
     val unlocked = bank?.packs?.keys.orEmpty()
-    // bank-sheet.tsx keyQuantity: the merchant's inventory plus every bank pack.
+    // Keys owned: the merchant's inventory plus every bank pack.
     fun keyQuantity(key: String): Int {
         var quantity = merchant?.let { characters[it]?.inventory?.items }.orEmpty().sumOf { if (it?.item?.name == key) it.item.q ?: 1 else 0 }
         for (entries in bank?.packs?.values.orEmpty()) for (entry in entries) if (entry?.item?.name == key) quantity += entry.item.q ?: 1
@@ -289,10 +288,10 @@ private fun AdditionalStorageSection(viewModel: PartyViewModel) {
     }
 }
 
-/** bank-sheet.tsx "Bankbois": overflow storage workers - create one (the
- *  first reserves 7 slots of bank pane 1, so it asks), each one's state,
- *  load and error, its items (the same options as a bank item, on pack
- *  bankboi:NAME), and a two-step delete once it's empty. */
+/** Bankbois, the overflow storage workers: create one (the first reserves 7
+ *  slots of bank pane 1, so it asks), each one's state, load and error, its
+ *  items (the same options as a bank item, on pack bankboi:NAME), and a
+ *  two-step delete once it's empty. */
 private fun LazyListScope.bankbois(viewModel: PartyViewModel, catalogFor: (String) -> CatalogItem?, matches: (InventoryEntry) -> Boolean, onOpen: (String, InventoryEntry) -> Unit) {
     item(key = "bankbois") { BankboisHeader(viewModel) }
     item(key = "bankbois-list") {
@@ -396,9 +395,9 @@ private fun BankboisHeader(viewModel: PartyViewModel) {
     }
 }
 
-/** bank-sheet.tsx tile markers, as a list row: every pending mark at once
- *  (withdrawal border + Withdraw / Stand / NPC / Deconstruct labels), the
- *  stat-scroll badge, Auto stand, and RESERVED on items1's last seven slots. */
+/** Bank tile markers as a list row: every pending mark at once (withdrawal
+ *  border + Withdraw / Stand / NPC / Deconstruct labels), the stat-scroll
+ *  badge, Auto stand, and RESERVED on items1's last seven slots. */
 @Composable
 private fun BankRow(viewModel: PartyViewModel, entry: InventoryEntry, pack: String, catalogFor: (String) -> CatalogItem?, dimmed: Boolean, onOpen: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()

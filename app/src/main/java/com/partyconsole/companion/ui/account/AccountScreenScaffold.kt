@@ -16,11 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** Shared shell for every account-wide screen (Mail/Bestiary/Skills/Stand/
- *  Market/Bank/Logs/Settings) - same title bar + back button + an optional
- *  manual-refresh action, so each screen only supplies its own list/content
- *  body. Data otherwise only updates on the ~6s poll (or SSE deltas for
- *  vitals) - [onRefresh] forces an immediate re-fetch instead of waiting. */
+/** Shared shell for the account-wide screens: title bar, back button and an
+ *  optional manual refresh. Data otherwise updates only on the ~6s poll (or
+ *  SSE deltas for vitals); [onRefresh] forces an immediate re-fetch. */
 @Composable
 fun AccountScreenScaffold(
     title: String,
