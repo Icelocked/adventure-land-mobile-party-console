@@ -156,9 +156,8 @@ Release with the APK and a zip of the PWA bundle.
   happens on `dev`, which CI also tests, and merges into `main` for a release.
 - Debug builds of the Android app are a separate app, "Party Console (dev)",
   so they install next to the release app on the same phone.
-- To try PWA changes on a live setup without touching the released PWA, run
-  a second container built from your checkout on another port (see
-  [DEPLOYMENT.md § 4e](DEPLOYMENT.md#4e-optional-a-development-copy)).
+- To run the PWA from your own checkout or branch, build it from source
+  (see "Building from source instead" in [DEPLOYMENT.md § 4d](DEPLOYMENT.md#4d-updates)).
 
 ## Contributing
 
