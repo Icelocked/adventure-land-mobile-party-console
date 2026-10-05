@@ -1,3 +1,4 @@
+import { sanitizeDollHtml } from '@/lib/safeHtml'
 import { useState } from 'react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
@@ -226,7 +227,7 @@ export function GearComparisonSheet({
       <section aria-label={proposed ? 'With this item' : 'Currently equipped'} className={`rounded-lg border p-3 ${proposed ? 'border-cyan-800' : 'border-border'}`}>
         <div className="mb-3 flex items-center gap-3">
           {/* gear-comparison-dialog.tsx renders the game's own character doll markup. */}
-          <div className="h-20 w-16 shrink-0 overflow-hidden" dangerouslySetInnerHTML={diagnostics.characterDollHtml ? { __html: diagnostics.characterDollHtml } : undefined} />
+          <div className="h-20 w-16 shrink-0 overflow-hidden" dangerouslySetInnerHTML={diagnostics.characterDollHtml ? { __html: sanitizeDollHtml(diagnostics.characterDollHtml) } : undefined} />
           <div className="min-w-0">
             <p className="font-semibold">{proposed ? name : equipped ? `${nameOf(equipped.item, equippedMeta)} +${leftLevel}` : 'Empty slot'}</p>
             <p className="font-mono text-[10px] text-muted-foreground">

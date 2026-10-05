@@ -283,8 +283,19 @@ Requirements:
      `https://<machine>.<tailnet>.ts.net`. Tapping a notification opens the
      app, which needs Tailscale connected.
   2. **Tailscale Funnel.** Same address, also reachable without Tailscale
-     (from any network): `tailscale funnel --bg 8080`. Because the app is
-     then public, keep "Require secure pairing" on in Settings.
+     (from any network, e.g. a work network that blocks Tailscale):
+     `tailscale funnel --bg 8080`. The app is then on the public internet:
+     - Keep "Require secure pairing" on in Settings. Every console
+       request then needs this browser's pairing cookie (a random 256-bit
+       token); without it nothing but the sign-in pages is served.
+     - Expose only the PWA (port 8080) through Funnel, never
+       party-console's own port 3010.
+     - Invitation links work until used: create one only when you are
+       about to pair a device, and don't share it.
+     - The PWA container is built for this: rate limits per visitor,
+       security headers (no framing, HTTPS-only once on HTTPS), relative
+       redirects, sanitized game markup, and a notifier that accepts only
+       same-site requests from paired browsers.
   3. **The Tailscale certificate inside the PWA container** (section 3c).
   4. **Your own domain** behind a reverse proxy with a real certificate
      (Caddy or nginx with Let's Encrypt, or a Cloudflare Tunnel).
