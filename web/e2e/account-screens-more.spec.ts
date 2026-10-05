@@ -8,9 +8,8 @@ test('Settings: App updates section can check for an update without erroring', a
   await server.install(page)
 
   await page.goto('/settings')
-  // Installed as a home-screen app, there's no browser chrome to force-
-  // refresh from at all - this button is the only in-app escape hatch
-  // for a stuck service worker.
+  // An installed app has no browser chrome to force-refresh, so this button
+  // is the way out of a stuck service worker.
   await page.getByRole('button', { name: 'Check for updates' }).click()
   await expect(page.getByRole('button', { name: /Checking…|Up to date/ })).toBeVisible()
 })
@@ -33,7 +32,7 @@ test('WTB: placing an order fails once with a server error, then succeeds, then 
   server.failOnce['merchant/bid'] = 'Stand is full'
   await page.getByRole('button', { name: 'Place WTB' }).click()
   await expect(page.getByText('Stand is full')).toBeVisible()
-  // The form must stay open on failure - the order was never actually placed.
+  // The form stays open on failure; the order was not placed.
   await expect(page.getByRole('button', { name: 'Place WTB' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Place WTB' }).click()

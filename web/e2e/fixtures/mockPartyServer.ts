@@ -2,15 +2,12 @@ import type { Page } from '@playwright/test'
 import { createServer, type Server, type ServerResponse } from 'node:http'
 
 /**
- * A stateful in-memory stand-in for party-console's own HTTP surface,
- * installed via Playwright route interception - no live server is ever
- * involved. This keeps e2e tests fast, deterministic, and completely
- * incapable of mutating a real account (there's no way to "accidentally"
- * mark a real character's real items while testing against this).
+ * A stateful in-memory stand-in for party-console's HTTP API, installed via
+ * Playwright route interception, so e2e tests are deterministic and can't
+ * touch a real account.
  *
- * Deliberately loose typing (Record<string, unknown> throughout) - this
- * mirrors the wire shapes in web/src/models exactly enough for the app to
- * render and act on, without importing/duplicating those interfaces here.
+ * Typing is deliberately loose (Record<string, unknown>): the shapes only
+ * need to match web/src/models closely enough for the app to render and act.
  */
 
 const TINY_PNG_BASE64 =
@@ -36,10 +33,8 @@ export interface MockCharacter {
   x?: number
   y?: number
   items?: (MockItem | null)[]
-  // Deliberately string | number, not just string - the real vitals status's
-  // own target field is never coerced server-side (characters/shared.js's
-  // publishMapFrame), unlike the map-frame's entities[].id (explicitly
-  // String()'d) - this models that real, exact asymmetry.
+  // string | number on purpose: the console never coerces the vitals
+  // target, while map-frame entity ids are always strings.
   target?: string | number
   conditions?: { id: string; name: string; remainingMs?: number }[]
   // The game realm the character is on (vitals.server).
@@ -48,8 +43,8 @@ export interface MockCharacter {
   slots?: Record<string, { item: MockItem; price?: number } | null>
   // Extra characterDetails fields (the script's stats: str, attack, combatStats, characterDollHtml, ...).
   diagnostics?: Record<string, unknown>
-  // This character's own Hunt quest assignment - mirrors state.statuses[name].monsterHunt,
-  // exposed via characterDetails in the real state?section=core&dashboard=1 response.
+  // This character's Hunt quest (state.statuses[name].monsterHunt), served in
+  // characterDetails by section=core&dashboard=1.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
 }
 
@@ -71,9 +66,8 @@ export interface MockCatalogEntry {
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
 
-// Copied VERBATIM from party-console v1.2.0
-// runtime/coordinator/telemetry/public-state.ts:65-86 (configFields,
-// configExtraKeys). Re-sync on every console release: these decide which
+// Console: runtime/coordinator/telemetry/public-state.ts (configFields,
+// configExtraKeys). Keep in sync with console releases: these decide which
 // keys `section=core&dashboard=1` strips and `section=config` serves.
 const CONFIG_FIELDS = [
   'characterAppearances', 'merchantRules',
@@ -100,8 +94,8 @@ const BANK_FIELDS = ['bank', 'bankVaults', 'bankCurrent', 'bankQueue'] as const
 const MARKET_FIELDS = ['aldata', 'ponty', 'standPriceHistory'] as const
 const LOGS_FIELDS = ['gameLogs', 'combatLogs', 'merchantActivity'] as const
 
-// merchant/initial-settings.ts defaults (party-console v1.2.0) - the keys
-// the server accepts in /merchant/routine-priorities.
+// merchant/initial-settings.ts defaults: the keys the server accepts in
+// /merchant/routine-priorities.
 const DEFAULT_ROUTINE_PRIORITIES: Record<string, number> = {
   'merchant luck': 100, 'inventory cleanout': 95, 'manual visit': 90, deliveries: 90, withdrawals: 90,
   'ALData authentication': 90, 'party collection': 90, restock: 90, 'gold threshold': 85, 'npc sales': 80,
@@ -164,54 +158,47 @@ export class MockPartyServer {
   huntBlacklist: Record<string, Record<string, unknown>> = {}
   monsterFocusByCharacter: Record<string, string[]> = {}
   monsterSearchRadiusByCharacter: Record<string, number> = {}
-  // The leader's own effective focus (party-state.tsx's flat field) -
-  // the real server deliberately keeps monsterFocusByCharacter[leader]
-  // empty (navigation/focus.ts's characterFocus() deletes it there),
-  // so a leader-focus test needs this set directly, not the by-character map.
+  // The leader's focus. The console keeps monsterFocusByCharacter[leader]
+  // empty, so leader-focus tests set this flat field instead.
   monsterFocus: string[] = []
-  // farmingAreas.ts's Catalog shape - spawn-area GEOMETRY, a separate
-  // catalog from bestiaryCatalog's own simpler spawnRecords.
+  // Spawn-area geometry (farmingAreas.ts Catalog), separate from the
+  // bestiaryCatalog's spawnRecords.
   monsterChoices: { id: string; locations?: { map: string; x: number; y: number; mapName?: string; boundary?: number[] }[] }[] = []
   phoenixRouteOrder: string[] = []
   huntSettings: Record<string, unknown> | null = null
   monsterHunt: Record<string, unknown> | null = null
-  // A real account always has a leader once configured - resolveFarmingContext
-  // (models/state.ts) falls back to the plain top-level farmingPolicy/
-  // huntBlacklist/monsterHunt fields above ONLY for whichever character IS
-  // the leader (or follows nobody and matches `leader`); every other
-  // character needs its own farmingProfiles entry or it sees nothing.
+  // resolveFarmingContext (models/state.ts) uses the top-level farmingPolicy/
+  // huntBlacklist/monsterHunt only for the leader; every other character
+  // needs its own farmingProfiles entry.
   leader: string | null = null
   followers: Record<string, boolean> = {}
   farmingProfiles: Record<string, Record<string, unknown>> = {}
   requirePairing = false
-  // Both keyed by character - mirrors state.luckyUpgradeSlots/luckySlotTracking.
+  // Both keyed by character (state.luckyUpgradeSlots/luckySlotTracking).
   luckyUpgradeSlots: Record<string, number> = {}
   luckySlotTracking: Record<string, Record<string, { version: 1; slots: Record<string, { totalRolls: number; sumRolls: number; rollsAbove96_3: number; perfectRolls: number }> }>> = {}
-  // Pending bank withdrawals, keyed by the collecting character (usually
-  // the merchant) - mirrors the coordinator's own `state.withdrawals`.
+  // Pending bank withdrawals keyed by the collecting character, usually the
+  // merchant (state.withdrawals).
   withdrawals: Record<string, { pack: string; slot: number; item: MockItem }[]> = {}
-  // Keyed by item id (matches item.name) - {} means nothing is
-  // deconstructible unless a test explicitly opts an item in.
+  // Keyed by item id (item.name); empty means nothing is deconstructible.
   deconstructionCatalog: Record<string, { compound: boolean; cost?: number; rewards?: unknown[] }> = {}
 
-  // Auto-mark state, mutated by POSTed commands - mirrors PartyStateDynamic's shape.
+  // Auto-mark state, mutated by POSTed commands (PartyStateDynamic shape).
   autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
   // Pending one-time inventory marks (not standing rules), keyed by
-  // character - mirrors state.upgrades/compounds/statScrolls.
+  // character (state.upgrades/compounds/statScrolls).
   upgrades: Record<string, { slot?: number | string; item: MockItem; tiers?: number; equipped?: boolean }[]> = {}
   compounds: Record<string, { id: string; name: string; items: { slot?: number | string; item: MockItem }[] }[]> = {}
   statScrolls: Record<string, { slot?: number | string; item: MockItem; statType: string }[]> = {}
-  // Flat, account-wide - mirrors state.npcSaleMarks/deconstructionMarks.
+  // Flat, account-wide (state.npcSaleMarks/deconstructionMarks).
   npcSaleMarks: { id: string; source?: string; pack?: string; character?: string; slot: number; item: MockItem; quantity: number }[] = []
   deconstructionMarks: { id: string; owner: string; slot: number; item: MockItem; quantity: number; state: string; storage?: { pack: string; slot: number } }[] = []
-  // Keyed by the RECIPIENT's name - mirrors state.merchantDeliveries.
+  // Keyed by the recipient's name (state.merchantDeliveries).
   merchantDeliveries: Record<string, { id: string; slot: number; item: MockItem; equipOnDelivery?: boolean }[]> = {}
 
-  /** One-shot error injection for error-path tests: set
-   *  `failOnce['merchant/bid'] = 'Stand is full'` before triggering the
-   *  action - the NEXT matching POST fails with that message (via a real
-   *  non-2xx CommandResult body, exactly like the coordinator), then
-   *  reverts to normal success handling. */
+  /** One-shot error injection: after `failOnce['merchant/bid'] = 'Stand is full'`
+   *  the next matching POST fails with that message in a non-2xx
+   *  CommandResult body, then handling returns to normal. */
   failOnce: Record<string, string> = {}
   // Extra response fields for a failOnce (e.g. a 409's `missing` list).
   failOnceBody: Record<string, Record<string, unknown>> = {}
@@ -258,10 +245,8 @@ export class MockPartyServer {
       merchantCurrent: this.merchantCurrent,
       merchantQueue: this.merchantQueue,
       merchantCatalog: {
-        // `meta.upgradeable`/`meta.compoundable` (read by itemFormulas'
-        // itemMaximumLevel) are a separate nested field from the
-        // top-level convenience flags WtbScreen/etc. read directly -
-        // synthesize both from the one flag addCatalogEntry takes.
+        // The app reads both meta.upgradeable/compoundable (itemFormulas)
+        // and the top-level flags (WtbScreen etc.); fill both from one.
         allItems: Object.values(this.catalogEntries).map((entry) => ({
           ...entry,
           sprite: testSprite(),
@@ -337,8 +322,8 @@ export class MockPartyServer {
   /** Every state GET's `section` (or '' for none), in request order. */
   stateRequests: { section: string; dashboard: boolean }[] = []
 
-  /** GET /party-api/state, split by `section` the way the real
-   *  coordinator does (public-state.ts:236-277). */
+  /** GET /party-api/state, split by `section` the way the
+   *  console does (public-state.ts). */
   stateSection(section: string, dashboard: boolean): Record<string, unknown> {
     const full: Record<string, unknown> = { roster: this.roster(), ...this.dynamicState() }
     if (section === 'config') return pick(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS])
@@ -386,8 +371,7 @@ export class MockPartyServer {
     for (const c of this.characters) {
       const items: Record<string, unknown> = {}
       ;(c.items ?? []).forEach((item, index) => {
-        // The wire shape is InventoryEntry ({slot, item}), not the bare
-        // item - recordToState() in the app casts this straight through.
+        // The wire shape is InventoryEntry ({slot, item}), not the bare item.
         const operation = this.inventoryOperations[c.name]?.[index]
         if (item) items[String(index)] = { slot: index, item, ...(operation ? { operation } : {}) }
       })
@@ -419,14 +403,9 @@ export class MockPartyServer {
   private sseServer: Server | null = null
   private sseClients = new Set<ServerResponse>()
   private sseSequence = 1
-  // Per-character map/entities frames (telemetry/map-stream.ts) - keyed by
-  // character name. Each entity's `id` is deliberately left as whatever
-  // type the test sets (string OR number) rather than always coercing to
-  // string, since the real bug this exists to catch (useTargetMonsterType.ts)
-  // is an asymmetric id type between the vitals status's own `target` field
-  // (never coerced server-side, characters/shared.js's publishMapFrame) and
-  // mapEntity()'s explicit `String(entity.id)` cast for THIS feed - a mock
-  // that always stringified both sides could never reproduce it.
+  // Per-character map/entities frames (telemetry/map-stream.ts). Entity ids
+  // keep whatever type the test sets so tests can reproduce the string vs
+  // number mismatch with the vitals `target` (useTargetMonsterType.ts).
   private mapFrameEntities = new Map<string, { id: string | number; mtype?: string }[]>()
   private mapStreamClients = new Map<string, Set<ServerResponse>>()
 
@@ -447,17 +426,11 @@ export class MockPartyServer {
     for (const client of this.mapStreamClients.get(character) ?? []) client.write(frame)
   }
 
-  /** A REAL persistent text/event-stream server - not a Playwright
-   *  `route.fulfill()`, which sends one complete response and closes the
-   *  connection. That one-shot close is exactly the failure mode
-   *  liveConnection.ts's reconnect logic exists to recover from: the app
-   *  would genuinely see a disconnect/reconnect cycle every ~1s, cycling
-   *  the "connected" indicator, instead of the stable always-open
-   *  connection a real server holds open. Started lazily; the app's
-   *  EventSource is redirected here via `route.continue({url})` in
-   *  install(), which lets the browser's own networking connect to it
-   *  directly (Playwright's fulfill API has no incremental-write mode).
-   *  Also serves /map-stream/:character the same way, on the same server. */
+  /** A real persistent text/event-stream server. `route.fulfill()` sends one
+   *  response and closes, which the app would treat as a dropped stream and
+   *  reconnect every second. Started lazily; install() redirects the app's
+   *  EventSource here with `route.continue({url})`. Also serves
+   *  /map-stream/:character. */
   private startSseServer(): Promise<string> {
     if (this.sseServer) {
       const address = this.sseServer.address()
@@ -499,9 +472,7 @@ export class MockPartyServer {
       server.listen(0, '127.0.0.1', () => {
         const address = server.address()
         const port = typeof address === 'object' && address ? address.port : 0
-        // A heartbeat keeps every open connection well within
-        // liveConnection.ts's 15s watchdog timeout indefinitely, matching
-        // the real coordinator's own heartbeat cadence.
+        // Heartbeat well inside liveConnection.ts's 15s watchdog.
         setInterval(() => this.broadcastHeartbeat(), 2000).unref()
         resolve(`http://127.0.0.1:${port}`)
       })
@@ -536,12 +507,8 @@ export class MockPartyServer {
     this.farmingProfiles = { ...this.farmingProfiles, [name]: { ...(this.farmingProfiles[name] ?? {}), ...patch } }
   }
 
-  /** Applies one POST body against the given logical /party-api/<path>,
-   *  mutating this mock's state where the real coordinator would. Only
-   *  the command types these tests actually exercise are handled -
-   *  anything else is accepted as a no-op success, matching how a real
-   *  POST /party-api/command with an unhandled `type` still returns
-   *  `{ok:true}` for fields the server simply ignores. */
+  /** Applies one POST body to /party-api/<path>, mutating mock state where
+   *  the console would. Commands the tests don't exercise succeed as no-ops. */
   private applyCommand(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
     if (this.failOnce[path] !== undefined) {
       const error = this.failOnce[path]
@@ -551,7 +518,7 @@ export class MockPartyServer {
       return { status: 409, json: { ok: false, error, ...extra } }
     }
     if (path === 'formation') {
-      // Mirrors http/formation.ts: `leader` is only touched when the key is
+      // http/formation.ts: `leader` is only touched when the key is
       // present (null clears it), `follow` only when `character` is sent.
       if (body.leader !== undefined) this.leader = body.leader === null ? null : String(body.leader)
       if (body.character !== undefined && body.follow !== undefined) {
@@ -569,10 +536,9 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true, leader: this.leader, followers: this.followers } }
     }
     if (path === 'merchant/auto-npc-sale') {
-      // Mirrors http/automatic-sales.ts npc(): `character` is kept exactly
-      // as sent (a per-player rule keyed [character, ruleKey] - even for the
-      // merchant, where such a rule never fires); omitted, it's the
-      // account-wide merchant rule.
+      // http/automatic-sales.ts npc(): with `character` the rule is per-player
+      // (keyed [character, ruleKey], even for the merchant, where it never
+      // fires); without it, the account-wide merchant rule.
       const character = typeof body.character === 'string' ? body.character : undefined
       if (character && !this.characters.some((c) => c.name === character)) return { status: 400, json: { error: 'Unknown character' } }
       if (body.action === 'clear-all') {
@@ -593,10 +559,9 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && !body.remove) {
-      // Mirrors npc-sale.ts's validate(): the merchant's own items can
-      // never use source "character" (that's rejected server-side with
-      // this exact error), and any modified item (level>0/stat_type/p)
-      // needs an explicit acknowledgement or the sale is refused outright.
+      // npc-sale.ts validate(): the merchant's own items can't use source
+      // "character", and a modified item (level>0/stat_type/p) needs an
+      // explicit acknowledgement.
       const merchantName = this.characters.find((c) => c.ctype === 'merchant')?.name
       if (body.source === 'character' && body.character === merchantName) {
         return { status: 400, json: { ok: false, error: 'Unknown player character' } }
@@ -623,9 +588,8 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.source === 'bank') {
-      // Bank-sourced NPC sales queue for the merchant to actually collect
-      // and sell, same as the real server (npc-sale.ts sets state:
-      // "queued", not an instant removal) - the item stays put until then.
+      // Bank-sourced NPC sales are queued (state "queued") for the merchant
+      // to collect; the item stays in the bank until then.
       const pack = String(body.pack)
       const slot = Number(body.slot)
       if (body.remove) {
@@ -665,10 +629,9 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'deconstruction/mark' && body.pack) {
-      // Bank-sourced deconstruction also queues (bank-deconstruction.ts
-      // pushes a mark with `storage:{pack,slot}` and a real `slot` of -1,
-      // matching the real server) - the item stays in the pack until the
-      // merchant actually collects and deconstructs it.
+      // Bank-sourced deconstruction also queues: the mark has
+      // `storage:{pack,slot}` and slot -1, and the item stays in the pack
+      // until the merchant collects it.
       const push = (pack: string, slot: number, item: MockItem) =>
         this.deconstructionMarks.push({
           id: `deconstruction-${this.deconstructionMarks.length + 1}`,
@@ -719,7 +682,7 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/stand') {
-      // Mirrors http/stand-marks.ts + merchant/stand-marks.ts.
+      // http/stand-marks.ts + merchant/stand-marks.ts.
       const slot = Number(body.slot)
       const item = (body.item ?? {}) as MockItem
       if (typeof item.name !== 'string' || !Number.isSafeInteger(slot) || slot < 0) return { status: 400, json: { error: 'invalid stand item' } }
@@ -815,7 +778,7 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true, bankboi: { name } } }
     }
     if (path === 'dashboard-preferences') {
-      // Mirrors http/dashboard-import.ts preferences().
+      // http/dashboard-import.ts preferences().
       const prefix = body.bankboiPrefix
       if (prefix !== undefined && (typeof prefix !== 'string' || (prefix !== '' && !/^[A-Za-z0-9_]{3,11}$/.test(prefix))))
         return { status: 400, json: { error: 'Use 3–11 letters, numbers, or underscores' } }
@@ -829,7 +792,7 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'focus') {
-      // Mirrors http/focus.ts validation + navigation/focus.ts placement:
+      // http/focus.ts validation + navigation/focus.ts placement:
       // the leader's focus lives in the flat monsterFocus field.
       const focus = body.monsterFocus
       if (!Array.isArray(focus) || focus.some((entry) => entry === 'tinyp' || typeof entry !== 'string' || !/^[a-z0-9_]+$/i.test(entry)))
@@ -848,7 +811,7 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true, character: name, monsterFocus: normalized } }
     }
     if (path === 'hunt-settings' || path === 'hunt-blacklist') {
-      // Mirrors http/farming-scope.ts: no `character` edits the leader's
+      // http/farming-scope.ts: no `character` edits the leader's
       // (top-level) settings; a follower or merchant is refused; any other
       // character edits its own farmingProfiles entry.
       const scope = this.huntScope(body.character)
@@ -869,7 +832,7 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/routine-priorities') {
-      // Mirrors http/routine-priorities.ts + merchant-configuration.ts
+      // http/routine-priorities.ts + merchant-configuration.ts
       // setGathering: unknown keys are dropped, priorities must be 0-100
       // integers, and fishing/mining in `enabled` toggle gatheringModes.
       this.lastRoutineSave = body
@@ -956,9 +919,8 @@ export class MockPartyServer {
       const target = String(body.target)
       const slot = Number(body.slot)
       const item = body.item as MockItem
-      // Mirrors transfer-commands.ts's delivery(): drop any existing
-      // delivery for this exact slot+item from every recipient first, then
-      // queue it for the new target - a delivery is never split/duplicated.
+      // transfer-commands.ts delivery(): drop any existing delivery of this
+      // slot+item from every recipient, then queue it for the new target.
       for (const name of Object.keys(this.merchantDeliveries)) {
         this.merchantDeliveries[name] = this.merchantDeliveries[name].filter((mark) => !(mark.slot === slot && mark.item.name === item.name && mark.item.level === item.level))
       }
@@ -1017,23 +979,16 @@ export class MockPartyServer {
   }
 
   /** Installs every route handler on [page]. Call before navigating.
-   *  Registration order matters: Playwright checks the MOST recently
-   *  registered route first, so the broad party-api fallback is
-   *  registered first (lowest priority) and specific handlers after it
-   *  (highest priority) - matching how a test's own late `page.route()`
-   *  override (e.g. account-screens.spec.ts's Stand removal) still wins
-   *  over anything installed here. */
+   *  Playwright checks the most recently registered route first, so the
+   *  broad fallback goes first and a test's own later `page.route()` wins. */
   async install(page: Page): Promise<void> {
     await page.route('**/e2e-sprite.png', (route) =>
       route.fulfill({ contentType: 'image/png', body: Buffer.from(TINY_PNG_BASE64, 'base64') }),
     )
 
-    // Broad fallback for every /party-api/* POST not given a specific
-    // handler below (hunt-settings, hunt-blacklist, realm/switch,
-    // merchant/bid, merchant/routine-priorities, command, merchant/**,
-    // deconstruction/**, mail/**, ...). GETs not otherwise handled get an
-    // empty object rather than a 404, since several settings-only reads
-    // (ALData's key/auth checks) aren't modeled by this mock.
+    // Fallback for /party-api/* POSTs without a specific handler below.
+    // Unhandled GETs get {} rather than a 404, since some settings reads
+    // (ALData key/auth checks) aren't modeled.
     await page.route('**/party-api/**', async (route) => {
       const request = route.request()
       const url = new URL(request.url())
@@ -1073,9 +1028,7 @@ export class MockPartyServer {
       return route.fulfill({ json: this.stateSection(section, dashboard) })
     })
     await page.route('**/party-api/mail**', (route) => {
-      // This pattern also matches POST /party-api/mail/collect - defer
-      // that to the broad command fallback registered above (lower
-      // priority) instead of wrongly answering it with the inbox snapshot.
+      // Also matches POST /party-api/mail/collect; leave that to the fallback.
       if (route.request().method() !== 'GET') return route.fallback()
       if (new URL(route.request().url()).pathname.endsWith('/mail/postage'))
         return this.mailPostage === null ? route.fulfill({ status: 503, json: { error: 'unavailable' } }) : route.fulfill({ json: { gold: this.mailPostage } })

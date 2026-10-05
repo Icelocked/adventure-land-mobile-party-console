@@ -1,18 +1,12 @@
 #!/bin/sh
-# Runs automatically before nginx starts (nginx's official image executes
-# every executable script under /docker-entrypoint.d/, in order, on
-# container start - no extra wiring needed for that part).
+# Run by the nginx image's entrypoint (every executable script under
+# /docker-entrypoint.d/) before nginx starts.
 #
-# If a Tailscale-issued cert/key pair is mounted at the paths below, adds a
-# second nginx server block listening on 443 with it - this is what makes
-# the PWA installable as a real app on Android (see DEPLOYMENT.md section
-# 3b): Android's Chrome requires HTTPS + a registered service worker
-# before it'll offer "Install app" rather than a plain shortcut, and a
-# Tailscale MagicDNS cert is real, browser-trusted TLS without exposing
-# anything publicly. If nothing is mounted, this is a no-op and the
-# container behaves exactly as it did before HTTPS support existed - port
-# 80 only, still fully usable (iPhone's "Add to Home Screen" never needed
-# HTTPS in the first place).
+# If a Tailscale cert/key pair is mounted at the paths below, adds an HTTPS
+# server on 443. Android Chrome only offers "Install app" over HTTPS with a
+# service worker, and a MagicDNS cert is browser-trusted. Without a cert this
+# does nothing and the container serves port 80 only (iPhone's "Add to Home
+# Screen" works over HTTP).
 set -e
 
 CERT_DIR=/etc/nginx/tailscale-certs

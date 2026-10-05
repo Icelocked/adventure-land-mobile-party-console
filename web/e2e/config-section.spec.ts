@@ -16,7 +16,7 @@ test('Config section: settings that only the config section carries reach the UI
   await page.goto('/characters/Patinder')
   await expect(page.getByRole('button', { name: /Force stand · On/ })).toBeVisible()
 
-  // Every domain uses the dashboard's own request shape.
+  // Every domain uses the console's request shape.
   const sections = new Set(server.stateRequests.map((r) => `${r.section}:${r.dashboard}`))
   expect(sections).toContain('config:true')
   expect(sections).toContain('core:true')
@@ -40,7 +40,7 @@ test('Config section: a slow config response never holds up core, and config-see
   // ...and the controls that would otherwise save defaults stay disabled.
   await expect(page.getByRole('button', { name: 'Follow', exact: true })).toBeDisabled()
   await expect(page.getByText('Loading settings…').first()).toBeVisible()
-  // Merchant sections wait for the configured merchant (a config field), as on the dashboard.
+  // Merchant sections wait for the configured merchant (a config field).
   await expect(page.getByText(/Party restock/)).toBeVisible({ timeout: 25_000 })
 })
 
