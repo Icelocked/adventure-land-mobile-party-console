@@ -4,10 +4,8 @@ import { Input } from '@/components/ui/input'
 import { npcSaleValue } from '@/lib/itemFormulas'
 import type { Item, ItemMeta } from '@/models'
 
-/** party-management-panels.tsx's "Sell to NPC?" dialog + use-party-
- *  console.tsx confirmNpcSale's checks, inline: the quantity defaults to
- *  the whole stack (or every matching copy for "sell all", where it's
- *  fixed), "You will receive" shows the proceeds, modified gear needs the
+/** "Sell to NPC?": the quantity defaults to the whole stack (or every
+ *  matching copy for "sell all", where it's fixed), modified gear needs the
  *  acknowledgement, and nothing is sent until Sell is pressed. */
 export function NpcSaleSheet({
   item,
@@ -21,7 +19,7 @@ export function NpcSaleSheet({
 }: {
   item: Item
   meta: ItemMeta | undefined
-  /** The dashboard's location line, e.g. "Bank · items0 · slot 3". */
+  /** Location line, e.g. "Bank · items0 · slot 3". */
   location: string
   /** The merchant collects it from another character first. */
   collects?: boolean

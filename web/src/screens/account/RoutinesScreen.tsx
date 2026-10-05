@@ -8,13 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 
-/** routine-priorities-dialog.tsx ported as its own screen. The dashboard
- *  supports real pointer-drag reordering with live position animation -
- *  overkill for a touch list where up/down taps are just as fast and far
- *  simpler to get right. Ported the EXACT renumbering algorithm the
- *  dashboard's own arrow-key handler uses (its `move()` function), not a
- *  simplified version, so priorities after a reorder here match what the
- *  dashboard would have produced for the same move. */
+/** Routine priorities, reordered with up/down taps instead of drag. The
+ *  renumbering follows the console's arrow-key `move()` so a reorder here
+ *  produces the same priorities as the same move on the dashboard. */
 export function RoutinesScreen() {
   const dynamicState = useDynamicState()
   const api = usePartyApi()
@@ -22,7 +18,7 @@ export function RoutinesScreen() {
   const navigate = useNavigate()
   const configLoaded = useConfigLoaded()
 
-  // party-management-panels.tsx: fishing/mining aren't automations - their
+  // Fishing/mining aren't automations - their
   // switches mirror the standing gathering modes.
   const priorities = dynamicState.merchantRoutinePriorities
   const enabled: Record<string, boolean> = {
@@ -36,9 +32,9 @@ export function RoutinesScreen() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Seed the draft from live state once (on mount / first data arrival),
-  // same as the dashboard's own "never overwrite a draft while open"
-  // polling guard - after that, only local edits and Save change it.
+  // Seed the draft from live state once (on mount / first data arrival) so
+  // polling never overwrites an open draft; after that, only local edits
+  // and Save change it.
   useEffect(() => {
     if (!seeded && configLoaded) {
       setDraft(priorities)
@@ -52,7 +48,7 @@ export function RoutinesScreen() {
     (a, b) => (draft[b] ?? 50) - (draft[a] ?? 50) || ROUTINE_LABELS[a].localeCompare(ROUTINE_LABELS[b]),
   )
   // Deliveries/withdrawals are switched on in Merchant settings; while off
-  // their rows are locked (routine-priorities-dialog.tsx disabledRoutine).
+  // their rows are locked.
   const disabledRoutine = (key: string) => ['deliveries', 'withdrawals'].includes(key) && enabled[key] === false
   const movableKeys = sortedKeys.filter((key) => !disabledRoutine(key))
 
@@ -135,8 +131,8 @@ export function RoutinesScreen() {
           onClick={async () => {
             setSaving(true)
             setError(null)
-            // routine-priorities-dialog.tsx's save: the seeded server maps with
-            // the user's edits, never synthesised values.
+            // Save the seeded server maps with the user's edits, never
+            // synthesised values.
             const nextPriorities = { ...draft }
             if (disabledRoutine('deliveries')) delete nextPriorities.deliveries
             if (disabledRoutine('withdrawals')) delete nextPriorities.withdrawals
@@ -147,7 +143,7 @@ export function RoutinesScreen() {
             setSaving(false)
             if (result.kind === 'failure') setError(result.message)
             else {
-              // use-party-console.tsx saveRoutinePriorities: a successful save closes the dialog.
+              // A successful save closes the screen.
               await refreshNow()
               navigate(-1)
             }
@@ -155,7 +151,7 @@ export function RoutinesScreen() {
         >
           {saving ? 'Saving...' : 'Save routines'}
         </Button>
-        {/* routine-priorities-dialog.tsx Cancel: discard the draft. */}
+        {/* Cancel discards the draft. */}
         <Button className="mt-2 w-full" variant="outline" disabled={saving} onClick={() => navigate(-1)}>
           Cancel
         </Button>

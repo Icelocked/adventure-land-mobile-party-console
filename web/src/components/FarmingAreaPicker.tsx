@@ -8,7 +8,6 @@ import { farmingAreas, defaultPhoenixOrder, type FarmingArea } from '@/lib/farmi
 import type { Catalog } from '@/lib/farmingZones'
 import type { BestiaryMonster, Sprite } from '@/models'
 
-/** monster-choice.tsx SpawnRecord / MonsterChoice. */
 export interface SpawnRecord {
   sourceMap: string
   map: string
@@ -34,7 +33,7 @@ const SPAWN_REASONS: Record<string, string> = {
   'invalid-geometry': 'Spawn coordinates unavailable',
 }
 
-/** monster-spawns.tsx: every recorded spawn and why ordinary routing can't use it. */
+/** Every recorded spawn and why ordinary routing can't use it. */
 export function MonsterSpawns({ records }: { records?: SpawnRecord[] }) {
   return (
     <section className="rounded border border-emerald-800 p-3 text-sm">
@@ -64,18 +63,15 @@ export function MonsterSpawns({ records }: { records?: SpawnRecord[] }) {
 }
 
 /**
- * Ported from party-console's farming-area-picker.tsx - the dashboard's one
- * component for every "pick a place to farm these monsters" flow:
- *  - `preparation`: Hunt backup setup (monster picker inline, Phoenix's own
- *    patrol mode is deliberately OFF here - matches the real dashboard,
- *    which disables it during hunt prep specifically).
+ * The picker for every "pick a place to farm these monsters" flow:
+ *  - `preparation`: Hunt backup setup, with the monster picker inline.
+ *    Phoenix's patrol mode is deliberately off during hunt prep.
  *  - Phoenix selected (and not `preparation`): the 5-region ordered patrol.
- *  - otherwise: the general "choose a farming area" picker - areas grouped
- *    by how many of the selected monsters share them, ranked by distance
- *    to the character's current position.
+ *  - otherwise: areas grouped by how many of the selected monsters share
+ *    them, ranked by distance to the character's current position.
  *
- * The selected area shows FarmingAreaPreview with the dashboard's legend and
- * "Enlarge map" (a full-screen view here instead of a dialog).
+ * The selected area shows FarmingAreaPreview with its legend and a
+ * full-screen "Enlarge map" view.
  */
 export function FarmingAreaPicker({
   catalog,
@@ -98,16 +94,15 @@ export function FarmingAreaPicker({
   /** Only used in `preparation` mode - lets the inline monster picker edit the selection. */
   onIdsChange?: (ids: string[]) => void
   character?: { map: string; x: number; y: number } | null
-  // party-workspace.tsx: the saved waypoint is preferred over proximity.
+  // The saved waypoint is preferred over proximity.
   waypoint?: { map: string; x: number; y: number } | null
   // A monster navigation (bestiary) rather than a waypoint for the focus.
   override?: boolean
   radius: number
   busy: boolean
   preparation?: boolean
-  /** state.phoenixRouteOrder - a previously-saved 5-region search order, reused
-   *  when it's still valid for the current areas rather than always falling
-   *  back to the computed default. */
+  /** state.phoenixRouteOrder: a saved 5-region search order, reused while
+   *  it's still valid for the current areas. */
   savedPhoenixOrder?: string[]
   onCancel: () => void
   onStart: (area: FarmingArea, phoenixRouteOrder?: string[]) => void | Promise<void>
@@ -163,7 +158,7 @@ export function FarmingAreaPicker({
           ? `Shared by ${a.monsterIds.length} selected monsters`
           : choiceFor(a.monsterIds[0])?.name || a.monsterIds[0]
 
-  // The dashboard's pickers list monsterChoices (name · id with sprite).
+  // Options read "name · id" with a sprite.
   const choiceFor = (id: string) => (catalog as unknown as MonsterChoiceEntry[]).find((entry) => entry.id === id) ?? bestiaryCatalog.find((m) => m.id === id)
   const query = search.trim().toLowerCase()
   const monsterOptions = preparation
@@ -197,7 +192,7 @@ export function FarmingAreaPicker({
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search monsters…" className="mb-2" />
           <div className="max-h-40 overflow-y-auto">
             {monsterOptions.map((monster) =>
-              // monster-focus-picker.tsx: Fairy has no verified regular spawn route.
+              // Fairy has no verified regular spawn route.
               monster.id === 'tinyp' ? (
                 <button key={monster.id} type="button" aria-disabled="true" onClick={() => setFairyNote(true)} className="flex w-full items-center gap-2 py-1 text-left text-sm text-muted-foreground">
                   <SpriteIcon sprite={monster.sprite} size={24} />

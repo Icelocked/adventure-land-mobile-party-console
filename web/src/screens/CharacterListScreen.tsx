@@ -20,10 +20,8 @@ import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import type { BestiaryMonster, CharacterState } from '@/models'
 
-/** Party overview - ported from ui/characterlist/CharacterListScreen.kt:
- *  class icon, level/class, HP/MP, one-line activity, gold carried per
- *  character and the account total, pull-to-refresh (here: a refresh
- *  button, matching the icon already added to the Android app's top bar). */
+/** Party overview: class icon, level/class, HP/MP, one-line activity, gold
+ *  carried per character and the account total, and a refresh button. */
 export function CharacterListScreen() {
   const characters = useCharacters()
   const connected = useConnected()
@@ -33,10 +31,10 @@ export function CharacterListScreen() {
   // character online; the server-address override lives in Settings.
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // use-party-console.tsx chars: bankbois get their own cards, not party ones.
+  // Bankbois get their own cards, not party ones.
   const bankboiNames = new Set(dynamicState.bankbois.map((bankboi) => bankboi.name))
   const roster = useRoster()
-  // use-party-console.tsx chars: active slots in slot order (all live
+  // Active slots in slot order (all live
   // characters on a server that reports no slots), then orderCharacters.
   const slots = dynamicState.activeSlots
   const liveNames = (slots
@@ -62,7 +60,7 @@ export function CharacterListScreen() {
   const updates = useConsoleUpdates().state
   const navigate = useNavigate()
   const settings = useServerSettings()
-  // party-workspace.tsx's empty states.
+  // Picks between the empty-state messages.
   const configLoaded = useConfigLoaded()
 
   return (
@@ -71,7 +69,7 @@ export function CharacterListScreen() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">Party</h1>
-            {/* console-updates.tsx ConsoleUpdateIndicator */}
+            {/* Console update indicator */}
             {updates?.available && (
               <button
                 type="button"
@@ -84,7 +82,7 @@ export function CharacterListScreen() {
               </button>
             )}
           </div>
-          {/* party-header.tsx version line */}
+          {/* Version line */}
           <span className="block font-mono text-[10px] text-muted-foreground">
             {dynamicState.gameVersion ? `Game v${dynamicState.gameVersion} · ` : ''}Console {updates ? `v${updates.displayVersion || updates.current}` : 'loading…'}
           </span>
@@ -105,7 +103,7 @@ export function CharacterListScreen() {
       {!connected && <div className="h-0.5 w-full animate-pulse bg-primary/60" />}
       <DebugBrowserBanner />
 
-      {/* party-workspace.tsx: the dungeon panel heads the party while a visit runs. */}
+      {/* The dungeon panel heads the party while a visit runs. */}
       <DungeonPanel />
       {(names.length > 0 || pending.length > 0) && <PartyControls />}
 
@@ -137,7 +135,7 @@ export function CharacterListScreen() {
       )}
       <RosterSlots onChoose={setPickerSlot} />
       {dynamicState.bankboiTransaction && (
-        // party-workspace.tsx's "Bankboi Active" card.
+        // "Bankboi Active" card.
         <div className="mx-3 mb-3 rounded-lg border-2 border-dashed border-primary/60 p-4 text-center">
           <p className="font-mono text-lg font-black uppercase tracking-widest text-primary">Bankboi Active</p>
           <p className="mt-1 font-mono text-xs uppercase text-muted-foreground">{dynamicState.bankboiTransaction.bankboi}</p>
@@ -162,17 +160,16 @@ export function CharacterListScreen() {
   )
 }
 
-/** party-workspace.tsx's two party-wide (not per-character) buttons: "Send party to
- *  town" (bulk /town-party) and "Escape" (escape-control.tsx's polled emergency-
- *  recovery command - needs one online warrior/mage/priest, the server owns the
- *  whole staged rendezvous/convoy-fallback sequence, this just triggers + shows
- *  `stage`/`error`). */
+/** Party-wide buttons: "Send party to town" (bulk /town-party) and "Escape",
+ *  a polled emergency-recovery command that needs one online warrior/mage/priest.
+ *  The server runs the staged rendezvous/convoy-fallback sequence; this only
+ *  triggers it and shows `stage`/`error`. */
 function PartyControls() {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const escape = useEscapeStatus()
   const escapeReadError = useEscapeError()
-  // escape-control.tsx: inside a dungeon, Escape exits the dungeon instead.
+  // Inside a dungeon, Escape exits the dungeon instead.
   const dungeon = useDungeons()
   const inDungeon = !!dungeon.data && !['idle', 'held'].includes(dungeon.data.state.phase)
   const [busy, setBusy] = useState(false)
@@ -180,7 +177,6 @@ function PartyControls() {
 
   const running = !!escape && !['complete', 'failed-hold', 'released'].includes(escape.stage)
   const failed = !!error || !!escapeReadError || (!!escape && escape.stage !== 'released' && (!!escape.error || escape.stage === 'failed-hold'))
-  // escape-control.tsx labels.
   const label = failed ? 'Escape - failed' : escape?.stage === 'complete' ? 'Escape - success' : 'Escape'
   const [townError, setTownError] = useState<string | null>(null)
 
@@ -194,7 +190,6 @@ function PartyControls() {
         onClick={async () => {
           setTownError(null)
           const result = await api.sendPartyToTown()
-          // use-party-console.tsx townParty: "Party town request failed".
           if (result.kind === 'failure') setTownError(result.message || 'Party town request failed')
         }}
       >
@@ -271,11 +266,11 @@ function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: C
                 </span>
                 <span>{vitals.gold.toLocaleString()}g</span>
               </div>
-              {/* Not on the dashboard: shows a character that stopped reporting (possibly hung). */}
+              {/* Flags a character that stopped reporting (possibly hung). */}
               {seenAt > 0 && <FreshnessBadge at={seenAt} className="mt-1" />}
             </>
           ) : (
-            // connected-character-card.tsx: connected, but no status yet.
+            // Connected, but no status yet.
             <div className="text-sm text-muted-foreground">awaiting status</div>
           )}
         </div>
@@ -284,7 +279,7 @@ function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: C
   )
 }
 
-/** roster-controls.tsx: one "Load character slot N" per empty headless
+/** One "Load character slot N" per empty headless
  *  slot, disabled while a Steam handoff is running. */
 function RosterSlots({ onChoose }: { onChoose: (slot: number) => void }) {
   const state = useDynamicState()
@@ -309,7 +304,7 @@ function RosterSlots({ onChoose }: { onChoose: (slot: number) => void }) {
   )
 }
 
-/** pending-character-cards.tsx: a character that's loading, waiting or
+/** A character that's loading, waiting or
  *  lost, with its portrait, class, hosting and status. */
 function PendingCharacterCard({ entry }: { entry: PendingCharacter }) {
   const state = useDynamicState()

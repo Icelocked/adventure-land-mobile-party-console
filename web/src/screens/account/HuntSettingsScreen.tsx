@@ -13,7 +13,7 @@ import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type MonsterChoiceEntry } from './HuntExtras'
 import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
 
-// runtime/coordinator/hunt/settings.ts defaultHuntSettings.
+// Server defaults (runtime/coordinator/hunt/settings.ts).
 const DEFAULT_HUNT_SETTINGS: HuntSettings = {
   relocateIfCompeting: true,
   blacklistDeaths: true,
@@ -22,11 +22,10 @@ const DEFAULT_HUNT_SETTINGS: HuntSettings = {
   expirationThreshold: 1,
 }
 
-/** hunt-settings-control.tsx + the Hunt blacklist from farming-mode-
- *  control.tsx's settings dialog, for one character. Like the dashboard,
- *  every control saves its own field as soon as it changes (thresholds on
- *  blur), always scoped with `character`; a character following the leader
- *  sees the leader's settings read-only. */
+/** Hunt settings and blacklist for one character. Every control saves its
+ *  own field as soon as it changes (thresholds on blur), always scoped with
+ *  `character`; a character following the leader sees the leader's settings
+ *  read-only. */
 export function HuntSettingsScreen() {
   const { name = '' } = useParams()
   const dynamicState = useDynamicState()
@@ -34,14 +33,13 @@ export function HuntSettingsScreen() {
   const [inspectError, setInspectError] = useState<string | null>(null)
   const [clearAllError, setClearAllError] = useState<string | null>(null)
   const [drop, setDrop] = useState<string | null>(null)
-  // party-reference-panels.tsx: a drop opened from a monster's details.
+  // A drop opened from a monster's details.
   const [dropSource, setDropSource] = useState('')
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
-  // Monster names/sprites live in the bestiary catalog, NOT the item
-  // catalog (useCatalogLookup) - a monster id like "booboo" would never
-  // resolve there.
+  // Monster names/sprites live in the bestiary catalog, not the item
+  // catalog (useCatalogLookup), where a monster id like "booboo" never resolves.
   const monsterFor = useMemo(() => {
     const byId = new Map(dynamicState.bestiaryCatalog.map((m) => [m.id, m]))
     return (id: string) => byId.get(id)
@@ -98,7 +96,7 @@ export function HuntSettingsScreen() {
     const result = await api.updateHuntBlacklist(name, monsterId ? 'remove' : 'clear', monsterId)
     setBlacklistBusy(false)
     if (result.kind === 'failure') {
-      // farming-mode-control.tsx: Clear all keeps its confirmation open with the error.
+      // Clear all keeps its confirmation open with the error.
       if (monsterId) setError(result.message)
       else setClearAllError(result.message)
       return
@@ -106,7 +104,7 @@ export function HuntSettingsScreen() {
     if (!monsterId) setConfirmingClearAll(false)
     await refreshNow()
   }
-  // connected-character-card.tsx onInspectMonster: details, or why they are unavailable.
+  // Monster details, or why they are unavailable.
   const inspectMonster = (id: string) => {
     const monster = dynamicState.bestiaryCatalog.find((entry) => entry.id === id)
     if (monster) {
@@ -223,7 +221,7 @@ export function HuntSettingsScreen() {
         <div className="flex flex-col gap-1.5 px-3 pb-4">
           {blacklist.map(([id, entry]) => (
             <div key={id} className="flex items-center gap-2.5 rounded-md border border-border bg-card p-2.5">
-              {/* farming-mode-control.tsx: a blacklisted monster opens its details. */}
+              {/* A blacklisted monster opens its details. */}
               <button
                 type="button"
                 aria-label={`Inspect ${monsterFor(id)?.name || id}`}

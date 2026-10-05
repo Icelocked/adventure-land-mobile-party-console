@@ -31,8 +31,7 @@ interface SaveHandle {
   createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>
 }
 
-/** dashboard-state-import.tsx with state-export-button.tsx and
- *  settings-export.ts: export to a save picker (or download), and import a
+/** Export to a save picker (or download), and import a
  *  settings or legacy caraGarage.jsonl file through preview and digest. */
 export function DashboardStateImport() {
   const api = usePartyApi()
@@ -125,7 +124,6 @@ export function DashboardStateImport() {
       setBusy(false)
     }
   }
-  // settings-export.ts exportSettings.
   async function exportSettings() {
     const name = `party_console_settings_${new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_')}.json`
     const savePicker = (window as unknown as { showSaveFilePicker?: (options: unknown) => Promise<SaveHandle> }).showSaveFilePicker

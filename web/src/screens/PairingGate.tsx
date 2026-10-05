@@ -4,13 +4,11 @@ import { loadServerSettings } from '@/config/serverConfig'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-/** Gates the whole app behind party-console's own browser-pairing check
- *  (GET /setup/state - 200 once paired, 401 otherwise; confirmed against
- *  a live server) before anything tries to open the live party-data
- *  connection. Without this, an unpaired browser's fetches to /party-api/*
- *  just keep 302-redirecting to /setup forever, and every screen that
- *  depends on live data sits on an unexplained "connecting" spinner with
- *  no indication that pairing - not the network - is what's blocking it. */
+/** Gates the app behind party-console's browser-pairing check
+ *  (GET /setup/state: 200 once paired, 401 otherwise) before opening the live
+ *  party-data connection. An unpaired browser's /party-api/* fetches just
+ *  302 to /setup forever, which would otherwise look like an endless
+ *  "connecting" spinner. */
 
 type Status = 'checking' | 'paired' | 'unpaired' | 'unreachable'
 
@@ -35,12 +33,10 @@ export function PairingGate({ children }: { children: ReactNode }) {
     setStatus('checking')
     const api = new PartyApiClient(loadServerSettings())
     const result = await api.getRoot('setup/state')
-    // A real response (even a 401) means the server itself said "you're
-    // not paired" - show the re-pair flow. No response at all (network
-    // error, timeout, the request getting blocked before it ever reaches
-    // the server) is a DIFFERENT problem that re-pairing can't fix, and
-    // showing the same screen for both was actively misleading - see the
-    // corporate-network incident this screen was built to stop repeating.
+    // A real response (even a 401) means the server said "not paired":
+    // show the re-pair flow. No response at all (network error, timeout,
+    // blocked before reaching the server) is a different problem that
+    // re-pairing can't fix, so it gets its own message.
     if (result.kind === 'success') setStatus('paired')
     else setStatus(result.status !== undefined ? 'unpaired' : 'unreachable')
   }
@@ -86,9 +82,8 @@ export function PairingGate({ children }: { children: ReactNode }) {
 
   async function startScan() {
     setError('')
-    // BarcodeDetector: supported on Chrome/Android (this project's proven
-    // path per DEPLOYMENT.md); not on Safari/iOS, so this always falls
-    // back to the manual-paste field below rather than being the only way in.
+    // BarcodeDetector exists on Chrome/Android but not Safari/iOS, so the
+    // manual-paste field below is always available as a fallback.
     const Detector = (window as unknown as { BarcodeDetector?: new (options: { formats: string[] }) => { detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]> } }).BarcodeDetector
     if (!Detector) {
       setScanUnsupported(true)
@@ -106,10 +101,9 @@ export function PairingGate({ children }: { children: ReactNode }) {
       let detecting = false
       let submitted = false
       scanTimerRef.current = window.setInterval(() => {
-        // Guards against overlapping detect() calls (a slow frame taking
-        // longer than the 350ms tick) each independently finding a code and
-        // calling submitToken - without this, a slow decode could fire the
-        // pairing request more than once for the same scan.
+        // Guards against overlapping detect() calls (a frame slower than the
+        // 350ms tick) each finding a code and firing the pairing request
+        // more than once for the same scan.
         if (!videoRef.current || detecting) return
         detecting = true
         detector

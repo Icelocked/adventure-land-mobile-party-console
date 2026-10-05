@@ -2,16 +2,12 @@ import { useEffect, useState } from 'react'
 import type { Sprite } from '@/models'
 import { cn } from '@/lib/utils'
 
-/** Renders one tile out of a shared sprite sheet as a fixed-size icon -
- *  the web equivalent of the Android app's components/itemicon/
- *  SpriteIcon.kt, MUCH simpler here: a straight CSS `background-image` +
- *  `background-position` + `background-size` crop, no bitmap-cropping
- *  workaround needed (that whole saga - tileSize unit confusion,
- *  Modifier.scale's transform-origin bug - was specific to Compose/Coil).
+/** Renders one tile of a shared sprite sheet as a fixed-size icon via a CSS
+ *  background crop.
  *
- *  Tile size is derived from the loaded image's own natural dimensions
- *  divided by columns/rows, NOT from Sprite.tileSize - confirmed
- *  unreliable for monster sheets (see models/sprite.ts's doc comment). */
+ *  Tile size comes from the loaded image's natural dimensions divided by
+ *  columns/rows, not Sprite.tileSize, which is unreliable for monster
+ *  sheets (see models/sprite.ts). */
 
 // Shared across every icon using the same sheet URL, so opening a screen
 // with 30 items from the same sheet only loads its natural size once.
@@ -43,8 +39,8 @@ export function SpriteIcon({ sprite, size = 40, className }: { sprite?: Sprite |
         if (!cancelled) setNatural(dims)
       })
       .catch(() => {
-        // Sheet failed to load (network hiccup, dead URL) - stay a blank
-        // tile rather than throwing, same as the Android app's behavior.
+        // Sheet failed to load (network hiccup, dead URL): stay a blank
+        // tile rather than throwing.
       })
     return () => {
       cancelled = true

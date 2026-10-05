@@ -17,8 +17,7 @@ import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
 import { applyPendingUpdate, checkForUpdate, subscribeUpdateStatus, type UpdateStatus } from '@/lib/serviceWorkerUpdate'
 
-/** party-inventory-panels.tsx "Interface settings" as a screen, in its
- *  order: state import/export, realm, characters (create, member grid,
+/** Interface settings, in the console's order: state import/export, realm, characters (create, member grid,
  *  bankboi name), ALData, hosting, console updates and debugging - then
  *  this app's own connection and update controls. */
 export function SettingsScreen() {
@@ -31,7 +30,7 @@ export function SettingsScreen() {
   const [prefixStatus, setPrefixStatus] = useState<{ saved: true } | { error: string } | null>(null)
   const [creating, setCreating] = useState(false)
   const [steamError, setSteamError] = useState<string | null>(null)
-  // console-updates.tsx ConsoleUpdateIndicator: arriving from the "!" scrolls to and focuses the update section.
+  // Arriving from the "!" update indicator scrolls to and focuses the update section.
   const location = useLocation()
   const focusTarget = (location.state as { focus?: string } | null)?.focus
   useEffect(() => {
@@ -121,7 +120,7 @@ export function SettingsScreen() {
         <AppUpdateSection />
 
         {dynamicState.steamSwitch?.phase === 'failed' && (
-          // party-inventory-panels.tsx: offered while a Steam handoff has failed.
+          // Offered while a Steam handoff has failed.
           <>
             <Button
               variant="outline"
@@ -146,10 +145,9 @@ export function SettingsScreen() {
   )
 }
 
-/** party-inventory-panels.tsx's ALData key-management panel - generate/reveal/copy the
- *  publishing key, check auth status, and "Prepare mail" (fills the fixed earthiverse/
- *  aldata_auth authentication mail so the user can review postage and send it themselves,
- *  same as the dashboard - this never auto-sends, since each message costs real gold). */
+/** ALData key management: generate/reveal/copy the publishing key, check auth status, and
+ *  "Prepare mail", which fills the earthiverse/aldata_auth mail for the user to review and
+ *  send. It never auto-sends, since each message costs real gold. */
 function ALDataSection() {
   const api = usePartyApi()
   const dynamicState = useDynamicState()
@@ -165,7 +163,7 @@ function ALDataSection() {
   const authStatus = useAlDataAuthStatus()
   const setAuthStatus = (value: string) => queryClient.setQueryData(QK.aldataAuthStatus, value)
   const aldata = dynamicState.aldata
-  // party-header.tsx: opening settings loads a stored key (still masked) so Copy works.
+  // Opening settings loads a stored key (still masked) so Copy works.
   useEffect(() => {
     if (!aldata?.hasKey || key) return
     let alive = true
@@ -261,9 +259,9 @@ function ALDataSection() {
             setBusy(true)
             setError(null)
             const result = key ? { kind: 'success' as const, value: key } : await api.revealAlDataKey()
-            // use-party-console.tsx: Prepare mail opens the mail composer
-            // with the earthiverse / aldata_auth draft (postage shown there).
-            // use-party-console.tsx aldataAction('send'): no stored key -> "Generate an ALData key first".
+            // Prepare mail opens the mail composer with the earthiverse /
+            // aldata_auth draft (postage shown there). Without a stored key
+            // it reports "Generate an ALData key first".
             if (result.kind === 'success' && result.value) navigate('/mail', { state: { draft: { recipient: 'earthiverse', subject: 'aldata_auth', message: result.value } } })
             else setError(result.kind === 'failure' ? result.message : 'Generate an ALData key first')
             setBusy(false)

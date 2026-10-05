@@ -5,7 +5,6 @@ import { eventTimeLabel } from '@/lib/eventPolicy'
 import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 
-/** party-state.tsx `anniversary`. */
 type Anniversary = {
   slices?: string[]
   labels?: Record<string, string>
@@ -20,7 +19,7 @@ type Anniversary = {
   activity?: { at: number; level?: string; message?: string }[]
 }
 
-// anniversary-dialog.tsx: rewards green, failures red, routine bookkeeping neutral.
+// Rewards green, failures red, routine bookkeeping neutral.
 function anniversaryActivityClass(entry: { level?: string; message?: string }) {
   const message = String(entry.message || '')
   if (/\band received [^·]+ Slice$/i.test(message)) return 'text-emerald-300'
@@ -32,8 +31,7 @@ function anniversaryActivityClass(entry: { level?: string; message?: string }) {
 
 const clockText = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`
 
-/** anniversary-dialog.tsx as its own screen, opened from the anniversary
- *  event's settings button. */
+/** Anniversary event status, opened from the event's settings button. */
 export function AnniversaryScreen() {
   const state = useDynamicState()
   const diagnostics = useCharacterDiagnosticsMap()

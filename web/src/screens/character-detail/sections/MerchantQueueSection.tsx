@@ -9,11 +9,9 @@ import { SectionCard } from '../SectionCard'
 import type { ActivityEntry, MerchantJob } from '@/models'
 
 // A handful of retries on the same error is normal (a realm hop, a brief
-// inventory-full moment); past this it's a genuine stuck loop, not a
-// transient hiccup - confirmed against a live account where this exact
-// error ("Couldn't use lucky slot: displaced item changed") retried 36+
-// times over 3+ hours with zero progress, and nothing in the UI ever
-// indicated anything was wrong beyond "nothing's happening."
+// inventory-full moment); past this it's a stuck loop. Errors like
+// "Couldn't use lucky slot: displaced item changed" can otherwise retry
+// for hours with no progress and no visible sign.
 const STUCK_RECOVERY_ATTEMPTS = 5
 const STUCK_AFTER_MS = 3 * 60_000
 
@@ -24,7 +22,7 @@ function stuckReason(job: MerchantJob | null | undefined): string | null {
   return stuckByAttempts || stuckByAge ? job.lastDeferredReason : null
 }
 
-/** merchant-card-controls.tsx's "Merchant logistics" and "Activity": the
+/** "Merchant logistics" and "Activity": the
  *  current job and the queue (priority, label, target, status, cancel /
  *  retry), the Merchant's Luck upkeep line, and the merchant's activity log
  *  with its cleanup actions. Only ever rendered for the merchant. */
@@ -104,8 +102,7 @@ function RetryJobButton({ id }: { id?: string }) {
   )
 }
 
-/** merchant-card-controls.tsx "Activity" + components/merchant-activity.tsx:
- *  newest first, time (full date on tap/hover), "— details", coloured by
+/** Merchant activity, newest first, time (full date on tap/hover), "— details", coloured by
  *  level, with Clear stale orders / Clear history and their results. */
 function MerchantActivity() {
   const [open, setOpen] = useState(false)
@@ -166,7 +163,7 @@ function MerchantActivityLog() {
   )
 }
 
-/** merchant-cancel-job-control.tsx: cancelling an automatic routine's job
+/** Cancelling an automatic routine's job
  *  also switches that routine off server-side (merchant-control.ts), so it
  *  asks first; a manual job cancels (and undoes its pending intent) at once. */
 function CancelJobControl({ job, label }: { job: MerchantJob; label: string }) {

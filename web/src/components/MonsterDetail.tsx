@@ -13,7 +13,7 @@ import type { BestiaryDrop, BestiaryMonster, CatalogItem, ItemDropSource, Sprite
 
 type Achievement = { score: number; owner: string | null }
 
-/** monster-details-dialog.tsx: header with G.monsters id and Navigate,
+/** Header with G.monsters id and Navigate,
  *  achievements, recorded spawns, the definition grid and drops. */
 export function MonsterDetail({ monster, onInspectDrop, onNavigated }: { monster: BestiaryMonster; onInspectDrop: (itemId: string) => void; onNavigated?: () => void }) {
   const state = useDynamicState()
@@ -60,7 +60,7 @@ export function MonsterDetail({ monster, onInspectDrop, onNavigated }: { monster
   )
 }
 
-/** party-workspace.tsx's FarmingAreaPicker for a monster navigation:
+/** FarmingAreaPicker for a monster navigation:
  *  the leader's position and waypoint, override on, then
  *  POST /navigate-to-monster (startFarmingArea). */
 function MonsterNavigatePicker({ monster, onClose, onNavigated }: { monster: BestiaryMonster; onClose: () => void; onNavigated: () => void }) {
@@ -102,7 +102,6 @@ function MonsterNavigatePicker({ monster, onClose, onNavigated }: { monster: Bes
   )
 }
 
-/** monster-achievement-progress.tsx. */
 function MonsterAchievementProgress({ monster, achievement }: { monster: BestiaryMonster; achievement: Achievement | null }) {
   const achievementsList = Array.isArray(monster.definition?.achievements) ? ((monster.definition!.achievements as unknown[]).filter(Array.isArray) as unknown[][]) : []
   if (!achievementsList.length) return null
@@ -145,7 +144,7 @@ function MonsterAchievementProgress({ monster, achievement }: { monster: Bestiar
 
 type DropCard = BestiaryDrop & { originRate?: number; sourceType?: string; acquisitionPath?: string[]; mapName?: string }
 
-/** indirect-bestiary-drops.tsx, verbatim: zone and world loot rolls for this monster. */
+/** Zone and world loot rolls for this monster. */
 function indirectBestiaryDrops(monster: BestiaryMonster, catalog: CatalogItem[]) {
   const drops: DropCard[] = []
   const seen = new Set<string>()
@@ -161,7 +160,7 @@ function indirectBestiaryDrops(monster: BestiaryMonster, catalog: CatalogItem[])
   return drops.sort((a, b) => b.rate - a.rate || a.name.localeCompare(b.name))
 }
 
-/** bestiary-drops.tsx: monster-specific drops in server order, then zone and world drops. */
+/** Monster-specific drops in server order, then zone and world drops. */
 function BestiaryDrops({ monster, catalog, onInspectDrop }: { monster: BestiaryMonster; catalog: CatalogItem[]; onInspectDrop: (itemId: string) => void }) {
   const otherDrops = indirectBestiaryDrops(monster, catalog)
   const cards = (drops: DropCard[], indirect = false) =>

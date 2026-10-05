@@ -1,7 +1,6 @@
 import { durationStat } from '@/lib/itemFormulas'
 import { displayValue } from '@/lib/statusDuration'
 
-/** definition-grid.tsx. */
 export function DefinitionGrid({ value, omit = [] }: { value: Record<string, unknown>; omit?: string[] }) {
   const hidden = new Set(omit)
   const entries = Object.entries(value || {}).filter(([key, field]) => !hidden.has(key) && field !== undefined && field !== null && field !== '')

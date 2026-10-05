@@ -4,13 +4,10 @@ import { aggregateSlotTracking, emptyRolls, luckySlotSearch, normalizeSlotTracki
 import { SectionCard } from '../SectionCard'
 import type { LuckySlotStreams } from '@/models'
 
-/** Lucky-upgrade-slot testing/results - ported from lucky-slot-tracker.tsx.
- *  party-console rotates automatic upgrades through the merchant's 42
- *  inventory slots and records where each roll lands, since some AL
- *  private-server slots carry a hidden bonus to upgrade success chance;
- *  this was previously entirely invisible in the PWA - you could see that
- *  testing was happening (upgrade marks moving between slots) with no way
- *  to see what it had actually found. */
+/** Lucky-upgrade-slot results. party-console rotates automatic upgrades
+ *  through the merchant's 42 inventory slots and records where each roll
+ *  lands, since some AL private-server slots carry a hidden bonus to
+ *  upgrade success chance. */
 export function LuckySlotSection({
   characterName,
   streams,
@@ -22,7 +19,7 @@ export function LuckySlotSection({
   characterName: string
   streams: LuckySlotStreams
   verified?: number | null
-  // Controlled so the inventory's lucky slot can open it too (lucky-slot-menu.tsx "Show lucky slot data").
+  // Controlled so the inventory's lucky slot can open it too ("Show lucky slot data").
   open: boolean
   onOpenChange: (open: boolean) => void
   localLucky?: unknown

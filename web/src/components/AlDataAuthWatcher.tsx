@@ -4,9 +4,8 @@ import { QK } from '@/data/queryKeys'
 import { useAlDataAuthPending, usePartyApi } from '@/data/PartyDataProvider'
 import { useVisible } from '@/data/useMapFrames'
 
-/** use-party-console.tsx's aldata-auth query: while the ALData auth mail is
- *  pending, /aldata/auth is re-read every 15 s wherever the user is, until
- *  CORRECT. Mounted once for the whole app; renders nothing. */
+/** While the ALData auth mail is pending, re-reads /aldata/auth every 15 s
+ *  wherever the user is, until CORRECT. Mounted once; renders nothing. */
 export function AlDataAuthWatcher() {
   const api = usePartyApi()
   const client = useQueryClient()

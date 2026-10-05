@@ -23,10 +23,8 @@ export function ActionToastHost() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-2 z-[100] flex flex-col items-center gap-1.5 px-3">
       {entries.map((entry) => (
-        // Deliberately generic, even on failure - the acting screen's own
-        // inline error already carries the real message persistently;
-        // duplicating it here would just be the same text appearing
-        // twice on screen for no benefit.
+        // Deliberately generic, even on failure: the acting screen's inline
+        // error already shows the real message.
         <div key={entry.id} className={`rounded-full border px-3 py-1 text-xs font-medium shadow-lg ${STYLE[entry.status]}`}>
           {LABEL[entry.status]}
         </div>

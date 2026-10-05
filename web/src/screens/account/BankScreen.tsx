@@ -12,14 +12,10 @@ import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
 import { MluckClover } from '@/components/ItemTileParts'
 import type { BankVault, CatalogItem, CharacterState, InventoryEntry } from '@/models'
 
-/** Shared bank vault browse - ported from ui/account/BankScreen.kt and
- *  matched against the dashboard's own bank-sheet.tsx action set
- *  (confirmed field-by-field against party-console v1.1.0's source):
- *  mark/unmark for withdrawal (always to the configured merchant, same
- *  as the dashboard - an earlier version let you pick any character,
- *  which the dashboard has no UI for and can't show back to you), mark
- *  for stand, deconstruction gated by whether the item is actually
- *  deconstructible, and NPC sale. Tap a row to open its options. */
+/** Shared bank vault browser. Item actions: mark/unmark for withdrawal
+ *  (always to the configured merchant), mark for stand, deconstruction
+ *  (only for deconstructible items) and NPC sale. Tap a row for its options.
+ *  Console: bank-sheet.tsx. */
 export function BankScreen() {
   useDomainInterest('bank')
   const dynamicState = useDynamicState()
@@ -29,7 +25,7 @@ export function BankScreen() {
   const [opened, setOpened] = useState<{ pack: string; entry: InventoryEntry } | null>(null)
   const [search, setSearch] = useState('')
   const query = search.trim().toLowerCase()
-  // bank-sheet.tsx matchesSearch: item id or name; non-matches are dimmed.
+  // Matches item id or name; non-matches are dimmed.
   const matches = (entry: InventoryEntry) =>
     !query || [entry.item.name, catalogFor(entry.item.name)?.name].some((name) => String(name || '').toLowerCase().includes(query))
   const [collapsedPacks, setCollapsedPacks] = useState<Set<string>>(new Set())
@@ -58,9 +54,8 @@ export function BankScreen() {
           {Object.entries(bank.packs).map(([packName, entries]) => {
             const filled = entries.filter((e): e is InventoryEntry => e != null)
             // items1's last 7 slots are reserved and never usable, even
-            // though the pack still reports a full 42-length array -
-            // matches bank-sheet.tsx's own `usableItems` split, so "free"
-            // here doesn't overstate real deposit room on that one pack.
+            // though the pack reports a full 42-length array, so they're
+            // excluded to keep "free" from overstating deposit room.
             const usableEntries = packName === 'items1' ? entries.slice(0, 35) : entries
             const free = usableEntries.length - usableEntries.filter((e) => e != null).length
             const freeColor = free < 5 ? 'text-destructive' : free <= 10 ? 'text-amber-500' : 'text-muted-foreground'
@@ -120,9 +115,8 @@ function GoldBreakdown({ bankGold, characters }: { bankGold: number; characters:
   )
 }
 
-/** bank-sort-control.tsx's one-shot "Sort on next visit" toggle, distinct from the standing
- *  automatic/on-request mode radio already ported into Collection settings - only shown while
- *  that mode is "request". */
+/** One-shot "Sort on next visit" toggle, separate from the standing
+ *  automatic/on-request mode in Merchant settings. Only shown while that mode is "request". */
 function BankSortToggle({ pending }: { pending?: { status: 'queued' | 'sorting' | 'retry'; message?: string } | null }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
@@ -161,7 +155,7 @@ function BankSortToggle({ pending }: { pending?: { status: 'queued' | 'sorting' 
 
 const FLOOR_NAMES: Record<string, string> = { bank: 'Main bank', bank_b: 'Bank basement', bank_u: 'Bank underground' }
 
-/** bank-sheet.tsx "Additional bank storage": each floor, whether it's
+/** "Additional bank storage": each floor, whether it's
  *  accessible (or which key unlocks it, and how many are owned), and the
  *  purchasable vaults on accessible floors - every unlock confirmed first
  *  and sent through the configured merchant. */
@@ -177,7 +171,7 @@ function AdditionalStorageSection() {
   const [error, setError] = useState<string | null>(null)
   if (!vaults.length) return null
   const unlocked = new Set(Object.keys(bank?.packs ?? {}))
-  // bank-sheet.tsx keyQuantity: the merchant's inventory plus every bank pack.
+  // Keys held in the merchant's inventory plus every bank pack.
   const keyQuantity = (key: string) => {
     let quantity = (merchant ? (characters[merchant]?.inventory?.items ?? []) : []).reduce((sum, entry) => sum + (entry?.item.name === key ? Number(entry.item.q || 1) : 0), 0)
     for (const entries of Object.values(bank?.packs ?? {})) for (const entry of entries) if (entry?.item.name === key) quantity += Number(entry.item.q || 1)
@@ -262,7 +256,7 @@ function AdditionalStorageSection() {
   )
 }
 
-/** bank-sheet.tsx "Bankbois": overflow storage workers - create one (the
+/** "Bankbois": overflow storage workers - create one (the
  *  first reserves 7 slots of bank pane 1, so it asks), each one's state,
  *  load and error, its items (the same options as a bank item, on pack
  *  bankboi:NAME), and a two-step delete once it's empty. */
@@ -377,7 +371,7 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
   )
 }
 
-/** bank-sheet.tsx tile markers, as a list row: every pending mark shows at
+/** One bank item as a list row: every pending mark shows at
  *  once (withdrawal border + Withdraw / Stand / NPC / Deconstruct labels),
  *  plus the stat-scroll badge and RESERVED on items1's last seven slots.
  *  Tapping opens the item's options (BankItemPanel). */

@@ -6,10 +6,9 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import type { TravelPlace } from '@/models'
 
-/** Ports the "Send to..." / "Return to leader" (every character) and
- *  "Send merchant to..." / "Go home" (merchant only) quick-travel
- *  buttons from inventory-panel.tsx. "Send to..." opens the preset
- *  location list (travelPlaces) rather than raw coordinate entry. */
+/** Quick-travel buttons: "Send to..." / "Return to leader" (every character)
+ *  and "Send merchant to..." / "Go home" (merchant only). "Send to..." opens
+ *  the preset location list (travelPlaces) rather than raw coordinate entry. */
 export function TravelSection({
   characterName,
   isMerchant,
@@ -26,15 +25,15 @@ export function TravelSection({
   const [showPlaces, setShowPlaces] = useState(false)
   const [showVisits, setShowVisits] = useState(false)
   const [visitMessage, setVisitMessage] = useState<string | null>(null)
-  // merchant-visit-control.tsx: "Queuing visit…" and no repeat sends while one is in flight.
+  // "Queuing visit…" and no repeat sends while one is in flight.
   const [queuingVisit, setQueuingVisit] = useState(false)
   const visitRef = useRef(false)
-  // merchant-visit-control.tsx: online (seen in the last 10s) non-merchant characters.
+  // Online (seen in the last 10s) non-merchant characters.
   const eligible = Object.entries(diagnostics)
     .filter(([name, detail]) => name !== state.merchantCharacter && detail.ctype !== 'merchant' && Number(detail.seenAt) > 0 && now - Number(detail.seenAt) < 10_000)
     .map(([name]) => name)
   const [error, setError] = useState<string | null>(null)
-  // inventory-panel.tsx leaderOnline: a different leader, seen recently.
+  // A different leader, seen recently.
   const leader = state.leader
   const leaderOnline = !!leader && leader !== characterName && now - Number(diagnostics[leader]?.seenAt || 0) < 10_000
   const report = async (request: Promise<{ kind: string; message?: string }>) => {
@@ -82,7 +81,7 @@ export function TravelSection({
                     setError(null)
                     setVisitMessage(null)
                     try {
-                      // merchant-visit-control.tsx: queue a merchant visit to that character.
+                      // Queue a merchant visit to that character.
                       const result = await api.sendCommand(name, { type: 'bank' })
                       if (result.kind === 'failure') return setError(result.message)
                       setVisitMessage(`Merchant visit queued for ${name}`)
@@ -107,7 +106,7 @@ export function TravelSection({
   )
 }
 
-/** character-travel-dialog.tsx, inline: a known area fills the exact map
+/** Travel form: a known area fills the exact map
  *  and coordinates (default main -174, 121), which can also be typed; the
  *  label is the area's name or "map [x, y]", and errors stay in the form. */
 function CharacterTravelForm({ characterName, places, onClose }: { characterName: string; places: TravelPlace[]; onClose: () => void }) {

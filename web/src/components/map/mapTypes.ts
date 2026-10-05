@@ -1,6 +1,6 @@
 import type { Sprite } from '@/models'
 
-// map-tile.ts, map-placement.ts, map-definition.ts, map-entity.ts, map-event.ts, map-frame.ts - verbatim.
+// Console: map-tile.ts, map-placement.ts, map-definition.ts, map-entity.ts, map-event.ts, map-frame.ts.
 export type MapTile = [string, number, number, number, number?]
 export type MapPlacement = [number, number, number, number?, number?]
 
