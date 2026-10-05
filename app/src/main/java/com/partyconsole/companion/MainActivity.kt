@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import com.partyconsole.companion.network.PartyCookies
 import com.partyconsole.companion.notify.AlertNotifications
 import com.partyconsole.companion.notify.NotifierControl
+import com.partyconsole.companion.update.UpdateControl
 import com.partyconsole.companion.notify.PendingRoute
 import com.partyconsole.companion.network.ServerConfigStore
 import com.partyconsole.companion.ui.AppForeground
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
         AppForeground.observe()
         AlertNotifications.ensureChannels(applicationContext)
         NotifierControl.apply(applicationContext)
+        UpdateControl.apply(applicationContext)
         if (savedInstanceState == null) PendingRoute.from(intent)
         val store = ServerConfigStore(applicationContext)
         val lastCrash = if (savedInstanceState == null) CrashReport.take(applicationContext) else null

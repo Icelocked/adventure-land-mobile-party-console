@@ -117,6 +117,8 @@ fun PairingScreen(viewModel: PairingViewModel, onPaired: () -> Unit) {
 /** CameraX preview + on-device ML Kit QR decoding (no network call). Requests
  *  CAMERA at most once per screen visit; declining leaves the manual paste
  *  field, which is always present. */
+// ImageProxy.image is opt-in; the frame is closed after every analysis.
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Composable
 private fun QrScanner(modifier: Modifier = Modifier, onScanned: (String) -> Unit) {
     val context = LocalContext.current
