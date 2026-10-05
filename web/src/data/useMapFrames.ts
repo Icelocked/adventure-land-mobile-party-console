@@ -7,17 +7,22 @@ type Listener = { frame: (frame: MapFrame) => void; state?: (state: 'live' | 're
 
 /** One EventSource per character's map stream
  *  (runtime/coordinator/telemetry/map-stream.ts), shared by every
- *  subscriber - the live map and the target-type lookup - and closed when
- *  the last one leaves. */
+ *  subscriber and closed when the last one leaves. Only views that show a
+ *  map open a stream (like the dashboard: the live map and the Cave map);
+ *  while one is open the character keeps POSTing frames to the console,
+ *  so nothing else may open one. Passive listeners (the target-type
+ *  lookup) only hear frames from a stream a map view already opened. */
 const streams = new Map<string, { source: EventSource; listeners: Set<Listener> }>()
+const passive = new Map<string, Set<Listener>>()
 
 export function subscribeMapFrames(url: string, listener: Listener): () => void {
   let stream = streams.get(url)
   if (!stream) {
     const source = new EventSource(url)
     const created = { source, listeners: new Set<Listener>() }
-    source.onopen = () => created.listeners.forEach((entry) => entry.state?.('live'))
-    source.onerror = () => created.listeners.forEach((entry) => entry.state?.('reconnecting'))
+    const everyone = () => [...created.listeners, ...(passive.get(url) || [])]
+    source.onopen = () => everyone().forEach((entry) => entry.state?.('live'))
+    source.onerror = () => everyone().forEach((entry) => entry.state?.('reconnecting'))
     source.onmessage = (event) => {
       let frame: MapFrame
       try {
@@ -25,7 +30,7 @@ export function subscribeMapFrames(url: string, listener: Listener): () => void 
       } catch {
         return
       }
-      created.listeners.forEach((entry) => entry.frame(frame))
+      everyone().forEach((entry) => entry.frame(frame))
     }
     streams.set(url, created)
     stream = created
@@ -40,6 +45,18 @@ export function subscribeMapFrames(url: string, listener: Listener): () => void 
       owned.source.close()
       streams.delete(url)
     }
+  }
+}
+
+/** Hears [url]'s frames only while a map view has the stream open; never opens one. */
+export function observeMapFrames(url: string, listener: Listener): () => void {
+  let set = passive.get(url)
+  if (!set) passive.set(url, (set = new Set()))
+  set.add(listener)
+  const owned = set
+  return () => {
+    owned.delete(listener)
+    if (!owned.size) passive.delete(url)
   }
 }
 

@@ -23,9 +23,12 @@ sealed interface MapStreamEvent {
 
 /** useMapFrames.ts subscribeMapFrames: one stream per character's map
  *  stream (runtime/coordinator/telemetry/map-stream.ts), shared by every
- *  subscriber - the live map, the Cave map and the target-type lookup -
- *  and closed when the last one leaves. Reconnects after a failure like
- *  a browser EventSource does. */
+ *  subscriber and closed when the last one leaves. Only views that show a
+ *  map open a stream (like the dashboard: the live map and the Cave map);
+ *  while one is open the character keeps POSTing frames to the console.
+ *  Passive observers (the target-type lookup) only hear frames from a
+ *  stream a map view already opened. Reconnects after a failure like a
+ *  browser EventSource does. */
 class MapStreams(private val client: OkHttpClient, private val apiBase: String) {
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
     private val timer by lazy { Timer("map-streams", true) }
@@ -37,7 +40,7 @@ class MapStreams(private val client: OkHttpClient, private val apiBase: String) 
         var closed = false
         @Volatile var last: MapFrame? = null
 
-        fun emit(event: MapStreamEvent) = synchronized(streams) { listeners.toList() }.forEach { it(event) }
+        fun emit(event: MapStreamEvent) = synchronized(streams) { listeners.toList() + passive[url].orEmpty() }.forEach { it(event) }
 
         fun connect() {
             if (closed) return
@@ -69,6 +72,28 @@ class MapStreams(private val client: OkHttpClient, private val apiBase: String) 
     }
 
     private val streams = mutableMapOf<String, Stream>()
+    private val passive = mutableMapOf<String, MutableSet<(MapStreamEvent) -> Unit>>()
+
+    /** Hears [character]'s frames only while a map view has the stream open; never opens one. */
+    fun observe(character: String, listener: (MapStreamEvent) -> Unit): () -> Unit {
+        val url = url(character)
+        val existing = synchronized(streams) {
+            passive.getOrPut(url) { mutableSetOf() } += listener
+            streams[url]
+        }
+        existing?.last?.let { listener(MapStreamEvent.Frame(it)) }
+        return {
+            synchronized(streams) {
+                passive[url]?.let { set -> set -= listener; if (set.isEmpty()) passive.remove(url) }
+            }
+        }
+    }
+
+    /** [observe] as a Flow. */
+    fun observed(character: String): Flow<MapStreamEvent> = callbackFlow {
+        val stop = observe(character) { trySend(it) }
+        awaitClose(stop)
+    }
 
     fun url(character: String) = "${apiBase.trimEnd('/')}/map-stream/${URLEncoder.encode(character, "UTF-8").replace("+", "%20")}"
 

@@ -131,7 +131,7 @@ class MapTest {
     }
 
     @Test
-    fun liveMapStreamsFramesAndTheTargetResolvesToItsMonsterType() {
+    fun liveMapStreamsFramesAndTheTargetResolvesOnlyFromAnOpenMap() {
         console.gets["/party-api/maps/main"] = definition("main")
         console.mapFrames["Leada"] = listOf(frame("Leada", "main"))
         val viewModel = PartyViewModel(console.settings)
@@ -142,10 +142,15 @@ class MapTest {
             }
         }
         compose.onNodeWithText("main [12, 81]").assertExists()
-        compose.waitUntil(10_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("target: crabx")).fetchSemanticsNodes().isNotEmpty() }
+        // Like the dashboard, nothing opens a map stream until a map is shown.
+        Thread.sleep(1_500)
+        compose.waitForIdle()
+        compose.onNodeWithText("target: none").assertExists()
+        assertTrue(console.requests.none { it.path.startsWith("/party-api/map-stream/") })
         // The open map redraws every frame: drive the clock by hand from here.
         compose.mainClock.autoAdvance = false
         compose.onNodeWithContentDescription("Expand live map").performClick()
+        frames { compose.onAllNodes(androidx.compose.ui.test.hasText("target: crabx")).fetchSemanticsNodes().isNotEmpty() }
         frames { compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Live map")).fetchSemanticsNodes().isNotEmpty() }
         frames { compose.onAllNodes(androidx.compose.ui.test.hasText("Waiting for the first frame…")).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("reconnecting").assertDoesNotExist()

@@ -42,12 +42,18 @@ fun MapFrames(viewModel: PartyViewModel, character: String, enabled: Boolean, on
 
 /** useTargetMonsterType: the live target's monster type (e.g. "crabx")
  *  from the character's latest map frame - `entities` carry both `id` and
- *  `mtype`. Null until a frame names it, never the raw id. */
+ *  `mtype`. Passive: it only reads frames while the live map or the Cave
+ *  map has the stream open (opening one just for this name made the
+ *  character stream frames to the console continuously, load the dashboard
+ *  never creates). Null until a frame names it, never the raw id. */
 @Composable
 fun rememberTargetMonsterType(viewModel: PartyViewModel, character: String, target: String?): String? {
     var resolved by remember(character, target) { mutableStateOf<String?>(null) }
-    MapFrames(viewModel, character, target != null) { event ->
-        if (event is MapStreamEvent.Frame) resolved = event.frame.entities.find { it.id == target }?.mtype
+    LaunchedEffect(character, target) {
+        if (target == null) return@LaunchedEffect
+        viewModel.mapStreams.observed(character).collect { event ->
+            if (event is MapStreamEvent.Frame) resolved = event.frame.entities.find { it.id == target }?.mtype
+        }
     }
     return resolved
 }
