@@ -13,8 +13,8 @@ import com.partyconsole.companion.network.MapStreamEvent
 import com.partyconsole.companion.ui.AppForeground
 import com.partyconsole.companion.ui.PartyViewModel
 
-/** useMapDefinition: the map's definition (cached per reference revision)
- *  while [enabled] and the app is visible; [failed] once a load gave up. */
+/** The map's definition (cached per reference revision) while [enabled] and
+ *  the app is visible; [failed] once a load gave up. */
 class MapDefinitionState(val data: MapDefinition?, val failed: Boolean)
 
 @Composable
@@ -30,7 +30,7 @@ fun rememberMapDefinition(viewModel: PartyViewModel, map: String, enabled: Boole
     return MapDefinitionState(data?.takeIf { it.name == map }, failed)
 }
 
-/** useMapFrames: [onEvent] hears [character]'s map stream while [enabled]. */
+/** [onEvent] hears [character]'s map stream while [enabled]. */
 @Composable
 fun MapFrames(viewModel: PartyViewModel, character: String, enabled: Boolean, onEvent: (MapStreamEvent) -> Unit) {
     val listener by rememberUpdatedState(onEvent)
@@ -40,12 +40,11 @@ fun MapFrames(viewModel: PartyViewModel, character: String, enabled: Boolean, on
     }
 }
 
-/** useTargetMonsterType: the live target's monster type (e.g. "crabx")
- *  from the character's latest map frame - `entities` carry both `id` and
- *  `mtype`. Passive: it only reads frames while the live map or the Cave
- *  map has the stream open (opening one just for this name made the
- *  character stream frames to the console continuously, load the dashboard
- *  never creates). Null until a frame names it, never the raw id. */
+/** The live target's monster type (e.g. "crabx") from the character's latest
+ *  map frame - `entities` carry both `id` and `mtype`. Passive: it only reads
+ *  frames while the live map or the Cave map has the stream open, since
+ *  opening one just for this name would make the character stream frames
+ *  continuously. Null until a frame names it, never the raw id. */
 @Composable
 fun rememberTargetMonsterType(viewModel: PartyViewModel, character: String, target: String?): String? {
     var resolved by remember(character, target) { mutableStateOf<String?>(null) }

@@ -64,7 +64,7 @@ private val SPAWN_REASONS = mapOf(
 
 private fun coordinate(value: Double) = if (value == Math.floor(value)) value.roundToLong().toString() else value.toString()
 
-/** monster-spawns.tsx: every recorded spawn and why ordinary routing can't use it. */
+/** Every recorded spawn and why ordinary routing can't use it. */
 @Composable
 fun MonsterSpawns(records: List<MonsterSpawnRecord>?) {
     Column(modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF065F46), RoundedCornerShape(4.dp)).padding(12.dp)) {
@@ -90,12 +90,11 @@ fun MonsterSpawns(records: List<MonsterSpawnRecord>?) {
     }
 }
 
-/** farming-area-picker.tsx (the PWA's FarmingAreaPicker.tsx): Hunt backup
- *  setup ([preparation], with the monster picker inline), Phoenix's ordered
- *  5-region patrol, or the general "choose a farming area" list grouped by
- *  how many selected monsters share each area and ranked by the saved
- *  waypoint, then proximity. The selected area shows FarmingAreaPreview
- *  with the legend and "Enlarge map" (a full-screen view). */
+/** Farming area picker: Hunt backup setup ([preparation], with the monster
+ *  picker inline), Phoenix's ordered 5-region patrol, or the general "choose
+ *  a farming area" list grouped by how many selected monsters share each area
+ *  and ranked by the saved waypoint, then proximity. The selected area shows
+ *  FarmingAreaPreview with the legend and "Enlarge map" (a full-screen view). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FarmingAreaPicker(
@@ -175,7 +174,7 @@ fun FarmingAreaPicker(
             OutlinedTextField(search, { search = it }, placeholder = { Text("Search monsters…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             Column(modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
                 for (monster in monsterOptions) {
-                    // monster-focus-picker.tsx: Fairy has no verified regular spawn route.
+                    // Fairy has no verified regular spawn route.
                     if (monster.id == "tinyp") {
                         Row(modifier = Modifier.fillMaxWidth().clickable { fairyNote = true }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             SpriteIcon(monster.sprite, size = 24.dp)

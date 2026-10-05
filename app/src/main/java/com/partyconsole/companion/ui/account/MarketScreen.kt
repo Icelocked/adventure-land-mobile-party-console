@@ -85,7 +85,7 @@ private fun gold(value: Long) = "%,d".format(value)
 
 private data class ListingDraft(val key: String, val entry: InventoryEntry, val bankPack: String?, val price: Long, val quantity: Int)
 
-/** Inline Yes/Cancel confirmation (the dashboard's confirm dialogs). */
+/** Inline Yes/Cancel confirmation. */
 @Composable
 private fun Confirm(title: String, text: String, busy: Boolean, error: String?, onYes: () -> Unit, onCancel: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x990E7490), RoundedCornerShape(6.dp)).padding(10.dp).semantics { contentDescription = title }) {
@@ -99,14 +99,13 @@ private fun Confirm(title: String, text: String, busy: Boolean, error: String?, 
     }
 }
 
-/** stand-sheet.tsx's market (the PWA's MarketScreen.tsx): ALData/Ponty
- *  status, Live WTS / Live WTB / Classifieds / Ponty tabs with counts, one
- *  search, the WTS filters (deals, bad deals, affordable with bank gold,
- *  blacklisted), grouped listings with deal colouring and stale dimming,
- *  confirmed buys split across grouped listings, "Make WTB" for stale rows,
- *  selling into live WTB offers (or "List" at the WTB price when stale),
- *  classifieds' Add to WTB / Add to stand, and Ponty's grouped lots. Every
- *  row inspects its item. */
+/** The market: ALData/Ponty status, Live WTS / Live WTB / Classifieds / Ponty
+ *  tabs with counts, one search, the WTS filters (deals, bad deals,
+ *  affordable with bank gold, blacklisted), grouped listings with deal
+ *  colouring and stale dimming, confirmed buys split across grouped listings,
+ *  "Make WTB" for stale rows, selling into live WTB offers (or "List" at the
+ *  WTB price when stale), classifieds' Add to WTB / Add to stand, and Ponty's
+ *  grouped lots. Every row inspects its item. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () -> Unit, onOpenSettings: () -> Unit, onOpenSetup: () -> Unit) {
@@ -129,7 +128,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     var busy by remember { mutableStateOf<String?>(null) }
     var rowError by remember { mutableStateOf<Pair<String, String>?>(null) }
     var inspecting by remember { mutableStateOf<Item?>(null) }
-    // stand-sheet.tsx onInspect's source label for the item-details header.
+    // Source label for the item-details header.
     var inspectSource by remember { mutableStateOf("") }
     var wtbItem by remember { mutableStateOf<Item?>(null) }
     var listing by remember { mutableStateOf<ListingDraft?>(null) }
@@ -174,7 +173,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
         viewModel.refreshDynamicStateNow()
     }
     fun ApiResult<CommandResult>.message() = (this as? ApiResult.Failure)?.message
-    // stand-sheet.tsx purchase confirmation: split the quantity across the grouped listings.
+    // Purchase confirmation: split the quantity across the grouped listings.
     suspend fun buyGrouped(entry: AlDataListing, quantity: Int): String? {
         var remaining = quantity
         for (physical in entry.groupedListings ?: listOf(entry)) {

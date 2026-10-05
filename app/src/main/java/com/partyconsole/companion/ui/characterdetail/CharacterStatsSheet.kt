@@ -37,7 +37,7 @@ import kotlin.math.roundToLong
 /** Number.prototype.toLocaleString() (en-US): grouping, up to 3 decimals. */
 internal fun localeNumber(value: Double): String = DecimalFormat("#,##0.###", DecimalFormatSymbols(Locale.US)).format(value)
 
-/** display-character.ts displayRunSpeed, verbatim. */
+/** Run speed as the dashboard displays it. */
 fun displayRunSpeed(ctype: String, speed: Double?, unrestrictedSpeed: Double?, standOpen: Boolean?): Double? {
     if (ctype == "merchant") {
         if (unrestrictedSpeed != null && unrestrictedSpeed.isFinite()) return unrestrictedSpeed
@@ -46,7 +46,7 @@ fun displayRunSpeed(ctype: String, speed: Double?, unrestrictedSpeed: Double?, s
     return speed
 }
 
-/** The damage multiplier for a defense value (character-stats-dialog.tsx). */
+/** The damage multiplier for a defense value. */
 internal fun damageMultiplier(defense: Double): Double {
     fun band(from: Double, rate: Double) = max(0.0, min(100.0, defense - from)) * rate
     val reduction = band(0.0, 0.001) + band(100.0, 0.001) + band(200.0, 0.00095) + band(300.0, 0.0009) + band(400.0, 0.00082) +
@@ -54,7 +54,7 @@ internal fun damageMultiplier(defense: Double): Double {
     return min(1.32, max(0.05, 1 - reduction))
 }
 
-/** The rows of character-stats-dialog.tsx, label to value. */
+/** The stats sheet's rows, label to value. */
 internal fun characterStats(vitals: CharacterVitals, diagnostics: CharacterDiagnostics?, slots: Map<String, EquippedEntry?>): List<Pair<String, String>> {
     val raw = diagnostics?.raw ?: JsonObject(emptyMap())
     fun num(key: String) = (raw[key] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
@@ -136,10 +136,9 @@ internal fun characterStats(vitals: CharacterVitals, diagnostics: CharacterDiagn
 
 private val SMALL = setOf("Strength", "Intelligence", "Dexterity", "Vitality", "Fortitude")
 
-/** character-stats-dialog.tsx (the PWA's CharacterStatsSheet.tsx): level,
- *  HP/MP, attack, speeds, armor and resistance with their damage reduction,
- *  STR/INT/DEX/VIT/FOR effects (primary stat marked), luck, and the combat
- *  stats. */
+/** Character stats: level, HP/MP, attack, speeds, armor and resistance with
+ *  their damage reduction, STR/INT/DEX/VIT/FOR effects (primary stat marked),
+ *  luck, and the combat stats. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CharacterStatsSheet(name: String, vitals: CharacterVitals, diagnostics: CharacterDiagnostics?, slots: Map<String, EquippedEntry?>, onClose: () -> Unit) {

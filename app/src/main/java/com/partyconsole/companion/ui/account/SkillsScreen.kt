@@ -51,7 +51,7 @@ private fun JsonElement?.truthy(): Boolean = when (this) {
 
 private fun jsNumber(value: Double) = if (value == Math.floor(value) && value.isFinite()) value.toLong().toString() else value.toString()
 
-/** skill-range-label.tsx, verbatim. */
+/** A skill's range, as the dashboard labels it. */
 fun skillRangeLabel(skill: SkillEntry): String {
     val definition = skill.definition.orEmpty()
     if (definition["global"].truthy()) return "Global"
@@ -66,9 +66,8 @@ fun skillRangeLabel(skill: SkillEntry): String {
     return label
 }
 
-/** skills-dialog.tsx as a screen (the PWA's SkillsScreen.tsx): search across
- *  class and skill, a sprite grid per class, and the selected skill's full
- *  definition in a sheet. */
+/** Skills: search across class and skill, a sprite grid per class, and the
+ *  selected skill's full definition in a sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {

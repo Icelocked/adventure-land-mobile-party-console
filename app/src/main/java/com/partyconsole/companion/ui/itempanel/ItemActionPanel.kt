@@ -70,11 +70,9 @@ private val Orange = Color(0xFFFB923C)
 private val Rose = Color(0xFFFB7185)
 private const val CLEAR_MARKS_TITLE = "Clear this item’s manual marks and matching shared automatic rules"
 
-/** The item options panel (the PWA's ItemActionPanel.tsx): tapping an item
- *  opens its options list in the dashboard's order, with its labels and
- *  gating. "Item details" is the first option and opens the full
- *  ItemDetailBrowser in its own sheet - the details pane no longer hosts
- *  the options. */
+/** The item options panel: tapping an item opens its options list in the
+ *  dashboard's order, with its labels and gating. "Item details" is the first
+ *  option and opens ItemDetailBrowser in its own sheet. */
 @Composable
 fun ItemActionPanel(
     target: ItemActionTarget,
@@ -84,7 +82,7 @@ fun ItemActionPanel(
     viewModel: PartyViewModel,
     sheetState: SheetState,
     onDismiss: () -> Unit,
-    // lucky-slot-menu.tsx "Show lucky slot data", when this is the merchant's lucky slot.
+    // "Show lucky slot data", when this is the merchant's lucky slot.
     onLuckySlotData: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -111,7 +109,7 @@ fun ItemActionPanel(
         scope.launch { finish(action())?.let { error = it } }
     }
 
-    // use-party-console.tsx statScrollInventory: the merchant's bag plus the bank.
+    // Stat scrolls on hand: the merchant's bag plus the bank.
     val statScrollInventory = remember(characters, state.bank, state.merchantCharacter) {
         val quantities = mutableMapOf<String, Int>()
         fun add(entryItem: Item?) {
@@ -162,7 +160,7 @@ fun ItemActionPanel(
                     rootGift = item.gift == true,
                     rootExpires = item.expires,
                     context = ItemDetailContext(characterName, (target as? ItemActionTarget.InventorySlot)?.slot ?: -1),
-                    // connected-inventory.tsx: only the merchant's own inventory is a stand source.
+                    // Only the merchant's own inventory is a stand source.
                     onAddStand = if (isMerchant && target is ItemActionTarget.InventorySlot) ({ showingDetails = false; expanded = "stand" }) else null,
                     viewModel = viewModel,
                 )
@@ -182,8 +180,8 @@ internal fun TapRow(label: String, enabled: Boolean = true, color: Color? = null
     }
 }
 
-/** inventory-panel.tsx's item context menu, in its order and with its labels
- *  and gating, as this app's options list. */
+/** The inventory item menu, in the dashboard's order and with its labels and
+ *  gating. */
 @Composable
 private fun InventoryActions(
     viewModel: PartyViewModel,
@@ -227,7 +225,7 @@ private fun InventoryActions(
     val merchantMarkedItem = markedIn(state.merchantMarked[characterName].orEmpty(), entry)
     val deliveryTarget = if (isMerchant) state.merchantDeliveries.entries.find { (_, list) -> list.any { it.slot == slot && sameMarkedItem(it.item, item) } }?.key else null
     val standListing = if (isMerchant) state.standListings.find { it.bankPack == null && it.slot == slot && sameMarkedItem(it.item, item) } else null
-    // inventory-panel.tsx: standIsFull (sales + buy orders reserving a slot).
+    // Stand full: sales + buy orders reserving a slot.
     val standFull = standIsFull(state.standListings, state.standBids)
     val weaponMarked = isMerchant && state.merchantWeapon?.item?.let { sameMarkedItem(it, item) } == true
     val upgradeMark = if (meta?.upgradeable == true) state.upgrades[characterName].orEmpty().find { !it.equipped && it.slot.slotInt() == slot && sameMarkedItem(it.item, item) } else null
@@ -247,7 +245,7 @@ private fun InventoryActions(
     val deconstructable = canDeconstruct(item, state.deconstructionCatalog)
     val upgradeMax = maxOf(0, itemMaximumLevel(meta) - level)
     val compoundMax = minOf(7, itemMaximumLevel(meta))
-    // use-party-console.tsx: online party members other than this one; bankbois are storage workers.
+    // Online party members other than this one; bankbois are storage workers.
     val bankboiNames = state.bankbois.map { it.name }.toSet()
     val deliveryTargets = diagnostics.filter { (name, detail) -> name != characterName && (detail.seenAt ?: 0) > 0 && name !in bankboiNames }.keys.toList()
     val anyMark = bankMarked || merchantMarkedItem || autoMarkMode != null || upgradeMark != null || autoUpgradeRule != null || statScrollMark != null ||
@@ -305,7 +303,7 @@ private fun InventoryActions(
             if (expanded == "statscroll") StatScrollPicker(meta, item, statScrollInventory) { statType -> command("stat-scroll-mark", slot, mapOf("statType" to JsonPrimitive(statType))) }
         }
 
-        // automatic-item-actions.tsx section="exchange". The server toggles this rule.
+        // The server toggles this rule.
         if (merchant != null && exchangeable) TapRow("Auto exchange", enabled = loaded && !autoExchangeMarked) { command("auto-exchange", slot) }
 
         TapRow("Mark for bank", enabled = !bankMarked) { command("mark", slot) }
@@ -332,7 +330,7 @@ private fun InventoryActions(
             }
         }
 
-        // upgrade-actions.tsx (offerings are U1).
+        // Upgrade marks; offerings are listed separately.
         if (merchant != null && meta?.upgradeable == true && upgradeMax > 0) {
             TapRow("Mark for upgrade" + (upgradeMark?.let { " · ${tiers(it.tiers ?: 1)}" } ?: "")) { toggle("upgrade") }
             if (expanded == "upgrade") {
@@ -399,7 +397,7 @@ private fun InventoryActions(
     }
 }
 
-/** equip-slot.tsx's menu: Unequip (the elixir only shows its active effect),
+/** Equip-slot menu: Unequip (the elixir only shows its active effect),
  *  upgrade marks, and Clear all marks when anything matches. */
 @Composable
 private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget.EquipmentSlot, meta: ItemMeta?, characterName: String, run: (suspend () -> ApiResult<CommandResult>) -> Unit) {
@@ -421,7 +419,6 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
     val slotArg = JsonPrimitive(slotName)
     val mark = state.upgrades[characterName].orEmpty().find { it.equipped && (it.slot as? JsonPrimitive)?.content == slotName && sameMarkedItem(it.item, item) }
     val statScrollMark = state.statScrolls[characterName].orEmpty().find { (it.slot as? JsonPrimitive)?.content == slotName && sameMarkedItem(it.item, item) }
-    // inventory-panel.tsx hasAutomaticMarks.
     val commerceKey = automaticCommerceRuleKey(item)
     val autoItemMarks = state.autoItemMarks[ruleName].orEmpty()
     val hasAutomaticMarks = autoItemMarks[key] != null || (level == 0 && autoItemMarks[item.name] != null) || autoUpgradeRule != null ||
@@ -431,7 +428,7 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
     fun tiers(n: Int) = "$n tier${if (n == 1) "" else "s"}"
 
     Column {
-        // equipment.tsx: trade1..N are the merchant's stand slots, not gear.
+        // trade1..N are the merchant's stand slots, not gear.
         if (slotName != "elixir" && !slotName.startsWith("trade")) TapRow("Unequip") { run { api.itemCommand("unequip", characterName, item, slotArg) } }
         if (slotName == "elixir") TapRow("Active elixir effect", enabled = false) {}
         if (meta?.upgradeable == true && upgradeMax > 0) {
@@ -453,8 +450,8 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
     }
 }
 
-/** upgrade-actions.tsx's tier submenu: one row per achievable target tier,
- *  "+N → +N+tiers" with the scroll gold cost. */
+/** Upgrade tier submenu: one row per achievable target tier, "+N → +N+tiers"
+ *  with the scroll gold cost. */
 @Composable
 internal fun UpgradeTierPicker(meta: ItemMeta?, level: Int, current: Int? = null, onPick: (Int) -> Unit) {
     val max = maxOf(0, itemMaximumLevel(meta) - level)
@@ -472,8 +469,8 @@ internal fun UpgradeTierPicker(meta: ItemMeta?, level: Int, current: Int? = null
     }
 }
 
-/** inventory-panel.tsx's "Auto compound" submenu: one row per tier up to +7
- *  (the server's validTier cap) with the real compound-scroll cost. */
+/** "Auto compound" submenu: one row per tier up to +7 (the server's validTier
+ *  cap) with the real compound-scroll cost. */
 @Composable
 internal fun CompoundTierPicker(meta: ItemMeta?, level: Int, buyable: List<MerchantBuyItem>, onPick: (Int) -> Unit) {
     val max = maxOf(0, minOf(7, itemMaximumLevel(meta)) - level)
@@ -490,8 +487,8 @@ internal fun CompoundTierPicker(meta: ItemMeta?, level: Int, buyable: List<Merch
     }
 }
 
-/** stat-scroll-mark's option list: str/int/dex/vit are always shown (bought
- *  for gold); every other stat only once enough of its scroll is owned. */
+/** Stat-scroll mark options: str/int/dex/vit are always shown (bought for
+ *  gold); every other stat only once enough of its scroll is owned. */
 @Composable
 private fun StatScrollPicker(meta: ItemMeta?, item: Item, statScrollInventory: Map<String, Int>, onPick: (String) -> Unit) {
     val level = item.level ?: 0

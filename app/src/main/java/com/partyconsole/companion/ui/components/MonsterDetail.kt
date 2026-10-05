@@ -55,7 +55,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** definition-grid.tsx: a raw definition as label / value rows (durations formatted). */
+/** A raw definition as label / value rows (durations formatted). */
 @Composable
 fun DefinitionGrid(value: JsonObject?, omit: Set<String> = emptySet()) {
     val entries = value.orEmpty().filter { (key, field) -> key !in omit && field !is JsonNull && !(field is JsonPrimitive && field.isString && field.content.isEmpty()) }
@@ -83,9 +83,8 @@ fun DefinitionGrid(value: JsonObject?, omit: Set<String> = emptySet()) {
     }
 }
 
-/** monster-details-dialog.tsx (the PWA's MonsterDetail.tsx): header with the
- *  G.monsters id and Navigate, achievements, recorded spawns, the
- *  definition grid and drops. */
+/** Monster details: header with the G.monsters id and Navigate, achievements,
+ *  recorded spawns, the definition grid and drops. */
 @Composable
 fun MonsterDetail(viewModel: PartyViewModel, monster: BestiaryMonster, onInspectDrop: (String) -> Unit, onNavigated: (() -> Unit)? = null) {
     val state by viewModel.dynamicState.collectAsState()
@@ -120,9 +119,8 @@ fun MonsterDetail(viewModel: PartyViewModel, monster: BestiaryMonster, onInspect
     }
 }
 
-/** party-workspace.tsx's FarmingAreaPicker for a monster navigation: the
- *  leader's position and waypoint, override on, then POST
- *  /navigate-to-monster (startFarmingArea). */
+/** The farming-area picker for navigating to a monster: the leader's position
+ *  and waypoint, override on, then POST /navigate-to-monster. */
 @Composable
 private fun MonsterNavigatePicker(viewModel: PartyViewModel, monster: BestiaryMonster, onClose: () -> Unit, onNavigated: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
@@ -163,7 +161,7 @@ private fun MonsterNavigatePicker(viewModel: PartyViewModel, monster: BestiaryMo
     }
 }
 
-/** monster-achievement-progress.tsx. */
+/** Achievement progress for a monster. */
 @Composable
 private fun MonsterAchievementProgress(monster: BestiaryMonster, achievement: MonsterAchievement?) {
     val list = (monster.definition?.get("achievements") as? JsonArray)?.mapNotNull { it as? JsonArray }.orEmpty()
@@ -205,7 +203,7 @@ internal fun localeAmount(value: Double): String = java.text.DecimalFormat("#,##
 
 private data class DropCard(val id: String, val name: String, val rate: Double, val quantity: Int, val sprite: Sprite?, val sourceType: String? = null, val mapName: String? = null)
 
-/** indirect-bestiary-drops.tsx, verbatim: zone and world loot rolls for this monster. */
+/** Zone and world loot rolls for this monster. */
 private fun indirectBestiaryDrops(monster: BestiaryMonster, catalog: List<CatalogItem>): List<DropCard> {
     val drops = mutableListOf<DropCard>()
     val seen = mutableSetOf<String>()
@@ -220,7 +218,7 @@ private fun indirectBestiaryDrops(monster: BestiaryMonster, catalog: List<Catalo
     return drops.sortedWith(compareByDescending<DropCard> { it.rate }.thenBy { it.name })
 }
 
-/** bestiary-drops.tsx: monster-specific drops in server order, then zone and world drops. */
+/** Monster-specific drops in server order, then zone and world drops. */
 @Composable
 private fun BestiaryDrops(monster: BestiaryMonster, catalog: List<CatalogItem>, onInspectDrop: (String) -> Unit) {
     val otherDrops = remember(monster, catalog) { indirectBestiaryDrops(monster, catalog) }
@@ -256,8 +254,7 @@ private fun BestiaryDrops(monster: BestiaryMonster, catalog: List<CatalogItem>, 
     Cards(otherDrops, indirect = true)
 }
 
-/** tracktrix-bonuses.tsx TracktrixBonusList: active / inactive / waiting, and
- *  the non-zero bonuses. */
+/** Tracktrix bonuses: active / inactive / waiting, and the non-zero bonuses. */
 @Composable
 fun TracktrixBonusList(data: JsonObject?, title: String = "Current Tracktrix bonuses", rose: Boolean = false) {
     val active = (data?.get("active") as? JsonPrimitive)?.content == "true"
@@ -282,8 +279,7 @@ fun TracktrixBonusList(data: JsonObject?, title: String = "Current Tracktrix bon
     }
 }
 
-/** tracktrix-bonuses.tsx SharedTracktrixBonuses: the newest active
- *  character's reported bonuses. */
+/** The newest active character's reported Tracktrix bonuses. */
 @Composable
 fun SharedTracktrixBonuses(viewModel: PartyViewModel, names: List<String>) {
     val diagnostics by viewModel.characterDetails.collectAsState()

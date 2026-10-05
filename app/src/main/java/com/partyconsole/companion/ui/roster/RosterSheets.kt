@@ -44,9 +44,9 @@ import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.components.CharacterPortrait
 import kotlinx.coroutines.launch
 
-/** roster-picker.tsx + party-roster-picker.tsx: choose who to load into an
- *  empty slot (headless or Steam), or - for slot 0 - switch the Steam
- *  character. Offline, inactive roster members only, plus Create character. */
+/** Choose who to load into an empty slot (headless or Steam), or - for slot 0
+ *  - switch the Steam character. Offline, inactive roster members only, plus
+ *  Create character. */
 @Composable
 fun RosterPickerSheet(viewModel: PartyViewModel, slot: Int, onClose: () -> Unit, onCreate: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
@@ -62,8 +62,8 @@ fun RosterPickerSheet(viewModel: PartyViewModel, slot: Int, onClose: () -> Unit,
         scope.launch {
             busy = true
             error = null
-            // use-party-console.tsx: slot 0 switches the Steam primary; otherwise
-            // load headless (slot spawn) or into Steam.
+            // Slot 0 switches the Steam primary; otherwise load headless (slot
+            // spawn) or into Steam.
             val result = when {
                 slot == 0 -> viewModel.api.steamAction(name, "primary")
                 hosting == "steam" -> viewModel.api.steamAction(name, "login")
@@ -126,9 +126,8 @@ fun RosterPickerSheet(viewModel: PartyViewModel, slot: Int, onClose: () -> Unit,
 
 private val NAME = Regex("^[A-Za-z0-9_]{4,12}$")
 
-/** create-character.tsx + use-party-console.tsx createCharacter: name
- *  (4-12 letters, numbers, underscores), class, one of the class's
- *  official starting looks, then create and spawn. */
+/** Create character: name (4-12 letters, numbers, underscores), class, one of
+ *  the class's official starting looks, then create and spawn. */
 @Composable
 fun CreateCharacterSheet(viewModel: PartyViewModel, onClose: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()

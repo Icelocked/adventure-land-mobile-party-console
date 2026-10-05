@@ -4,11 +4,10 @@ import com.partyconsole.companion.model.MerchantJob
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
-/** routine-labels.tsx + automatic-routine-keys.tsx (party-console v1.2.0),
- *  ported verbatim (same as the PWA's lib/routineLabels.ts) - the
- *  merchant's schedulable work reasons and which ones have an on/off
- *  switch. Re-sync from the dashboard on every release; the server drops
- *  unknown keys (routine-priorities.ts). */
+/** The merchant's schedulable work reasons and which ones have an on/off
+ *  switch, as of party-console v1.2.0 (shared with the PWA's
+ *  lib/routineLabels.ts). Re-sync on every console release; the server drops
+ *  unknown keys. */
 val ROUTINE_LABELS: Map<String, String> = linkedMapOf(
     "merchant luck" to "Merchant's Luck",
     "inventory cleanout" to "Emergency inventory cleanout",
@@ -59,8 +58,7 @@ val AUTOMATIC_ROUTINE_KEYS: Set<String> = setOf(
 
 fun hasEnableToggle(key: String): Boolean = AUTOMATIC_ROUTINE_KEYS.contains(key) || key == "fishing" || key == "mining"
 
-/** runtime/coordinator/merchant/routines.ts routineFor (v1.2.0), verbatim -
- *  which routine a queued merchant job belongs to. */
+/** Which routine a queued merchant job belongs to (console v1.2.0). */
 private val PURCHASES = setOf("stand purchases", "stand bid purchases", "ALData marketplace purchases", "Ponty purchases")
 private val ALIASES = mapOf(
     "stand search" to "manual marketplace purchases",

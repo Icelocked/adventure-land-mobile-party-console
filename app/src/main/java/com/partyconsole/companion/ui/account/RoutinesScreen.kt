@@ -37,21 +37,17 @@ import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.characterdetail.sections.ConfigLoadingNote
 import kotlinx.coroutines.launch
 
-/** routine-priorities-dialog.tsx ported as its own screen. The dashboard
- *  supports real pointer-drag reordering with live position animation -
- *  overkill for a touch list where up/down taps are just as fast and far
- *  simpler to get right. Ported the EXACT renumbering algorithm the
- *  dashboard's own arrow-key handler uses (its `move()` function), not a
- *  simplified version, so priorities after a reorder here match what the
- *  dashboard would have produced for the same move. */
+/** Routine priorities. Reordering uses up/down taps instead of drag, but the
+ *  same renumbering as the dashboard's arrow-key `move()`, so priorities
+ *  after a reorder match what the dashboard would produce. */
 @Composable
 fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     val dynamicState by viewModel.dynamicState.collectAsState()
     val loaded by viewModel.stateLoaded.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // party-management-panels.tsx: fishing/mining aren't automations - their
-    // switches mirror the standing gathering modes.
+    // Fishing/mining aren't automations; their switches mirror the standing
+    // gathering modes.
     val priorities = dynamicState.merchantRoutinePriorities
     val enabled = dynamicState.merchantAutomations +
         mapOf("fishing" to dynamicState.gatheringModes.contains("fishing"), "mining" to dynamicState.gatheringModes.contains("mining"))
@@ -75,7 +71,7 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
         compareByDescending<String> { draft[it] ?: 50 }.thenBy { ROUTINE_LABELS[it] ?: it },
     )
     // Deliveries/withdrawals are switched on in Merchant settings; while off
-    // their rows are locked (routine-priorities-dialog.tsx disabledRoutine).
+    // their rows are locked.
     fun disabledRoutine(key: String) = key in setOf("deliveries", "withdrawals") && enabled[key] == false
     val movableKeys = sortedKeys.filter { !disabledRoutine(it) }
 
@@ -146,8 +142,8 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                         scope.launch {
                             saving = true
                             error = null
-                            // routine-priorities-dialog.tsx save: the seeded server maps
-                            // with the user's edits, never synthesised values.
+                            // Save the seeded server maps with the user's edits, never
+                            // synthesised values.
                             val nextPriorities = draft.toMutableMap()
                             if (disabledRoutine("deliveries")) nextPriorities.remove("deliveries")
                             if (disabledRoutine("withdrawals")) nextPriorities.remove("withdrawals")
@@ -156,7 +152,7 @@ fun RoutinesScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                             when (val result = viewModel.api.saveRoutinePriorities(nextPriorities, nextEnabled)) {
                                 is ApiResult.Failure -> error = result.message
                                 is ApiResult.Success -> {
-                                    // use-party-console.tsx: a successful save closes the dialog.
+                                    // A successful save closes the screen.
                                     viewModel.refreshDynamicStateNow()
                                     onBack()
                                 }

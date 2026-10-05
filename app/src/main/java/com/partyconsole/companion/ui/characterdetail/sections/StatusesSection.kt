@@ -54,7 +54,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private val Cyan = Color(0xFF06B6D4)
 
-/** A collapsible card header (the PWA's chevron + title + right-hand count). */
+/** A collapsible card header: chevron, title and right-hand count. */
 @Composable
 internal fun CollapsibleCard(title: String, open: Boolean, onToggle: () -> Unit, trailing: String? = null, content: @Composable () -> Unit) {
     Column(
@@ -71,10 +71,9 @@ internal fun CollapsibleCard(title: String, open: Boolean, onToggle: () -> Unit,
     }
 }
 
-/** active-statuses.tsx (the PWA's StatusesSection.tsx): a collapsed "Active
- *  status" with the count; open, each status shows its sprite, a ticking
- *  countdown over a depleting bar, and stacks, and opens its Condition
- *  details. Shown for every class. */
+/** A collapsed "Active status" with the count; open, each status shows its
+ *  sprite, a ticking countdown over a depleting bar, and stacks, and opens
+ *  its Condition details. Shown for every class. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StatusesSection(characterName: String, conditions: List<Condition>) {
@@ -83,7 +82,7 @@ fun StatusesSection(characterName: String, conditions: List<Condition>) {
     val now = rememberClock()
     var durations by remember { mutableStateOf<Map<String, StatusDuration?>>(emptyMap()) }
     val signature = durationSignature(conditions)
-    // Anchor newly observed telemetry when it arrives (active-statuses.tsx).
+    // Anchor newly observed telemetry when it arrives.
     LaunchedEffect(signature) { durations = reconcileDurations(signature, durations, System.currentTimeMillis()) }
 
     CollapsibleCard("Active status", open, { open = !open }, trailing = "${conditions.size}") {
@@ -117,8 +116,8 @@ fun StatusesSection(characterName: String, conditions: List<Condition>) {
     selected?.let { ConditionDetailsSheet(characterName, it) { selected = null } }
 }
 
-/** condition-details.tsx: the status's name, owner and duration, its
- *  explanation, and every definition/live field (durations formatted). */
+/** Condition details: the status's name, owner and duration, its explanation,
+ *  and every definition/live field (durations formatted). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConditionDetailsSheet(characterName: String, condition: Condition, onClose: () -> Unit) {

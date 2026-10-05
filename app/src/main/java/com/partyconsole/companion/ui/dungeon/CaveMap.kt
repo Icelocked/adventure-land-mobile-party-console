@@ -47,9 +47,8 @@ import com.partyconsole.companion.ui.map.MapProps
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
-/** cave-map.tsx (the PWA's CaveMap.tsx): the full floor map with party,
- *  room and waypoint pins, opened from the dungeon panel full-screen;
- *  every participant's map stream feeds it. */
+/** The full Cave floor map with party, room and waypoint pins, opened from
+ *  the dungeon panel full-screen; every participant's map stream feeds it. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CaveMap(viewModel: PartyViewModel, participants: List<String>, cave: CaveState, error: String, onAction: suspend (Map<String, Any?>) -> Boolean) {

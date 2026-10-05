@@ -63,12 +63,11 @@ import java.util.Date
 
 private class TileDetails(val entry: InventoryEntry, val lucky: Boolean, val banner: ItemActionBanner?, val deconstruction: String?, val npcSaleDetails: String?)
 
-/** inventory-panel.tsx's inventory grid (the PWA's InventorySection.tsx): a
- *  collapsible header with the occupied/total counter, the merchant's
- *  physical 42-slot layout (with the lucky upgrade slot outlined) or a
- *  compact grid for everyone else, and per tile the sprite, operation
- *  overlay, +level, stat badge, quantity, mluck clover and the one item-
- *  action banner. A long press shows what the dashboard's tooltip does. */
+/** The inventory grid: a collapsible header with the occupied/total counter,
+ *  the merchant's physical 42-slot layout (with the lucky upgrade slot
+ *  outlined) or a compact grid for everyone else, and per tile the sprite,
+ *  operation overlay, +level, stat badge, quantity, mluck clover and the one
+ *  item- action banner. A long press shows the dashboard tooltip's details. */
 @Composable
 fun InventorySection(
     characterName: String,
@@ -86,7 +85,7 @@ fun InventorySection(
     var details by remember { mutableStateOf<TileDetails?>(null) }
     var luckyMenu by remember { mutableStateOf<Int?>(null) }
 
-    // connected-inventory.tsx: missing inventory is still loading, not an empty bag.
+    // Missing inventory is still loading, not an empty bag.
     if (!loaded) {
         SectionCard(title = "Inventory") { Text("Loading inventory…", style = MaterialTheme.typography.bodySmall) }
         return
@@ -204,7 +203,7 @@ fun InventorySection(
                                 ItemTile(
                                     label = itemName,
                                     border = banner?.let { bannerColors(it.action).border } ?: MaterialTheme.colorScheme.outlineVariant,
-                                    // Tap is the dashboard's item menu; on the lucky slot it also offers the lucky slot data.
+                                    // Tap opens the item menu; on the lucky slot it also offers the lucky slot data.
                                     onTap = { onItemTap(entry, lucky) },
                                     onLongPress = tileDetails?.let { { details = it } },
                                 ) {

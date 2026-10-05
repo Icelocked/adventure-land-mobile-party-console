@@ -60,15 +60,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** runtime/upgrade-offerings.ts, verbatim. */
+/** A different rule for the same item whose level range overlaps [next]'s. */
 fun offeringOverlap(rules: List<UpgradeOfferingRule>, next: UpgradeOfferingRule): UpgradeOfferingRule? =
     rules.find { it.id != next.id && it.name == next.name && it.floor < next.ceiling && next.floor < it.ceiling }
 
-// runtime/upgrade-preview.ts previewOptions.
+// Preview variants: no offering, then each offering.
 private val PREVIEW_OPTIONS = listOf("none", "offeringp", "offering", "offeringx")
 private val Sky = Color(0xFF075985)
 
-/** upgrade-offering-controls.tsx's OfferingSource: an inventory slot, or an equip slot. */
+/** Where an offering is applied: an inventory slot, or an equip slot. */
 data class OfferingSource(val slot: JsonElement, val equipped: Boolean = false)
 
 @Composable
@@ -91,10 +91,10 @@ private fun LevelMenu(label: String, value: Int, options: List<Int>, enabled: Bo
     }
 }
 
-/** upgrade-offering-controls.tsx OfferingDialog, inline: with a [source] it
- *  confirms a one-tier upgrade with that offering ("Confirm upgrade");
- *  without, it adds or edits a standing rule (range, offering, Required /
- *  Only if available) with the overlap and destination checks. */
+/** The offering form, inline: with a [source] it confirms a one-tier upgrade
+ *  with that offering ("Confirm upgrade"); without, it adds or edits a
+ *  standing rule (range, offering, Required / Only if available) with the
+ *  overlap and destination checks. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OfferingDialog(
@@ -203,10 +203,9 @@ fun OfferingDialog(
 
 private val previewJson = Json { ignoreUnknownKeys = true }
 
-/** upgrade-preview-panel.tsx: the merchant's stored server preview for the
- *  next attempt (no offering and each offering), polled every 2 s, with
- *  "Refresh chances" to queue a new one. Only for the merchant's own
- *  inventory items. */
+/** The merchant's stored server preview for the next attempt (no offering and
+ *  each offering), polled every 2 s, with "Refresh chances" to queue a new
+ *  one. Only for the merchant's own inventory items. */
 @Composable
 fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingSource?, character: String) {
     val state by viewModel.dynamicState.collectAsState()
@@ -298,8 +297,8 @@ fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingS
     }
 }
 
-/** upgrade-actions.tsx's offering rows under Mark for upgrade: "Upgrade with
- *  X" (needs stock and a source) and, beside them, the server preview. */
+/** Offering rows under Mark for upgrade: "Upgrade with X" (needs stock and a
+ *  source) and, beside them, the server preview. */
 @Composable
 fun OfferingRows(viewModel: PartyViewModel, character: String, item: Item, meta: ItemMeta?, source: OfferingSource? = null, enabled: Boolean = true) {
     val state by viewModel.dynamicState.collectAsState()
@@ -318,7 +317,7 @@ fun OfferingRows(viewModel: PartyViewModel, character: String, item: Item, meta:
     }
 }
 
-/** upgrade-actions.tsx's "Add upgrade rule" under Auto mark for upgrade. */
+/** "Add upgrade rule" under Auto mark for upgrade. */
 @Composable
 fun AddUpgradeRule(viewModel: PartyViewModel, character: String, item: Item, meta: ItemMeta?, enabled: Boolean = true) {
     var open by remember(item) { mutableStateOf(false) }

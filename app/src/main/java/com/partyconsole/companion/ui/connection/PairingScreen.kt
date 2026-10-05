@@ -41,12 +41,10 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.launch
 
-/** Shown once per app install/reset, between the connection screen and the
- *  character list, whenever this phone hasn't completed party-console's
- *  browser-pairing handshake yet (see PairingViewModel for why that's a
- *  real, separate gate from "the server address works"). Scan the QR code
- *  shown on an already-paired browser's Setup page, or paste its invite
- *  link if scanning isn't an option. */
+/** Shown between the connection screen and the character list until this
+ *  phone completes party-console's browser-pairing handshake (see
+ *  PairingViewModel). Scan the QR code on an already-paired browser's Setup
+ *  page, or paste its invite link. */
 @Composable
 fun PairingScreen(viewModel: PairingViewModel, onPaired: () -> Unit) {
     val state by viewModel.state.collectAsState()
@@ -116,10 +114,9 @@ fun PairingScreen(viewModel: PairingViewModel, onPaired: () -> Unit) {
     }
 }
 
-/** CameraX preview + ML Kit on-device QR decoding, entirely local - no
- *  network call, matching this app's self-hosted posture. Requests CAMERA
- *  at most once per screen visit; declining it just leaves the manual
- *  paste field as the only path, which is always present regardless. */
+/** CameraX preview + on-device ML Kit QR decoding (no network call). Requests
+ *  CAMERA at most once per screen visit; declining leaves the manual paste
+ *  field, which is always present. */
 @Composable
 private fun QrScanner(modifier: Modifier = Modifier, onScanned: (String) -> Unit) {
     val context = LocalContext.current

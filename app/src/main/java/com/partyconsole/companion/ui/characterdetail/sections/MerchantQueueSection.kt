@@ -63,8 +63,7 @@ private fun stuckReason(job: MerchantJob?, now: Long): String? {
     return if (byAttempts || byAge) reason else null
 }
 
-/** merchant-card-controls.tsx's "Merchant logistics" and "Activity" (the
- *  PWA's MerchantQueueSection.tsx): the current job and the queue
+/** "Merchant logistics" and "Activity": the current job and the queue
  *  (priority, label, target, status, cancel / retry), the Merchant's Luck
  *  upkeep line, and the activity log with its cleanup actions. Only ever
  *  rendered for the merchant. */
@@ -131,9 +130,9 @@ private fun RetryJobButton(id: String?, viewModel: PartyViewModel) {
     OutlinedButton(enabled = id != null, onClick = { id?.let { scope.launch { viewModel.api.retryMerchantJob(it) } } }) { Text("Retry") }
 }
 
-/** merchant-card-controls.tsx "Activity": collapsed until opened (logs poll
- *  fast while open); newest first, coloured by level, full date on tap,
- *  with Clear stale orders / Clear history and their results. */
+/** "Activity": collapsed until opened (logs poll fast while open); newest
+ *  first, coloured by level, full date on tap, with Clear stale orders /
+ *  Clear history and their results. */
 @Composable
 private fun MerchantActivity(viewModel: PartyViewModel) {
     var open by remember { mutableStateOf(false) }
@@ -189,9 +188,9 @@ private fun MerchantActivity(viewModel: PartyViewModel) {
     }
 }
 
-/** merchant-cancel-job-control.tsx: cancelling an automatic routine's job
- *  also switches that routine off server-side (merchant-control.ts), so it
- *  asks first; a manual job cancels (and undoes its pending intent) at once. */
+/** Cancelling an automatic routine's job also switches that routine off
+ *  server-side, so it asks first; a manual job cancels (and undoes its
+ *  pending intent) at once. */
 @Composable
 private fun CancelJobControl(job: MerchantJob, viewModel: PartyViewModel) {
     val scope = rememberCoroutineScope()

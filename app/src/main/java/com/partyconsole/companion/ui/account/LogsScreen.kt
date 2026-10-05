@@ -46,7 +46,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.text.DateFormat
 import java.util.Date
 
-/** runtime/game-log-filters.ts, verbatim (the PWA's lib/gameLogFilters.ts). */
+/** Game-log category filters; keep in sync with the PWA's lib/gameLogFilters.ts. */
 data class LogFilter(val id: String, val label: String, val pattern: Regex, val enabled: Boolean)
 
 val LOG_FILTERS = listOf(
@@ -90,10 +90,9 @@ private fun parseColor(hex: String): Color? = runCatching {
     }
 }.getOrNull()
 
-/** log-sidebar.tsx as a screen (the PWA's LogsScreen.tsx): Game logs
- *  (category toggles, persisted) and Dashboard logs (combat, merchant /
- *  coordinator, anniversary), a character filter, the status line, and
- *  the latest 1,000 matching entries in order, auto-following the end. */
+/** Logs: Game logs (category toggles, persisted) and Dashboard logs (combat,
+ *  merchant / coordinator, anniversary), a character filter, the status line,
+ *  and the latest 1,000 matching entries in order, auto-following the end. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LogsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {

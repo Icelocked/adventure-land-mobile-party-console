@@ -52,7 +52,7 @@ import com.partyconsole.companion.notify.QuietHours
 import com.partyconsole.companion.notify.mergeLimits
 import com.partyconsole.companion.ui.PartyViewModel
 
-/** lib/pushNotifications.ts ALERT_GROUPS, verbatim. */
+/** Same groups as the PWA's lib/pushNotifications.ts ALERT_GROUPS. */
 private data class AlertInfo(val id: String, val label: String, val description: String)
 private data class AlertGroup(val title: String, val note: String?, val alerts: List<AlertInfo>)
 
@@ -104,9 +104,9 @@ private fun LimitRow(content: @Composable () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) { content() }
 }
 
-/** NotificationsSection.tsx on the phone: Android notifications from this
- *  app's own polling (no push server) - alerts, limits, quiet hours, muted
- *  characters, live alerts and a test notification. */
+/** Android notifications from this app's own polling (no push server):
+ *  alerts, limits, quiet hours, muted characters, live alerts and a test
+ *  notification. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NotificationsSection(viewModel: PartyViewModel) {

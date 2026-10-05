@@ -39,11 +39,9 @@ import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.CharacterVitals
 import com.partyconsole.companion.ui.activityLine
 
-/** Class icon + color badge (per the "simple class icon, not a sprite"
- *  decision for v1 - see the mobile-redesign plan). Falls back to a
- *  generic person icon for any ctype not in this list rather than
- *  failing - new classes/typos should degrade, not crash. Shared with
- *  CharacterListScreen so the party overview gets the same class icons. */
+/** Class icon + color badge. Falls back to a generic person icon for any
+ *  ctype not in this list - new classes or typos should degrade, not crash.
+ *  Shared with CharacterListScreen. */
 fun classLook(ctype: String): Pair<ImageVector, Color> = when (ctype.lowercase()) {
     "warrior" -> Icons.Filled.Shield to Color(0xFFCC5555)
     "mage" -> Icons.Filled.AutoAwesome to Color(0xFF66CCFF)
@@ -58,10 +56,10 @@ fun classLook(ctype: String): Pair<ImageVector, Color> = when (ctype.lowercase()
 private val zoneMap = Regex("^zone_[a-f0-9]+_\\d+$")
 private val portraitJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
-/** The sticky, always-visible top of the character detail screen (the
- *  PWA's VitalsHeader.tsx): the portrait (opens the character's stats, with
- *  the Tracktrix badge), online dot, level / class / primary stat / realm /
- *  ping, the banking flag, XP, map, HP/MP, gold, and the activity line. */
+/** The sticky, always-visible top of the character detail screen: the
+ *  portrait (opens the character's stats, with the Tracktrix badge), online
+ *  dot, level / class / primary stat / realm / ping, the banking flag, XP,
+ *  map, HP/MP, gold, and the activity line. */
 @Composable
 fun VitalsHeader(
     name: String,
@@ -79,12 +77,12 @@ fun VitalsHeader(
     val tracktrixActive = (tracktrix?.get("active") as? kotlinx.serialization.json.JsonPrimitive)?.content == "true" && tracktrixSprite != null &&
         (tracktrix["bonuses"] as? kotlinx.serialization.json.JsonObject)?.values?.any { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.let { v -> v != 0.0 } == true } == true
     val ping = vitals.ping ?: diagnostics?.ping
-    // character-map-section.tsx: instanced caves get a readable name.
+    // Instanced caves get a readable name.
     val mapLabel = if (zoneMap.matches(vitals.map)) "Cave of Many Dreams" else vitals.map
     val portraitSprite = diagnostics?.characterSprite?.let { runCatching { portraitJson.decodeFromJsonElement(com.partyconsole.companion.model.Sprite.serializer(), it) }.getOrNull() }
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // character-stats-trigger.tsx: the portrait opens the character's stats.
+            // The portrait opens the character's stats.
             Box(
                 modifier = Modifier.size(width = 56.dp, height = 80.dp)
                     .border(1.dp, Color(0xCC065F46), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))

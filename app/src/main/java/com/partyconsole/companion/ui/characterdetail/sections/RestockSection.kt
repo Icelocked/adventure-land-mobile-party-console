@@ -23,11 +23,11 @@ import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
-/** Ports restock-controls.tsx's HP/MP min/max fields + Save button. Keeps
- *  a local "dirty" copy once the user starts typing so an incoming poll
- *  refresh can't clobber an in-progress edit - only resets from the server
- *  value while untouched. Save sends the whole policy (potion items
- *  included) and stays disabled until the server's policy has loaded. */
+/** HP/MP potion min/max fields + Save. Keeps a local "dirty" copy once the
+ *  user starts typing so an incoming poll refresh can't clobber an
+ *  in-progress edit - only resets from the server value while untouched. Save
+ *  sends the whole policy (potion items included) and stays disabled until
+ *  the server's policy has loaded. */
 @Composable
 fun RestockSection(characterName: String, serverPolicy: RestockPolicy, viewModel: PartyViewModel) {
     val loaded by viewModel.stateLoaded.collectAsState()
@@ -69,7 +69,7 @@ fun RestockSection(characterName: String, serverPolicy: RestockPolicy, viewModel
                 scope.launch {
                     saving = true
                     error = null
-                    // restock-controls.tsx: digits only, so a cleared field is 0 there too.
+                    // Digits only, so a cleared field is 0.
                     val policy = RestockPolicy(
                         hp = serverPolicy.hp.copy(min = hpMin.toIntOrNull() ?: 0, max = hpMax.toIntOrNull() ?: 0),
                         mp = serverPolicy.mp.copy(min = mpMin.toIntOrNull() ?: 0, max = mpMax.toIntOrNull() ?: 0),

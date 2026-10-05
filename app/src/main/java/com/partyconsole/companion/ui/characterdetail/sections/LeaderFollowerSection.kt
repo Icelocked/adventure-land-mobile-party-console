@@ -25,10 +25,9 @@ import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 
-/** Ports party-workspace.tsx's leader RadioGroup + per-card follow
- *  Checkbox into two independent tap targets on POST /party-api/formation.
- *  "Leader" sends only {leader} (a radio - tapping the current leader does
- *  nothing, as on the dashboard); "Follow" sends only {character, follow}. */
+/** Leader and follow as two independent tap targets on POST
+ *  /party-api/formation. "Leader" sends only {leader} (a radio - tapping the
+ *  current leader does nothing); "Follow" sends only {character, follow}. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LeaderFollowerSection(characterName: String, dynamicState: PartyStateDynamic, viewModel: PartyViewModel, onOpenAnniversary: () -> Unit = {}) {
@@ -82,9 +81,9 @@ fun LeaderFollowerSection(characterName: String, dynamicState: PartyStateDynamic
     }
 }
 
-/** event-selection-control.tsx: the "Events (n)" popover as an inline list -
- *  the Cave row first, then each event (sorted by name) with LIVE / next /
- *  stale / unsupported. Followers use their leader's events. */
+/** The "Events (n)" popover as an inline list - the Cave row first, then each
+ *  event (sorted by name) with LIVE / next / stale / unsupported. Followers
+ *  use their leader's events. */
 @Composable
 private fun EventSelectionControl(state: PartyStateDynamic, name: String, viewModel: PartyViewModel, onOpenAnniversary: () -> Unit) {
     val scope = rememberCoroutineScope()

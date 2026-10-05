@@ -49,10 +49,10 @@ private val Amber = Color(0xFFF59E0B)
 private val Emerald = Color(0xFF10B981)
 private val Violet = Color(0xFFA78BFA)
 
-/** merchant-card-controls.tsx (the PWA's MerchantControlsSection.tsx):
- *  Buy/Craft/Exchange, Force stand, Mining/Fishing with readiness, Routines,
- *  Send to party (group picker), Donate (XP preview), Join giveaway (realm
- *  then player), Merchant settings and Clear job queue. Merchant only. */
+/** Merchant controls: Buy/Craft/Exchange, Force stand, Mining/Fishing with
+ *  readiness, Routines, Send to party (group picker), Donate (XP preview),
+ *  Join giveaway (realm then player), Merchant settings and Clear job queue.
+ *  Merchant only. */
 @Composable
 fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) -> Unit, onOpenRoutines: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
@@ -64,7 +64,7 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
     val merchant = state.merchantCharacter
     val merchantRaw = merchant?.let { diagnostics[it]?.raw }
     val groups = merchantPartyGroups(state, characters.keys.toList())
-    // party-reference-panels.tsx: the merchant's own XP-per-gold rate, 3.2 until known.
+    // The merchant's own XP-per-gold rate, 3.2 until known.
     val xpPerGold = (merchantRaw?.get("donationXpPerGold") as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it > 0 } ?: 3.2
     var expanded by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -83,7 +83,7 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
             }
         }
     }
-    // send-to-party-control.tsx: one request at a time, controls disabled while it runs.
+    // One request at a time; controls are disabled while it runs.
     fun sendToParty(group: String?) {
         if (sendingToParty) return
         sendingToParty = true
@@ -99,7 +99,7 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
             sendingToParty = false
         }
     }
-    // merchant-card-controls.tsx readiness: the later of the merchant's and the party's cooldowns.
+    // Readiness: the later of the merchant's and the party's cooldowns.
     fun readiness(mode: String): Pair<String, Color?> {
         val own = ((merchantRaw?.get("gatheringCooldowns") as? JsonObject)?.get(mode) as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() ?: 0L
         val party = (if (mode == "fishing") state.gatheringCooldowns?.fishing else state.gatheringCooldowns?.mining) ?: 0L
@@ -140,7 +140,7 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
                 Text(if (sendingToParty) "Sending…" else "Send to party")
             }
             if (expanded == "party") {
-                // send-to-party-control.tsx: pick a party group when there's more than one.
+                // Pick a party group when there's more than one.
                 Column(modifier = Modifier.padding(start = 12.dp)) {
                     Text("Select party group", style = MaterialTheme.typography.labelSmall)
                     for (group in groups) {
@@ -152,7 +152,7 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
             if (expanded == "donate") DonateForm(merchant, xpPerGold) { amount -> run { viewModel.api.donateGold(amount) } }
             TextButton(onClick = { toggle("giveaway") }) { Text("Join giveaway") }
             if (expanded == "giveaway") {
-                // connected-character-card.tsx onGiveaway: the merchant's current realm, else the first.
+                // The merchant's current realm, else the first.
                 val currentRealm = merchant?.let { characters[it]?.vitals?.server }
                 GiveawayForm(
                     initialRealm = currentRealm?.let { "SR_$it" } ?: state.giveawayRealms.firstOrNull()?.key.orEmpty(),
@@ -183,13 +183,11 @@ private fun DonateForm(merchant: String?, xpPerGold: Double, onDonate: (Long) ->
     var amount by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        // party-reference-panels.tsx's donation dialog title.
         Text("Donate gold for merchant XP", style = MaterialTheme.typography.bodySmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
         Text("${merchant ?: "The merchant"} will withdraw any shortage, travel to the XP frog, and donate this amount.", style = MaterialTheme.typography.labelSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = amount, onValueChange = { amount = it.filter(Char::isDigit) }, label = { Text("Donation amount") }, singleLine = true, modifier = Modifier.weight(1f))
             Button(onClick = {
-                // use-party-console.tsx donateGold
                 val value = amount.toLongOrNull()
                 if (value == null || value < 1) error = "Enter a positive whole-number donation" else { error = null; onDonate(value) }
             }) { Text("Donate") }
@@ -204,8 +202,7 @@ private fun DonateForm(merchant: String?, xpPerGold: Double, onDonate: (Long) ->
     }
 }
 
-/** party-management-panels.tsx "Join giveaway": pick a realm, then a
- *  player online there (searchable). */
+/** "Join giveaway": pick a realm, then a player online there (searchable). */
 @Composable
 private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, players: Map<String, List<String>>, onJoin: (String, String) -> Unit) {
     var realm by remember { mutableStateOf(initialRealm) }
@@ -248,7 +245,6 @@ private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, play
         Text("${online.size} online players loaded", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
         Button(onClick = {
-            // use-party-console.tsx joinGiveaway
             if (realm.isBlank() || seller.isBlank()) error = "Enter both a server realm and merchant name" else { error = null; onJoin(realm.trim(), seller.trim()) }
         }) { Text("Join") }
     }

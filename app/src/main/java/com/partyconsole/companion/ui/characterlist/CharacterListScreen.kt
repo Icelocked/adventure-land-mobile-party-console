@@ -75,9 +75,9 @@ import com.partyconsole.companion.ui.roster.RosterPickerSheet
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
-/** Party overview (the PWA's CharacterListScreen.tsx): live characters in
- *  the console's order, pending cards for ones still loading, the empty
- *  slots to load a character into, and the party-wide controls. */
+/** Party overview: live characters in the console's order, pending cards for
+ *  ones still loading, the empty slots to load a character into, and the
+ *  party-wide controls. */
 @Composable
 fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -> Unit, onReconnect: () -> Unit = {}, onNavigate: (String) -> Unit = {}) {
     val characters by viewModel.characters.collectAsState()
@@ -93,9 +93,8 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
     var creating by remember { mutableStateOf(false) }
     val updates = rememberConsoleUpdates(viewModel)
 
-    // use-party-console.tsx chars: active slots in slot order (all live
-    // characters on a server that reports no slots), bankbois excluded,
-    // then orderCharacters.
+    // Active slots in slot order (all live characters on a server that
+    // reports no slots), bankbois excluded, then orderCharacters.
     val bankboiNames = state.bankbois.map { it.name }.toSet()
     val slots = state.activeSlots
     val liveNames = (if (slots.isNotEmpty()) slots.sortedBy { it.index }.mapNotNull { it.character }.filter { characters.containsKey(it) } else characters.keys.toList())
@@ -113,7 +112,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Party")
-                            // console-updates.tsx ConsoleUpdateIndicator
+                            // Console update indicator
                             if (updates?.updateAvailable == true) {
                                 Box(
                                     modifier = Modifier.size(20.dp).background(Color(0xFF047857), CircleShape).clickable { onNavigate(Routes.ACCOUNT_SETTINGS) },
@@ -121,7 +120,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                                 ) { Text("!", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) }
                             }
                         }
-                        // party-header.tsx version line
+                        // Version line
                         Text(
                             (state.gameVersion?.let { "Game v$it · " } ?: "") + "Console " + (updates?.let { "v${it.displayVersion ?: it.current}" } ?: "loading…"),
                             style = MaterialTheme.typography.labelSmall,
@@ -148,13 +147,13 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
             if (!connected) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
             if (sessionLost) item { SessionLostCard(onReconnect) }
             item { DebugBrowserBanner(viewModel) }
-            // party-workspace.tsx: the dungeon panel heads the party while a visit runs.
+            // The dungeon panel heads the party while a visit runs.
             item { com.partyconsole.companion.ui.dungeon.DungeonPanel(viewModel) }
             if (names.isNotEmpty() || pending.isNotEmpty()) item { PartyControls(viewModel) }
             if (names.isEmpty() && pending.isEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        // party-workspace.tsx's empty states.
+                        // Empty states.
                         when {
                             !configLoaded -> {
                                 CircularProgressIndicator()
@@ -174,8 +173,8 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                 }
                 items(pending, key = { "pending-${it.name}" }) { PendingCharacterCard(viewModel, it) }
             }
-            // roster-controls.tsx: one "Load character slot N" per empty
-            // headless slot, disabled while a Steam handoff is running.
+            // One "Load character slot N" per empty headless slot, disabled
+            // while a Steam handoff is running.
             val handoffRunning = state.steamSwitch?.phase?.let { it != "complete" } == true
             items(slots.filter { it.kind == "headless" && it.character == null }, key = { "slot-${it.index}" }) { slot ->
                 OutlinedButton(
@@ -188,7 +187,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                 }
             }
             state.bankboiTransaction?.let { transaction ->
-                // party-workspace.tsx's "Bankboi Active" card.
+                // "Bankboi Active" card.
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(12.dp)
@@ -229,9 +228,9 @@ private fun SessionLostCard(onReconnect: () -> Unit) {
     }
 }
 
-/** party-workspace.tsx's two party-wide buttons: "Send party to town" and
- *  "Escape" (escape-control.tsx: needs one online warrior/mage/priest; the
- *  server owns the staged sequence, this triggers it and shows its stage). */
+/** The two party-wide buttons: "Send party to town" and "Escape" (needs one
+ *  online warrior/mage/priest; the server owns the staged sequence, this
+ *  triggers it and shows its stage). */
 @Composable
 private fun PartyControls(viewModel: PartyViewModel) {
     val escape by viewModel.escape.collectAsState()
@@ -240,7 +239,7 @@ private fun PartyControls(viewModel: PartyViewModel) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var townError by remember { mutableStateOf<String?>(null) }
-    // escape-control.tsx: inside a dungeon, Escape exits the dungeon instead.
+    // Inside a dungeon, Escape exits the dungeon instead.
     val dungeon = com.partyconsole.companion.ui.dungeon.rememberDungeons(viewModel)
     val dungeonView by dungeon.view.collectAsState()
     val dungeonBusy by dungeon.busy.collectAsState()
@@ -250,7 +249,7 @@ private fun PartyControls(viewModel: PartyViewModel) {
     val current = escape
     val running = current != null && current.stage !in listOf("complete", "failed-hold", "released")
     val failed = error != null || escapeReadError != null || (current != null && current.stage != "released" && (current.error != null || current.stage == "failed-hold"))
-    // escape-control.tsx labels.
+    // Escape stage labels.
     val label = if (failed) "Escape - failed" else if (current?.stage == "complete") "Escape - success" else "Escape"
 
     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -259,7 +258,6 @@ private fun PartyControls(viewModel: PartyViewModel) {
                 onClick = {
                     scope.launch {
                         townError = null
-                        // use-party-console.tsx townParty: "Party town request failed".
                         (viewModel.api.sendPartyToTown() as? ApiResult.Failure)?.let { townError = it.message.ifBlank { "Party town request failed" } }
                     }
                 },
@@ -309,7 +307,7 @@ private fun CharacterRow(viewModel: PartyViewModel, name: String, state: Charact
                 }
                 val vitals = state.vitals
                 if (vitals == null) {
-                    // connected-character-card.tsx: connected, but no status yet.
+                    // Connected, but no status yet.
                     Text("awaiting status", style = MaterialTheme.typography.bodySmall)
                 } else {
                     Text(
@@ -323,7 +321,7 @@ private fun CharacterRow(viewModel: PartyViewModel, name: String, state: Charact
                         Text("MP ${vitals.mp}/${vitals.maxMp}", style = MaterialTheme.typography.labelMedium)
                         Text("${"%,d".format(vitals.gold)}g", style = MaterialTheme.typography.labelMedium)
                     }
-                    // Not on the dashboard: shows a character that stopped reporting (possibly hung).
+                    // App-only: shows a character that stopped reporting (possibly hung).
                     if (seenAt > 0) FreshnessBadge(viewModel, seenAt, modifier = Modifier.padding(top = 4.dp))
                 }
             }
@@ -331,8 +329,8 @@ private fun CharacterRow(viewModel: PartyViewModel, name: String, state: Charact
     }
 }
 
-/** pending-character-cards.tsx: a character that's loading, waiting or
- *  lost, with its portrait, class, hosting and status. */
+/** A pending character card: loading, waiting or lost, with its portrait,
+ *  class, hosting and status. */
 @Composable
 private fun PendingCharacterCard(viewModel: PartyViewModel, entry: PendingCharacter) {
     val state by viewModel.dynamicState.collectAsState()
@@ -363,11 +361,11 @@ private fun PendingCharacterCard(viewModel: PartyViewModel, entry: PendingCharac
     }
 }
 
-/** debug-browser.tsx DebugBrowserBanner: on a debug instance, a banner with the game client link. */
+/** On a debug instance, a banner with the game client link. */
 @Composable
 private fun DebugBrowserBanner(viewModel: PartyViewModel) {
     val debug by viewModel.debugBrowser.collectAsState()
-    // debug-browser.tsx setLocalDebugAssets: map images come from the debug instance's copy.
+    // Map images come from the debug instance's copy.
     androidx.compose.runtime.LaunchedEffect(debug) {
         com.partyconsole.companion.ui.map.MapImages.debugAssetsBase = if (debug) viewModel.api.baseUrl.trimEnd('/') else null
     }
