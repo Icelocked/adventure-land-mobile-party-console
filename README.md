@@ -150,6 +150,16 @@ signed APK (from the `RELEASE_KEYSTORE_BASE64` and
 `ghcr.io/icelocked/party-console-pwa` for amd64 and arm64, and a GitHub
 Release with the APK and a zip of the PWA bundle.
 
+### Development
+
+- `main` holds released code; releases are tags on `main`. Day-to-day work
+  happens on `dev`, which CI also tests, and merges into `main` for a release.
+- Debug builds of the Android app are a separate app, "Party Console (dev)",
+  so they install next to the release app on the same phone.
+- To try PWA changes on a live setup without touching the released PWA, run
+  a second container built from your checkout on another port (see
+  [DEPLOYMENT.md § 4e](DEPLOYMENT.md#4e-optional-a-development-copy)).
+
 ## Contributing
 
 Issues and PRs are welcome. This is a hobby project maintained alongside

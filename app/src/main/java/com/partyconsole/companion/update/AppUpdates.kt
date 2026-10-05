@@ -65,6 +65,12 @@ object AppUpdates {
     private val _state = MutableStateFlow(UpdateState())
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
+    // Overridable only so tests can exercise either kind of build.
+    internal var devBuildOverride: Boolean? = null
+
+    /** Debug builds are a separate app (".dev"), so releases can't update them. */
+    fun isDevBuild(context: Context): Boolean = devBuildOverride ?: context.packageName.endsWith(".dev")
+
     fun installedVersion(context: Context): String =
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()
 
@@ -228,7 +234,7 @@ object UpdateControl {
 
     fun apply(context: Context) {
         val work = WorkManager.getInstance(context.applicationContext)
-        if (UpdatePrefs(context).automaticChecks) {
+        if (UpdatePrefs(context).automaticChecks && !AppUpdates.isDevBuild(context)) {
             val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(6, TimeUnit.HOURS)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .build()
