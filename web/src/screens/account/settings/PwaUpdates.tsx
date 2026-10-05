@@ -67,6 +67,7 @@ export function PwaUpdateSettings() {
       setState(await updates(baseUrl, path, body))
     } catch (e) {
       setError((e as Error).message)
+      updates(baseUrl, '').then(setState, () => {})
     } finally {
       setPending(false)
     }
@@ -123,7 +124,12 @@ export function PwaUpdateSettings() {
           className="mt-1 size-4 accent-emerald-500"
           checked={state?.automatic === true}
           disabled={!state?.managed || busy}
-          onChange={(event) => void action('/preferences', { automatic: event.target.checked })}
+          onChange={(event) => {
+            const automatic = event.target.checked
+            // Show the change at once; a failed save is replaced by the server's state.
+            setState((current) => current && { ...current, automatic })
+            void action('/preferences', { automatic })
+          }}
         />
         Automatically download and install new versions when available
       </label>
