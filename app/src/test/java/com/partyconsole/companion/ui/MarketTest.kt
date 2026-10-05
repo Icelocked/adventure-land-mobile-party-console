@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -210,7 +211,8 @@ class MarketTest {
             assertEquals("3", it.text("bidRevision"))
         }
 
-        compose.waitForIdle()
+        // The quantity save must settle first: edits are ignored while one is in flight.
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Quantity for Ring of Strength").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Edit priority for Ring of Strength").performClick()
         compose.onNodeWithContentDescription("Priority for Ring of Strength").performTextReplacement("150")
         compose.onNodeWithContentDescription("Priority for Ring of Strength").performImeAction()
