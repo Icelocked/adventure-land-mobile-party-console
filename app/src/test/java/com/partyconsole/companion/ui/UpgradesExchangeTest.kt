@@ -85,7 +85,10 @@ class UpgradesExchangeTest {
 
     @Test
     fun addUpgradeRuleRejectsAnOverlapAndSavesTheRule() {
-        console.override("config", mapOf("upgradeOfferingRules" to Json.parseToJsonElement("""[{"id":"r1","name":"bow","floor":0,"ceiling":2,"offering":"offering","required":true}]""")))
+        // The core section carries the rules too (and polls every 2 s): override both.
+        val rules = Json.parseToJsonElement("""[{"id":"r1","name":"bow","floor":0,"ceiling":2,"offering":"offering","required":true}]""")
+        console.override("config", mapOf("upgradeOfferingRules" to rules))
+        console.override("core", mapOf("upgradeOfferingRules" to rules))
         val viewModel = panel(Item(name = "bow", level = 1), 2)
         eventually { viewModel.dynamicState.value.upgradeOfferingRules.isNotEmpty() }
         compose.waitForIdle()
