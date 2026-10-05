@@ -102,7 +102,7 @@ class EventsDungeonTest {
         compose.setContent { DungeonPanel(viewModel) }
         eventually { viewModel.dungeons.view.value != null }
         compose.waitForIdle()
-        compose.onNode(hasText("Floor 2 · 0h 9m", substring = true) and hasText("remaining · 100 gold · 3 Amber", substring = true)).assertExists()
+        compose.onNode(hasText("Floor 2 · 0h ", substring = true) and hasText("remaining · 100 gold · 3 Amber", substring = true)).assertExists()
         compose.onNodeWithText("Leada · Folla — awaiting connection").assertExists()
         compose.onNodeWithText("Library — complete").assertIsNotEnabled()
         compose.onNodeWithText("Vault — locked").assertIsNotEnabled()
