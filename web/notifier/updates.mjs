@@ -4,7 +4,8 @@
 // ever installs the latest official release. The two talk through files in a
 // shared volume; neither listens to the other over the network.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const REPOSITORY = 'Icelocked/adventure-land-mobile-party-console'
 // Overridable only to test against a fake release feed.
@@ -18,13 +19,21 @@ export function parseVersion(value) {
 }
 export function newer(candidate, current) {
   const a = parseVersion(candidate), b = parseVersion(current)
-  if (!a) return false
-  if (!b) return true
+  if (!a || !b) return false
   for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]
   return false
 }
 
-export function createUpdates({ dir = process.env.UPDATES_DIR || '/data/updates', current = process.env.PWA_VERSION || '', fetchImpl = fetch, now = Date.now, log = console.log } = {}) {
+// The package.json version the image was built from (see the Dockerfile).
+function builtFrom() {
+  try {
+    return readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'base-version.txt'), 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+
+export function createUpdates({ dir = process.env.UPDATES_DIR || '/data/updates', current = process.env.PWA_VERSION || '', base = builtFrom(), fetchImpl = fetch, now = Date.now, log = console.log } = {}) {
   mkdirSync(dir, { recursive: true })
   const file = (name) => join(dir, name)
   const read = (name, fallback) => {
@@ -41,12 +50,15 @@ export function createUpdates({ dir = process.env.UPDATES_DIR || '/data/updates'
   let error = ''
   let etag = ''
 
+  // A release image carries its version; a source build only knows the
+  // version it was built from, which it compares releases against.
   const installed = () => (parseVersion(current) ? current.replace(/^v/, '') : '')
+  const builtVersion = () => (parseVersion(base) ? base.replace(/^v/, '') : '')
   const agent = () => {
     const value = read('agent.json', null)
     return value && now() - Number(value.at || 0) < AGENT_STALE_MS ? value : null
   }
-  const available = () => (release && newer(release.version, installed()) ? release.version : '')
+  const available = () => (release && newer(release.version, installed() || builtVersion()) ? release.version : '')
 
   async function check() {
     if (checking) return checking
@@ -90,7 +102,8 @@ export function createUpdates({ dir = process.env.UPDATES_DIR || '/data/updates'
   function status() {
     const worker = agent()
     return {
-      current: installed() || 'development build',
+      current: installed() || (builtVersion() ? `${builtVersion()}-dev` : 'development build'),
+      development: !installed(),
       available: available() || undefined,
       notes: available() ? release.notes : undefined,
       checkedAt: release?.checkedAt,

@@ -12,10 +12,10 @@ type Handle = (req: { method: string }, path: string, body: Record<string, unkno
 const release = (tag: string, extra: Record<string, unknown> = {}) => async () =>
   new Response(JSON.stringify({ tag_name: tag, draft: false, prerelease: false, ...extra }), { status: 200, headers: { etag: '"1"' } })
 
-function setup(current: string, fetchImpl = release('v1.1.0'), withAgent = true) {
+function setup(current: string, fetchImpl = release('v1.1.0'), withAgent = true, base = '') {
   const dir = mkdtempSync(join(tmpdir(), 'pwa-updates-'))
   if (withAgent) writeFileSync(join(dir, 'agent.json'), JSON.stringify({ at: Date.now(), phase: 'idle' }))
-  const updates = createUpdates({ dir, current, fetchImpl, log: () => {} })
+  const updates = createUpdates({ dir, current, base, fetchImpl, log: () => {} })
   const handle = updates.handle as Handle
   return { dir, updates, get: () => handle({ method: 'GET' }, '/update', {}), post: (path: string, body = {}) => handle({ method: 'POST' }, path, body) }
 }
@@ -28,7 +28,8 @@ describe('versions', () => {
     expect(newer('1.10.0', '1.9.9')).toBe(true)
     expect(newer('1.0.0', '1.0.0')).toBe(false)
     expect(newer('0.9.0', '1.0.0')).toBe(false)
-    expect(newer('1.0.0', '')).toBe(true)
+    // An unversioned install is never told an arbitrary release is newer.
+    expect(newer('1.0.0', '')).toBe(false)
   })
 })
 
@@ -63,7 +64,16 @@ describe('notifier update routes', () => {
     const source = setup('')
     await source.post('/update/check')
     expect((await source.post('/update/install'))![0]).toBe(409)
-    expect((await source.get())![1]).toMatchObject({ current: 'development build', managed: false })
+    expect((await source.get())![1]).toMatchObject({ current: 'development build', managed: false, development: true })
+  })
+
+  it('a source build compares releases with the version it was built from', async () => {
+    // Failure mode: an unversioned dev build announced the old 0.7.1 release as new.
+    const older = setup('', release('v0.7.1'), false, '1.0.0')
+    expect((await older.post('/update/check'))![1]).toMatchObject({ current: '1.0.0-dev', development: true, available: undefined, managed: false })
+    const newer = setup('', release('v1.1.0'), false, '1.0.0')
+    expect((await newer.post('/update/check'))![1]).toMatchObject({ current: '1.0.0-dev', available: '1.1.0', managed: false })
+    expect((await newer.post('/update/install'))![0]).toBe(409)
   })
 
   it('automatic updates request an install as soon as one is available', async () => {
