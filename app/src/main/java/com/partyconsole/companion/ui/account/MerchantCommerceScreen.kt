@@ -1,5 +1,11 @@
 package com.partyconsole.companion.ui.account
 
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.withFrameNanos
@@ -283,21 +289,24 @@ private fun QuantityField(label: String, value: String, onChange: (String) -> Un
 private enum class CommercePart { LIST, CART }
 
 /** The cart, pinned above the submit button so an added item shows at once
- *  while the list scrolls. Adding something opens it and scrolls to the
- *  newest line; the header folds it to a summary. */
+ *  while the list scrolls. Adding something opens it and scrolls to that
+ *  item's line (see [cartLine]); the header folds it to a summary. [footer]
+ *  stays visible below the lines. */
 @Composable
-private fun CartDock(title: String, lines: Int, units: Int, summary: String? = null, content: @Composable ColumnScope.() -> Unit) {
+private fun CartDock(title: String, quantities: Map<String, Int>, summary: String? = null, footer: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     var open by rememberSaveable { mutableStateOf(true) }
     val scroll = rememberScrollState()
-    var previousUnits by remember { mutableIntStateOf(units) }
-    LaunchedEffect(units) {
-        if (units > previousUnits) {
+    val focus = remember { mutableStateOf<Pair<String, Int>?>(null) }
+    var previous by remember { mutableStateOf(quantities) }
+    LaunchedEffect(quantities) {
+        val added = quantities.keys.firstOrNull { (quantities[it] ?: 0) > (previous[it] ?: 0) }
+        previous = quantities
+        if (added != null) {
             open = true
-            withFrameNanos { }
-            scroll.animateScrollTo(scroll.maxValue)
+            focus.value = added to ((focus.value?.second ?: 0) + 1)
         }
-        previousUnits = units
     }
+    val lines = quantities.values.count { it > 0 }
     val label = title + if (lines > 0) " ($lines)" else ""
     Column(modifier = Modifier.fillMaxWidth().semantics { contentDescription = title }) {
         HorizontalDivider()
@@ -311,9 +320,29 @@ private fun CartDock(title: String, lines: Int, units: Int, summary: String? = n
         }
         if (open) {
             val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.4f).dp
-            Column(modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight).verticalScroll(scroll).padding(horizontal = 12.dp), content = content)
+            CompositionLocalProvider(LocalCartFocus provides focus) {
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight).verticalScroll(scroll).padding(horizontal = 12.dp), content = content)
+            }
+        }
+        footer?.invoke()
+    }
+}
+
+private val LocalCartFocus = compositionLocalOf<MutableState<Pair<String, Int>?>> { mutableStateOf(null) }
+
+/** Marks a cart line so the dock can scroll it into view when it's added to. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.cartLine(key: String): Modifier {
+    val requester = remember { BringIntoViewRequester() }
+    val focus = LocalCartFocus.current
+    LaunchedEffect(focus.value) {
+        if (focus.value?.first == key) {
+            withFrameNanos { }
+            requester.bringIntoView()
         }
     }
+    return this.bringIntoViewRequester(requester)
 }
 
 // Buy
@@ -334,11 +363,11 @@ private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, searc
             setCart(cart + (item.id to BuyLine((old?.quantity ?: 0) + 1, old?.level ?: 0)))
         }
     }
-    } else CartDock("Cart", selected.size, selected.sumOf { cart.getValue(it.id).quantity }, "Gold${if (hasEstimatedGold) " (est)" else ""}: ${"%,d".format(Math.round(goldTotal))}g") {
+    } else CartDock("Cart", cart.mapValues { it.value.quantity }, "Gold${if (hasEstimatedGold) " (est)" else ""}: ${"%,d".format(Math.round(goldTotal))}g") {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
             val line = cart.getValue(item.id)
-            FlowRow(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(modifier = Modifier.fillMaxWidth().cartLine(item.id).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SpriteIcon(item.sprite, size = 28.dp)
                 Text(item.name, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterVertically))
                 QuantityField("${item.name} quantity", line.quantity.toString()) { setCart(cart + (item.id to line.copy(quantity = capQuantity(it)))) }
@@ -441,18 +470,38 @@ private fun CraftContent(part: CommercePart, recipes: List<MerchantCraftRecipe>,
             }
         }
     }
-    } else CartDock("Craft list", selected.size, selected.sumOf { cart.getValue(it.id) }, "Gold: ${"%,d".format(goldTotal)}g") {
+    } else {
+    var showIngredients by rememberSaveable { mutableStateOf(false) }
+    val missing = requirements.filter { (key, req) -> req.second > (owned[key] ?: 0) && !canPurchaseMaterial(req.first, buyableById) }
+        .map { (_, req) -> req.first.name + ((req.first.level ?: 0).takeIf { it > 0 }?.let { " +$it" } ?: "") }
+    val toBuy = requirements.entries.sumOf { (key, req) -> if (canPurchaseMaterial(req.first, buyableById)) maxOf(0, req.second - (owned[key] ?: 0)) else 0 }
+    CartDock("Craft list", cart, "Gold: ${"%,d".format(goldTotal)}g", footer = if (selected.isEmpty()) null else ({
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { showIngredients = !showIngredients }.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (missing.isNotEmpty()) "Missing: ${missing.joinToString(", ")}" else "Ingredients: ${requirements.size}" + if (toBuy > 0) " · buy $toBuy" else " · all owned",
+                color = if (missing.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+            Text(if (showIngredients) "Hide" else "Show", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        }
+    })) {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.cartLine(item.id).padding(vertical = 4.dp)) {
                 SpriteIcon(item.sprite, size = 28.dp)
                 Text(item.name, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
                 QuantityField("${item.name} quantity", cart.getValue(item.id).toString()) { setCart(cart + (item.id to capQuantity(it))) }
                 TextButton(onClick = { setCart(cart + (item.id to 0)) }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             }
         }
-        Text("INGREDIENT TOTALS", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-        for ((key, req) in requirements) {
+        if (showIngredients && selected.isNotEmpty()) Text("INGREDIENT TOTALS", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+        if (showIngredients) for ((key, req) in requirements) {
             val available = owned[key] ?: 0
             val ok = req.second <= available || canPurchaseMaterial(req.first, buyableById)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
@@ -466,6 +515,7 @@ private fun CraftContent(part: CommercePart, recipes: List<MerchantCraftRecipe>,
                 )
             }
         }
+    }
     }
 }
 
@@ -554,10 +604,10 @@ private fun ExchangeContent(part: CommercePart, viewModel: PartyViewModel, excha
             onClose = { selectedExchange = null },
         )
     }
-    } else CartDock("Exchange cart", selected.size, selected.sumOf { cart.getValue(it.key) }) {
+    } else CartDock("Exchange cart", cart) {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.cartLine(item.key).padding(vertical = 4.dp)) {
                 SpriteIcon(item.sprite, size = 28.dp)
                 Text(
                     "${item.name} ${if ((item.rewardQuantity ?: 1) > 1) "× ${item.rewardQuantity}" else ""} · uses ${item.required} ${item.currencyName?.ifEmpty { null } ?: "ea."}",

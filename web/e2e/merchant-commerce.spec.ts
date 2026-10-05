@@ -119,6 +119,8 @@ test('Craft: owned counts include bankbois, gold adds ingredient purchases, reci
   await expect(recipe.getByText('Next craft: 150g total')).toBeVisible()
 
   await page.getByRole('button', { name: 'Add' }).click()
+  // The ingredient totals fold behind a summary line that stays in view.
+  await page.getByRole('button', { name: /Ingredients: 1 · buy 1/ }).click()
   await expect(page.getByText('3 needed · 2 owned · buy 1')).toBeVisible()
   await expect(page.getByText('Gold: 150g')).toBeVisible()
   await expect(recipe.getByText('Next craft: 250g total')).toBeVisible()
@@ -176,4 +178,39 @@ test('Buy on a phone: the cart stays pinned, so an item added far down the list 
   await expect(cart.getByLabel('Item 30 quantity')).toHaveCount(0)
   await row.getByRole('button', { name: 'Add' }).click()
   await expect(cart.getByLabel('Item 30 quantity')).toHaveValue('2')
+})
+
+test('Craft on a phone: the added recipe stays in view and missing ingredients show above the button', async ({ page }) => {
+  // Failure mode: the cart scrolled to its bottom (the ingredient totals),
+  // pushing the recipe just added out of view.
+  await page.setViewportSize({ width: 390, height: 780 })
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'gem0', level: 0, q: 1 }] })
+  const mats = ['Iron Ore', 'Gold Ore', 'Leather', 'Spider Silk', 'Bat Wing', 'Frog', 'Seashell', 'Gem Fragment']
+  server.buyable = mats.map((name) => ({ id: name.toLowerCase().replace(/ /g, ''), name, cost: 50 }))
+  server.craftable = [
+    ...Array.from({ length: 12 }, (_, i) => ({ id: 'r' + i, name: 'Recipe ' + i, cost: 100, materials: [0, 1, 2].map((k) => ({ id: mats[(i + k) % 8].toLowerCase().replace(/ /g, ''), name: mats[(i + k) % 8], quantity: 2 + k, level: 0 })) })),
+    { id: 'gemcoat', name: 'Gem Coat', cost: 100, materials: [{ id: 'gem0', name: 'Green Gem', quantity: 1, level: 0 }] },
+  ]
+  await server.install(page)
+
+  await page.goto('/merchant/craft')
+  const cart = page.getByRole('region', { name: 'Craft list' })
+  for (const i of [0, 3, 6]) {
+    const row = page.locator('.rounded-md.border', { hasText: 'Recipe ' + i }).first()
+    await row.scrollIntoViewIfNeeded()
+    await row.getByRole('button', { name: 'Add' }).click()
+    await expect(cart.getByLabel(`Recipe ${i} quantity`)).toBeInViewport()
+  }
+  await expect(cart.getByRole('button', { name: /Ingredients: 8 · buy \d+/ })).toBeInViewport()
+  await expect(cart.getByRole('button', { name: 'Craft', exact: true })).toBeEnabled()
+
+  const gem = page.locator('.rounded-md.border', { hasText: 'Gem Coat' }).first()
+  await gem.scrollIntoViewIfNeeded()
+  await gem.getByRole('button', { name: 'Add' }).click()
+  // One gem is owned; asking for two can't be covered by buying.
+  await cart.getByLabel('Gem Coat quantity').fill('2')
+  await expect(cart.getByText('Missing: Green Gem')).toBeInViewport()
+  await expect(cart.getByRole('button', { name: 'Craft', exact: true })).toBeDisabled()
 })
