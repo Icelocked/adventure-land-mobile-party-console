@@ -22,48 +22,34 @@ import javax.net.ssl.X509TrustManager
 
 private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
-/** Applies exactly the TrustMode the user chose on the connection screen
- *  (network/ServerConfig.kt) - the one place that decides how (or
- *  whether) the server's TLS certificate gets verified. Shared by both
- *  [buildHttpClient] and [buildSseHttpClient] so REST calls and the SSE
- *  stream always trust the server the same way; only their timeouts
- *  differ (see each function's doc). */
+/** Applies the user's chosen [TrustMode]. Shared by [buildHttpClient] and
+ *  [buildSseHttpClient] so REST calls and the SSE stream trust the server
+ *  the same way; only their timeouts differ. */
 private fun baseHttpClientBuilder(settings: ServerSettings): OkHttpClient.Builder {
     // The pairing cookie travels with every request, REST and stream alike.
     val builder = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).cookieJar(PartyCookies)
     when (settings.trustMode) {
         TrustMode.SYSTEM, TrustMode.CLEARTEXT -> {
-            // Ordinary platform trust store. For CLEARTEXT the URL itself
-            // is http://, so TLS verification never enters into it at all -
-            // nothing extra to configure here.
+            // Platform trust store; CLEARTEXT URLs are http:// so TLS never applies.
         }
         TrustMode.PINNED_CERTIFICATE -> {
             val fingerprint = settings.pinnedCertificateSha256
                 ?: throw IllegalStateException("PINNED_CERTIFICATE trust mode requires a saved fingerprint")
             val trustManager = PinnedTrustManager(fingerprint)
             builder.sslSocketFactory(trustManager.socketFactory(), trustManager as X509TrustManager)
-            // Hostname verification is meaningless against a self-signed
-            // certificate for a bare IP/Tailscale address (no CA vouching
-            // for "this cert belongs to this name") - the fingerprint
-            // pin above is the actual trust check; this just stops the
-            // platform's own hostname check from rejecting a perfectly
-            // legitimate pinned connection first.
+            // A self-signed cert for a bare IP/Tailscale address has no name a
+            // CA vouches for; the fingerprint pin is the real trust check, so
+            // skip the platform hostname check that would reject it first.
             builder.hostnameVerifier(HostnameVerifier { _, _ -> true })
         }
     }
     return builder
 }
 
-/** For ordinary one-shot REST calls (roster fetch, state polling, item
- *  commands) - a real, bounded timeout, so a request that stalls after
- *  connecting (a network hiccup, the phone handing off from WiFi to
- *  cellular mid-request) actually fails and lets the caller's own retry
- *  logic (e.g. PartyRepository.fetchRosterWithRetry) kick in, instead of
- *  hanging forever with nothing to time it out. This client used to be
- *  shared with the SSE stream's readTimeout=0/callTimeout=0 - correct for
- *  a connection meant to stay open indefinitely, but silently disabled
- *  timeouts for every REST call too, which could hang the whole
- *  "Connecting..." screen with no error and no recovery. */
+/** For one-shot REST calls. Bounded timeouts so a request that stalls after
+ *  connecting (e.g. a WiFi-to-cellular handoff) fails and lets the caller's
+ *  retry logic run instead of hanging. Must not share the SSE client's
+ *  zero timeouts. */
 fun buildHttpClient(settings: ServerSettings): OkHttpClient =
     baseHttpClientBuilder(settings)
         // The gateway answers an unpaired request with 302 -> /setup; following
@@ -73,10 +59,9 @@ fun buildHttpClient(settings: ServerSettings): OkHttpClient =
         .callTimeout(20, TimeUnit.SECONDS)
         .build()
 
-/** For the SSE stream specifically (LiveConnection.kt) - genuinely no
- *  read/call timeout, since the connection is meant to stay open
- *  indefinitely; LiveConnection's own heartbeat watchdog (not OkHttp) is
- *  what detects a stalled-but-not-closed stream. */
+/** For the SSE stream: no read/call timeout since it stays open
+ *  indefinitely. LiveConnection's heartbeat watchdog detects a stalled
+ *  stream instead. */
 fun buildSseHttpClient(settings: ServerSettings): OkHttpClient =
     baseHttpClientBuilder(settings)
         .readTimeout(0, TimeUnit.SECONDS)
@@ -90,8 +75,8 @@ data class CommandResult(
     // Machine-readable reason some routes add (e.g. auto_bank_confirmation_required).
     val code: String? = null,
 ) {
-    /** The whole parsed response body (the PWA's CommandResult.data) - routes
-     *  that answer with a view (e.g. daily dungeons) are read from here. */
+    /** The whole parsed response body; routes that answer with a view
+     *  (e.g. daily dungeons) are read from here. */
     @kotlinx.serialization.Transient
     var data: JsonObject? = null
         internal set
@@ -103,8 +88,8 @@ private data class AlDataKeyResponse(val key: String? = null, val error: String?
 @kotlinx.serialization.Serializable
 private data class AlDataAuthResponse(val auth: String? = null, val error: String? = null)
 
-/** The pairing gate's answers (tools/hosting/authorize.ts): a redirect to
- *  /setup, or 401/403. */
+/** How the pairing gate rejects an unpaired request: a redirect to /setup,
+ *  or 401/403. */
 internal fun sessionLost(code: Int) = code in 300..399 || code == 401 || code == 403
 internal const val SESSION_EXPIRED = "Session expired - pair this device again"
 
@@ -115,20 +100,14 @@ sealed interface ApiResult<out T> {
     data class Failure(val message: String, val code: String? = null, val status: Int = 0, val body: JsonObject? = null) : ApiResult<Nothing>
 }
 
-/** Thin wrapper over the party-api REST surface - every endpoint listed
- *  in Adventureland-Team's PARTY-CONSOLE-COMPARISON.md research (e.g.
- *  /party-api/command, /party-api/merchant/order, /party-api/travel) is
- *  reachable through [post] with that endpoint's own field names; this
- *  class deliberately doesn't hardcode a method per endpoint yet since
- *  the app only needs a handful for v1 (see ui/characterdetail for which
- *  ones are actually wired to a button). Add a typed convenience method
- *  here as each new screen needs one, rather than guessing the full
- *  surface up front. */
+/** Thin wrapper over the party-api REST surface. Any endpoint is reachable
+ *  through [post]; typed helpers exist for the ones the UI uses.
+ *  PWA: web/src/api/partyApi.ts. */
 class PartyApiClient(
     private val client: OkHttpClient,
     private val settings: ServerSettings,
-    // query-actions.ts: told about every POST (success or not) so the data
-    // layer can refresh exactly the domains that action touched.
+    // Told about every POST (success or not) so the data layer can refresh
+    // the domains that action touched.
     private val onAction: (path: String, body: JsonObject) -> Unit = { _, _ -> },
 ) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -136,12 +115,8 @@ class PartyApiClient(
     /** The console's own address (setup and debug links open from it). */
     val baseUrl: String get() = settings.baseUrl
 
-    /** GET against the party-api base - used for one-shot reads like
-     *  /party-api/state (roster, merchant queue) that don't belong on the
-     *  SSE stream (live-protocol.ts's LiveRecord is vitals/items/slots
-     *  only). Returns the raw body string; callers decode with the exact
-     *  slice-type they need (see PartyRepository's roster/merchant-queue
-     *  fetches) rather than this class assuming one shape for every GET. */
+    /** GET against the party-api base for one-shot reads that aren't on the
+     *  SSE stream. Returns the raw body; callers decode the shape they need. */
     suspend fun get(path: String): ApiResult<String> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(settings.apiBase.trimEnd('/') + "/" + path.trimStart('/'))
@@ -159,20 +134,18 @@ class PartyApiClient(
         }
     }
 
-    /** POST /party-api/formation {leader} - party-workspace.tsx's leader
-     *  radio. Only the leader key, so nobody's follow flag changes. */
+    /** POST /party-api/formation {leader}. Only the leader key, so nobody's
+     *  follow flag changes. */
     suspend fun setLeader(leader: String): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("leader" to JsonPrimitive(leader))))
 
-    /** POST /party-api/formation {character, follow} - connected-character-
-     *  card.tsx's Follow checkbox. Never sends `leader`: the server applies
-     *  any `leader` key it gets, so sending one would change the leader. */
+    /** POST /party-api/formation {character, follow}. Never sends `leader`:
+     *  the server applies any `leader` key it gets. */
     suspend fun setFollow(character: String, follow: Boolean): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "follow" to JsonPrimitive(follow))))
 
-    /** POST /party-api/restock (use-party-console.tsx saveRestock) - the
-     *  whole policy, potion `item` included, so saving thresholds never
-     *  drops the chosen potion. */
+    /** POST /party-api/restock with the whole policy, potion `item`
+     *  included, so saving thresholds never drops the chosen potion. */
     suspend fun saveRestock(character: String, policy: com.partyconsole.companion.model.RestockPolicy): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
@@ -185,7 +158,7 @@ class PartyApiClient(
     }
 
     /** POST /party-api/slots/{slot}/spawn - load a roster member headless
-     *  into an empty slot (roster-controls.tsx). */
+     *  into an empty slot. */
     suspend fun spawnSlot(slot: Int, character: String): ApiResult<CommandResult> =
         post("slots/$slot/spawn", JsonObject(mapOf("character" to JsonPrimitive(character))))
 
@@ -193,7 +166,7 @@ class PartyApiClient(
     suspend fun logoutSlot(slot: Int): ApiResult<CommandResult> = post("slots/$slot/logout", JsonObject(emptyMap()))
 
     /** POST /party-api/steam/action - login | primary | headless | logout
-     *  through the Steam bridge (character-session-controls.tsx). */
+     *  through the Steam bridge. */
     suspend fun steamAction(character: String?, action: String): ApiResult<CommandResult> =
         post("steam/action", JsonObject(mapOf("character" to (character?.let { JsonPrimitive(it) } ?: JsonNull), "action" to JsonPrimitive(action))))
 
@@ -201,19 +174,16 @@ class PartyApiClient(
     suspend fun steamRecover(): ApiResult<CommandResult> = post("steam/recover", JsonObject(emptyMap()))
 
     /** POST /party-api/roster/create - create a character with one of its
-     *  class's official starting looks, then spawn it (create-character.tsx). */
+     *  class's official starting looks, then spawn it. */
     suspend fun createCharacter(name: String, ctype: String, look: Int): ApiResult<CommandResult> =
         post("roster/create", JsonObject(mapOf("name" to JsonPrimitive(name), "class" to JsonPrimitive(ctype), "look" to JsonPrimitive(look))))
 
-    /** `/party-api/command` type "go-home" (manual-commands.ts goHome) -
-     *  back to the character's home spot and home realm. */
+    /** `/party-api/command` type "go-home" - back to the character's home
+     *  spot and home realm. */
     suspend fun goHome(character: String): ApiResult<CommandResult> = sendCommand(character, mapOf("type" to "go-home"))
 
-    /** party-console's account-pairing controls (/setup/state,
-     *  /setup/pairing) live at the server root, not under /party-api - see
-     *  SettingsScreen. Everything else in this class deliberately only
-     *  ever talks to party-api routes, so this is spelled out as its own
-     *  root-relative pair rather than a silent exception inside get/post. */
+    /** GET relative to the server root rather than /party-api, for routes
+     *  like /setup/state and /console-debug. */
     suspend fun getRoot(path: String): ApiResult<String> = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(settings.baseUrl.trimEnd('/') + "/" + path.trimStart('/')).get().build()
         try {
@@ -228,7 +198,7 @@ class PartyApiClient(
     }
 
     /** A party-api request whose failures keep the server's {error} text or
-     *  raw body (partyApi.ts textWithError); POSTs acknowledge with a toast. */
+     *  raw body; POSTs acknowledge with a toast. */
     private suspend fun textWithError(method: String, path: String, body: String? = null, headers: Map<String, String> = emptyMap()): ApiResult<String> {
         val toast = if (method == "POST") ActionToasts.begin() else null
         val result = withContext(Dispatchers.IO) {
@@ -258,7 +228,7 @@ class PartyApiClient(
     /** GET /party-api/dashboard-state - the import source paths and size limit. */
     suspend fun dashboardStateInfo(): ApiResult<String> = textWithError("GET", "dashboard-state")
 
-    /** GET /party-api/dashboard-state/export - the settings JSON (settings-export.ts). */
+    /** GET /party-api/dashboard-state/export - the settings JSON. */
     suspend fun dashboardStateExport(): ApiResult<String> = textWithError("GET", "dashboard-state/export")
 
     /** POST /party-api/dashboard-state/{preview,import} - the raw file as
@@ -269,7 +239,7 @@ class PartyApiClient(
             digest?.let { put("X-State-Preview", it) }
         })
 
-    /** GET /console-debug - the debug instance state (debug-instance.tsx). */
+    /** GET /console-debug - the debug instance state. */
     suspend fun consoleDebug(): ApiResult<String> = getRoot("console-debug")
 
     /** POST /console-debug/{start,stop}. */
@@ -297,12 +267,12 @@ class PartyApiClient(
     }
 
     suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> {
-        // Every mutating action funnels through here - the one place that
-        // acknowledges a tap at once (lib/actionToast.ts).
+        // Every mutating action funnels through here, so this is where a tap
+        // gets its immediate acknowledgement toast.
         val toast = ActionToasts.begin()
         var sent = false
         try {
-            // Only an explicit `ok: false` is a refusal (partyApi.ts parseCommandResult).
+            // Only an explicit `ok: false` is a refusal.
             return postOnce(path, body).also { sent = it is ApiResult.Success && (it.value.data?.get("ok") as? JsonPrimitive)?.content != "false" }
         } finally {
             ActionToasts.resolve(toast, sent)
@@ -333,9 +303,8 @@ class PartyApiClient(
         }
     }
 
-    /** `/party-api/command` - the general-purpose command endpoint
-     *  (see runtime/coordinator/http/character-command.ts): character
-     *  name plus whatever domain-specific fields that command needs. */
+    /** `/party-api/command` - the general-purpose command endpoint:
+     *  character name plus that command's own fields. */
     suspend fun sendCommand(character: String, fields: Map<String, Any?>): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -355,15 +324,10 @@ class PartyApiClient(
         else -> JsonPrimitive(value.toString())
     }
 
-    /** Every item-mark/equip/use/give command on /party-api/command needs
-     *  the FULL item object in its `item` field, not just its name - the
-     *  server verifies identity against it (see mark-commands.ts:
-     *  `requestObject(body.item)`, requires `.name` to be a string) rather
-     *  than trusting a bare name/slot pair, since the slot's contents can
-     *  have changed between when this app last saw them and when the tap
-     *  landed. [slot] varies by action: a number (inventory index) for
-     *  most, but a string equip-slot name (e.g. "mainhand") for unequip -
-     *  callers pass whichever JsonElement that action expects. */
+    /** Item commands send the full item object, not just its name: the
+     *  server checks it against the slot, which may have changed since the
+     *  app last saw it. [slot] is an inventory index for most actions but an
+     *  equip-slot name (e.g. "mainhand") for unequip. */
     suspend fun itemCommand(
         type: String,
         character: String,
@@ -383,14 +347,11 @@ class PartyApiClient(
         return post("command", body)
     }
 
-    /** POST /party-api/merchant/stand (http/stand-marks.ts) - list an
-     *  inventory item on the merchant's stand, or edit an existing listing
-     *  in place by passing its `id` (stand-marks.ts's update() finds the
-     *  existing mark by id/pack/slot/item and reuses the same slot rather
-     *  than creating a new one). */
+    /** POST /party-api/merchant/stand - list an item on the merchant's
+     *  stand, or edit an existing listing in place by passing its `id`. */
     suspend fun markForStand(
         item: Item,
-        // Left out for a listing without one (partyApi.ts sends `undefined`).
+        // Left out for a listing without one.
         slot: Int?,
         bankPack: String? = null,
         price: Long,
@@ -415,9 +376,9 @@ class PartyApiClient(
         return post("merchant/stand", body)
     }
 
-    /** POST /party-api/merchant/npc-sale (use-party-console.tsx
-     *  confirmNpcSale). The configured merchant's own items use source
-     *  "merchant" with no `character`; anyone else's use "character". */
+    /** POST /party-api/merchant/npc-sale. The configured merchant's own
+     *  items use source "merchant" with no `character`; anyone else's use
+     *  "character". */
     suspend fun markForNpcSale(
         character: String,
         item: Item,
@@ -439,20 +400,18 @@ class PartyApiClient(
         return post("merchant/npc-sale", body)
     }
 
-    /** `/party-api/command` type "withdraw" (inventory/transfer-commands.ts) -
-     *  pulls one item out of the shared bank to a character's own bag.
-     *  `pack` is the bank pack name (e.g. "items0", or "bankboi:Name"),
-     *  `slot` is that pack's slot index - both distinct from the
-     *  requesting character's own inventory slot, which this command
-     *  doesn't need (the server finds room on its own). */
+    /** `/party-api/command` type "withdraw" - pulls one item from the bank
+     *  to a character's bag. [pack] is the bank pack (e.g. "items0" or
+     *  "bankboi:Name") and [slot] that pack's index; the server finds room
+     *  in the bag itself. */
     suspend fun withdrawFromBank(character: String, item: Item, pack: String, slot: Int, markAll: Boolean = false, removeAutoBankMark: Boolean = false, upgradeTiers: Int? = null): ApiResult<CommandResult> {
-        // bank-withdrawal.tsx: removeAutoBankMark confirms dropping an
-        // automatic bank mark when the server asks (auto_bank_confirmation_required).
+        // removeAutoBankMark confirms dropping an automatic bank mark when the
+        // server asks (auto_bank_confirmation_required).
         val extra = buildMap {
             put("pack", JsonPrimitive(pack))
             put("markAll", JsonPrimitive(markAll))
             put("removeAutoBankMark", JsonPrimitive(removeAutoBankMark))
-            // party-inventory-panels.tsx onBankUpgrade: withdraw the item to upgrade it.
+            // Withdraw the item in order to upgrade it.
             upgradeTiers?.let { put("upgradeTiers", JsonPrimitive(it)) }
         }
         return itemCommand("withdraw", character, item, JsonPrimitive(slot), extra)
@@ -474,18 +433,15 @@ class PartyApiClient(
         return post("merchant/npc-sale", body)
     }
 
-    /** POST /party-api/bank/unlock (http/bank-unlock.ts) - queues a merchant
-     *  errand to open one locked bank pack. `kind = "key"` unlocks a floor's
-     *  first (0-gold) vault using an owned key item; null spends the
-     *  vault's `gold` to open an already-accessible vault. The server
-     *  enforces ordering/ownership and returns a specific error otherwise. */
+    /** POST /party-api/bank/unlock - queues a merchant errand to open one
+     *  locked bank pack. [kind] is "key" (a floor's first vault, using an
+     *  owned key) or "gold" (spends the vault's price). The server enforces
+     *  ordering/ownership and explains any refusal. */
     suspend fun unlockBankVault(pack: String, kind: String): ApiResult<CommandResult> =
-        // party-inventory-panels.tsx onUnlock: {pack, kind} - "key" or "gold".
         post("bank/unlock", JsonObject(mapOf("pack" to JsonPrimitive(pack), "kind" to JsonPrimitive(kind))))
 
-    /** POST /party-api/deconstruction/mark (merchant/bank-deconstruction.ts,
-     *  triggered by `pack` being present) - marks a bank item for scrap
-     *  without withdrawing it first. */
+    /** POST /party-api/deconstruction/mark with `pack` - marks a bank item
+     *  for scrap without withdrawing it first. */
     suspend fun markBankItemForDeconstruction(item: Item, pack: String, slot: Int, all: Boolean = false): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
@@ -498,7 +454,7 @@ class PartyApiClient(
         return post("deconstruction/mark", body)
     }
 
-    /** POST /party-api/deconstruction/mark (merchant/deconstruction.ts). */
+    /** POST /party-api/deconstruction/mark. */
     suspend fun markForDeconstruction(
         character: String,
         item: Item,
@@ -535,13 +491,12 @@ class PartyApiClient(
     suspend fun retryDeconstructionMark(character: String, id: String): ApiResult<CommandResult> =
         post("deconstruction/mark", JsonObject(mapOf("character" to JsonPrimitive(character), "id" to JsonPrimitive(id), "retry" to JsonPrimitive(true))))
 
-    /** connected-inventory.tsx onRemoveNpcSale: a manual NPC-sale mark by id. */
+    /** Removes a manual NPC-sale mark by id. */
     suspend fun removeNpcSaleMark(character: String, id: String): ApiResult<CommandResult> =
         post("merchant/npc-sale", JsonObject(mapOf("character" to JsonPrimitive(character), "id" to JsonPrimitive(id), "remove" to JsonPrimitive(true))))
 
-    /** POST /party-api/deconstruction/auto (merchant/deconstruction.ts) -
-     *  a standing "always deconstruct this item type" rule, separate from
-     *  marking one instance (markForDeconstruction). */
+    /** POST /party-api/deconstruction/auto - a standing "always deconstruct
+     *  this item type" rule, as opposed to marking one instance. */
     suspend fun autoDeconstruct(character: String, item: Item, remove: Boolean = false): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -553,12 +508,12 @@ class PartyApiClient(
         return post("deconstruction/auto", body)
     }
 
-    /** POST /party-api/merchant/auto-npc-sale (http/automatic-sales.ts) -
-     *  a standing "always sell this item type to an NPC" rule. */
+    /** POST /party-api/merchant/auto-npc-sale - a standing "always sell this
+     *  item type to an NPC" rule. */
     suspend fun autoNpcSale(character: String?, item: Item, remove: Boolean = false): ApiResult<CommandResult> {
-        // connected-inventory.tsx: `character` is omitted for the configured
-        // merchant (its rule is the account-wide one); with it, the server
-        // stores a per-player rule that never fires for the merchant.
+        // `character` is omitted for the configured merchant (its rule is the
+        // account-wide one); with it, the server stores a per-player rule
+        // that never fires for the merchant.
         val body = JsonObject(
             buildMap {
                 character?.let { put("character", JsonPrimitive(it)) }
@@ -569,11 +524,10 @@ class PartyApiClient(
         return post("merchant/auto-npc-sale", body)
     }
 
-    /** POST /party-api/merchant/auto-stand (http/automatic-sales.ts) - a
-     *  standing "always list this item type on the stand at this price"
-     *  rule, merchant-only. */
+    /** POST /party-api/merchant/auto-stand - a standing "always list this
+     *  item type at this price" rule. */
     suspend fun autoStand(item: Item, price: Long, remove: Boolean = false): ApiResult<CommandResult> {
-        // use-party-console.tsx saveStandListing (auto): no character - the rule is the merchant's.
+        // No character: the rule always belongs to the merchant.
         val body = JsonObject(
             mapOf(
                 "item" to json.encodeToJsonElement(Item.serializer(), item),
@@ -598,10 +552,9 @@ class PartyApiClient(
     suspend fun deleteBankboi(name: String): ApiResult<CommandResult> =
         post("bankbois/${java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")}/delete", JsonObject(emptyMap()))
 
-    /** POST /party-api/merchant/auto-npc-sale with action "clear-all"
-     *  (automatic-sales.ts) - drops every auto-NPC-sale rule scoped to
-     *  `character` (null clears the merchant's own account-wide rules,
-     *  matching how npcEntries filters by `rule.character == null`). */
+    /** POST /party-api/merchant/auto-npc-sale with action "clear-all" -
+     *  drops every auto-NPC-sale rule scoped to [character]; null clears
+     *  the merchant's account-wide rules. */
     suspend fun clearAllAutoNpcSales(character: String? = null): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -617,9 +570,9 @@ class PartyApiClient(
     suspend fun clearAllAutoStand(): ApiResult<CommandResult> =
         post("merchant/auto-stand", JsonObject(mapOf("action" to JsonPrimitive("clear-all"))))
 
-    /** `/party-api/command` type "clear-auto-upgrades"/"clear-auto-compounds"
-     *  (compound-commands.ts) - drops EVERY owner's rules at once; the
-     *  server requires `character` to be the configured merchant. */
+    /** `/party-api/command` type "clear-auto-upgrades"/"clear-auto-compounds" -
+     *  drops every owner's rules at once; the server requires `character`
+     *  to be the configured merchant. */
     suspend fun clearAutoUpgrades(merchantCharacter: String): ApiResult<CommandResult> =
         sendCommand(merchantCharacter, mapOf("type" to "clear-auto-upgrades"))
 
@@ -631,11 +584,9 @@ class PartyApiClient(
     suspend fun clearAutoItemMarks(character: String, mode: String): ApiResult<CommandResult> =
         sendCommand(character, mapOf("type" to "clear-auto-item-marks", "mode" to mode))
 
-    /** POST /party-api/merchant/order (http/merchant-order.ts) - queues an
-     *  NPC buy and/or crafting job. The server recomputes each buy line's
-     *  upgrade-attempt budget itself before queuing - `level` (the desired
-     *  target level for an upgradeable buy) is the only field worth
-     *  sending from here; any client-side cost estimate is display-only. */
+    /** POST /party-api/merchant/order - queues an NPC buy and/or crafting
+     *  job. The server recomputes each buy line's upgrade budget, so `level`
+     *  is what matters; client-side cost estimates are display-only. */
     suspend fun submitMerchantOrder(
         buys: List<com.partyconsole.companion.model.MerchantOrderBuyLine>,
         crafts: List<com.partyconsole.companion.model.MerchantOrderCraftLine>,
@@ -687,9 +638,8 @@ class PartyApiClient(
     suspend fun retryMerchantJob(id: String): ApiResult<CommandResult> =
         post("merchant/job/retry", JsonObject(mapOf("id" to JsonPrimitive(id))))
 
-    /** POST /party-api/merchant/clear - drops the ENTIRE merchant job
-     *  queue and gathering modes, not just one job (see merchant/job/
-     *  cancel for that). No confirmation server-side, so callers should
+    /** POST /party-api/merchant/clear - drops the entire merchant job queue
+     *  and gathering modes. No confirmation server-side, so callers should
      *  confirm first. */
     suspend fun clearMerchantQueue(): ApiResult<CommandResult> = post("merchant/clear", JsonObject(emptyMap()))
 
@@ -702,29 +652,24 @@ class PartyApiClient(
     suspend fun joinGiveaway(seller: String, realm: String): ApiResult<CommandResult> =
         post("merchant/join-giveaway", JsonObject(mapOf("seller" to JsonPrimitive(seller), "realm" to JsonPrimitive(realm))))
 
-    /** POST /party-api/bank-party - has the merchant visit party members
-     *  to collect gold/items. Omitting `group` auto-selects when the
-     *  account only has one party group (the common case); with more than
-     *  one, the server 409s with the group list rather than guessing -
-     *  surfaced as a plain error here rather than a group picker (not
-     *  built yet). */
+    /** POST /party-api/bank-party - has the merchant visit party members to
+     *  collect gold/items. Without `group` the server picks the only party
+     *  group, or 409s with the group list when there are several. */
     suspend fun sendMerchantToParty(group: String? = null): ApiResult<CommandResult> =
         post("bank-party", JsonObject(if (group != null) mapOf("group" to JsonPrimitive(group)) else emptyMap()))
 
-    /** POST /party-api/merchant/stale-orders/clear - drops delivery/bank-
-     *  mark records for items no longer actually in the merchant's
-     *  inventory (a recovery action, not a normal workflow step). */
+    /** POST /party-api/merchant/stale-orders/clear - recovery action that
+     *  drops delivery/bank-mark records for items no longer in the
+     *  merchant's inventory. */
     suspend fun clearStaleOrders(): ApiResult<CommandResult> = post("merchant/stale-orders/clear", JsonObject(emptyMap()))
 
     /** POST /party-api/merchant/activity/clear - clears the merchant
      *  activity log shown on the Logs screen. */
     suspend fun clearMerchantActivity(): ApiResult<CommandResult> = post("merchant/activity/clear", JsonObject(emptyMap()))
 
-    /** POST /party-api/merchant/routine-priorities - reorders/enables the
-     *  merchant's automatic-routine scheduling. `priorities` only needs
-     *  entries that actually changed (server merges), but sending the
-     *  full map is simplest and always valid. `enabled` only applies to
-     *  automatic routines - server ignores keys outside that set. */
+    /** POST /party-api/merchant/routine-priorities. The server merges
+     *  `priorities`, so the full map is always valid; `enabled` keys outside
+     *  the automatic routines are ignored. */
     suspend fun saveRoutinePriorities(priorities: Map<String, Int>, enabled: Map<String, Boolean>): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
@@ -744,10 +689,9 @@ class PartyApiClient(
     suspend fun requestBankSort(enabled: Boolean): ApiResult<CommandResult> =
         post("merchant/bank-sort", JsonObject(mapOf("enabled" to JsonPrimitive(enabled))))
 
-    /** POST /party-api/config - either or both of `threshold` (gold-
-     *  carrying threshold before auto-banking) and `itemCollectionThreshold`
-     *  (1-42, marked-slot count before a collection trip queues) in one
-     *  call; pass null for whichever one isn't changing. */
+    /** POST /party-api/config - `threshold` (gold carried before
+     *  auto-banking) and/or `itemCollectionThreshold` (1-42 marked slots
+     *  before a collection trip); null leaves a value unchanged. */
     suspend fun setThresholds(threshold: Long?, itemCollectionThreshold: Int?): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -758,17 +702,12 @@ class PartyApiClient(
         return post("config", body)
     }
 
-    /** POST /party-api/farming-mode - the account-wide farming strategy
-     *  (Auto/Default/Scatter/Hunt); unlike nearly everything else in this
-     *  client, this command takes no `character` field at all (confirmed
-     *  against runtime/coordinator/http/hunt-mode.ts) - it's one shared
-     *  value for the whole party. Hunt specifically requires a `backup`
-     *  (monster focus + a real spawn location) the first time, or
-     *  whenever changing it - the server 409s with `code:"backup_required"`
-     *  if Hunt is requested without one and none is already set. */
+    /** POST /party-api/farming-mode (Auto/Default/Scatter/Hunt). Hunt needs a
+     *  `backup` (monster focus + spawn location) when none is set yet; the
+     *  server answers 409 `backup_required` otherwise. */
     suspend fun setFarmingMode(mode: String, character: String, backupMonsterFocus: List<String>? = null, backupMap: String? = null, backupX: Double? = null, backupY: Double? = null): ApiResult<CommandResult> {
-        // use-party-console.tsx setFarmingPolicy: scoped to the character;
-        // without it the server changes the leader's policy.
+        // Scoped to the character; without it the server changes the
+        // leader's policy.
         val body = JsonObject(
             buildMap {
                 put("mode", JsonPrimitive(mode))
@@ -799,7 +738,7 @@ class PartyApiClient(
      *  per-character (unlike farming-mode). Omitting `monsterSearchRadius`
      *  leaves it unchanged server-side. */
     suspend fun setFocus(character: String, monsterFocus: List<String>, monsterSearchRadius: Int? = null, monsterPriorities: Map<String, Int>? = null): ApiResult<CommandResult> {
-        // use-party-console.tsx setFocus: priorities and radius only when given.
+        // Priorities and radius only when given.
         val body = JsonObject(
             buildMap {
                 put("character", JsonPrimitive(character))
@@ -814,8 +753,7 @@ class PartyApiClient(
     private fun locationJson(map: String, x: Double, y: Double) = JsonObject(mapOf("map" to JsonPrimitive(map), "x" to JsonPrimitive(x), "y" to JsonPrimitive(y)))
 
     /** POST /party-api/navigate-to-monster - sends the whole party convoy to
-     *  one monster (monster-route-button.tsx); `phoenixRouteOrder` only for
-     *  "phoenix". */
+     *  one monster; `phoenixRouteOrder` only for "phoenix". */
     suspend fun navigateToMonster(monsterId: String, map: String, x: Double, y: Double, phoenixRouteOrder: List<String>? = null): ApiResult<CommandResult> =
         post(
             "navigate-to-monster",
@@ -828,9 +766,8 @@ class PartyApiClient(
             ),
         )
 
-    /** `/party-api/command` "party-monster-travel" (the leader) or
-     *  "character-travel" (anyone else): use-party-console.tsx
-     *  startFarmingArea - one character to a farming area for its focus. */
+    /** Sends one character to a farming area for its focus:
+     *  "party-monster-travel" for the leader, "character-travel" otherwise. */
     suspend fun routeToFarmingArea(character: String, isLeader: Boolean, map: String, x: Double, y: Double, farmingMonsterIds: List<String>, label: String? = null): ApiResult<CommandResult> =
         sendCommand(
             character,
@@ -842,9 +779,8 @@ class PartyApiClient(
             },
         )
 
-    /** POST /party-api/hunt-blacklist - always scoped to the character
-     *  (connected-character-card.tsx); without it the server edits the
-     *  leader's list. */
+    /** POST /party-api/hunt-blacklist - always scoped to the character;
+     *  without it the server edits the leader's list. */
     suspend fun updateHuntBlacklist(character: String, action: String, monsterId: String? = null): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -856,8 +792,8 @@ class PartyApiClient(
         return post("hunt-blacklist", body)
     }
 
-    /** POST /party-api/rare-hunting - connected-character-card.tsx onRareChange:
-     *  passive hunting rules and/or the field-generator toggle (party-wide). */
+    /** POST /party-api/rare-hunting - passive hunting rules and/or the
+     *  party-wide field-generator toggle. */
     suspend fun setRareHunting(patch: JsonObject): ApiResult<CommandResult> = post("rare-hunting", patch)
 
     /** POST /party-api/hunt-settings - a partial patch of only the changed
@@ -865,8 +801,8 @@ class PartyApiClient(
     suspend fun saveHuntSettings(character: String, patch: Map<String, JsonElement>): ApiResult<CommandResult> =
         post("hunt-settings", JsonObject(patch + ("character" to JsonPrimitive(character))))
 
-    /** wtb-preferences.tsx WTBOptions. [value] is sent as given (JsonNull
-     *  clears); null leaves it out. */
+    /** Optional WTB edit fields. [value] is sent as given (JsonNull clears);
+     *  null leaves it out. */
     data class WtbOptions(
         val editField: String? = null,
         val value: JsonElement? = null,
@@ -877,8 +813,8 @@ class PartyApiClient(
         val replaceStandEntry: String? = null,
     )
 
-    /** POST /party-api/merchant/bid (partyApi.ts saveBid): create, edit or
-     *  (clear) cancel a WTB order. [priorityOverride] is sent as given -
+    /** POST /party-api/merchant/bid - create, edit or (clear) cancel a WTB
+     *  order. [priorityOverride] is sent as given -
      *  JsonNull clears the override, null leaves the key out. A full stand
      *  answers 409 with `occupants` (see the WTB replacement prompt). */
     suspend fun saveBid(
@@ -910,13 +846,9 @@ class PartyApiClient(
         return post("merchant/bid", body)
     }
 
-    /** `/party-api/command` type "upgrade-offering-rule" - creates (empty
-     *  `id`) or edits (existing `id`) a standing "use this offering
-     *  instead of scrolls during automatic upgrades in this level range"
-     *  rule. The server assigns a real id for new rules. */
-    /** POST /party-api/upgrade-preview - upgrade-preview-panel.tsx's 2 s poll
-     *  (no action toast, no domain refresh). `refresh` queues a new server
-     *  preview; otherwise the stored one is returned. */
+    /** POST /party-api/upgrade-preview - polled, so no action toast and no
+     *  domain refresh. `refresh` queues a new server preview; otherwise the
+     *  stored one is returned. */
     suspend fun upgradePreview(body: JsonObject): ApiResult<JsonObject> = when (val result = postOnce("upgrade-preview", body)) {
         is ApiResult.Success -> ApiResult.Success(result.value.data ?: JsonObject(emptyMap()))
         is ApiResult.Failure -> ApiResult.Failure(
@@ -927,6 +859,9 @@ class PartyApiClient(
         )
     }
 
+    /** `/party-api/command` type "upgrade-offering-rule" - creates (empty
+     *  `id`) or edits a rule to use an offering instead of scrolls in a
+     *  level range. The server assigns ids for new rules. */
     suspend fun saveOfferingRule(character: String, id: String, name: String, floor: Int, ceiling: Int, offering: String, required: Boolean): ApiResult<CommandResult> {
         val rule = JsonObject(
             mapOf(
@@ -947,11 +882,8 @@ class PartyApiClient(
         return sendCommand(character, mapOf("type" to "upgrade-offering-rule", "rule" to rule, "remove" to true))
     }
 
-    /** `/party-api/command` type "character-travel" (navigation/manual-
-     *  commands.ts's travel handler) - sends one character to a preset
-     *  map location (see model/TravelPlace, sourced from state's
-     *  travelPlaces list). No item involved, so this uses sendCommand
-     *  directly rather than itemCommand. */
+    /** `/party-api/command` type "character-travel" - sends one character to
+     *  a map location (e.g. a [com.partyconsole.companion.model.TravelPlace]). */
     suspend fun sendCharacterTo(character: String, map: String, x: Double, y: Double, label: String): ApiResult<CommandResult> {
         val location = JsonObject(
             mapOf(
@@ -963,28 +895,22 @@ class PartyApiClient(
         return sendCommand(character, mapOf("type" to "character-travel", "location" to location, "label" to label))
     }
 
-    /** `/party-api/command` type "return-leader" - rendezvous back with
-     *  the current party leader. Server requires a different, currently-
-     *  online leader to exist. */
+    /** `/party-api/command` type "return-leader" - rejoin the party leader,
+     *  who must be a different, online character. */
     suspend fun returnToLeader(character: String): ApiResult<CommandResult> =
         sendCommand(character, mapOf("type" to "return-leader"))
 
-    /** POST /party-api/town-party (party-actions.ts's town()) - sends EVERY
-     *  active character to town at once, distinct from character-travel's
-     *  per-character command. */
+    /** POST /party-api/town-party - sends every active character to town. */
     suspend fun sendPartyToTown(): ApiResult<CommandResult> = post("town-party", JsonObject(emptyMap()))
 
-    /** POST /party-api/escape (party-actions.ts's escape()) - the party-wide
-     *  emergency-recovery command: needs one online warrior/mage/priest, the
-     *  server owns the whole staged rendezvous/convoy-fallback sequence.
-     *  Poll GET /party-api/escape (PartyRepository.escape) for stage/error. */
+    /** POST /party-api/escape - party-wide emergency recovery; needs one
+     *  online warrior/mage/priest and the server runs the staged sequence.
+     *  Poll GET /party-api/escape for stage/error. */
     suspend fun triggerEscape(): ApiResult<CommandResult> = post("escape", JsonObject(emptyMap()))
 
-    /** `/party-api/command` type "remove-auto-item-mark" (inventory/mark-
-     *  commands.ts) - removes one standing auto-bank/auto-merchant rule
-     *  by its rule key. Deliberately no `item` field: the real dashboard
-     *  omits it too, and the server-side handler for this type never
-     *  requires one (only auto-item-mark itself does). */
+    /** `/party-api/command` type "remove-auto-item-mark" - removes one
+     *  auto-bank/auto-merchant rule by key. No `item` field; this command
+     *  doesn't need one. */
     suspend fun removeAutoItemMark(character: String, mode: String, ruleKey: String): ApiResult<CommandResult> =
         sendCommand(character, mapOf("type" to "remove-auto-item-mark", "mode" to mode, "ruleKey" to ruleKey))
 
@@ -993,20 +919,17 @@ class PartyApiClient(
     suspend fun removeAutoUpgradeRule(owner: String, item: Item, ruleKey: String): ApiResult<CommandResult> =
         itemCommand("update-auto-upgrade-rule", owner, item, null, mapOf("ruleKey" to JsonPrimitive(ruleKey), "remove" to JsonPrimitive(true)))
 
-    /** `/party-api/command` type "auto-compound-mark" with remove - the
-     *  same command that CREATES the rule (see itemCommand's earlier
-     *  auto-compound call), just with remove=true. */
+    /** `/party-api/command` type "auto-compound-mark" with remove - the same
+     *  command that creates the rule. */
     suspend fun removeAutoCompound(owner: String, name: String, targetTier: Int): ApiResult<CommandResult> =
         itemCommand(
             "auto-compound-mark", owner, Item(name = name), null,
             mapOf("targetTier" to JsonPrimitive(targetTier), "remove" to JsonPrimitive(true)),
         )
 
-    /** POST /party-api/realm/switch (http/realms.ts) - moves every active
-     *  character to a different Adventure Land realm together. Server
-     *  refuses PVP realms and refuses if a switch is already running or a
-     *  bankboi transaction is in progress - surface the returned error
-     *  rather than assume success. */
+    /** POST /party-api/realm/switch - moves every active character to another
+     *  realm. The server refuses PVP realms, or while a switch or bankboi
+     *  transaction is already running. */
     suspend fun switchRealm(realm: String, setHome: Boolean = false): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(
@@ -1017,22 +940,21 @@ class PartyApiClient(
         return post("realm/switch", body)
     }
 
-    /** POST /party-api/dashboard-preferences (http/dashboard-import.ts's
-     *  preferences handler) - the bankboi mule-character naming prefix. */
+    /** POST /party-api/dashboard-preferences - the bankboi naming prefix. */
     suspend fun setBankboiPrefix(prefix: String): ApiResult<CommandResult> =
         post("dashboard-preferences", JsonObject(mapOf("bankboiPrefix" to JsonPrimitive(prefix))))
 
-    /** POST /party-api/formation {character, eventSelections} - event-selection-control.tsx. */
+    /** POST /party-api/formation {character, eventSelections}. */
     suspend fun setEventSelections(character: String, eventSelections: List<String>): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventSelections" to kotlinx.serialization.json.JsonArray(eventSelections.map { JsonPrimitive(it) }))))
 
-    /** POST /party-api/dashboard-preferences - "Send anniversary chat message
-     *  when receiving cake from a kiss" (anniversary-dialog.tsx's autoChat toggle). */
+    /** POST /party-api/dashboard-preferences - whether to send the
+     *  anniversary chat message when receiving cake from a kiss. */
     suspend fun setAnniversaryAutoChat(enabled: Boolean): ApiResult<CommandResult> =
         post("dashboard-preferences", JsonObject(mapOf("anniversaryAutoChat" to JsonPrimitive(enabled))))
 
-    /** POST /party-api/anniversary/chat-advertise - manually sends the
-     *  server-generated cake-slice-trade advertisement to in-game chat right now. */
+    /** POST /party-api/anniversary/chat-advertise - posts the cake-trade
+     *  advertisement to in-game chat now. */
     suspend fun sendAnniversaryChatAdvertisement(): ApiResult<CommandResult> =
         post("anniversary/chat-advertise", JsonObject(emptyMap()))
 
@@ -1081,9 +1003,9 @@ class PartyApiClient(
         }
     }
 
-    /** POST /party-api/merchant/send-mail - send-mail-dialog.tsx onSend body,
-     *  verbatim: an optional attachment from a pack (merchant, bank pack or
-     *  bankboi:NAME) and slot, with the quantity for stacks. */
+    /** POST /party-api/merchant/send-mail - with an optional attachment from
+     *  a pack (merchant, bank pack or bankboi:NAME) and slot; [quantity]
+     *  applies to stacks. */
     suspend fun sendMail(recipient: String, subject: String, message: String, quantity: Int, sourcePack: String? = null, sourceSlot: Int? = null, sourceItem: Item? = null): ApiResult<CommandResult> {
         val body = JsonObject(
             buildMap {
@@ -1108,22 +1030,22 @@ class PartyApiClient(
     suspend fun collectMail(id: String): ApiResult<CommandResult> =
         post("mail/collect", JsonObject(mapOf("id" to JsonPrimitive(id))))
 
-    /** POST /party-api/combat-log/:character/clear - combat-log.tsx Clear history. */
+    /** POST /party-api/combat-log/:character/clear. */
     suspend fun clearCombatLog(character: String): ApiResult<CommandResult> =
         post("combat-log/${java.net.URLEncoder.encode(character, "UTF-8").replace("+", "%20")}/clear", JsonObject(emptyMap()))
 
-    /** POST /party-api/merchant/aldata-order (manual-market-orders.ts) -
-     *  use-party-console.tsx buyALDataListing: the listing as received. */
+    /** POST /party-api/merchant/aldata-order - the listing as received,
+     *  minus client-only grouping fields. */
     suspend fun buyAlData(listing: JsonObject, buyQuantity: Int): ApiResult<CommandResult> =
         post("merchant/aldata-order", JsonObject(mapOf("listing" to JsonObject(listing - "origin" - "groupedListings"), "buyQuantity" to JsonPrimitive(buyQuantity))))
 
-    /** POST /party-api/merchant/aldata-sale - use-party-console.tsx
-     *  sellALDataOrder: sell owned copies into a live ALData buy order. */
+    /** POST /party-api/merchant/aldata-sale - sell owned copies into a live
+     *  ALData buy order. */
     suspend fun sellAlData(order: JsonObject, sellQuantity: Int): ApiResult<CommandResult> =
         post("merchant/aldata-sale", JsonObject(mapOf("order" to order, "sellQuantity" to JsonPrimitive(sellQuantity))))
 
-    /** POST /party-api/merchant/ponty-order - use-party-console.tsx
-     *  buyPontyListing: every listing key of the grouped lot. */
+    /** POST /party-api/merchant/ponty-order - every listing key of the
+     *  grouped lot. */
     suspend fun buyPonty(keys: List<String>, quantity: Int, unitPrice: Long): ApiResult<CommandResult> {
         val body = JsonObject(
             mapOf(

@@ -22,9 +22,8 @@ private val itemJson = Json { encodeDefaults = false; explicitNulls = false }
 private fun JsonElement?.str(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
 private fun JsonElement?.num(): Double? = (this as? JsonPrimitive)?.content?.toDoubleOrNull()
 
-/** merchant-job-label.ts (party-console v1.2.0), verbatim (the PWA's
- *  lib/merchantJobLabel.ts): one label for queue rows, tooltips and
- *  cancellation controls. */
+/** One label per job for queue rows, tooltips and cancellation controls.
+ *  PWA: web/src/lib/merchantJobLabel.ts. */
 private val JOB_LABELS = mapOf(
     "party collection" to "Item collection",
     "manual visit" to "Manual visit",
@@ -143,8 +142,7 @@ private fun itemObject(item: Item): JsonObject = itemJson.encodeToJsonElement(It
 private fun sameIdentity(first: JsonObject, second: JsonObject): Boolean =
     second.keys.filter { it !in TRANSIENT }.all { first[it] == second[it] }
 
-/** runtime/coordinator/inventory/shared-rules.ts (party-console v1.2.0):
- *  itemRuleConflicts and the helpers it needs, verbatim. */
+/** Rule-conflict detection. Console: runtime/coordinator/inventory/shared-rules.ts. */
 private fun ruleOwner(state: PartyStateDynamic, name: String) = if (state.merchantRules?.version == 1) state.merchantCharacter.toString() else name
 
 private fun withLevel(item: JsonObject, level: Int) = JsonObject(item + ("level" to JsonPrimitive(level)))
@@ -190,7 +188,7 @@ fun itemRuleConflicts(state: PartyStateDynamic, item: Item): List<String> {
 
 data class ItemConflict(val item: Item, val actions: List<String>)
 
-/** shared-rule-conflicts.tsx conflictingItems, verbatim. */
+/** Items whose automatic rules conflict with each other. */
 fun conflictingItems(state: PartyStateDynamic): List<ItemConflict> {
     val owner = state.merchantCharacter.toString()
     val rules = state.autoNpcSales.values.map { it.item } + state.autoStandMarks.values.map { it.item } + state.autoDeconstruction[owner].orEmpty().values.map { it.item }
@@ -199,7 +197,7 @@ fun conflictingItems(state: PartyStateDynamic): List<ItemConflict> {
     return items.values.map { ItemConflict(it, itemRuleConflicts(state, it)) }.filter { it.actions.isNotEmpty() }
 }
 
-/** shared-rule-conflicts.tsx describe, verbatim. */
+/** A short human description of one rule value. */
 fun describeRule(value: JsonElement?): String {
     val rule = value as? JsonObject ?: return (value as? JsonPrimitive)?.content ?: "null"
     fun remaining(): String {

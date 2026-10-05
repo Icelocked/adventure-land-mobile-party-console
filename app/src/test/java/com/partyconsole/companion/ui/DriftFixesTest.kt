@@ -41,8 +41,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** The three-way drift review's fixes: v1.3.0 inventory, Hunt settings
- *  parity, the dashboard's NPC sale and gold target wording. */
+/** Overflow inventory layout, Hunt settings, and the NPC sale and gold
+ *  target wording. */
 @RunWith(RobolectricTestRunner::class)
 class DriftFixesTest {
     @get:Rule val compose = createComposeRule()
@@ -56,7 +56,7 @@ class DriftFixesTest {
 
     @Test
     fun inventoryPinsTheTrackerAndKeepsOverflowLikeV130() {
-        // compact-inventory.tsx: a tracker in the last usable slot stays there.
+        // A tracker in the last usable slot stays there.
         val items = listOf(entry(0, "hpot0"), null, entry(3, "tracker"), null)
         val grid = compactInventory(items, size = 4)
         assertEquals(listOf("hpot0", null, null, "tracker"), grid.map { it?.item?.name })
@@ -65,7 +65,7 @@ class DriftFixesTest {
         assertEquals(listOf("a", null, null, "supercomputer", "b"), overflow.map { it?.item?.name })
         // Without a pinned item: occupied first.
         assertEquals(listOf("a", "b", null), compactInventory(listOf(null, entry(1, "a"), entry(2, "b"))).map { it?.item?.name })
-        // dashboard-live.tsx displaySize: occupied numeric keys past isize extend the grid.
+        // Occupied numeric keys past isize extend the grid.
         assertEquals(44, liveInventoryDisplaySize(obj("""{"0":{"name":"a"},"43":{"name":"b"},"50":null,"x":{"name":"c"}}"""), 42))
         assertEquals(42, liveInventoryDisplaySize(obj("""{"0":{"name":"a"}}"""), 42))
     }
@@ -98,7 +98,7 @@ class DriftFixesTest {
         compose.setContent { HuntSettingsScreen(viewModel, "Leada", onBack = {}) }
         eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.monsterChoices.size == 2 }
         compose.waitForIdle()
-        // hunt-blacklist-label.ts on the fixture's crab entry.
+        // The blacklist label for the fixture's crab entry.
         compose.onNode(hasText("3 hunt deaths", substring = true)).performScrollTo().assertExists()
 
         scrollTo("Set preferred hunt spawns")

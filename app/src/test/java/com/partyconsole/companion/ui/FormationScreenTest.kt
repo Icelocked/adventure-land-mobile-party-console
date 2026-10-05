@@ -18,8 +18,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** e2e/formation.spec.ts on the native screen: Follow sends exactly
- *  {character, follow}, Leader exactly {leader}. */
+/** formation.spec.ts on the native screen: Follow sends only
+ *  {character, follow}, Leader only {leader}. */
 @RunWith(RobolectricTestRunner::class)
 class FormationScreenTest {
     @get:Rule val compose = createComposeRule()

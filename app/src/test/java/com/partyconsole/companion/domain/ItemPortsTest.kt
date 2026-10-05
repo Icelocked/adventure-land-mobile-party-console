@@ -13,9 +13,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The PWA's lib/ports.test.ts cases for these ports, plus reference values
- *  computed by the PWA's own TypeScript - the seeded upgrade estimate and
- *  the lucky-slot search must give identical numbers on both clients. */
+/** Cases shared with web/src/lib/ports.test.ts, plus reference values from
+ *  the PWA's TypeScript: the seeded upgrade estimate and the lucky-slot
+ *  search must give identical numbers on both clients. */
 class ItemPortsTest {
     private val bow = MerchantBuyItem(id = "bow", name = "Bow", cost = 1000, seller = "", upgradeable = true, upgradeChances = UPGRADE_CHANCES[0], scrollCosts = listOf(1000, 40000, 1600000, 64000000))
 

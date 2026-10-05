@@ -24,15 +24,15 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The pure pieces behind the Phase A0 write-path fixes, checked against
- *  the same cases the PWA's ports are built on. */
+/** Pure helpers behind the write paths (routine keys, request bodies, state
+ *  decoding), checked against the PWA's cases. */
 class PhaseZeroTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
     fun routineLabelsMatchTheDashboard() {
-        // The legacy "exchange" key is gone (the server ignores it); the
-        // v1.2.0 keys the server accepts are present.
+        // No legacy "exchange" key (the server ignores it); every key the
+        // server accepts is present.
         assertFalse(ROUTINE_LABELS.containsKey("exchange"))
         for (key in listOf("deliveries", "withdrawals", "upgrade preview", "manual exchange", "automatic exchange")) assertTrue(key, ROUTINE_LABELS.containsKey(key))
         assertTrue(AUTOMATIC_ROUTINE_KEYS.contains("automatic exchange"))
@@ -83,7 +83,7 @@ class PhaseZeroTest {
 
     @Test
     fun stateWithNewFieldsDecodes() {
-        // A string monsterFocus, a job without target and the new config
+        // A string monsterFocus, a job without target and newer config
         // fields must not fail the whole state.
         val body = buildJsonObject {
             put("merchantCharacter", "Merchy")

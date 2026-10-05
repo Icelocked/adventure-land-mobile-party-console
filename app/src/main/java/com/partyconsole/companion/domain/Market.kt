@@ -21,8 +21,7 @@ private fun JsonObject.str(key: String) = (this[key] as? JsonPrimitive)?.takeIf 
 private fun JsonObject.num(key: String) = (this[key] as? JsonPrimitive)?.content?.toDoubleOrNull()
 private fun JsonObject.item(): Item = this["item"]?.let { runCatching { marketJson.decodeFromJsonElement(Item.serializer(), it) }.getOrNull() } ?: Item(name = "")
 
-/** aldata-listing.tsx, read from the listing as received ([raw] is what a
- *  purchase echoes back). */
+/** An ALData listing; [raw] is what a purchase echoes back. */
 data class AlDataListing(
     val raw: JsonObject,
     val key: String,
@@ -50,7 +49,6 @@ fun alDataListing(raw: JsonObject) = AlDataListing(
     item = raw.item(),
 )
 
-/** aldata-buy-order.ts. */
 data class AlDataBuyOrder(
     val raw: JsonObject,
     val key: String,
@@ -75,7 +73,6 @@ fun alDataBuyOrder(raw: JsonObject) = AlDataBuyOrder(
     item = raw.item(),
 )
 
-/** ponty-listing.ts. */
 data class PontyListing(
     val key: String,
     val item: Item,
@@ -98,7 +95,7 @@ fun pontyListing(raw: JsonObject) = PontyListing(
     seenAt = raw.num("seenAt")?.toLong(),
 )
 
-/** aldata-public-trade.ts: one owner's published intentions. */
+/** One owner's published ALData trade intentions. */
 data class TradeIntention(val price: Long?, val quantity: Int?)
 data class PublicTradeListing(val name: String, val level: Int, val p: String?, val note: String?, val wts: TradeIntention?, val wtb: TradeIntention?)
 data class AlDataPublicTrade(val owner: String, val label: String?, val characters: List<String>, val listings: List<PublicTradeListing>)
@@ -115,7 +112,7 @@ fun alDataPublicTrade(raw: JsonObject): AlDataPublicTrade {
     )
 }
 
-// stand-sheet.tsx, verbatim logic from here down.
+// Market screen logic. PWA: web/src/lib/market.ts.
 
 /** The value a listing is judged against: the cheapest of the farm-price
  *  sources and the vendor cost, never below the item's own value. */
