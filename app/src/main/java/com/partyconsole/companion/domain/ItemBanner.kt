@@ -1,9 +1,8 @@
 package com.partyconsole.companion.domain
 
-/** item-action-banner.ts (party-console v1.2.0), verbatim (the PWA's
- *  lib/itemActionBanner.ts): the one banner an item tile shows - a rule
- *  conflict first, then manual marks, automatic rules, delivery, bank,
- *  merchant and merchant weapon. Colours live in the UI layer. */
+/** The one banner an item tile shows: a rule conflict first, then manual
+ *  marks, automatic rules, delivery, bank, merchant and merchant weapon.
+ *  PWA: web/src/lib/itemActionBanner.ts. */
 enum class BannerAction { CONFLICT, UPGRADE, COMPOUND, NPC, STAND, EXCHANGE, DECONSTRUCTION, DELIVERY, BANK, MERCHANT, WEAPON, STAT }
 
 data class BannerCandidate(val action: BannerAction, val label: String, val automatic: Boolean = false, val title: String? = null)
@@ -30,12 +29,12 @@ fun itemActionBanner(candidates: List<BannerCandidate?>, merchant: Boolean): Ite
     return ItemActionBanner(choice.action, choice.label, choice.title)
 }
 
-/** equipment-slots.tsx, verbatim - the fixed slot order. */
+/** Equipment slots in display order. */
 val EQUIPMENT_SLOTS = listOf("helmet", "amulet", "earring1", "earring2", "cape", "chest", "mainhand", "offhand", "ring1", "ring2", "belt", "pants", "gloves", "shoes", "orb")
 
-/** compact-inventory.tsx (v1.3.0), verbatim: occupied first, empties after;
- *  a tracker or supercomputer in the bag's last usable slot stays pinned
- *  there, and occupied overflow cells beyond the bag size follow it. */
+/** Occupied first, empties after. A tracker or supercomputer in the bag's
+ *  last usable slot stays pinned there, and occupied overflow cells beyond
+ *  the bag size follow it. */
 fun compactInventory(items: List<com.partyconsole.companion.model.InventoryEntry?>, size: Int = items.size): List<com.partyconsole.companion.model.InventoryEntry?> {
     val occupied = items.filterNotNull()
     val pinned = occupied.find { it.slot == size - 1 && it.item.name in setOf("tracker", "supercomputer") }
@@ -47,7 +46,7 @@ fun compactInventory(items: List<com.partyconsole.companion.model.InventoryEntry
     return occupied + List(maxOf(0, items.size - occupied.size)) { null }
 }
 
-/** lucky-upgrade-slot.tsx physicalInventory: each entry at its own slot. */
+/** Each entry placed at its own slot index. */
 fun <T : Any> physicalInventory(items: List<T?>, slotOf: (T) -> Int, size: Int = 42): List<T?> {
     val slots = MutableList<T?>(maxOf(size, items.size)) { null }
     for (entry in items) if (entry != null) slotOf(entry).takeIf { it in slots.indices }?.let { slots[it] = entry }

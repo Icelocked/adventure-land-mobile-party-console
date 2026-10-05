@@ -98,7 +98,7 @@ class ReferenceSettingsTest {
         compose.onNodeWithText("Tracktrix data unavailable").assertExists()
         compose.onNodeWithText("Mainland (main) · (0, 700)").assertExists()
         compose.onNode(hasText("MONSTER-SPECIFIC DROPS (1)")).performScrollTo().assertExists()
-        // drop-rate.ts: 250% is two guaranteed plus a 50% chance.
+        // 250% is two guaranteed plus a 50% chance.
         compose.onNodeWithText("100% ×2 + 50%").performScrollTo().assertExists()
     }
 

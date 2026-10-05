@@ -13,7 +13,7 @@ import java.util.Calendar
  *  PWA route; [routeFor] maps it onto this app's navigation. */
 data class Notice(val title: String, val body: String, val tag: String, val url: String)
 
-/** The notifier's memory between polls (server.mjs `watch`), kept on the phone. */
+/** The notifier's memory between polls, kept on the phone. */
 @Serializable
 data class WatchState(
     val problems: Map<String, String> = emptyMap(),
@@ -38,8 +38,8 @@ data class WatchState(
     val tick: Long = 0,
 )
 
-/** This device's notification settings and the watch state (the PWA keeps
- *  limits on its notifier; with no notifier here they live on the phone). */
+/** This device's notification settings, limits and watch state. The PWA
+ *  keeps limits on its notifier server; here they live on the phone. */
 class NotifierStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("notifier", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -74,9 +74,9 @@ class NotifierStore(context: Context) {
     private inline fun <reified T> write(key: String, value: T) = prefs.edit().putString(key, json.encodeToString(kotlinx.serialization.serializer<T>(), value)).apply()
 }
 
-/** server.mjs's poll, run on the phone: the same section reads and checks
- *  (config every 4th tick, logs and inventory every 2nd, bank and mail
- *  every 4th). [deliver] shows one notice. */
+/** The notifier poll, run on the phone (PWA: web/notifier/server.mjs).
+ *  Config, bank and mail are read every 4th tick, logs and inventory every
+ *  2nd. [deliver] shows one notice. */
 class Notifier(
     private val api: PartyApiClient,
     private val store: NotifierStore,

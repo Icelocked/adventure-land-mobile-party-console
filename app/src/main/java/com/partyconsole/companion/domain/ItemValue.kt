@@ -10,7 +10,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-/** upgrade-chances.tsx, verbatim. */
+/** Upgrade success chance per level, by item grade. */
 val UPGRADE_CHANCES: Map<Int, List<Double>> = mapOf(
     0 to listOf(1.0, 0.9999999, 0.98, 0.95, 0.7, 0.6, 0.4, 0.25, 0.15, 0.07, 0.024, 0.14, 0.11),
     1 to listOf(1.0, 0.99998, 0.97, 0.94, 0.68, 0.58, 0.38, 0.24, 0.14, 0.066, 0.018, 0.13, 0.1),
@@ -24,11 +24,10 @@ data class UpgradeEstimate(val attempts: Long, val gold: Double, val scrolls: Li
 
 private val estimateCache = java.util.concurrent.ConcurrentHashMap<String, UpgradeEstimate>()
 
-/** upgrade-estimate.tsx, verbatim: the 90th-percentile cost of producing
- *  [quantity] items at +[target] from a seeded 3000-run simulation. The
- *  seeded generator reproduces the JavaScript integer semantics exactly
- *  (Math.imul, >>>, a seed that grows as a double) so the numbers match
- *  the dashboard and the PWA. */
+/** The 90th-percentile cost of producing [quantity] items at +[target] from
+ *  a seeded 3000-run simulation. The generator reproduces JavaScript integer
+ *  semantics (Math.imul, >>>, a seed that grows as a double) so the numbers
+ *  match the dashboard. */
 fun upgradeEstimate(item: MerchantBuyItem, quantity: Int, target: Int): UpgradeEstimate {
     if (target == 0 || !item.upgradeable) return UpgradeEstimate(quantity.toLong(), item.cost.toDouble() * quantity, emptyList())
     val cacheKey = "${item.id}:${item.cost}:${item.upgradeGrade ?: 0}:$quantity:$target"
@@ -37,7 +36,7 @@ fun upgradeEstimate(item: MerchantBuyItem, quantity: Int, target: Int): UpgradeE
     val grades = item.grades ?: listOf(9, 10, 11, 12)
     val itemGrade = max(0, item.upgradeGrade ?: 0)
     // The seed is a JavaScript number: it grows as a double and, past 2^53,
-    // loses integer precision exactly like the dashboard's does.
+    // loses integer precision just as the dashboard's does.
     var seed = 2166136261.0
     for (char in "${item.id}:$quantity:$target") seed = ((toInt32(seed) xor char.code) * 16777619).toDouble()
     fun random(): Double {
@@ -95,7 +94,7 @@ fun upgradeEstimate(item: MerchantBuyItem, quantity: Int, target: Int): UpgradeE
 
 data class SuggestedValue(val suggested: Double, val defaultPrice: Double, val sources: List<ItemSuggestedPrice>)
 
-/** suggested-item-value.tsx, verbatim. */
+/** PWA: web/src/lib/suggestedItemValue.ts. */
 fun suggestedItemValue(entry: InventoryEntry, buyable: List<MerchantBuyItem>): SuggestedValue {
     val definition = entry.meta?.definition.orEmpty()
     fun num(key: String) = (definition[key] as? JsonPrimitive)?.content?.toDoubleOrNull()

@@ -3,26 +3,12 @@ package com.partyconsole.companion.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Mirrors party-console's `Char` type (dashboard/features/party/char.tsx).
- * Deliberately only the fields this companion app's screens actually need
- * for v1 (vitals card, equipment tab, inventory tab, activity readout) -
- * the server sends more than this (tracktrix, anniversary state, bestiary
- * catalogs, ...) and kotlinx.serialization's `ignoreUnknownKeys` (see
- * network/ApiClient.kt's Json config) means the extra fields are simply
- * skipped, not an error. Add fields here as later screens need them,
- * cross-checking char.tsx for the exact name/type first.
- */
+/** A character's live vitals; only the fields the app reads. */
 @Serializable
 data class CharacterVitals(
     val name: String,
-    // ctype/level default here (not required) because they're not part of
-    // the live vitals stream at all (see live-protocol.ts's LiveRecord -
-    // vitals is an untyped bag of whatever changed) - PartyRepository
-    // overwrites these from the roster fetch (model/Roster.kt) once it
-    // completes. Left defaulted rather than made non-null so a slow/failed
-    // roster fetch still shows a usable (if blank) character instead of
-    // failing the whole vitals parse the way the old required fields did.
+    // Not in the live vitals stream; filled from the roster, and defaulted
+    // so a missing roster never fails the vitals decode.
     val ctype: String = "",
     val level: Int = 0,
     val hp: Int,
@@ -36,15 +22,15 @@ data class CharacterVitals(
     val rip: Boolean,
     val xp: Long? = null,
     @SerialName("max_xp") val maxXp: Long? = null,
-    // A monster id or a numeric entity id - never coerced server-side
-    // (characters/shared.js), so it stays raw; see [targetId].
+    // A monster id or a numeric entity id, not coerced server-side, so it
+    // stays raw; see [targetId].
     val target: kotlinx.serialization.json.JsonElement? = null,
     val server: String? = null,
-    // character.ping is a fractional millisecond count.
+    // Fractional milliseconds.
     val ping: Double? = null,
-    // The character's own live lucky-slot stream (connected-inventory.tsx).
+    // The character's own live lucky-slot stream.
     val luckySlotTracking: kotlinx.serialization.json.JsonElement? = null,
-    // The merchant's stand is open (stand-inspection.ts).
+    // The merchant's stand is open.
     val standOpen: Boolean? = null,
     val primaryStat: String? = null,
     val banking: Boolean = false,
@@ -58,19 +44,15 @@ data class CharacterVitals(
     val targetId: String? get() = (target as? kotlinx.serialization.json.JsonPrimitive)?.content
 }
 
-/** The character's carried items + what's equipped, kept as its own
- *  live-record slice (see network/LiveProtocol.kt) so the inventory tab
- *  can subscribe without re-rendering on every HP/MP tick, matching how
- *  the web dashboard splits 'vitals' from 'inventory' queries. */
+/** Carried items and equipment, kept apart from vitals. */
 @Serializable
 data class CharacterInventory(
     val items: List<InventoryEntry?> = emptyList(),
     val slots: Map<String, EquippedEntry?> = emptyMap(),
 )
 
-/** One character's full known state as the app holds it - vitals and
- *  inventory arrive/update independently (see LiveReceiver), so this is
- *  assembled in the repository layer, not sent as one message. */
+/** One character's known state, assembled by the repository from live
+ *  records. */
 data class CharacterState(
     val vitals: CharacterVitals?,
     val inventory: CharacterInventory?,

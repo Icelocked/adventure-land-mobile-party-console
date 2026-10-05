@@ -8,24 +8,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * How this app should treat the server's TLS certificate. party-console
- * itself has no single answer here - it's explicitly designed to run
- * anywhere from a home PC on a LAN to a real VPS (see this project's
- * PARTY-CONSOLE-COMPARISON.md and the Adventureland-Team repo's research
- * notes), so different users will have different setups:
- *   - a real domain behind Let's Encrypt (put the coordinator behind your
- *     own reverse proxy for this - party-console's own bundled Caddy only
- *     does local-CA trust, not public certs)
- *   - party-console's own bundled local-CA HTTPS (self-signed, normally
- *     trusted by installing its certificate on the game computer - a
- *     phone can't do that install step the same way, so this app pins the
- *     certificate's fingerprint instead, the same trust-on-first-use
- *     pattern Syncthing/Home Assistant's companion apps use)
- *   - plain HTTP over an already-encrypted transport (e.g. Tailscale),
- *     where TLS on top would be redundant
- * The connection screen (ui/connection/ConnectionScreen.kt) is what
- * actually decides this per-server; nothing here assumes one hosting
- * choice is "correct".
+ * How to treat the server's TLS certificate; chosen per server on the
+ * connection screen. party-console runs anywhere from a LAN PC to a VPS:
+ *   - a real domain with a public cert (behind your own reverse proxy;
+ *     the bundled Caddy only does local-CA)
+ *   - the bundled local-CA HTTPS: a phone can't easily install that CA,
+ *     so the app pins the certificate fingerprint (trust on first use)
+ *   - plain HTTP over an already-encrypted transport such as Tailscale
  */
 enum class TrustMode {
     SYSTEM, // ordinary HTTPS, verified against the phone's normal trusted CAs
@@ -38,11 +27,8 @@ data class ServerSettings(
     val trustMode: TrustMode,
     val pinnedCertificateSha256: String? = null, // required when trustMode == PINNED_CERTIFICATE
 ) {
-    /** party-console's own client code uses a relative "/party-api" base
-     *  (dashboard/features/party/api.tsx) because it's served same-origin
-     *  from the coordinator. This app isn't same-origin, so every call
-     *  joins baseUrl with that same relative path - kept as one constant
-     *  so it can never drift from the server's actual route prefix. */
+    /** The dashboard calls a same-origin "/party-api"; this app joins it to
+     *  baseUrl. */
     val apiBase: String get() = baseUrl.trimEnd('/') + "/party-api"
     val streamUrl: String get() = "$apiBase/dashboard-stream"
 
@@ -52,10 +38,7 @@ data class ServerSettings(
 
 private val Context.dataStore by preferencesDataStore(name = "server_settings")
 
-/** Reads/writes the one server connection this app talks to. Deliberately
- *  a single active server, not a list - matches the personal/small-group
- *  self-hosted use case this is built for; multi-server support would be
- *  a real, separate feature to add later, not assumed here. */
+/** Persists the single active server connection. */
 class ServerConfigStore(private val context: Context) {
     private object Keys {
         val BASE_URL = stringPreferencesKey("base_url")

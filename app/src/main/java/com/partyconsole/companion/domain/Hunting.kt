@@ -6,9 +6,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-// The PWA's lib/hunting.ts: runtime/coordinator/navigation/passive-settings.ts
-// (the parts the dashboard imports), hunt/spawn-preferences.ts huntSpawnKey
-// and hunt-blacklist-label.ts, verbatim.
+// Passive rare-hunt settings, spawn keys and blacklist labels.
+// PWA: web/src/lib/hunting.ts.
 
 data class PassiveRule(val enabled: Boolean, val keepMoving: Boolean, val priority: Int, val maxLevel: Int? = -1)
 data class PassiveSettings(val rules: Map<String, PassiveRule>, val useFieldGenerators: Boolean)
@@ -20,8 +19,8 @@ fun defaultPassiveRule(id: String) = PassiveRule(enabled = false, keepMoving = f
 private fun JsonElement?.bool(): Boolean? = (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content?.toBooleanStrictOrNull()
 private fun JsonElement?.int(): Int? = (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content?.toDoubleOrNull()?.toInt()
 
-/** migratePassiveSettings: version-1 settings as saved, else the legacy
- *  passiveRareHunts booleans as rules (field generators on). */
+/** Version-1 settings as saved, else the legacy passiveRareHunts booleans
+ *  as rules (field generators on). */
 fun migratePassiveSettings(saved: JsonElement?, legacy: Map<String, Boolean> = emptyMap()): PassiveSettings {
     val obj = saved as? JsonObject
     if (obj != null && obj["version"].int() == 1) {
@@ -44,13 +43,12 @@ fun migratePassiveSettings(saved: JsonElement?, legacy: Map<String, Boolean> = e
 private fun jsNumber(value: Double): String =
     if (value.isNaN() || value.isInfinite()) "null" else if (value == Math.floor(value) && Math.abs(value) < 1e21) value.toLong().toString() else value.toString()
 
-/** huntSpawnKey: stable across catalog ordering; coordinates identify the spawn center. */
+/** Stable across catalog ordering; coordinates identify the spawn center. */
 fun huntSpawnKey(map: String, x: Double, y: Double): String =
     "[${JsonPrimitive(map)},${jsNumber(x)},${jsNumber(y)}]"
 
 fun huntSpawnKey(area: Area): String = huntSpawnKey(area.map, area.x, area.y)
 
-/** hunt-blacklist-label.ts. */
 fun huntBlacklistLabel(entry: HuntBlacklistEntry): String {
     if (entry.reason == "Manually blacklisted") return "manually added"
     val expired = entry.expirations ?: if (entry.reason == "Hunt quest expired before completion") 1 else 0

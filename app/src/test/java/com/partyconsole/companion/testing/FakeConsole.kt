@@ -83,7 +83,7 @@ class FakeConsole : AutoCloseable {
                     "/party-api/mail" -> json("""{"messages":[],"count":0}""")
                     "/party-api/escape" -> json("""{"escape":null}""")
                     "/party-api/daily-dungeons" -> dailyDungeon?.let { json(it) } ?: MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
-                    // query-cache.tsx: the market domain's first read, before core's referenceRevision.
+                    // The market's first read, before core reports a referenceRevision.
                     "/party-api/aldata/market" -> json(sections["market"]?.get("aldata")?.takeIf { it is JsonObject }?.toString() ?: """{"listings":[]}""")
                     "/setup/state" -> json("""{"requirePairing":true}""")
                     else -> MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")

@@ -3,8 +3,8 @@ package com.partyconsole.companion.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-// runtime/dungeons/contracts.ts (the PWA's models/dungeon.ts): the wire
-// shapes GET/POST /daily-dungeons returns, for the fields the dashboard reads.
+// Wire shapes returned by GET/POST /daily-dungeons, for the fields the UI
+// reads. PWA: web/src/models/dungeon.ts.
 
 @Serializable
 data class PriestRecoveryAssignment(val id: String = "", val run: String = "", val priest: String = "", val target: String = "", val authorized: Boolean = false)

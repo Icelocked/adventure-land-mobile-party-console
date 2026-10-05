@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 
-/** The same cases as the PWA's lib/ports.test.ts for these ports. */
+/** Cases shared with web/src/lib/ports.test.ts. */
 class RosterTest {
     private data class C(val name: String, val ctype: String? = null)
 

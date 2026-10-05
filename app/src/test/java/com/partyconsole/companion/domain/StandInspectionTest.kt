@@ -13,7 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** stand-inspection.ts / stand-capacity.ts behaviour. */
+/** Stand inspection and stand capacity. */
 class StandInspectionTest {
     private val bow = Item(name = "bow", level = 3, price = 50_000)
 

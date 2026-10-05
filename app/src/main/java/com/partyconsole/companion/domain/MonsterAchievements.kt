@@ -9,8 +9,8 @@ import kotlin.math.max
 
 data class MonsterAchievement(val score: Double, val owner: String?)
 
-/** monster-achievements.ts, verbatim: the best score (and its owner) per
- *  monster across every character's diagnostics. */
+/** The best score (and its owner) per monster across every character's
+ *  diagnostics. */
 fun aggregateMonsterAchievements(diagnostics: Map<String, CharacterDiagnostics>): Map<String, MonsterAchievement> {
     val result = linkedMapOf<String, MonsterAchievement>()
     for ((name, detail) in diagnostics) {
@@ -27,7 +27,7 @@ fun aggregateMonsterAchievements(diagnostics: Map<String, CharacterDiagnostics>)
     return result
 }
 
-/** bestiary-dialog.tsx achievementMilestones, verbatim. */
+/** Kill-count thresholds from the monster's G.monsters achievements. */
 fun achievementMilestones(monster: BestiaryMonster): List<Double> =
     (monster.definition?.get("achievements") as? JsonArray)?.map { entry -> ((entry as? JsonArray)?.firstOrNull() as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0 }
         ?.filter { it.isFinite() && it > 0 }?.sorted().orEmpty()

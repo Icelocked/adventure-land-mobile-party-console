@@ -9,10 +9,9 @@ import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
-/** party-console's pairing gate (tools/hosting/authorize.ts) recognises a
- *  paired device by its `party` cookie - a browser keeps it, so this app
- *  must too, across REST calls, the live stream and app restarts. Stored
- *  encrypted, since that cookie is the device's credential. */
+/** The pairing gate recognises a paired device by its `party` cookie, so it
+ *  must persist across REST calls, the live stream and app restarts. Stored
+ *  encrypted, since it is the device's credential. */
 object PartyCookies : CookieJar {
     private const val KEY = "cookies"
     private var prefs: SharedPreferences? = null

@@ -8,8 +8,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-// map-tile.ts, map-placement.ts, map-definition.ts, map-entity.ts,
-// map-event.ts, map-frame.ts (the PWA's components/map/mapTypes.ts).
+// Map definitions, entities and live frames.
+// PWA: web/src/components/map/mapTypes.ts.
 
 /** [tileset, x, y, width, height?] - height defaults to width. */
 data class MapTile(val set: String, val x: Int, val y: Int, val width: Int, val height: Int)

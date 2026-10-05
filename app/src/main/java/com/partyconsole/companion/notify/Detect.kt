@@ -11,9 +11,9 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
-// The PWA notifier's detection logic (web/notifier/detect.mjs), ported
-// verbatim: pure functions over the console's section JSON. The APK runs
-// them on the phone (polling) instead of receiving Web Push.
+// Alert detection: pure functions over the console's section JSON. The app
+// runs them on the phone by polling instead of receiving Web Push.
+// PWA: web/notifier/detect.mjs.
 
 /** Every alert a device can switch on, grouped for Settings. */
 val ALERTS = listOf("stuck", "idle", "deaths", "errors", "inventory", "bank", "rules", "orders", "events", "rare", "trading", "mail")
@@ -27,7 +27,7 @@ data class Burst(val count: Int = 5, val minutes: Int = 10)
 @Serializable
 data class RareRule(val mode: String = "chance", val chanceOneIn: Long = 10000, val minGold: Long = 1_000_000)
 
-/** Account-wide limits (DEFAULT_SETTINGS). */
+/** Account-wide alert limits, with their defaults. */
 @Serializable
 data class NotifierLimits(
     val stuckMinutes: Int = 2,
@@ -37,7 +37,7 @@ data class NotifierLimits(
     val rare: RareRule = RareRule(),
 )
 
-/** mergeSettings: clamp a patch onto the current limits. */
+/** Clamps a patch onto the current limits. */
 fun mergeLimits(current: NotifierLimits, patch: NotifierLimits): NotifierLimits {
     fun positive(value: Long, fallback: Long, max: Long = 1_000_000_000): Long = if (value >= 1) min(max, value) else fallback
     return NotifierLimits(
@@ -58,7 +58,7 @@ internal fun JsonElement?.arr(): List<JsonElement> = (this as? JsonArray).orEmpt
 internal fun JsonElement?.str(): String? = (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
 internal fun JsonElement?.num(): Double = (this as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
 
-/** pending-character-cards.tsx labels for the connection states worth a notification. */
+/** Labels for the connection states worth a notification. */
 private val CONNECTION_PROBLEMS = mapOf("lost" to "Connection lost", "stopped" to "CODE stopped")
 
 /** The party's live (non-bankboi) characters from a core snapshot, in slot order. */
@@ -98,7 +98,7 @@ fun problemTransitions(previous: Map<String, String>, current: Map<String, Strin
     return events
 }
 
-/** runtime/game-log-filters.ts classifyGameLog's error rule. */
+/** Same error rule the console uses to classify game log lines. */
 private val GAME_LOG_ERROR = Regex("\\b\\w*error\\b|\\bexception\\b|\\bfailed\\b|route rejected|collisions detected|falling back to native|\\b(?:line|column)\\s*:?\\s*\\d+", RegexOption.IGNORE_CASE)
 fun isGameLogError(message: String?) = GAME_LOG_ERROR.containsMatchIn(message.orEmpty())
 
