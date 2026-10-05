@@ -283,7 +283,7 @@ export function DungeonPanel() {
       {itemInspection && (
         <Sheet open onOpenChange={(open) => !open && setItemInspection(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={itemInspection} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={itemInspection} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: view.members[0]?.name || '', slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}

@@ -75,7 +75,7 @@ export function InventorySection({
   const compoundGroups = state.compounds[characterName] ?? []
   const occupiedSlots = items.filter(Boolean).length
   const totalSlots = inventorySize || items.length
-  const freeSlots = totalSlots - occupiedSlots
+  const freeSlots = Math.max(0, totalSlots - occupiedSlots)
   const capacityColor = freeSlots < 5 ? 'text-rose-400' : freeSlots <= 10 ? 'text-orange-400' : 'text-muted-foreground'
   const luckyUpgradeSlot = state.luckyUpgradeSlots[characterName]
   // connected-inventory.tsx: merge the character's live local stream.
@@ -96,7 +96,7 @@ export function InventorySection({
       </button>
       {open && (
         <div className="grid grid-cols-5 gap-1.5">
-          {(isMerchant ? physicalInventory(items) : compactInventory(items)).map((entry, i) => {
+          {(isMerchant ? physicalInventory(items) : compactInventory(items, totalSlots)).map((entry, i) => {
             const lucky = isMerchant && i === nextUpgradeSlot
             if (!entry)
               return lucky ? (

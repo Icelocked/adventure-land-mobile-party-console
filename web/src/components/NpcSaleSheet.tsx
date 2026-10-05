@@ -13,6 +13,7 @@ export function NpcSaleSheet({
   item,
   meta,
   location,
+  collects = false,
   available,
   all = false,
   onConfirm,
@@ -20,7 +21,10 @@ export function NpcSaleSheet({
 }: {
   item: Item
   meta: ItemMeta | undefined
+  /** The dashboard's location line, e.g. "Bank · items0 · slot 3". */
   location: string
+  /** The merchant collects it from another character first. */
+  collects?: boolean
   available: number
   all?: boolean
   onConfirm: (quantity: number, acknowledged: boolean) => Promise<string | null>
@@ -47,7 +51,15 @@ export function NpcSaleSheet({
   return (
     <div role="group" aria-label="Sell to NPC" className="my-1.5 flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2.5 pl-4">
       <p className="text-sm font-medium">{all ? 'Sell all matching bank items to NPC?' : 'Sell to NPC?'}</p>
-      <p className="text-xs text-muted-foreground">{location}. Once sold, the sale cannot be undone.</p>
+      <p className="text-xs text-muted-foreground">
+        {collects
+          ? 'The merchant will collect this item and sell it to an NPC. Once sold, the sale cannot be undone.'
+          : 'The merchant will sell this item to an NPC. Once sold, the sale cannot be undone.'}
+      </p>
+      <div className="rounded border border-destructive/40 p-2">
+        <p className="text-sm font-semibold">{String(meta?.definition?.name || item.name)}</p>
+        <p className="font-mono text-xs text-muted-foreground">{location}</p>
+      </div>
       <label className="text-xs text-muted-foreground">
         Quantity
         <Input aria-label="Sale quantity" inputMode="numeric" value={quantity} disabled={busy || all} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} className="mt-1" />

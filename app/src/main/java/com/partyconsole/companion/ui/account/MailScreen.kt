@@ -224,7 +224,7 @@ private fun MailDetailSheet(
     if (inspecting && mail.item != null) {
         ModalBottomSheet(onDismissRequest = { inspecting = false }) {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ItemDetailBrowser(rootItemId = mail.item.name, rootLevel = mail.item.level ?: 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, rootStatType = mail.item.statType)
+                ItemDetailBrowser(rootItemId = mail.item.name, rootLevel = mail.item.level ?: 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, rootStatType = mail.item.statType, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext("Mail attachment", -1))
             }
         }
     }
@@ -304,7 +304,7 @@ private fun ComposeSection(viewModel: PartyViewModel, draft: MailDraft?, catalog
             if (inspectingAttachment) {
                 ModalBottomSheet(onDismissRequest = { inspectingAttachment = false }) {
                     Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
-                        ItemDetailBrowser(rootItemId = chosen.entry.item.name, rootLevel = chosen.entry.item.level ?: 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, rootStatType = chosen.entry.item.statType)
+                        ItemDetailBrowser(rootItemId = chosen.entry.item.name, rootLevel = chosen.entry.item.level ?: 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, rootStatType = chosen.entry.item.statType, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext("Mail attachment", chosen.entry.slot))
                     }
                 }
             }

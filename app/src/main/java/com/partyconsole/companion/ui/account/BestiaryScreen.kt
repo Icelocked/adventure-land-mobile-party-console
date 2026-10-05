@@ -89,6 +89,8 @@ fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var sortMenu by remember { mutableStateOf(false) }
     var inspecting by remember { mutableStateOf<BestiaryMonster?>(null) }
     var drop by remember { mutableStateOf<String?>(null) }
+    // party-reference-panels.tsx: a drop opened from a monster's details.
+    var dropSource by remember { mutableStateOf("") }
     val maps = monsters.flatMap { m -> m.spawnRecords.map { it.map } }.distinct().sorted()
     fun score(monster: BestiaryMonster) = max(0.0, achievements?.get(monster.id)?.score ?: 0.0)
     fun scoreToNext(monster: BestiaryMonster): Double? {
@@ -169,6 +171,7 @@ fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     viewModel, monster,
                     onInspectDrop = { itemId ->
                         if (state.merchantCatalog?.allItems?.any { it.id == itemId } == true) {
+                            dropSource = "Dropped by ${monster.name}"
                             inspecting = null
                             drop = itemId
                         }
@@ -181,7 +184,7 @@ fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     drop?.let { id ->
         ModalBottomSheet(onDismissRequest = { drop = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ItemDetailBrowser(rootItemId = id, rootLevel = 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel)
+                ItemDetailBrowser(rootItemId = id, rootLevel = 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext(dropSource, -1))
             }
         }
     }

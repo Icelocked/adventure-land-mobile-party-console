@@ -105,6 +105,8 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<String?>(null) }
     var editingBuy by remember { mutableStateOf<Item?>(null) }
     var inspecting by remember { mutableStateOf<Item?>(null) }
+    // stand-sheet.tsx onInspect's source label for the item-details header.
+    var inspectSource by remember { mutableStateOf("") }
     var suggesting by remember { mutableStateOf<Item?>(null) }
     var removeConfirmation by remember { mutableStateOf<String?>(null) }
     var removing by remember { mutableStateOf(false) }
@@ -197,7 +199,7 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            ItemTile("Inspect $name", Color(0xB378350F), onTap = { inspecting = configured.item }, onLongPress = { suggesting = item }) {
+                            ItemTile("Inspect $name", Color(0xB378350F), onTap = { inspectSource = "Your merchant stand"; inspecting = configured.item }, onLongPress = { suggesting = item }) {
                                 SpriteIcon(meta?.sprite ?: catalogFor(configured.item.name)?.sprite, size = 58.dp)
                                 if (level > 0) Text("+$level", color = Color(0xFF6EE7B7), fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopStart).padding(4.dp).background(Color(0xCC000000), RoundedCornerShape(3.dp)).padding(horizontal = 3.dp))
                                 statType?.let {
@@ -276,7 +278,7 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     val bid = row.bid
                     Box(modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF5B21B6), RoundedCornerShape(4.dp)).padding(12.dp).semantics { contentDescription = "Buy order $name" }) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(modifier = Modifier.clickable { inspecting = Item(name = row.id, level = row.level) }.padding(end = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(modifier = Modifier.clickable { inspectSource = "Your stand buy order"; inspecting = Item(name = row.id, level = row.level) }.padding(end = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                                 SpriteIcon(item?.sprite ?: item?.meta?.sprite, size = 48.dp)
                                 Text("$name +${row.level}", modifier = Modifier.padding(start = 12.dp))
                             }
@@ -348,7 +350,7 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     inspecting?.let { item ->
         ModalBottomSheet(onDismissRequest = { inspecting = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ItemDetailBrowser(rootItemId = item.name, rootLevel = item.level ?: 0, rootStatType = item.statType, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel)
+                ItemDetailBrowser(rootItemId = item.name, rootLevel = item.level ?: 0, rootStatType = item.statType, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext(inspectSource, -1))
             }
         }
     }

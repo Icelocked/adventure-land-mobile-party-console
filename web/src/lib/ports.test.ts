@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { aggregateSlotTracking } from './luckySlot'
 import { blacklistRecord, groupAlData, groupPonty, priceComparison } from './market'
-import { itemActionBanner } from './itemActionBanner'
+import { compactInventory, itemActionBanner } from './itemActionBanner'
 import { suggestedItemValue, upgradeEstimate, UPGRADE_CHANCES } from './suggestedItemValue'
 import { routineFor } from './routineLabels'
 import { bankSaleCopies, same } from './bankSaleCopies'
@@ -220,5 +220,14 @@ describe('lucky-slot-tracking.ts aggregateSlotTracking', () => {
     expect(result.slots['7'].totalRolls).toBe(3)
     // An older local snapshot never lowers the persisted counts.
     expect(aggregateSlotTracking(streams, { version: 1, streamId: 'abc-1', slots: { '5': stats(8) } } as never).slots['5'].totalRolls).toBe(14)
+  })
+})
+
+describe('compactInventory (compact-inventory.tsx, v1.3.0)', () => {
+  const entry = (slot: number, name: string) => ({ slot, item: { name } })
+  it('keeps a tracker or supercomputer pinned in the last usable slot, overflow after it', () => {
+    expect(compactInventory([entry(0, 'hpot0'), null, entry(3, 'tracker'), null], 4).map((e) => e?.item.name ?? null)).toEqual(['hpot0', null, null, 'tracker'])
+    expect(compactInventory([entry(0, 'a'), entry(3, 'supercomputer'), entry(5, 'b')], 4).map((e) => e?.item.name ?? null)).toEqual(['a', null, null, 'supercomputer', 'b'])
+    expect(compactInventory([null, entry(1, 'a'), entry(2, 'b')]).map((e) => e?.item.name ?? null)).toEqual(['a', 'b', null])
   })
 })

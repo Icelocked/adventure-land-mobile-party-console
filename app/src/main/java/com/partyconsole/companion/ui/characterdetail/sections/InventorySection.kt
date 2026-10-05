@@ -105,7 +105,7 @@ fun InventorySection(
     val compoundGroups = state.compounds[characterName].orEmpty()
     val occupied = items.count { it != null }
     val total = inventorySize ?: items.size
-    val free = total - occupied
+    val free = maxOf(0, total - occupied)
     val capacityColor = when {
         free < 5 -> Color(0xFFFB7185)
         free <= 10 -> Color(0xFFFB923C)
@@ -115,7 +115,7 @@ fun InventorySection(
     val nextUpgradeSlot = if (validLuckySlot(verifiedLucky)) verifiedLucky!! else
         luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName].orEmpty(), localLucky?.let { normalizeSlotTracking(it) })).nextSlot
     val luckySlotLabel = if (validLuckySlot(verifiedLucky)) "Verified lucky upgrade slot" else "Next upgrade will test for lucky upgrade"
-    val grid = if (isMerchant) physicalInventory(items, { it.slot }) else compactInventory(items)
+    val grid = if (isMerchant) physicalInventory(items, { it.slot }) else compactInventory(items, total)
 
     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {

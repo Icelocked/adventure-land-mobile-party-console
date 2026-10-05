@@ -26,7 +26,7 @@ test('Character card: gold target is the merchant’s only; Leader/Follow, Resto
   await server.install(page)
 
   await page.goto('/characters/Leada')
-  await expect(page.getByText('Gold target')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: "Merchant's pocket money" })).toHaveCount(0)
   server.failOnce['formation'] = 'Leader must be online'
   await page.getByRole('button', { name: 'Leader', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'Leader must be online' })).toBeVisible()
@@ -36,7 +36,7 @@ test('Character card: gold target is the merchant’s only; Leader/Follow, Resto
   await expect(page.getByRole('alert').filter({ hasText: 'Invalid restock policy' })).toBeVisible()
 
   await page.goto('/characters/Merchy')
-  await expect(page.getByText('Gold target')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: "Merchant's pocket money" })).toBeVisible()
   server.failOnce['command'] = 'Merchant is busy'
   await page.getByRole('button', { name: 'Exchange gold and items with bank' }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'Merchant is busy' })).toBeVisible()

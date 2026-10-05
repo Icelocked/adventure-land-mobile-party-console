@@ -57,9 +57,12 @@ function recordToState(name: string, record: LiveRecordWire, roster: Record<stri
     slots[key] = (value as EquippedEntry | null) ?? null
   }
 
-  const inventorySize = (record.vitals as { inventorySize?: number }).inventorySize ?? Object.keys(record.items).length
+  const inventorySize = Number((record.vitals as { inventorySize?: number }).inventorySize) || Object.keys(record.items).length
+  // dashboard-live.tsx (v1.3.0): native arrays can contain occupied overflow
+  // cells beyond isize. Keep them inspectable; inventorySize stays the capacity.
+  const displaySize = Object.keys(record.items).reduce((length, key) => (/^\d+$/.test(key) && record.items[key] ? Math.max(length, Number(key) + 1) : length), inventorySize)
   const items: (InventoryEntry | null)[] = []
-  for (let index = 0; index < inventorySize; index += 1) {
+  for (let index = 0; index < displaySize; index += 1) {
     const value = record.items[String(index)]
     items.push((value as InventoryEntry | undefined) ?? null)
   }

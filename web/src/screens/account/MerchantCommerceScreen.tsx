@@ -186,7 +186,10 @@ function ItemRow({
   onAdd,
   itemId,
   addLabel = 'Add',
+  source = 'Merchant catalog',
 }: {
+  /** party-merchant-commerce-dialog.tsx: the item-details header's source. */
+  source?: string
   /** merchant-commerce-dialog.tsx: tapping a catalog tile opens its item details. */
   itemId?: string
   name: string
@@ -213,7 +216,7 @@ function ItemRow({
       {inspecting && itemId && (
         <Sheet open onOpenChange={(open) => !open && setInspecting(false)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={itemId} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={itemId} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: source, slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}
@@ -427,7 +430,7 @@ function CraftScreen({
   return (
     <AccountScreenScaffold title="Merchant crafting">
       <ModeTabs mode="craft" setMode={setMode} />
-      <p className="px-3 pb-1 text-xs text-muted-foreground">Recipes account for materials held by the active party and the latest bank snapshot.</p>
+      <p className="px-3 pb-1 text-xs text-muted-foreground">Recipes account for materials held by the active party and in the latest bank snapshot.</p>
       <SearchBar value={search} onChange={setSearch} />
       {filtered.length === 0 ? (
         <EmptyState message="No craftable recipes found." />
@@ -438,7 +441,7 @@ function CraftScreen({
             const open = previewing === recipe.id
             return (
               <div key={recipe.id} className="flex flex-col gap-1">
-                <ItemRow
+                <ItemRow source="Crafting catalog"
                   itemId={recipe.id}
                   name={recipe.name}
                   sprite={recipe.sprite}
@@ -830,6 +833,7 @@ function ExchangeScreen({
               rootLevel={inspecting.level}
               catalog={state.merchantCatalog}
               monsters={state.bestiaryCatalog}
+              context={{ character: 'Exchange catalog', slot: -1 }}
               exchangeAdd={
                 inspecting.exchangeAdd && {
                   enabled: inspecting.exchangeAdd.enabled,

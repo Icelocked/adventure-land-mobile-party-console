@@ -277,7 +277,7 @@ export function CatalogScreen() {
       {inspecting && (
         <Sheet open onOpenChange={(open) => !open && setInspecting(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={inspecting.id} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} className="pt-2" />
+            <ItemDetailBrowser rootItemId={inspecting.id} rootLevel={0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: 'Equipment catalog', slot: -1 }} className="pt-2" />
           </SheetContent>
         </Sheet>
       )}

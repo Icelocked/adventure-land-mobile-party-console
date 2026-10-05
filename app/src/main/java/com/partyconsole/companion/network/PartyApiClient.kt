@@ -856,6 +856,10 @@ class PartyApiClient(
         return post("hunt-blacklist", body)
     }
 
+    /** POST /party-api/rare-hunting - connected-character-card.tsx onRareChange:
+     *  passive hunting rules and/or the field-generator toggle (party-wide). */
+    suspend fun setRareHunting(patch: JsonObject): ApiResult<CommandResult> = post("rare-hunting", patch)
+
     /** POST /party-api/hunt-settings - a partial patch of only the changed
      *  fields, scoped to the character. */
     suspend fun saveHuntSettings(character: String, patch: Map<String, JsonElement>): ApiResult<CommandResult> =

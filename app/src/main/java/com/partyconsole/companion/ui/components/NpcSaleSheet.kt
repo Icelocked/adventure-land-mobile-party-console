@@ -43,8 +43,11 @@ fun isModifiedItem(item: Item): Boolean = (item.level ?: 0) > 0 || item.statType
 fun NpcSaleSheet(
     item: Item,
     meta: ItemMeta?,
+    // The dashboard's location line, e.g. "Bank · items0 · slot 3".
     location: String,
     available: Int,
+    // The merchant collects it from another character first.
+    collects: Boolean = false,
     all: Boolean = false,
     onConfirm: suspend (quantity: Int, acknowledged: Boolean) -> String?,
     onCancel: () -> Unit,
@@ -64,7 +67,13 @@ fun NpcSaleSheet(
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(if (all) "Sell all matching bank items to NPC?" else "Sell to NPC?", style = MaterialTheme.typography.titleSmall)
-            Text("$location. Once sold, the sale cannot be undone.", style = MaterialTheme.typography.labelSmall)
+            Text(
+                if (collects) "The merchant will collect this item and sell it to an NPC. Once sold, the sale cannot be undone."
+                else "The merchant will sell this item to an NPC. Once sold, the sale cannot be undone.",
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Text((meta?.definition?.get("name") as? kotlinx.serialization.json.JsonPrimitive)?.content ?: item.name, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+            Text(location, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
             OutlinedTextField(
                 value = quantity,
                 enabled = !busy && !all,

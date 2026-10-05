@@ -57,9 +57,17 @@ export function statBadgeClass(statType?: string) {
 /** equipment-slots.tsx, verbatim - the fixed slot order. */
 export const equipmentSlots = ['helmet', 'amulet', 'earring1', 'earring2', 'cape', 'chest', 'mainhand', 'offhand', 'ring1', 'ring2', 'belt', 'pants', 'gloves', 'shoes', 'orb'] as const
 
-/** compact-inventory.tsx, verbatim. */
-export const compactInventory = <T,>(items: (T | null)[]) => {
+/** compact-inventory.tsx (v1.3.0), verbatim: a tracker or supercomputer in
+ *  the bag's last usable slot stays pinned there; occupied overflow cells
+ *  beyond the bag size follow it. */
+export const compactInventory = <T extends { slot: number; item: { name: string } }>(items: (T | null)[], size = items.length) => {
   const occupied = items.filter((entry): entry is T => entry !== null)
+  const pinned = occupied.find((entry) => entry.slot === size - 1 && ['tracker', 'supercomputer'].includes(entry.item.name))
+  if (pinned) {
+    const normal = occupied.filter((entry) => entry !== pinned && entry.slot < size)
+    const overflow = occupied.filter((entry) => entry.slot >= size)
+    return [...normal, ...Array<null>(Math.max(0, size - 1 - normal.length)).fill(null), pinned, ...overflow]
+  }
   return [...occupied, ...Array<null>(Math.max(0, items.length - occupied.length)).fill(null)]
 }
 

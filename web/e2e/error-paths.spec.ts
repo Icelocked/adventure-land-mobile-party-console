@@ -164,6 +164,8 @@ test('Bank: selling a modified item to NPC requires confirming the warning first
   await sheet.getByRole('checkbox').check()
   await sheet.getByRole('button', { name: 'Sell to NPC' }).click()
 
+  // The sale panel (which names the item) closes once the sale is queued.
+  await expect(page.getByRole('group', { name: 'Sell to NPC' })).toHaveCount(0)
   await expect(page.getByText('Wolf Coat')).toBeVisible()
   await expect(page.getByText('NPC', { exact: true })).toBeVisible()
 })

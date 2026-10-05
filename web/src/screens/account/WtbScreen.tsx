@@ -221,7 +221,7 @@ export function WtbScreen() {
       {inspecting && (
         <Sheet open onOpenChange={(value) => !value && setInspecting(null)}>
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
-            <ItemDetailBrowser rootItemId={inspecting.name} rootLevel={inspecting.level ?? 0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} />
+            <ItemDetailBrowser rootItemId={inspecting.name} rootLevel={inspecting.level ?? 0} catalog={state.merchantCatalog} monsters={state.bestiaryCatalog} context={{ character: 'Your active WTB order', slot: -1 }} />
           </SheetContent>
         </Sheet>
       )}

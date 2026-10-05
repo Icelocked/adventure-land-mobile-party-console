@@ -224,7 +224,7 @@ fun DungeonPanel(viewModel: PartyViewModel) {
     itemInspection?.let { id ->
         ModalBottomSheet(onDismissRequest = { itemInspection = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ItemDetailBrowser(rootItemId = id, rootLevel = 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel)
+                ItemDetailBrowser(rootItemId = id, rootLevel = 0, catalog = state.merchantCatalog, monsters = state.bestiaryCatalog, viewModel = viewModel, context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext(view?.members?.firstOrNull()?.name.orEmpty(), -1))
             }
         }
     }

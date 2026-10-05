@@ -220,6 +220,7 @@ function MailDetailSheet({
               rootStatType={mail.item.stat_type}
               catalog={dynamicState.merchantCatalog}
               monsters={dynamicState.bestiaryCatalog}
+              context={{ character: 'Mail attachment', slot: -1 }}
             />
           </SheetContent>
         </Sheet>
@@ -400,6 +401,7 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
                   rootStatType={attachment.entry.item.stat_type}
                   catalog={state.merchantCatalog}
                   monsters={state.bestiaryCatalog}
+                  context={{ character: 'Mail attachment', slot: attachment.entry.slot }}
                 />
               </SheetContent>
             </Sheet>

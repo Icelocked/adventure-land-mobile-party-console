@@ -33,9 +33,17 @@ fun itemActionBanner(candidates: List<BannerCandidate?>, merchant: Boolean): Ite
 /** equipment-slots.tsx, verbatim - the fixed slot order. */
 val EQUIPMENT_SLOTS = listOf("helmet", "amulet", "earring1", "earring2", "cape", "chest", "mainhand", "offhand", "ring1", "ring2", "belt", "pants", "gloves", "shoes", "orb")
 
-/** compact-inventory.tsx, verbatim: occupied first, empties after. */
-fun <T : Any> compactInventory(items: List<T?>): List<T?> {
+/** compact-inventory.tsx (v1.3.0), verbatim: occupied first, empties after;
+ *  a tracker or supercomputer in the bag's last usable slot stays pinned
+ *  there, and occupied overflow cells beyond the bag size follow it. */
+fun compactInventory(items: List<com.partyconsole.companion.model.InventoryEntry?>, size: Int = items.size): List<com.partyconsole.companion.model.InventoryEntry?> {
     val occupied = items.filterNotNull()
+    val pinned = occupied.find { it.slot == size - 1 && it.item.name in setOf("tracker", "supercomputer") }
+    if (pinned != null) {
+        val normal = occupied.filter { it !== pinned && it.slot < size }
+        val overflow = occupied.filter { it.slot >= size }
+        return normal + List(maxOf(0, size - 1 - normal.size)) { null } + pinned + overflow
+    }
     return occupied + List(maxOf(0, items.size - occupied.size)) { null }
 }
 
