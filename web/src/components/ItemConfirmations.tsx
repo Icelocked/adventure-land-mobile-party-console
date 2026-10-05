@@ -111,11 +111,14 @@ export function AutoNpcSaleConfirmation({
           {name}
           {item.level ? ` +${item.level}` : ''}
         </p>
-        <p className="mt-1 font-mono text-sm text-amber-500">You will receive {npcSaleValue(item.level ?? 0, !!item.gift, item.expires, meta).toLocaleString()}g per sale.</p>
+        <p className="mt-1 font-mono text-sm text-amber-200">You will receive {npcSaleValue(item.level ?? 0, !!item.gift, item.expires, meta).toLocaleString()}g per sale.</p>
         <p className="mt-1 text-xs text-muted-foreground">The rule matches this exact +level, stat type, and special property.</p>
       </div>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
+        <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
+          Cancel
+        </Button>
         <Button
           size="sm"
           disabled={busy}
@@ -129,9 +132,6 @@ export function AutoNpcSaleConfirmation({
           }}
         >
           Enable auto sale
-        </Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
-          Cancel
         </Button>
       </div>
     </div>

@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -31,6 +33,22 @@ class BankMailTest {
     @After fun stop() = console.close()
 
     private fun posts(path: String) = console.requests.filter { it.method == "POST" && it.path == "/party-api/$path" }.map { Json.parseToJsonElement(it.body).jsonObject }
+
+    @Test
+    fun withoutAMerchantTheMerchantOnlyBankOptionsAreListedButDisabled() {
+        // Failure mode: hiding these rows makes the list differ from the
+        // dashboard's bank menu, which shows them disabled.
+        console.override("config", mapOf("merchantCharacter" to kotlinx.serialization.json.JsonNull))
+        val viewModel = PartyViewModel(console.settings)
+        val entry = InventoryEntry(slot = 0, item = Item(name = "bow", level = 5))
+        compose.setContent { BankItemPanel(viewModel, "items0", entry) {} }
+        eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.merchantCharacter == null }
+        compose.waitForIdle()
+        for (label in listOf("Mark for withdrawal", "Mark all for withdrawal", "Auto mark for stand…", "Auto sell to NPC…", "Clear all marks")) {
+            compose.onNodeWithText(label).performScrollTo().assertIsNotEnabled()
+        }
+        compose.onNodeWithText("Sell to NPC…").performScrollTo().assertIsEnabled()
+    }
 
     @Test
     fun withdrawGoesThroughTheMerchantAndAsksBeforeDroppingAnAutoBankMark() {

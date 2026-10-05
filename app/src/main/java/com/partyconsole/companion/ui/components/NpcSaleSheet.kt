@@ -1,5 +1,10 @@
 package com.partyconsole.companion.ui.components
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -80,10 +85,13 @@ fun NpcSaleSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
-                "You will receive: ${format.format(each * (quantity.toLongOrNull() ?: 0L))}g (${format.format(each)}g each)",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF92400E), RoundedCornerShape(4.dp)).background(Color(0x33451A03)).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("You will receive: ${format.format(each * (quantity.toLongOrNull() ?: 0L))}g", color = Color(0xFFFDE68A), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                Text("(${format.format(each)}g each)", color = Color(0x8CFEF3C7), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 8.dp))
+            }
             if (modified) {
                 Row(verticalAlignment = Alignment.Top) {
                     Checkbox(checked = acknowledged, onCheckedChange = { acknowledged = it })
@@ -97,9 +105,10 @@ fun NpcSaleSheet(
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
                 Button(
                     enabled = !busy,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48), contentColor = Color.White),
                     onClick = {
                         error = null
                         val n = quantity.toIntOrNull()
@@ -118,7 +127,6 @@ fun NpcSaleSheet(
                         }
                     },
                 ) { Text(if (busy) "Queueing…" else if (all) "Sell all to NPC" else "Sell to NPC") }
-                OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
             }
         }
     }

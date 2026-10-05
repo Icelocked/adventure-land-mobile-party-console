@@ -68,7 +68,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private val Orange = Color(0xFFFB923C)
 private val Rose = Color(0xFFFB7185)
-private const val CLEAR_MARKS_TITLE = "Clear this item’s manual marks and matching shared automatic rules"
+internal const val CLEAR_MARKS_TITLE = "Clear this item’s manual marks and matching shared automatic rules"
 
 /** The item options panel: tapping an item opens its options list in the
  *  dashboard's order, with its labels and gating. "Item details" is the first

@@ -174,7 +174,7 @@ export function TapRow({ label, onClick, disabled, title, className = '' }: { la
   )
 }
 
-const CLEAR_MARKS_TITLE = 'Clear this item’s manual marks and matching shared automatic rules'
+export const CLEAR_MARKS_TITLE = 'Clear this item’s manual marks and matching shared automatic rules'
 
 /** The item options list. Order, labels and gating follow the console's
  *  inventory-panel.tsx context menu. */
