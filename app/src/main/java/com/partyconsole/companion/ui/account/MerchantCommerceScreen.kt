@@ -1,5 +1,15 @@
 package com.partyconsole.companion.ui.account
 
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -141,6 +151,13 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
     }
 
     val title = when (mode) { "craft" -> "Merchant crafting"; "exchange" -> "Exchange"; else -> "Merchant shopping" }
+    // Each mode draws its list in the scrolling area and its cart pinned below.
+    @Composable
+    fun Content(part: CommercePart) = when (mode) {
+        "buy" -> BuyContent(part, catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }) { inspecting = Inspecting(it, 0, source = "Merchant catalog") }
+        "craft" -> CraftContent(part, catalog?.craftable.orEmpty(), buyableById, owned, search, craftCart, { craftCart = it }) { inspecting = Inspecting(it, 0, source = "Crafting catalog") }
+        else -> ExchangeContent(part, viewModel, catalog?.exchangeable.orEmpty(), search, exchangeCart, { exchangeCart = it }) { inspecting = it }
+    }
     AccountScreenScaffold(title, onBack) {
         Column(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -158,13 +175,9 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
                 OutlinedTextField(search, { search = it }, placeholder = { Text("Search items…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp))
-                when (mode) {
-                    "buy" -> BuyContent(catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }) { inspecting = Inspecting(it, 0, source = "Merchant catalog") }
-                    "craft" -> CraftContent(catalog?.craftable.orEmpty(), buyableById, owned, search, craftCart, { craftCart = it }) { inspecting = Inspecting(it, 0, source = "Crafting catalog") }
-                    else -> ExchangeContent(viewModel, catalog?.exchangeable.orEmpty(), search, exchangeCart, { exchangeCart = it }) { inspecting = it }
-                }
+                Content(CommercePart.LIST)
             }
-            // The sticky submit bar.
+            Content(CommercePart.CART)
             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
                 when (mode) {
@@ -267,21 +280,53 @@ private fun QuantityField(label: String, value: String, onChange: (String) -> Un
     )
 }
 
+private enum class CommercePart { LIST, CART }
+
+/** The cart, pinned above the submit button so an added item shows at once
+ *  while the list scrolls. Adding something opens it and scrolls to the
+ *  newest line; the header folds it to a summary. */
 @Composable
-private fun CartTitle(text: String) {
-    Text(text.uppercase(), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp))
+private fun CartDock(title: String, lines: Int, units: Int, summary: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    var open by rememberSaveable { mutableStateOf(true) }
+    val scroll = rememberScrollState()
+    var previousUnits by remember { mutableIntStateOf(units) }
+    LaunchedEffect(units) {
+        if (units > previousUnits) {
+            open = true
+            withFrameNanos { }
+            scroll.animateScrollTo(scroll.maxValue)
+        }
+        previousUnits = units
+    }
+    val label = title + if (lines > 0) " ($lines)" else ""
+    Column(modifier = Modifier.fillMaxWidth().semantics { contentDescription = title }) {
+        HorizontalDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label.uppercase(), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            summary?.let { Text(it, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 6.dp)) }
+            Icon(if (open) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowUp, contentDescription = if (open) "Fold $title" else "Open $title")
+        }
+        if (open) {
+            val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.4f).dp
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight).verticalScroll(scroll).padding(horizontal = 12.dp), content = content)
+        }
+    }
 }
 
 // Buy
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BuyContent(catalog: List<MerchantBuyItem>, search: String, cart: Map<String, BuyLine>, setCart: (Map<String, BuyLine>) -> Unit, onInspect: (String) -> Unit) {
+private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, search: String, cart: Map<String, BuyLine>, setCart: (Map<String, BuyLine>) -> Unit, onInspect: (String) -> Unit) {
     val filtered = catalog.filter { "${it.name} ${it.id}".lowercase().contains(search.lowercase()) }
     val selected = catalog.filter { (cart[it.id]?.quantity ?: 0) > 0 }
     val estimates = selected.associate { it.id to upgradeEstimate(it, cart.getValue(it.id).quantity, cart.getValue(it.id).level) }
     val hasEstimatedGold = selected.any { cart.getValue(it.id).level > 0 && it.upgradeable }
     val goldTotal = selected.sumOf { estimates.getValue(it.id).gold }
+    if (part == CommercePart.LIST) {
     if (filtered.isEmpty()) EmptyState("No buyable items found.")
     for (item in filtered) {
         ItemRow(item.name, item.sprite, "${"%,d".format(item.cost)}g", { onInspect(item.id) }) {
@@ -289,9 +334,7 @@ private fun BuyContent(catalog: List<MerchantBuyItem>, search: String, cart: Map
             setCart(cart + (item.id to BuyLine((old?.quantity ?: 0) + 1, old?.level ?: 0)))
         }
     }
-    // The cart panel is always shown.
-    CartTitle("Cart")
-    Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+    } else CartDock("Cart", selected.size, selected.sumOf { cart.getValue(it.id).quantity }, "Gold${if (hasEstimatedGold) " (est)" else ""}: ${"%,d".format(Math.round(goldTotal))}g") {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
             val line = cart.getValue(item.id)
@@ -320,7 +363,6 @@ private fun BuyContent(catalog: List<MerchantBuyItem>, search: String, cart: Map
                 }
             }
         }
-        Text("Gold${if (hasEstimatedGold) " (est)" else ""}: ${"%,d".format(Math.round(goldTotal))}g", color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -344,7 +386,7 @@ private fun craftRequirements(recipes: List<MerchantCraftRecipe>, cart: Map<Stri
 }
 
 @Composable
-private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<String, MerchantBuyItem>, owned: Map<String, Int>, search: String, cart: Map<String, Int>, setCart: (Map<String, Int>) -> Unit, onInspect: (String) -> Unit) {
+private fun CraftContent(part: CommercePart, recipes: List<MerchantCraftRecipe>, buyableById: Map<String, MerchantBuyItem>, owned: Map<String, Int>, search: String, cart: Map<String, Int>, setCart: (Map<String, Int>) -> Unit, onInspect: (String) -> Unit) {
     val filtered = recipes.filter { "${it.name} ${it.id}".lowercase().contains(search.lowercase()) }
     val requirements = craftRequirements(recipes, cart)
     fun canAddRecipe(recipe: MerchantCraftRecipe) = recipe.materials.all { material ->
@@ -363,6 +405,7 @@ private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<St
     val selected = recipes.filter { (cart[it.id] ?: 0) > 0 }
     val goldTotal = selected.sumOf { it.cost * cart.getValue(it.id) } + ingredientPurchaseCost
 
+    if (part == CommercePart.LIST) {
     if (filtered.isEmpty()) EmptyState("No craftable recipes found.")
     for (recipe in filtered) {
         val open = previewing == recipe.id
@@ -398,8 +441,7 @@ private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<St
             }
         }
     }
-    CartTitle("Craft list")
-    Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+    } else CartDock("Craft list", selected.size, selected.sumOf { cart.getValue(it.id) }, "Gold: ${"%,d".format(goldTotal)}g") {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
@@ -424,7 +466,6 @@ private fun CraftContent(recipes: List<MerchantCraftRecipe>, buyableById: Map<St
                 )
             }
         }
-        Text("Gold: ${"%,d".format(goldTotal)}g", color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -460,7 +501,7 @@ private fun exchangeRequired(exchangeable: List<MerchantExchangeItem>, cart: Map
 private val REWARD_LEVEL = Regex("-(\\d+)$")
 
 @Composable
-private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<MerchantExchangeItem>, search: String, cart: Map<String, Int>, setCart: (Map<String, Int>) -> Unit, onInspect: (Inspecting) -> Unit) {
+private fun ExchangeContent(part: CommercePart, viewModel: PartyViewModel, exchangeable: List<MerchantExchangeItem>, search: String, cart: Map<String, Int>, setCart: (Map<String, Int>) -> Unit, onInspect: (Inspecting) -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
     val characters by viewModel.characters.collectAsState()
     // Owned counts: merchant-class characters, the bank and bankbois.
@@ -473,6 +514,7 @@ private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<Mercha
     val selected = exchangeable.filter { (cart[it.key] ?: 0) > 0 }
     fun add(key: String) = setCart(cart + (key to (cart[key] ?: 0) + 1))
 
+    if (part == CommercePart.LIST) {
     if (filtered.isEmpty()) EmptyState("No exchange operations available.")
     for (row in filtered) {
         val item = row.item
@@ -500,9 +542,19 @@ private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<Mercha
             Button(enabled = enabled, onClick = addOrChoose) { Text(if (row.choices != null) "Choose" else "Add") }
         }
     }
-    // The cart panel is always shown.
-    CartTitle("Exchange cart")
-    Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+    selectedExchange?.let { current ->
+        ExchangeDetails(
+            viewModel = viewModel,
+            current = current,
+            exchangeable = exchangeable,
+            canAdd = { choice -> exchangeRequired(exchangeable, cart, choice.id, choice.level) + choice.required <= (exchangeOwned["${choice.id}@${choice.level}"] ?: 0) },
+            onAdd = { add(it) },
+            onSelect = { selectedExchange = it },
+            onInspect = { id -> if (state.merchantCatalog?.allItems?.any { it.id == id } == true) onInspect(Inspecting(id, 0)) },
+            onClose = { selectedExchange = null },
+        )
+    }
+    } else CartDock("Exchange cart", selected.size, selected.sumOf { cart.getValue(it.key) }) {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
@@ -516,19 +568,6 @@ private fun ExchangeContent(viewModel: PartyViewModel, exchangeable: List<Mercha
                 TextButton(onClick = { setCart(cart + (item.key to 0)) }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             }
         }
-    }
-
-    selectedExchange?.let { current ->
-        ExchangeDetails(
-            viewModel = viewModel,
-            current = current,
-            exchangeable = exchangeable,
-            canAdd = { choice -> exchangeRequired(exchangeable, cart, choice.id, choice.level) + choice.required <= (exchangeOwned["${choice.id}@${choice.level}"] ?: 0) },
-            onAdd = { add(it) },
-            onSelect = { selectedExchange = it },
-            onInspect = { id -> if (state.merchantCatalog?.allItems?.any { it.id == id } == true) onInspect(Inspecting(id, 0)) },
-            onClose = { selectedExchange = null },
-        )
     }
 }
 
