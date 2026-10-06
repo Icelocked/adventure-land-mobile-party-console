@@ -264,7 +264,7 @@ export function MarketScreen() {
                   <button type="button" onClick={() => {
                     setInspectSource(`${entry.seller}'s ALData listing`)
                     setInspecting(entry.item)
-                  }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  }} className="flex min-w-0 flex-1 basis-64 items-center gap-3 text-left">
                     <SpriteIcon sprite={item?.sprite} size={40} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{itemLabel(entry.item)}</span>
@@ -345,7 +345,7 @@ export function MarketScreen() {
                     <button type="button" onClick={() => {
                       setInspectSource(`${order.buyer}'s live WTB`)
                       setInspecting(order.item)
-                    }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    }} className="flex min-w-0 flex-1 basis-64 items-center gap-3 text-left">
                       <SpriteIcon sprite={item?.sprite} size={40} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">{`${item?.name || order.item.name}${item?.meta?.upgradeable || item?.meta?.compoundable ? ` +${Number(order.item.level) || 0}` : ''}`}</span>
@@ -419,7 +419,7 @@ export function MarketScreen() {
                   <button type="button" onClick={() => {
                     setInspectSource('Published trade intention')
                     setInspecting(requested)
-                  }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  }} className="flex min-w-0 flex-1 basis-64 items-center gap-3 text-left">
                     <SpriteIcon sprite={item?.sprite} size={40} />
                     <span>
                       <span className="block text-sm">
@@ -495,7 +495,7 @@ export function MarketScreen() {
         <button type="button" onClick={() => {
           setInspectSource("Ponty's inventory")
           setInspecting(group.item)
-        }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        }} className="flex min-w-0 flex-1 basis-64 items-center gap-3 text-left">
           <SpriteIcon sprite={item?.sprite} size={40} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm">

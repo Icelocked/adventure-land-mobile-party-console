@@ -47,7 +47,7 @@ export type NotifierSettings = {
   stuckMinutes: number
   idleMinutes: number
   errors: { count: number; minutes: number }
-  deaths: { count: number; minutes: number }
+  deaths: { count: number; minutes: number; ignoreDuringEvents?: boolean }
   rare: { mode: 'chance' | 'value' | 'both'; chanceOneIn: number; minGold: number }
 }
 export type DevicePrefs = { alerts: AlertId[]; quiet: QuietHours; muted: string[] }
@@ -97,10 +97,40 @@ async function currentSubscription(): Promise<PushSubscription | null> {
 /** This device's quiet hours, in its own time zone. */
 export const quietHours = (start: string, end: string): QuietHours => ({ start, end, offsetMinutes: new Date().getTimezoneOffset() })
 
+// This device's alert choices are also kept on the device, so they come back
+// when the notifier no longer knows it (new push subscription, reinstalled
+// app, notifier data reset) instead of starting over from the defaults.
+const SAVED_PREFS = 'party-push-prefs'
+export function savedPrefs(): DevicePrefs | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(SAVED_PREFS) || 'null')
+    if (!value || !Array.isArray(value.alerts)) return null
+    const alerts = value.alerts.filter((id: unknown): id is AlertId => ALL_ALERTS.includes(id as AlertId))
+    return { alerts, quiet: value.quiet ?? null, muted: Array.isArray(value.muted) ? value.muted : [] }
+  } catch {
+    return null
+  }
+}
+function remember(status: PushStatus): PushStatus {
+  if (status.subscribed && Array.isArray(status.alerts)) {
+    try {
+      localStorage.setItem(SAVED_PREFS, JSON.stringify({ alerts: status.alerts, quiet: status.quiet ?? null, muted: status.muted ?? [] }))
+    } catch {
+      // Storage unavailable: the notifier still has them.
+    }
+  }
+  return status
+}
+
 export async function pushStatus(baseUrl: string): Promise<PushStatus> {
   const subscription = await currentSubscription()
   if (!subscription) return { subscribed: false }
-  return notifier<PushStatus>(baseUrl, `/status?endpoint=${encodeURIComponent(subscription.endpoint)}`)
+  const status = await notifier<PushStatus>(baseUrl, `/status?endpoint=${encodeURIComponent(subscription.endpoint)}`)
+  // Subscribed here but unknown to the notifier: sign up again with this device's saved choices.
+  const saved = savedPrefs()
+  if (!status.subscribed && saved && Notification.permission === 'granted')
+    return remember(await notifier<PushStatus>(baseUrl, '/subscribe', { subscription: subscription.toJSON(), ...saved }))
+  return remember(status)
 }
 
 export async function enablePush(baseUrl: string, prefs: DevicePrefs): Promise<PushStatus> {
@@ -110,13 +140,13 @@ export async function enablePush(baseUrl: string, prefs: DevicePrefs): Promise<P
   const registration = await navigator.serviceWorker.ready
   let subscription = await registration.pushManager.getSubscription()
   if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) })
-  return notifier<PushStatus>(baseUrl, '/subscribe', { subscription: subscription.toJSON(), ...prefs })
+  return remember(await notifier<PushStatus>(baseUrl, '/subscribe', { subscription: subscription.toJSON(), ...prefs }))
 }
 
 export async function setPushPrefs(baseUrl: string, prefs: Partial<DevicePrefs>): Promise<PushStatus> {
   const subscription = await currentSubscription()
   if (!subscription) throw new Error('Notifications are not enabled on this device.')
-  return notifier<PushStatus>(baseUrl, '/prefs', { endpoint: subscription.endpoint, ...prefs })
+  return remember(await notifier<PushStatus>(baseUrl, '/prefs', { endpoint: subscription.endpoint, ...prefs }))
 }
 
 function checkedSettings(value: NotifierSettings): NotifierSettings {

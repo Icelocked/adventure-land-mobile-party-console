@@ -11,6 +11,7 @@ import {
   pushSupport,
   quietHours,
   saveNotifierSettings,
+  savedPrefs,
   sendTestPush,
   setPushPrefs,
   type AlertId,
@@ -48,7 +49,7 @@ export function NotificationsSection() {
   const characters = useCharacters()
   const support = pushSupport()
   const [status, setStatus] = useState<PushStatus | null>(null)
-  const [prefs, setPrefs] = useState<DevicePrefs>({ alerts: ALL_ALERTS, quiet: null, muted: [] })
+  const [prefs, setPrefs] = useState<DevicePrefs>(() => savedPrefs() ?? { alerts: ALL_ALERTS, quiet: null, muted: [] })
   const [limits, setLimits] = useState<NotifierSettings | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,11 +110,25 @@ export function NotificationsSection() {
     if (id === 'stuck') return row(<>After <LimitInput label="Stuck after minutes" value={limits.stuckMinutes} onSave={(stuckMinutes) => updateLimits({ stuckMinutes })} /> min without a report</>)
     if (id === 'idle') return row(<>After <LimitInput label="No actions minutes" value={limits.idleMinutes} onSave={(idleMinutes) => updateLimits({ idleMinutes })} /> min without actions</>)
     if (id === 'deaths')
-      return row(
+      return (
         <>
-          <LimitInput label="Deaths count" value={limits.deaths.count} onSave={(count) => updateLimits({ deaths: { ...limits.deaths, count } })} /> deaths within{' '}
-          <LimitInput label="Deaths window minutes" value={limits.deaths.minutes} onSave={(minutes) => updateLimits({ deaths: { ...limits.deaths, minutes } })} /> min
-        </>,
+          {row(
+            <>
+              <LimitInput label="Deaths count" value={limits.deaths.count} onSave={(count) => updateLimits({ deaths: { ...limits.deaths, count } })} /> deaths within{' '}
+              <LimitInput label="Deaths window minutes" value={limits.deaths.minutes} onSave={(minutes) => updateLimits({ deaths: { ...limits.deaths, minutes } })} /> min
+            </>,
+          )}
+          {row(
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={!!limits.deaths.ignoreDuringEvents}
+                onChange={(event) => updateLimits({ deaths: { ...limits.deaths, ignoreDuringEvents: event.target.checked } })}
+              />
+              Ignore deaths during events the character joins
+            </label>,
+          )}
+        </>
       )
     if (id === 'errors')
       return row(

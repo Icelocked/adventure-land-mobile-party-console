@@ -148,7 +148,7 @@ function MerchantActivityLog() {
           Clear history
         </button>
       </div>
-      <div className="mt-2 max-h-48 space-y-1 overflow-y-auto font-mono text-[11px] text-muted-foreground">
+      <div className="mt-2 max-h-48 space-y-1 overflow-y-auto font-mono text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
         {entries.map((entry, index) => (
           <p key={`${entry.at}-${index}`} className={entry.level === 'error' ? 'text-destructive' : entry.level === 'success' ? 'text-emerald-500' : undefined}>
             <time className="mr-2 opacity-70" dateTime={new Date(entry.at).toISOString()} title={new Date(entry.at).toLocaleString()}>

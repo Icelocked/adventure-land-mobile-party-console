@@ -10,7 +10,7 @@ type Settings = {
   stuckMinutes: number
   idleMinutes: number
   errors: { count: number; minutes: number }
-  deaths: { count: number; minutes: number }
+  deaths: { count: number; minutes: number; ignoreDuringEvents: boolean }
   rare: { mode: 'chance' | 'value' | 'both'; chanceOneIn: number; minGold: number }
 }
 type Position = { map?: string; x?: number; y?: number }
@@ -34,6 +34,10 @@ export function idleCharacters(activity: Record<string, number>, names: string[]
 export function completedRules(previous: Record<string, unknown>, config: Record<string, unknown>): { kind: string; title: string; body: string }[]
 export function finishedUpgradeOrders(previousQueue: unknown[], queue: unknown[]): { title: string; body: string }[]
 export function selectedEventIds(config: Record<string, unknown>): Set<string>
+export function joinedEvents(config: Record<string, unknown>): Record<string, string[]>
+export type EventSpan = { start: number; end: number }
+export function eventSpans(previous: Record<string, EventSpan[]> | undefined, schedules: { id: string; live?: boolean }[] | undefined, now: number, pollMs: number): Record<string, EventSpan[]>
+export function deathsOutsideEvents(times: Record<string, number[]>, spans: Record<string, EventSpan[]>, joined: Record<string, string[]>, slackMs: number): Record<string, number[]>
 export function endedEvents(previous: { id: string; name?: string; live?: boolean }[], schedules: { id: string; live?: boolean }[], selected: Set<string>): { id: string; name?: string }[]
 export function rareIndex(allItems: unknown[]): Record<string, RareInfo>
 export function isRareDrop(info: RareInfo | undefined, rare: Settings['rare']): boolean
