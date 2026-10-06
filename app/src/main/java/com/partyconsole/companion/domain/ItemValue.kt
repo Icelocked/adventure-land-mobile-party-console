@@ -20,7 +20,15 @@ val UPGRADE_CHANCES: Map<Int, List<Double>> = mapOf(
 /** ECMAScript ToInt32 for an integral double. */
 private fun toInt32(value: Double): Int = (value % 4294967296.0).toLong().toInt()
 
-data class UpgradeEstimate(val attempts: Long, val gold: Double, val scrolls: List<Long>)
+/** [unlikely]: the target can't be estimated within the roll budget. */
+data class UpgradeEstimate(val attempts: Long, val gold: Double, val scrolls: List<Long>, val unlikely: Boolean = false)
+
+// Simulated upgrade rolls allowed per estimate, as in the PWA. A staff to +9
+// needs well under this; +10 and up can need billions and froze the screen,
+// so they stop at the budget with however many runs finished.
+private const val ROLL_BUDGET = 60_000_000L
+// Fewer finished runs than this can't support a 90th percentile.
+private const val MIN_RUNS = 30
 
 private val estimateCache = java.util.concurrent.ConcurrentHashMap<String, UpgradeEstimate>()
 
@@ -47,13 +55,15 @@ fun upgradeEstimate(item: MerchantBuyItem, quantity: Int, target: Int): UpgradeE
         return ((value xor (value ushr 14)).toLong() and 0xFFFFFFFFL) / 4294967296.0
     }
     val runs = ArrayList<UpgradeEstimate>(3000)
-    repeat(3000) {
+    var rolls = 0L
+    for (simulation in 0 until 3000) {
+        if (rolls >= ROLL_BUDGET) break
         val personalGrace = DoubleArray(20)
         val scrolls = LongArray(4)
         var attempts = 0L
         var successes = 0
         var guard = 0
-        while (successes < quantity && guard++ < 2_000_000) {
+        while (successes < quantity && guard++ < 2_000_000 && rolls < ROLL_BUDGET) {
             attempts += 1
             var level = 0
             var survived = true
@@ -61,6 +71,7 @@ fun upgradeEstimate(item: MerchantBuyItem, quantity: Int, target: Int): UpgradeE
                 val newLevel = level + 1
                 val scrollGrade = if (level >= (grades.getOrNull(2) ?: 11)) 3 else if (level >= (grades.getOrNull(1) ?: 10)) 2 else if (level >= (grades.getOrNull(0) ?: 9)) 1 else 0
                 scrolls[scrollGrade] += 1
+                rolls += 1
                 val base = chances.getOrNull(newLevel) ?: 0.0
                 val graceNumber = max(0.0, min((newLevel + 1).toDouble(), min(3.0, personalGrace.getOrElse(newLevel) { 0.0 } / 4.5) + itemGrade))
                 var graceChance = (base * graceNumber) / newLevel + graceNumber / 1000
@@ -83,9 +94,12 @@ fun upgradeEstimate(item: MerchantBuyItem, quantity: Int, target: Int): UpgradeE
             }
             if (survived) successes += 1
         }
+        // A run cut off by the budget never finished; it isn't a sample.
+        if (successes < quantity) break
         val scrollGold = scrolls.withIndex().sumOf { (grade, count) -> count * (item.scrollCosts?.getOrNull(grade) ?: 0L).toDouble() }
         runs += UpgradeEstimate(attempts, attempts * item.cost.toDouble() + scrollGold, scrolls.toList())
     }
+    if (runs.size < MIN_RUNS) return UpgradeEstimate(0, 0.0, emptyList(), unlikely = true).also { estimateCache[cacheKey] = it }
     runs.sortBy { it.gold }
     val result = runs[min(runs.size - 1, ceil(runs.size * 0.9).toInt() - 1)]
     estimateCache[cacheKey] = result
@@ -125,8 +139,9 @@ fun suggestedItemValue(entry: InventoryEntry, buyable: List<MerchantBuyItem>): S
         }
         source.copy(suggested = max(1.0, ceil(suggested)), purchase = false)
     }.toMutableList()
-    if (catalogItem != null) {
-        val estimated = upgradeEstimate(catalogItem, 1, level)
+    val estimated = catalogItem?.let { upgradeEstimate(it, 1, level) }
+    // A level too unlikely to estimate has no buy-and-upgrade price.
+    if (estimated != null && !estimated.unlikely) {
         sources += ItemSuggestedPrice(
             monsterId = "__buy__",
             monsterName = if (level > 0) "buy + upgrade" else "buy",

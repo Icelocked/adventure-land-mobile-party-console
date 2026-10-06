@@ -167,6 +167,20 @@ describe('suggested-item-value.tsx / upgrade-estimate.tsx', () => {
     expect(upgradeEstimate(item, 1, 7)).toEqual(upgradeEstimate({ ...item }, 1, 7))
     expect(upgradeEstimate(item, 1, 7).gold).toBeGreaterThan(1000)
   })
+  // A staff's real chances; a mistyped +91 (capped to +13) used to run for
+  // hours and freeze the page, and +10 took over 30 seconds.
+  const staff = { id: 'staff', name: 'Staff', cost: 12400, seller: 'basics', upgradeable: true, upgradeGrade: 0, grades: [7, 9, 10, 12],
+    upgradeChances: [1, 0.9999999, 0.98, 0.95, 0.7, 0.6, 0.4, 0.25, 0.15, 0.07, 0.024, 0.14, 0.11], scrollCosts: [1000, 40000, 1600000, 480000000] }
+  it('keeps the estimate for a reachable target (staff to +9)', () => {
+    expect(upgradeEstimate(staff, 1, 9)).toMatchObject({ attempts: 5691, gold: 109096400 })
+  })
+  it('gives up quickly on a target too unlikely to estimate', () => {
+    const started = performance.now()
+    expect(upgradeEstimate(staff, 1, 13)).toEqual({ attempts: 0, gold: 0, scrolls: [], unlikely: true })
+    expect(performance.now() - started).toBeLessThan(5000)
+    const value = suggestedItemValue({ slot: 0, item: { name: 'staff', level: 13 }, meta: { upgradeable: true, definition: { g: 12400 } } }, [staff])
+    expect(value.sources.some((source) => source.purchase)).toBe(false)
+  })
 })
 
 describe('stand-sheet.tsx market logic', () => {

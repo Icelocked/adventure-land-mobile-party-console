@@ -25,6 +25,28 @@ const MODES: Mode[] = ['buy', 'craft', 'exchange']
 // Quantities are capped at 9999.
 const capQuantity = (value: string) => Math.min(9999, Math.max(0, Number(value.replace(/[^0-9]/g, '')) || 0))
 
+/** A cart line's quantity box. Clearing it to type a new number keeps the
+ *  line (only Remove takes it out of the cart); left empty or at 0, it goes
+ *  back to the last quantity. */
+function QuantityInput({ label, value, onChange }: { label: string; value: number; onChange: (quantity: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <Input
+      aria-label={label}
+      inputMode="numeric"
+      value={draft ?? String(value)}
+      onChange={(e) => {
+        const digits = e.target.value.replace(/[^0-9]/g, '')
+        const quantity = capQuantity(digits)
+        setDraft(quantity > 0 ? String(quantity) : digits)
+        if (quantity > 0) onChange(quantity)
+      }}
+      onBlur={() => setDraft(null)}
+      className="h-8 w-14 px-1.5 text-center text-xs"
+    />
+  )
+}
+
 type Inventories = { name: string; items?: ({ item?: { name?: string; level?: number; q?: number } | null } | null)[] }[]
 function inventories(characters: ReturnType<typeof useCharacters>, filter: (state: ReturnType<typeof useCharacters>[string]) => boolean = () => true): Inventories {
   return Object.entries(characters)
@@ -323,6 +345,7 @@ function BuyScreen({
   const estimates = Object.fromEntries(selected.map((item) => [item.id, upgradeEstimate(item, cart[item.id].quantity, cart[item.id]?.level || 0)]))
   const hasEstimatedGold = selected.some((item) => (cart[item.id]?.level || 0) > 0 && item.upgradeable)
   const goldTotal = selected.reduce((sum, item) => sum + estimates[item.id].gold, 0)
+  const unlikely = selected.filter((item) => estimates[item.id].unlikely)
   const lines = () =>
     selected.map((item) => ({
       id: item.id,
@@ -357,7 +380,7 @@ function BuyScreen({
         title="Cart"
         quantities={Object.fromEntries(Object.entries(cart).map(([id, line]) => [id, line.quantity]))}
         summary={`Gold${hasEstimatedGold ? ' (est)' : ''}: ${goldTotal.toLocaleString()}g`}
-        submit={<SubmitBar label="Buy all" disabled={!selected.length} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />}
+        submit={<SubmitBar label="Buy all" disabled={!selected.length || unlikely.length > 0} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />}
       >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => {
@@ -366,11 +389,10 @@ function BuyScreen({
               <CartRow key={item.id} cartKey={item.id}>
                 <SpriteIcon sprite={item.sprite} size={28} />
                 <span className="min-w-0 flex-1 truncate text-xs">{item.name}</span>
-                <Input
-                  aria-label={`${item.name} quantity`}
-                  value={String(line.quantity)}
-                  onChange={(e) => setCart((old) => ({ ...old, [item.id]: { ...old[item.id], quantity: capQuantity(e.target.value) } }))}
-                  className="h-8 w-14 px-1.5 text-center text-xs"
+                <QuantityInput
+                  label={`${item.name} quantity`}
+                  value={line.quantity}
+                  onChange={(quantity) => setCart((old) => ({ ...old, [item.id]: { ...old[item.id], quantity } }))}
                 />
                 {item.upgradeable && (
                   <label className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground">
@@ -386,7 +408,9 @@ function BuyScreen({
                 <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
                   Remove
                 </Button>
-                {line.level > 0 && item.upgradeable ? (
+                {line.level > 0 && item.upgradeable && estimates[item.id].unlikely ? (
+                  <p className="ml-9 w-full text-[11px] text-amber-400">+{line.level} is too unlikely to estimate a budget for. Choose a lower target level.</p>
+                ) : line.level > 0 && item.upgradeable ? (
                   <p className="ml-9 w-full font-mono text-[10px] text-violet-300">
                     90% budget: {estimates[item.id].attempts} base items ·{' '}
                     {estimates[item.id].scrolls
@@ -575,12 +599,7 @@ function CraftScreen({
             <CartRow key={item.id} cartKey={item.id}>
               <SpriteIcon sprite={item.sprite} size={28} />
               <span className="min-w-0 flex-1 truncate text-xs">{item.name}</span>
-              <Input
-                aria-label={`${item.name} quantity`}
-                value={String(cart[item.id])}
-                onChange={(e) => setCart((old) => ({ ...old, [item.id]: capQuantity(e.target.value) }))}
-                className="h-8 w-14 px-1.5 text-center text-xs"
-              />
+              <QuantityInput label={`${item.name} quantity`} value={cart[item.id]} onChange={(quantity) => setCart((old) => ({ ...old, [item.id]: quantity }))} />
               <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: 0 }))}>
                 Remove
               </Button>
@@ -808,12 +827,7 @@ function ExchangeScreen({
                 {item.name}
                 {` ${(item.rewardQuantity ?? 1) > 1 ? `× ${item.rewardQuantity}` : ''} · uses ${item.required} ${item.currencyName || 'ea.'}`}
               </span>
-              <Input
-                aria-label={`${item.name} quantity`}
-                value={String(cart[item.key])}
-                onChange={(e) => setCart((old) => ({ ...old, [item.key]: capQuantity(e.target.value) }))}
-                className="h-8 w-14 px-1.5 text-center text-xs"
-              />
+              <QuantityInput label={`${item.name} quantity`} value={cart[item.key]} onChange={(quantity) => setCart((old) => ({ ...old, [item.key]: quantity }))} />
               <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.key]: 0 }))}>
                 Remove
               </Button>
