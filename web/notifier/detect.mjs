@@ -11,7 +11,8 @@ export const DEFAULT_SETTINGS = {
   stuckMinutes: 2,
   idleMinutes: 5,
   errors: { count: 5, minutes: 10 },
-  deaths: { count: 3, minutes: 30 },
+  // ignoreDuringEvents: skip a character's deaths while an event it joins is live.
+  deaths: { count: 3, minutes: 30, ignoreDuringEvents: false },
   // mode: 'chance' (drop chance under 1 in N), 'value' (worth at least N gold), or 'both'.
   rare: { mode: 'chance', chanceOneIn: 10000, minGold: 1000000 },
 }
@@ -24,7 +25,11 @@ export function mergeSettings(current, patch = {}) {
     stuckMinutes: positive(patch.stuckMinutes, base.stuckMinutes, 1440),
     idleMinutes: positive(patch.idleMinutes, base.idleMinutes, 1440),
     errors: { count: positive(patch.errors?.count, base.errors.count, 1000), minutes: positive(patch.errors?.minutes, base.errors.minutes, 1440) },
-    deaths: { count: positive(patch.deaths?.count, base.deaths.count, 1000), minutes: positive(patch.deaths?.minutes, base.deaths.minutes, 1440) },
+    deaths: {
+      count: positive(patch.deaths?.count, base.deaths.count, 1000),
+      minutes: positive(patch.deaths?.minutes, base.deaths.minutes, 1440),
+      ignoreDuringEvents: typeof patch.deaths?.ignoreDuringEvents === 'boolean' ? patch.deaths.ignoreDuringEvents : !!base.deaths.ignoreDuringEvents,
+    },
     rare: {
       mode: ['chance', 'value', 'both'].includes(patch.rare?.mode) ? patch.rare.mode : base.rare.mode,
       chanceOneIn: positive(patch.rare?.chanceOneIn, base.rare.chanceOneIn),
@@ -177,12 +182,50 @@ export function finishedUpgradeOrders(previousQueue, queue) {
 }
 
 /** The event ids any character has selected (event-policy.ts selectedEvents, unioned). */
+const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman']
 export function selectedEventIds(config) {
-  const supported = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman']
   const ids = new Set()
   for (const list of Object.values(config.eventSelectionsByCharacter || {})) for (const id of list || []) ids.add(id)
-  for (const [, enabled] of Object.entries(config.eventsByCharacter || {})) if (enabled) supported.forEach((id) => ids.add(id))
+  for (const [, enabled] of Object.entries(config.eventsByCharacter || {})) if (enabled) SUPPORTED_EVENTS.forEach((id) => ids.add(id))
   return ids
+}
+
+/** The events each character joins: its own selections, or every supported
+ *  event when "all events" is on for it. {name: [eventId]} */
+export function joinedEvents(config) {
+  const joined = {}
+  for (const [name, list] of Object.entries(config.eventSelectionsByCharacter || {})) joined[name] = [...(list || [])]
+  for (const [name, enabled] of Object.entries(config.eventsByCharacter || {})) if (enabled) joined[name] = [...new Set([...(joined[name] || []), ...SUPPORTED_EVENTS])]
+  return joined
+}
+
+/** When each event was live: {eventId: [{start, end}]}, extended each poll
+ *  while it stays live. Spans older than a day are dropped. */
+export function eventSpans(previous, schedules, now, pollMs) {
+  const spans = {}
+  for (const [id, list] of Object.entries(previous || {})) {
+    const kept = (list || []).filter((span) => span.end > now - 86_400_000).map((span) => ({ ...span }))
+    if (kept.length) spans[id] = kept
+  }
+  for (const event of schedules || []) {
+    if (!event.live) continue
+    const list = (spans[event.id] ||= [])
+    const last = list[list.length - 1]
+    if (last && last.end >= now - 3 * pollMs) last.end = now
+    else list.push({ start: now - pollMs, end: now })
+  }
+  return spans
+}
+
+/** Death times without the ones during a live event the character joins
+ *  (deaths there are expected). `slackMs` covers the gap between polls. */
+export function deathsOutsideEvents(times, spans, joined, slackMs) {
+  const result = {}
+  for (const [name, list] of Object.entries(times)) {
+    const windows = (joined[name] || []).flatMap((id) => spans[id] || [])
+    result[name] = list.filter((at) => !windows.some((span) => at >= span.start - slackMs && at <= span.end + slackMs))
+  }
+  return result
 }
 
 /** Selected events that were live and no longer are. */

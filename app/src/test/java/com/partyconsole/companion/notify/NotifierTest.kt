@@ -255,4 +255,26 @@ class NotifierTest {
         compose.onNodeWithContentDescription("Live alerts").performScrollTo().performClick().assertIsOn()
         assertTrue(store.live)
     }
+    @Test
+    fun deathsDuringJoinedLiveEventsAreIgnored() {
+        assertEquals(false, NotifierLimits().ignoreDeathsDuringEvents)
+        assertEquals(true, mergeLimits(NotifierLimits(), NotifierLimits(ignoreDeathsDuringEvents = true)).ignoreDeathsDuringEvents)
+        val joined = joinedEvents(obj("""{"eventSelectionsByCharacter":{"Tank":["crabxx"],"Healer":["anniversary"]},"eventsByCharacter":{"Mage":true}}"""))
+        assertTrue("crabxx" in joined.getValue("Mage"))
+        val live = listOf(obj("""{"id":"crabxx","live":true}"""), obj("""{"id":"franky","live":false}"""))
+        var spans = eventSpans(emptyMap(), live, 100_000, 15_000)
+        assertEquals(mapOf("crabxx" to listOf(EventSpan(85_000, 100_000))), spans)
+        spans = eventSpans(spans, live, 200_000, 100_000)
+        assertEquals(listOf(EventSpan(85_000, 200_000)), spans.getValue("crabxx"))
+        // A background gap longer than the check interval still extends the same run.
+        spans = eventSpans(spans, live, 200_000 + 15 * 60_000L, 15 * 60_000L)
+        assertEquals(1, spans.getValue("crabxx").size)
+        val end = 200_000 + 15 * 60_000L
+        val times = mapOf("Tank" to listOf(10_000L, 150_000L, end + 120_000), "Healer" to listOf(150_000L), "Mage" to listOf(150_000L), "Rogue" to listOf(150_000L))
+        assertEquals(
+            mapOf("Tank" to listOf(10_000L, end + 120_000), "Healer" to listOf(150_000L), "Mage" to emptyList(), "Rogue" to listOf(150_000L)),
+            deathsOutsideEvents(times, spans, joined, 60_000),
+        )
+        assertTrue(eventSpans(spans, emptyList(), end + 86_400_001, 15_000).isEmpty())
+    }
 }

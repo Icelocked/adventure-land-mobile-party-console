@@ -35,6 +35,8 @@ data class NotifierLimits(
     val errors: Burst = Burst(5, 10),
     val deaths: Burst = Burst(3, 30),
     val rare: RareRule = RareRule(),
+    /** Skip a character's deaths while an event it joins is live. */
+    val ignoreDeathsDuringEvents: Boolean = false,
 )
 
 /** Clamps a patch onto the current limits. */
@@ -50,6 +52,7 @@ fun mergeLimits(current: NotifierLimits, patch: NotifierLimits): NotifierLimits 
             chanceOneIn = positive(patch.rare.chanceOneIn, current.rare.chanceOneIn),
             minGold = positive(patch.rare.minGold, current.rare.minGold, 10_000_000_000_000),
         ),
+        ignoreDeathsDuringEvents = patch.ignoreDeathsDuringEvents,
     )
 }
 
@@ -211,14 +214,50 @@ fun finishedUpgradeOrders(previousQueue: List<JsonObject>, queue: List<JsonObjec
     return finished
 }
 
+private val SUPPORTED_EVENTS = listOf("anniversary", "abtesting", "goobrawl", "crabxx", "franky", "icegolem", "snowman")
+
 /** The event ids any character has selected (selectedEvents, unioned). */
 fun selectedEventIds(config: JsonObject): Set<String> {
-    val supported = listOf("anniversary", "abtesting", "goobrawl", "crabxx", "franky", "icegolem", "snowman")
     val ids = linkedSetOf<String>()
     for ((_, list) in config["eventSelectionsByCharacter"].obj().orEmpty()) for (id in list.arr()) id.str()?.let { ids += it }
-    for ((_, enabled) in config["eventsByCharacter"].obj().orEmpty()) if (enabled.str() == "true") ids += supported
+    for ((_, enabled) in config["eventsByCharacter"].obj().orEmpty()) if (enabled.str() == "true") ids += SUPPORTED_EVENTS
     return ids
 }
+
+/** The events each character joins: its own selections, or every supported
+ *  event when "all events" is on for it. */
+fun joinedEvents(config: JsonObject): Map<String, List<String>> {
+    val joined = linkedMapOf<String, List<String>>()
+    for ((name, list) in config["eventSelectionsByCharacter"].obj().orEmpty()) joined[name] = list.arr().mapNotNull { it.str() }
+    for ((name, enabled) in config["eventsByCharacter"].obj().orEmpty()) if (enabled.str() == "true") joined[name] = (joined[name].orEmpty() + SUPPORTED_EVENTS).distinct()
+    return joined
+}
+
+@Serializable
+data class EventSpan(val start: Long, val end: Long)
+
+/** When each event was live, extended at each check while it stays live.
+ *  `gapMs` is the time since the previous check (15 s in the app, up to
+ *  15 min in the background). Spans older than a day are dropped. */
+fun eventSpans(previous: Map<String, List<EventSpan>>, schedules: List<JsonObject>, now: Long, gapMs: Long): Map<String, List<EventSpan>> {
+    val spans = previous.mapValues { (_, list) -> list.filter { it.end > now - 86_400_000 }.toMutableList() }.filterValues { it.isNotEmpty() }.toMutableMap()
+    for (event in schedules) {
+        if (event["live"].str() != "true") continue
+        val id = event["id"].str() ?: continue
+        val list = spans.getOrPut(id) { mutableListOf() }
+        val last = list.lastOrNull()
+        if (last != null && last.end >= now - gapMs - 60_000) list[list.lastIndex] = last.copy(end = now)
+        else list += EventSpan(now - gapMs, now)
+    }
+    return spans
+}
+
+/** Death times without the ones during a live event the character joins. */
+fun deathsOutsideEvents(times: Map<String, List<Long>>, spans: Map<String, List<EventSpan>>, joined: Map<String, List<String>>, slackMs: Long): Map<String, List<Long>> =
+    times.mapValues { (name, list) ->
+        val windows = joined[name].orEmpty().flatMap { spans[it].orEmpty() }
+        list.filter { at -> windows.none { at >= it.start - slackMs && at <= it.end + slackMs } }
+    }
 
 @Serializable
 data class ScheduleSeen(val id: String, val name: String? = null, val live: Boolean = false)

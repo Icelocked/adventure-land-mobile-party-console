@@ -23,6 +23,9 @@ import {
   rareIndex,
   recipients,
   selectedEventIds,
+  joinedEvents,
+  eventSpans,
+  deathsOutsideEvents,
   tradeNotice,
   tradeDigest,
   latestError,
@@ -203,5 +206,36 @@ describe('push notifier: devices and settings', () => {
     expect(recipients(devices, 'stuck', 'Folla', night).map((device) => device.id)).toEqual([1])
     expect(recipients(devices, 'trading', undefined, night).map((device) => device.id)).toEqual([])
     expect(recipients(devices, 'stuck', 'Leada', night).map((device) => device.id)).toEqual([1, 2])
+  })
+})
+
+describe('deaths during events', () => {
+  const POLL = 15_000
+
+  it('is off by default and keeps its setting through other changes', () => {
+    expect(mergeSettings({}).deaths.ignoreDuringEvents).toBe(false)
+    const on = mergeSettings({}, { deaths: { ignoreDuringEvents: true } })
+    expect(on.deaths).toEqual({ count: 3, minutes: 30, ignoreDuringEvents: true })
+    expect(mergeSettings(on, { deaths: { count: 5 } }).deaths.ignoreDuringEvents).toBe(true)
+    expect(mergeSettings(on, { deaths: { ignoreDuringEvents: 'yes' } }).deaths.ignoreDuringEvents).toBe(true)
+  })
+
+  it('records when each event was live, one span per run', () => {
+    let spans = eventSpans(undefined, [{ id: 'crabxx', live: true }, { id: 'franky', live: false }], 100_000, POLL)
+    expect(spans).toEqual({ crabxx: [{ start: 85_000, end: 100_000 }] })
+    spans = eventSpans(spans, [{ id: 'crabxx', live: true }], 115_000, POLL)
+    expect(spans.crabxx).toEqual([{ start: 85_000, end: 115_000 }])
+    spans = eventSpans(spans, [{ id: 'crabxx', live: false }], 130_000, POLL)
+    spans = eventSpans(spans, [{ id: 'crabxx', live: true }], 1_000_000, POLL)
+    expect(spans.crabxx).toEqual([{ start: 85_000, end: 115_000 }, { start: 985_000, end: 1_000_000 }])
+    expect(eventSpans(spans, [], 1_000_000 + 86_400_001, POLL)).toEqual({})
+  })
+
+  it('ignores only deaths during live events the character joins', () => {
+    const joined = joinedEvents({ eventSelectionsByCharacter: { Tank: ['crabxx'], Healer: ['anniversary'] }, eventsByCharacter: { Mage: true } })
+    expect(joined.Mage).toContain('crabxx')
+    const spans = { crabxx: [{ start: 100_000, end: 200_000 }] }
+    const times = { Tank: [50_000, 150_000, 210_000, 300_000], Healer: [150_000], Mage: [150_000], Rogue: [150_000] }
+    expect(deathsOutsideEvents(times, spans, joined, POLL)).toEqual({ Tank: [50_000, 300_000], Healer: [150_000], Mage: [], Rogue: [150_000] })
   })
 })

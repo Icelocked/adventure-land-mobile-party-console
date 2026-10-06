@@ -31,6 +31,9 @@ import {
   rareIndex,
   recipients,
   selectedEventIds,
+  joinedEvents,
+  eventSpans,
+  deathsOutsideEvents,
   tradeNotice,
   tradeDigest,
   latestError,
@@ -171,6 +174,7 @@ async function checkCore(cookie, positions) {
   if (watch.schedules && watch.selectedEvents)
     for (const event of endedEvents(watch.schedules, core.eventSchedules || [], new Set(watch.selectedEvents))) await push('events', { title: `${event.name || event.id} ended`, body: 'The event is over.', tag: `event-${event.id}`, url: '/' })
   watch.schedules = (core.eventSchedules || []).map((event) => ({ id: event.id, name: event.name, live: !!event.live }))
+  watch.eventSpans = eventSpans(watch.eventSpans, core.eventSchedules, now, POLL_MS)
   // No actions (activity is refreshed from logs and positions).
   watch.activity = activityTimes(watch.activity, null, null, positions, watch.positions, now)
   watch.positions = positions
@@ -215,7 +219,9 @@ async function checkLogs(cookie, now) {
     }
   watch.combatSince = Math.max(watch.combatSince, latestCombat)
   // Repeated deaths.
-  const deaths = bursts(deathTimes(combatLogs), now, settings.deaths.count, settings.deaths.minutes * 60_000, watch.deathAlertAt)
+  let times = deathTimes(combatLogs)
+  if (settings.deaths.ignoreDuringEvents) times = deathsOutsideEvents(times, watch.eventSpans || {}, watch.joinedEvents || {}, POLL_MS)
+  const deaths = bursts(times, now, settings.deaths.count, settings.deaths.minutes * 60_000, watch.deathAlertAt)
   for (const [name, count] of Object.entries(deaths)) {
     watch.deathAlertAt[name] = now
     await push('deaths', { title: `${name} keeps dying`, body: `${count} deaths in the last ${settings.deaths.minutes} minutes.`, tag: `deaths-${name}`, url: characterUrl(name) }, name)
@@ -237,6 +243,7 @@ async function checkConfig(cookie) {
   if (watch.rules) for (const done of completedRules(watch.rules, rules)) await push('rules', { title: done.title, body: done.body, tag: `rule-${done.body}`, url: '/' })
   watch.rules = rules
   watch.selectedEvents = [...selectedEventIds(config)]
+  watch.joinedEvents = joinedEvents(config)
 }
 
 /** Inventory full (each time a bag fills up) and bank full (each time the

@@ -30,6 +30,9 @@ data class WatchState(
     val queue: List<JsonObject>? = null,
     val schedules: List<ScheduleSeen>? = null,
     val selectedEvents: List<String>? = null,
+    val joinedEvents: Map<String, List<String>> = emptyMap(),
+    val eventSpans: Map<String, List<EventSpan>> = emptyMap(),
+    val coreCheckedAt: Long? = null,
     val merchant: String? = null,
     val fullBags: List<String> = emptyList(),
     val bankFull: Boolean = false,
@@ -170,6 +173,8 @@ class Notifier(
             problems = problems,
             queue = queue,
             schedules = schedules.map { ScheduleSeen(it["id"].str().orEmpty(), it["name"].str(), it["live"].str() == "true") },
+            eventSpans = eventSpans(watch.eventSpans, schedules, now, (now - (watch.coreCheckedAt ?: now)).coerceIn(15_000L, 20 * 60_000L)),
+            coreCheckedAt = now,
             activity = activity,
             positions = positions,
             idleAlerted = idle,
@@ -210,7 +215,9 @@ class Notifier(
         }
         // Repeated deaths.
         val deathAlertAt = next.deathAlertAt.toMutableMap()
-        for ((name, count) in bursts(deathTimes(combatLogs), now, limits.deaths.count, limits.deaths.minutes * 60_000L, next.deathAlertAt)) {
+        var deaths = deathTimes(combatLogs)
+        if (limits.ignoreDeathsDuringEvents) deaths = deathsOutsideEvents(deaths, next.eventSpans, next.joinedEvents, 60_000L)
+        for ((name, count) in bursts(deaths, now, limits.deaths.count, limits.deaths.minutes * 60_000L, next.deathAlertAt)) {
             deathAlertAt[name] = now
             push("deaths", Notice("$name keeps dying", "$count deaths in the last ${limits.deaths.minutes} minutes.", "deaths-$name", characterUrl(name)), name)
         }
@@ -234,7 +241,7 @@ class Notifier(
         val config = section("config")
         val rules = JsonObject(mapOf("autoUpgradeMarks" to (config["autoUpgradeMarks"].obj() ?: JsonObject(emptyMap())), "autoCompounds" to (config["autoCompounds"].obj() ?: JsonObject(emptyMap()))))
         watch.rules?.let { previous -> for (done in completedRules(previous, rules)) push("rules", Notice(done.title, done.body, "rule-${done.body}", "/")) }
-        watch = watch.copy(merchant = config["merchantCharacter"].str()?.ifEmpty { null }, rules = rules, selectedEvents = selectedEventIds(config).toList())
+        watch = watch.copy(merchant = config["merchantCharacter"].str()?.ifEmpty { null }, rules = rules, selectedEvents = selectedEventIds(config).toList(), joinedEvents = joinedEvents(config))
     }
 
     /** Inventory full (each time a bag fills up) and bank full (each time

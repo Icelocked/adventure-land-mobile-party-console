@@ -253,11 +253,21 @@ private fun LimitsFor(id: String, limits: NotifierLimits, update: (NotifierLimit
     when (id) {
         "stuck" -> LimitRow { Text("After", style = small); LimitInput("Stuck after minutes", limits.stuckMinutes.toLong(), { update(limits.copy(stuckMinutes = it.toInt())) }); Text("min without a report", style = small) }
         "idle" -> LimitRow { Text("After", style = small); LimitInput("No actions minutes", limits.idleMinutes.toLong(), { update(limits.copy(idleMinutes = it.toInt())) }); Text("min without actions", style = small) }
-        "deaths" -> LimitRow {
-            LimitInput("Deaths count", limits.deaths.count.toLong(), { update(limits.copy(deaths = Burst(it.toInt(), limits.deaths.minutes))) })
-            Text("deaths within", style = small)
-            LimitInput("Deaths window minutes", limits.deaths.minutes.toLong(), { update(limits.copy(deaths = Burst(limits.deaths.count, it.toInt()))) })
-            Text("min", style = small)
+        "deaths" -> Column {
+            LimitRow {
+                LimitInput("Deaths count", limits.deaths.count.toLong(), { update(limits.copy(deaths = Burst(it.toInt(), limits.deaths.minutes))) })
+                Text("deaths within", style = small)
+                LimitInput("Deaths window minutes", limits.deaths.minutes.toLong(), { update(limits.copy(deaths = Burst(limits.deaths.count, it.toInt()))) })
+                Text("min", style = small)
+            }
+            LimitRow {
+                Checkbox(
+                    checked = limits.ignoreDeathsDuringEvents,
+                    onCheckedChange = { update(limits.copy(ignoreDeathsDuringEvents = it)) },
+                    modifier = Modifier.semantics { contentDescription = "Ignore deaths during events the character joins" },
+                )
+                Text("Ignore deaths during events the character joins", style = small)
+            }
         }
         "errors" -> LimitRow {
             LimitInput("Errors count", limits.errors.count.toLong(), { update(limits.copy(errors = Burst(it.toInt(), limits.errors.minutes))) })
