@@ -50,6 +50,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -189,7 +190,8 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 when (mode) {
                     "buy" -> {
                         val selected = catalog?.buyable.orEmpty().filter { (buyCart[it.id]?.quantity ?: 0) > 0 }
-                        Button(enabled = selected.isNotEmpty() && !submitting, modifier = Modifier.fillMaxWidth(), onClick = {
+                        val unlikely = selected.any { upgradeEstimate(it, buyCart.getValue(it.id).quantity, buyCart.getValue(it.id).level).unlikely }
+                        Button(enabled = selected.isNotEmpty() && !unlikely && !submitting, modifier = Modifier.fillMaxWidth(), onClick = {
                             val lines = selected.map { item ->
                                 val line = buyCart.getValue(item.id)
                                 val estimate = upgradeEstimate(item, line.quantity, line.level)
@@ -277,12 +279,32 @@ private fun ItemRow(name: String, sprite: Sprite?, subtitle: String, onInspect: 
 }
 
 @Composable
-private fun QuantityField(label: String, value: String, onChange: (String) -> Unit) {
+private fun LevelField(label: String, value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value, onChange, singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = MaterialTheme.typography.labelSmall,
         modifier = Modifier.width(72.dp).semantics { contentDescription = label },
+    )
+}
+
+@Composable
+private fun QuantityField(label: String, value: Int, onChange: (Int) -> Unit) {
+    // Clearing the box to type a new number keeps the line (only Remove takes
+    // it out of the cart); left empty or at 0, it goes back to the last quantity.
+    var draft by remember { mutableStateOf<String?>(null) }
+    OutlinedTextField(
+        draft ?: value.toString(),
+        { text ->
+            val digits = text.filter(Char::isDigit)
+            val quantity = capQuantity(digits)
+            draft = if (quantity > 0) quantity.toString() else digits
+            if (quantity > 0) onChange(quantity)
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        textStyle = MaterialTheme.typography.labelSmall,
+        modifier = Modifier.width(72.dp).onFocusChanged { if (!it.isFocused) draft = null }.semantics { contentDescription = label },
     )
 }
 
@@ -370,17 +392,24 @@ private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, searc
             FlowRow(modifier = Modifier.fillMaxWidth().cartLine(item.id).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SpriteIcon(item.sprite, size = 28.dp)
                 Text(item.name, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterVertically))
-                QuantityField("${item.name} quantity", line.quantity.toString()) { setCart(cart + (item.id to line.copy(quantity = capQuantity(it)))) }
+                QuantityField("${item.name} quantity", line.quantity) { setCart(cart + (item.id to line.copy(quantity = it))) }
                 if (item.upgradeable) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("TARGET", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 4.dp))
-                        QuantityField("${item.name} target level", "+${line.level}") { text ->
+                        LevelField("${item.name} target level", "+${line.level}") { text ->
                             setCart(cart + (item.id to line.copy(level = (text.filter(Char::isDigit).take(3).toIntOrNull() ?: 0).coerceIn(0, 13))))
                         }
                     }
                 }
                 TextButton(onClick = { setCart(cart + (item.id to BuyLine(0, 0))) }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
-                if (line.level > 0 && item.upgradeable) {
+                if (line.level > 0 && item.upgradeable && estimates.getValue(item.id).unlikely) {
+                    Text(
+                        "+${line.level} is too unlikely to estimate a budget for. Choose a lower target level.",
+                        color = Color(0xFFFBBF24),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.fillMaxWidth().padding(start = 36.dp),
+                    )
+                } else if (line.level > 0 && item.upgradeable) {
                     val estimate = estimates.getValue(item.id)
                     Text(
                         "90% budget: ${estimate.attempts} base items · " + estimate.scrolls.withIndex().filter { it.value != 0L }.joinToString(" · ") { "${it.value} scroll${it.index}" },
@@ -496,7 +525,7 @@ private fun CraftContent(part: CommercePart, recipes: List<MerchantCraftRecipe>,
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.cartLine(item.id).padding(vertical = 4.dp)) {
                 SpriteIcon(item.sprite, size = 28.dp)
                 Text(item.name, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-                QuantityField("${item.name} quantity", cart.getValue(item.id).toString()) { setCart(cart + (item.id to capQuantity(it))) }
+                QuantityField("${item.name} quantity", cart.getValue(item.id)) { setCart(cart + (item.id to it)) }
                 TextButton(onClick = { setCart(cart + (item.id to 0)) }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             }
         }
@@ -614,7 +643,7 @@ private fun ExchangeContent(part: CommercePart, viewModel: PartyViewModel, excha
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.weight(1f),
                 )
-                QuantityField("${item.name} quantity", cart.getValue(item.key).toString()) { setCart(cart + (item.key to capQuantity(it))) }
+                QuantityField("${item.name} quantity", cart.getValue(item.key)) { setCart(cart + (item.key to it)) }
                 TextButton(onClick = { setCart(cart + (item.key to 0)) }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             }
         }

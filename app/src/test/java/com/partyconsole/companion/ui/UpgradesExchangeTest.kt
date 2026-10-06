@@ -1,5 +1,7 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.assertIsDisplayed
@@ -166,6 +168,25 @@ class UpgradesExchangeTest {
         // The header folds the cart away.
         compose.onNodeWithContentDescription("Fold Cart").performClick()
         compose.onNode(hasContentDescription("Item 35 quantity")).assertDoesNotExist()
+    }
+
+    @Test
+    fun clearingACartQuantityToTypeANewOneKeepsTheLine() {
+        // Failure mode: an empty box reads as quantity 0, which drops the line
+        // (and its box) from the cart mid-edit.
+        val catalog = console.sections.getValue("catalog")["merchantCatalog"]!!.jsonObject
+        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + mapOf("buyable" to Json.parseToJsonElement("""[{"id":"hpot0","name":"Health Potion","cost":20,"seller":"basics"}]""")))))
+        val viewModel = PartyViewModel(console.settings)
+        compose.setContent { MerchantCommerceScreen(viewModel, "buy", onBack = {}) }
+        eventually { viewModel.dynamicState.value.merchantCatalog?.buyable?.size == 1 }
+        compose.waitForIdle()
+        compose.onNodeWithText("Add").performClick()
+        val box = hasContentDescription("Health Potion quantity")
+        compose.onNode(box).performTextClearance()
+        compose.onNode(box).assertIsDisplayed()
+        compose.onNode(box).performTextInput("5")
+        compose.waitForIdle()
+        compose.onNode(hasText("Gold: 100g")).assertIsDisplayed()
     }
 
     @Test

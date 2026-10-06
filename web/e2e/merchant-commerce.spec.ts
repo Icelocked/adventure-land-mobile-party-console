@@ -214,3 +214,31 @@ test('Craft on a phone: the added recipe stays in view and missing ingredients s
   await expect(cart.getByText('Missing: Green Gem')).toBeInViewport()
   await expect(cart.getByRole('button', { name: 'Craft', exact: true })).toBeDisabled()
 })
+
+test('Cart quantity: clearing the box to type a new number keeps the line; left empty it goes back', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [] })
+  server.buyable = [{ id: 'hpot0', name: 'Health Potion', cost: 20 }]
+  await server.install(page)
+
+  await page.goto('/merchant/buy')
+  await page.locator('.rounded-md.border', { hasText: 'Health Potion' }).getByRole('button', { name: 'Add' }).click()
+  const box = page.getByLabel('Health Potion quantity')
+  await box.click()
+  await box.press('End')
+  await box.press('Backspace')
+  await expect(box).toBeVisible()
+  await expect(box).toHaveValue('')
+  await box.pressSequentially('5')
+  await expect(box).toHaveValue('5')
+  await expect(page.getByText('Gold: 100g')).toBeVisible()
+
+  await box.fill('')
+  await box.blur()
+  await expect(box).toHaveValue('5')
+  await box.fill('0')
+  await expect(box).toBeVisible()
+  await box.blur()
+  await expect(box).toHaveValue('5')
+})

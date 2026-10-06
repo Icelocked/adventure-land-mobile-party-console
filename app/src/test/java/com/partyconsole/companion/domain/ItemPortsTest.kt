@@ -10,6 +10,7 @@ import com.partyconsole.companion.model.MerchantBuyItem
 import com.partyconsole.companion.model.SlotRollStatistics
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -24,7 +25,19 @@ class ItemPortsTest {
         // vite-node: upgradeEstimate(bow, 1, 7) and (blade grade 1, 3, 9)
         assertEquals(UpgradeEstimate(59, 358000.0, listOf(299, 0, 0, 0)), upgradeEstimate(bow, 1, 7))
         val blade = bow.copy(id = "blade", upgradeGrade = 1, upgradeChances = UPGRADE_CHANCES[1])
-        assertEquals(UpgradeEstimate(16848, 101801000.0, listOf(84953, 0, 0, 0)), upgradeEstimate(blade, 3, 9))
+        // Three to +9 runs into the roll budget, so fewer runs finish (as in the PWA).
+        assertEquals(UpgradeEstimate(16963, 102530000.0, listOf(85567, 0, 0, 0)), upgradeEstimate(blade, 3, 9))
+    }
+
+    @Test
+    fun aTargetTooUnlikelyToEstimateGivesUpInsteadOfFreezing() {
+        // A mistyped +91 (capped to +13) used to simulate for hours.
+        val staff = MerchantBuyItem(id = "staff", name = "Staff", cost = 12400, seller = "basics", upgradeable = true, upgradeGrade = 0, grades = listOf(7, 9, 10, 12),
+            upgradeChances = listOf(1.0, 0.9999999, 0.98, 0.95, 0.7, 0.6, 0.4, 0.25, 0.15, 0.07, 0.024, 0.14, 0.11), scrollCosts = listOf(1000, 40000, 1600000, 480000000))
+        assertEquals(5691L, upgradeEstimate(staff, 1, 9).attempts)
+        val started = System.currentTimeMillis()
+        assertTrue(upgradeEstimate(staff, 1, 13).unlikely)
+        assertTrue(System.currentTimeMillis() - started < 20_000)
     }
 
     @Test
