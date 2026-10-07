@@ -6,6 +6,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.withFrameNanos
@@ -166,8 +168,7 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
         else -> ExchangeContent(part, viewModel, catalog?.exchangeable.orEmpty(), search, exchangeCart, { exchangeCart = it }) { inspecting = it }
     }
     AccountScreenScaffold(title, onBack) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        val list: @Composable ColumnScope.() -> Unit = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 8.dp)) {
                     for (m in MODES) FilterChip(selected = mode == m, onClick = { setMode(m) }, label = { Text(m.replaceFirstChar { it.uppercase() }) })
                 }
@@ -183,7 +184,8 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 )
                 OutlinedTextField(search, { search = it }, placeholder = { Text("Search items…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp))
                 Content(CommercePart.LIST)
-            }
+        }
+        val checkout: @Composable ColumnScope.() -> Unit = {
             Content(CommercePart.CART)
             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
@@ -230,6 +232,21 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                             submit({ viewModel.api.submitExchangeOrder(lines) }) { exchangeCart = emptyMap() }
                         }) { Text(if (submitting) "Queuing..." else "Exchange all") }
                     }
+                }
+            }
+        }
+        // Wide screens (a turned phone, a tablet): the cart is a column beside
+        // the list instead of a bar under it.
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            if (maxWidth >= 600.dp) {
+                Row(Modifier.fillMaxSize()) {
+                    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()), content = list)
+                    Column(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()), content = checkout)
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), content = list)
+                    checkout()
                 }
             }
         }

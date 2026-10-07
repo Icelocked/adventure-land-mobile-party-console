@@ -33,6 +33,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** character-header / combat-status / hunting / travel / combat-log specs on the native character screen. */
 @RunWith(RobolectricTestRunner::class)
@@ -82,6 +83,25 @@ class CharacterScreenTest {
     // The screen body is the outermost vertical scroller (lists inside it scroll too).
     private fun scrollTo(text: String) = compose.onAllNodes(hasScrollActionMatcher)[0].performScrollToNode(hasText(text))
     private val hasScrollActionMatcher = androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)
+
+    @Test
+    @Config(qualifiers = "w844dp-h390dp")
+    fun aTurnedPhoneShowsControlsLeftAndGearRight() {
+        show("Leada")
+        val formation = compose.onNodeWithText("Formation").fetchSemanticsNode().boundsInRoot
+        val equipment = compose.onNodeWithText("Equipment").fetchSemanticsNode().boundsInRoot
+        assertTrue("Equipment sits in the right column", equipment.left > formation.right)
+        assertTrue("both columns start near the top", equipment.top < formation.top + 600)
+    }
+
+    @Test
+    fun anUprightPhoneKeepsOneColumn() {
+        show("Leada")
+        val formation = compose.onNodeWithText("Formation").fetchSemanticsNode().boundsInRoot
+        scrollTo("Equipment")
+        val equipment = compose.onNodeWithText("Equipment").fetchSemanticsNode().boundsInRoot
+        assertTrue("Equipment shares the column", kotlin.math.abs(equipment.left - formation.left) < 2f)
+    }
 
     @Test
     fun statusesOpenWithTheirCountdownAndThePortraitOpensTheStats() {
