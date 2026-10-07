@@ -64,7 +64,7 @@ export function CharacterListScreen() {
   const configLoaded = useConfigLoaded()
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-6xl">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
           <div className="flex items-center gap-2">
@@ -124,7 +124,8 @@ export function CharacterListScreen() {
           )}
         </div>
       ) : (
-        <ul className="flex flex-col gap-2 p-3">
+        // Cards side by side when the screen is wide enough.
+        <ul className="grid grid-cols-1 gap-2 p-3 md:grid-cols-2 xl:grid-cols-3">
           {names.filter((name) => !pending.some((entry) => entry.name === name)).map((name) => (
             <CharacterRow key={name} name={name} state={characters[name]} bestiaryCatalog={dynamicState.bestiaryCatalog} />
           ))}

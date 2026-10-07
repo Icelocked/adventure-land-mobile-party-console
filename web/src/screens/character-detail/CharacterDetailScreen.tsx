@@ -53,7 +53,7 @@ export function CharacterDetailScreen() {
   const others = Object.keys(characters).filter((n) => n !== name)
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-6xl">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
         <Button variant="ghost" size="icon-sm" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="size-5" />
@@ -92,7 +92,11 @@ export function CharacterDetailScreen() {
       {!vitals ? (
         <p className="p-6 text-sm text-muted-foreground">This character isn't reporting in right now.</p>
       ) : (
-        <>
+        // Wide screens (a turned phone, a tablet): the character and its
+        // controls on the left, gear, inventory and rules on the right. A
+        // narrow screen keeps one column in the same order.
+        <div className="flex-1 pb-6 md:grid md:grid-cols-2 md:items-start">
+          <div className="min-w-0">
           <VitalsHeader
             name={name}
             vitals={vitals}
@@ -104,7 +108,6 @@ export function CharacterDetailScreen() {
           />
           {/* The live map sits under the card header. */}
           <MapSection name={name} map={vitals.map} x={vitals.x} y={vitals.y} />
-          <div className="flex-1 pb-6">
             {/* Statuses sit under HP/MP for every class. */}
             <StatusesSection characterName={name} conditions={vitals.conditions ?? []} />
             <LeaderFollowerSection characterName={name} dynamicState={dynamicState} />
@@ -156,6 +159,8 @@ export function CharacterDetailScreen() {
                 localLucky={vitals.luckySlotTracking}
               />
             )}
+          </div>
+          <div className="min-w-0 md:pt-1.5">
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}
               upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => mark.equipped)}
@@ -186,7 +191,7 @@ export function CharacterDetailScreen() {
             <AutoMarksSection characterName={name} isMerchant={isMerchant} dynamicState={dynamicState} catalogFor={catalogFor} />
             <CombatLogSection characterName={name} />
           </div>
-        </>
+        </div>
       )}
 
       {actionTarget && (
