@@ -7,7 +7,7 @@ import { achievementMonsters, nextStep, type AchievementMonster } from '@/lib/ac
 import type { AchievementBlacklistEntry, PartyStateDynamic } from '@/models'
 import { SectionCard } from '../SectionCard'
 
-type Settings = { enabled: boolean; monsters: string[]; blacklistDeaths: boolean; deathThreshold: number }
+type Settings = { monsters: string[]; blacklistDeaths: boolean; deathThreshold: number }
 
 function progress(monster: AchievementMonster, kills: number): string {
   const step = nextStep(monster.ladder, kills)
@@ -31,7 +31,7 @@ export function AchievementHuntSection({ state }: { state: PartyStateDynamic }) 
   const selected = new Set(settings.monsters)
   const regular = monsters.filter((m) => !m.special)
   const special = monsters.filter((m) => m.special)
-  const hunting = state.farmingPolicy === 'hunt'
+  const active = state.farmingPolicy === 'achievements'
   const kills = (id: string) => Number(achievements[id]?.score) || 0
 
   const run = async (body: Parameters<typeof api.achievementHunt>[0]) => {
@@ -74,15 +74,10 @@ export function AchievementHuntSection({ state }: { state: PartyStateDynamic }) 
 
   return (
     <SectionCard title="Achievement Hunt">
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 text-xs text-muted-foreground">
-          {hunting && !settings.enabled ? 'Turn off Hunt mode to start.' : state.achievementMessage || 'Off'}
-          <span className="block">{selected.size} selected · fights in your Auto/Default/Scatter mode</span>
-        </p>
-        <Button size="sm" variant={settings.enabled ? 'outline' : 'default'} disabled={busy || (!settings.enabled && (hunting || !selected.size))} onClick={() => void run({ settings: { enabled: !settings.enabled } })}>
-          {settings.enabled ? 'Stop' : 'Start'}
-        </Button>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        {active ? state.achievementMessage || 'Starting' : 'Choose Achievements in Farming to start.'}
+        <span className="block">{selected.size} selected</span>
+      </p>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <Button size="sm" variant="outline" onClick={() => setChoosing(true)}>
           Choose monsters…

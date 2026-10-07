@@ -612,7 +612,7 @@ export class PartyApiClient {
    *  preference rather than applied live. Hunt needs a `backup` (monster
    *  focus + spawn location) when none is set yet, or the server 409s. */
   async setFarmingMode(
-    mode: 'auto' | 'default' | 'scatter' | 'hunt',
+    mode: 'auto' | 'default' | 'scatter' | 'hunt' | 'achievements',
     character: string,
     backup?: { monsterFocus: string[]; location: { map: string; x: number; y: number } },
   ): Promise<ApiResult<CommandResult>> {
@@ -672,7 +672,7 @@ export class PartyApiClient {
   /** POST /party-api/achievement-hunt - settings patch and/or a blacklist
    *  change (console branch achievement-hunt). */
   async achievementHunt(body: {
-    settings?: Partial<{ enabled: boolean; monsters: string[]; blacklistDeaths: boolean; deathThreshold: number }>
+    settings?: Partial<{ monsters: string[]; blacklistDeaths: boolean; deathThreshold: number }>
     blacklist?: { action: 'add' | 'remove' | 'clear'; monsterId?: string }
   }): Promise<ApiResult<CommandResult>> {
     return this.post('achievement-hunt', body)

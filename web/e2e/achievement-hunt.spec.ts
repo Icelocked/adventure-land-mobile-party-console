@@ -25,12 +25,12 @@ function setup(settings: Record<string, unknown> | null) {
     { id: 'phoenix', name: 'Phoenix', hp: 36000, threat: 300, definition: { achievements: ladder(1, 10) } },
   ]
   server.monsterChoices = [{ id: 'goo', locations: at }, { id: 'bee', locations: at }, { id: 'wolf', locations: at }]
-  if (settings) server.extraState = { achievementHunt: settings, achievementBlacklist: { bee: { monsterId: 'bee', at: 1, reason: '3 deaths while farming for achievements' } }, achievementMessage: 'Farming goo: 4 / 10 kills (step 1)' }
+  if (settings) server.extraState = { farmingPolicy: 'achievements', achievementHunt: settings, achievementBlacklist: { bee: { monsterId: 'bee', at: 1, reason: '3 deaths while farming for achievements' } }, achievementMessage: 'Farming goo: 4 / 10 kills (step 1)' }
   return server
 }
 
-test('Achievement Hunt: weakest-first selector, Up to here, skip, start and the status line', async ({ page }) => {
-  const server = setup({ enabled: false, monsters: ['goo'], blacklistDeaths: true, deathThreshold: 3 })
+test('Achievement Hunt: weakest-first selector, Up to here, skip, the Achievements mode and the status line', async ({ page }) => {
+  const server = setup({ monsters: ['goo'], blacklistDeaths: true, deathThreshold: 3 })
   await server.install(page)
   const sent = bodies(page)
   await page.goto('/characters/Leada')
@@ -53,8 +53,13 @@ test('Achievement Hunt: weakest-first selector, Up to here, skip, start and the 
   await expect.poll(() => sent.at(-1)).toEqual({ blacklist: { action: 'add', monsterId: 'wolf' } })
   await page.keyboard.press('Escape')
 
-  await section.getByRole('button', { name: 'Start' }).click()
-  await expect.poll(() => sent.at(-1)).toEqual({ settings: { enabled: true } })
+  // Achievements is a farming mode, chosen next to Hunt.
+  const modes: Record<string, unknown>[] = []
+  page.on('request', (request) => { if (request.method() === 'POST' && request.url().endsWith('/party-api/farming-mode')) modes.push(request.postDataJSON()) })
+  const farming = page.getByRole('region', { name: 'Farming' })
+  await farming.getByRole('button', { name: 'Hunt', exact: true }).waitFor()
+  await farming.getByRole('button', { name: 'Achievements' }).click()
+  await expect.poll(() => modes.at(-1)).toEqual({ mode: 'achievements', character: 'Leada' })
   await section.getByRole('button', { name: 'Unskip' }).first().click()
   await expect.poll(() => sent.at(-1)).toEqual({ blacklist: { action: 'remove', monsterId: 'bee' } })
 })
@@ -65,12 +70,14 @@ test('Achievement Hunt is absent on a console without it, and only on the leader
   await page.goto('/characters/Leada')
   await expect(page.getByRole('region', { name: 'Formation' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Achievement Hunt' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Farming' }).getByRole('button', { name: 'Achievements' })).toHaveCount(0)
 })
 
 test('Achievement Hunt shows only on the party leader', async ({ page }) => {
-  const server = setup({ enabled: true, monsters: ['goo'], blacklistDeaths: true, deathThreshold: 3 })
+  const server = setup({ monsters: ['goo'], blacklistDeaths: true, deathThreshold: 3 })
   await server.install(page)
   await page.goto('/characters/Folla')
   await expect(page.getByRole('region', { name: 'Formation' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Achievement Hunt' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Farming' }).getByRole('button', { name: 'Achievements' })).toHaveCount(0)
 })

@@ -938,7 +938,6 @@ export interface AppearanceChoice {
 
 /** Console runtime/coordinator/hunt/achievement-settings.ts. */
 export interface AchievementHuntSettings {
-  enabled: boolean
   monsters: string[]
   blacklistDeaths: boolean
   deathThreshold: number
