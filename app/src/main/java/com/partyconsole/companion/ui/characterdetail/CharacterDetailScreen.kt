@@ -1,5 +1,9 @@
 package com.partyconsole.companion.ui.characterdetail
 
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -116,19 +120,19 @@ fun CharacterDetailScreen(
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
-            VitalsHeader(
-                name = characterName,
-                vitals = vitals,
-                accountGold = accountGold,
-                bestiaryCatalog = dynamicState.bestiaryCatalog,
-                resolvedTargetType = resolvedTargetType,
-                diagnostics = diagnostics[characterName],
-                slots = state.inventory?.slots.orEmpty(),
-                online = diagnostics[characterName]?.online(now) == true,
-            )
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
-            ) {
+            val header: @Composable () -> Unit = {
+                VitalsHeader(
+                    name = characterName,
+                    vitals = vitals,
+                    accountGold = accountGold,
+                    bestiaryCatalog = dynamicState.bestiaryCatalog,
+                    resolvedTargetType = resolvedTargetType,
+                    diagnostics = diagnostics[characterName],
+                    slots = state.inventory?.slots.orEmpty(),
+                    online = diagnostics[characterName]?.online(now) == true,
+                )
+            }
+            val controls: @Composable ColumnScope.() -> Unit = {
                 // The live map sits under the card header.
                 com.partyconsole.companion.ui.characterdetail.sections.MapSection(viewModel, characterName, vitals.map, vitals.x, vitals.y)
                 // Statuses sit under HP/MP for every class.
@@ -178,6 +182,8 @@ fun CharacterDetailScreen(
                         localLucky = vitals.luckySlotTracking,
                     )
                 }
+            }
+            val gear: @Composable ColumnScope.() -> Unit = {
                 EquipmentSection(
                     slots = state.inventory?.slots.orEmpty(),
                     upgradeMarks = dynamicState.upgrades[characterName].orEmpty().filter { it.equipped },
@@ -211,6 +217,29 @@ fun CharacterDetailScreen(
                 if (isMerchant) com.partyconsole.companion.ui.characterdetail.sections.RuleConflictsSection(viewModel)
                 AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)
                 com.partyconsole.companion.ui.characterdetail.sections.CombatLogSection(characterName, viewModel)
+            }
+            // Wide screens (a turned phone, a tablet): the character and its
+            // controls on the left with the header scrolling above them, gear,
+            // inventory and rules on the right. A narrow screen keeps the header
+            // fixed above one column, in the same order.
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                if (maxWidth >= 600.dp) {
+                    Row(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f)) {
+                            header()
+                            controls()
+                        }
+                        Column(Modifier.weight(1f)) { gear() }
+                    }
+                } else {
+                    Column(Modifier.fillMaxSize()) {
+                        header()
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                            controls()
+                            gear()
+                        }
+                    }
+                }
             }
         }
 

@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -143,7 +145,14 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
             )
         },
     ) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 12.dp)) {
+      // Wide screens (a turned phone, a tablet) put the character cards side by side.
+      BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val perRow = when {
+            maxWidth >= 900.dp -> 3
+            maxWidth >= 600.dp -> 2
+            else -> 1
+        }
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp)) {
             if (!connected) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
             if (sessionLost) item { SessionLostCard(onReconnect) }
             item { DebugBrowserBanner(viewModel) }
@@ -168,8 +177,13 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                     }
                 }
             } else {
-                items(names.filter { it !in pendingNames }, key = { it }) { name ->
-                    characters[name]?.let { CharacterRow(viewModel, name, it, state.bestiaryCatalog) { onSelectCharacter(name) } }
+                items(names.filter { it !in pendingNames }.chunked(perRow), key = { it.joinToString("|") }) { row ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        for (name in row) {
+                            Box(Modifier.weight(1f)) { characters[name]?.let { CharacterRow(viewModel, name, it, state.bestiaryCatalog) { onSelectCharacter(name) } } }
+                        }
+                        repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
                 items(pending, key = { "pending-${it.name}" }) { PendingCharacterCard(viewModel, it) }
             }
@@ -202,6 +216,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                 }
             }
         }
+      }
     }
 
     pickerSlot?.let { slot ->

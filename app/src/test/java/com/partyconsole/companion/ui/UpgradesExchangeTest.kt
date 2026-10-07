@@ -39,6 +39,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.robolectric.annotation.Config
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -168,6 +169,15 @@ class UpgradesExchangeTest {
         // The header folds the cart away.
         compose.onNodeWithContentDescription("Fold Cart").performClick()
         compose.onNode(hasContentDescription("Item 35 quantity")).assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w844dp-h390dp")
+    fun aTurnedPhoneShowsTheCartBesideTheList() {
+        commerce("buy")
+        val search = compose.onNodeWithText("Search items…").fetchSemanticsNode().boundsInRoot
+        val cart = compose.onNodeWithContentDescription("Cart").fetchSemanticsNode().boundsInRoot
+        assertTrue("the cart is a column to the right of the list", cart.left >= search.right)
     }
 
     @Test
