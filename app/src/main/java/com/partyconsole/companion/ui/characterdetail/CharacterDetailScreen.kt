@@ -1,6 +1,6 @@
 package com.partyconsole.companion.ui.characterdetail
 
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -220,16 +220,17 @@ fun CharacterDetailScreen(
             }
             // Wide screens (a turned phone, a tablet): the character and its
             // controls on the left with the header scrolling above them, gear,
-            // inventory and rules on the right. A narrow screen keeps the header
-            // fixed above one column, in the same order.
+            // inventory and rules on the right, each column scrolling on its
+            // own. A narrow screen keeps the header fixed above one column, in
+            // the same order.
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 if (maxWidth >= 600.dp) {
-                    Row(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalAlignment = Alignment.Top) {
-                        Column(Modifier.weight(1f)) {
+                    Row(Modifier.fillMaxSize()) {
+                        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
                             header()
                             controls()
                         }
-                        Column(Modifier.weight(1f)) { gear() }
+                        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) { gear() }
                     }
                 } else {
                     Column(Modifier.fillMaxSize()) {
