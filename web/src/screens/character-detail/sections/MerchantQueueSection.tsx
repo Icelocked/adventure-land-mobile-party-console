@@ -53,7 +53,7 @@ export function MerchantQueueSection() {
   const mluck = state.mluckSchedule
 
   return (
-    <SectionCard title={`Merchant logistics · ${queue.length} queued`}>
+    <SectionCard title={`Merchant logistics · ${queue.length} queued`} id="Merchant logistics">
       {stuck && (
         <p className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
           Stuck: {stuck}

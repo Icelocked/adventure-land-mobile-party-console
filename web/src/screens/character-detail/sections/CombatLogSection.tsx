@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSectionOpen } from '@/lib/sectionOpen'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { usePartyApi, useDomainInterest, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 
@@ -14,10 +15,10 @@ const COLORS: Record<string, string> = {
  *  while open, keeps the logs domain fresh and lists the last 50 events
  *  (newest first, coloured by type) with Clear history. */
 export function CombatLogSection({ characterName }: { characterName: string }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useSectionOpen('character:Combat log', false)
   return (
     <section aria-label="Combat log" className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex w-full items-center gap-1 text-left text-sm font-semibold">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center gap-1 text-left text-sm font-semibold">
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         Combat log
       </button>

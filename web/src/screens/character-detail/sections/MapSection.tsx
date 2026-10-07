@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSectionOpen } from '@/lib/sectionOpen'
 import { ChevronDown, ChevronRight, Maximize2, X } from 'lucide-react'
 import { MapCanvas } from '@/components/map/MapCanvas'
 import { FreshnessBadge } from '@/components/FreshnessBadge'
@@ -12,7 +13,7 @@ import { useMapDefinition, useMapFrames, useVisible } from '@/data/useMapFrames'
 export function MapSection({ name, map, x, y }: { name: string; map: string; x: number; y: number }) {
   const caveMap = /^zone_[a-f0-9]+_\d+$/.test(map)
   const mapLabel = caveMap ? 'Cave of Many Dreams' : map
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useSectionOpen('character:Map', false)
   const [large, setLarge] = useState(false)
   const [streamDefinition, setStreamDefinition] = useState<MapDefinition | null>(null)
   const definitionQuery = useMapDefinition(map, open && !caveMap)
@@ -51,7 +52,7 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
               Object.assign(buffer.current, { frame: null, previous: null, receivedAt: 0 })
               setLastFrameAt(0)
             }
-            setOpen((value) => !value)
+            setOpen(!open)
           }}
           className="rounded p-0.5"
           aria-label={open ? 'Collapse live map' : 'Expand live map'}
