@@ -54,6 +54,8 @@ export function CharacterDetailScreen() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-6xl">
+      {/* The title bar and the character switcher stay in view while the page scrolls. */}
+      <div className="sticky top-0 z-20 bg-background">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
         <Button variant="ghost" size="icon-sm" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="size-5" />
@@ -88,6 +90,7 @@ export function CharacterDetailScreen() {
           ))}
         </div>
       )}
+      </div>
 
       {!vitals ? (
         <p className="p-6 text-sm text-muted-foreground">This character isn't reporting in right now.</p>
