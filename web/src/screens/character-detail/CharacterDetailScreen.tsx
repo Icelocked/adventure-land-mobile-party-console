@@ -53,7 +53,7 @@ export function CharacterDetailScreen() {
   const others = Object.keys(characters).filter((n) => n !== name)
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-6xl">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col md:h-dvh md:min-h-0 md:max-w-6xl">
       {/* The title bar and the character switcher stay in view while the page scrolls. */}
       <div className="sticky top-0 z-20 bg-background">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -96,10 +96,11 @@ export function CharacterDetailScreen() {
         <p className="p-6 text-sm text-muted-foreground">This character isn't reporting in right now.</p>
       ) : (
         // Wide screens (a turned phone, a tablet): the character and its
-        // controls on the left, gear, inventory and rules on the right. A
-        // narrow screen keeps one column in the same order.
-        <div className="flex-1 pb-6 md:grid md:grid-cols-2 md:items-start">
-          <div className="min-w-0">
+        // controls on the left, gear, inventory and rules on the right, each
+        // scrolling on its own under the fixed title bar. A narrow screen
+        // keeps one column in the same order.
+        <div className="flex-1 pb-6 md:grid md:min-h-0 md:grid-cols-2 md:pb-0">
+          <div className="min-w-0 md:overflow-y-auto md:pb-6">
           <VitalsHeader
             name={name}
             vitals={vitals}
@@ -163,7 +164,7 @@ export function CharacterDetailScreen() {
               />
             )}
           </div>
-          <div className="min-w-0 md:pt-1.5">
+          <div className="min-w-0 md:overflow-y-auto md:pt-1.5 md:pb-6">
             <EquipmentSection
               slots={state?.inventory?.slots ?? {}}
               upgradeMarks={(dynamicState.upgrades[name] ?? []).filter((mark) => mark.equipped)}

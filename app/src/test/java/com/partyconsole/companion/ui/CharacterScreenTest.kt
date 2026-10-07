@@ -95,6 +95,19 @@ class CharacterScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w844dp-h390dp")
+    fun aTurnedPhoneScrollsEachColumnSeparately() {
+        show("Leada")
+        val scrollers = compose.onAllNodes(hasScrollActionMatcher)
+        val position = { i: Int -> scrollers[i].fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange].value() }
+        // The right column (gear) ends in the combat log.
+        scrollers[1].performScrollToNode(hasText("Combat log"))
+        compose.waitForIdle()
+        assertTrue("the right column scrolled", position(1) > 0f)
+        assertEquals("the left column stayed put", 0f, position(0), 0f)
+    }
+
+    @Test
     fun anUprightPhoneKeepsOneColumn() {
         show("Leada")
         val formation = compose.onNodeWithText("Formation").fetchSemanticsNode().boundsInRoot
