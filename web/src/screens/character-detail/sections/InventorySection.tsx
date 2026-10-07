@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
+import { useSectionOpen } from '@/lib/sectionOpen'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -50,7 +51,7 @@ export function InventorySection({
   onLuckySlotData: () => void
   localLucky?: unknown
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useSectionOpen('character:Inventory')
   const [details, setDetails] = useState<TileDetails | null>(null)
   const [luckyMenu, setLuckyMenu] = useState<{ slot: number } | null>(null)
 
@@ -85,7 +86,7 @@ export function InventorySection({
 
   return (
     <section aria-label="Inventory" className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="mb-2 flex w-full items-center justify-between text-left">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="mb-2 flex w-full items-center justify-between text-left">
         <span className="flex items-center gap-1 text-sm font-semibold">
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           Inventory

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSectionOpen } from '@/lib/sectionOpen'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -11,7 +12,7 @@ import type { Condition } from '@/models'
  *  each status shows its sprite, a ticking countdown over a depleting bar,
  *  and stacks, and opens its Condition details. Shown for every class. */
 export function StatusesSection({ characterName, conditions }: { characterName: string; conditions: Condition[] }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useSectionOpen('character:Active status', false)
   const [selected, setSelected] = useState<Condition | null>(null)
   const now = useClock()
   const [durations, setDurations] = useState<Record<string, StatusDuration | undefined>>({})
@@ -23,7 +24,7 @@ export function StatusesSection({ characterName, conditions }: { characterName: 
 
   return (
     <section aria-label="Active status" className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between text-left">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center justify-between text-left">
         <span className="flex items-center gap-1 text-sm font-semibold">
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           Active status

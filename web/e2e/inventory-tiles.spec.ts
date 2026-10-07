@@ -99,7 +99,8 @@ test('Equipment: all 15 slots in dashboard order with Empty tiles; the elixir on
 
   await page.goto('/characters/Ranger1')
   const equipment = page.getByRole('region', { name: 'Equipment' })
-  const tiles = equipment.getByRole('button')
+  // Slot tiles are named "<slot>: <item>"; the section title is the fold button.
+  const tiles = equipment.getByRole('button', { name: /^[a-z0-9 ]+: / })
   await expect(tiles).toHaveCount(16)
   await expect(tiles.nth(0)).toHaveAccessibleName('helmet: Empty')
   await expect(tiles.nth(0)).toBeDisabled()
@@ -112,4 +113,33 @@ test('Equipment: all 15 slots in dashboard order with Empty tiles; the elixir on
   await tiles.nth(15).click()
   await expect(page.getByRole('button', { name: 'Active elixir effect' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Unequip' })).not.toBeVisible()
+})
+
+test('Sections fold from their title and stay folded on this device, for every character', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, slots: { mainhand: { item: { name: 'bow', level: 7 } } } })
+  server.addCharacter({ name: 'Mage1', ctype: 'mage', level: 50 })
+  server.addCatalogEntry({ id: 'bow', name: 'Bow', upgradeable: true })
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  const equipment = page.getByRole('region', { name: 'Equipment' })
+  const fold = equipment.getByRole('button', { name: 'Equipment' })
+  await expect(fold).toHaveAttribute('aria-expanded', 'true')
+  await expect(equipment.getByRole('button', { name: 'mainhand: Bow' })).toBeVisible()
+  await fold.click()
+  await expect(fold).toHaveAttribute('aria-expanded', 'false')
+  await expect(equipment.getByRole('button', { name: 'mainhand: Bow' })).toHaveCount(0)
+  // Inventory folds the same way and is independent.
+  const inventory = page.getByRole('region', { name: 'Inventory' }).getByRole('button', { name: /Inventory/ })
+  await inventory.click()
+  await expect(inventory).toHaveAttribute('aria-expanded', 'false')
+
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Equipment' }).getByRole('button', { name: 'Equipment' })).toHaveAttribute('aria-expanded', 'false')
+  await page.goto('/characters/Mage1')
+  await expect(page.getByRole('region', { name: 'Equipment' }).getByRole('button', { name: 'Equipment' })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('region', { name: 'Inventory' }).getByRole('button', { name: /Inventory/ })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('region', { name: 'Formation' }).getByRole('button', { name: 'Formation' })).toHaveAttribute('aria-expanded', 'true')
 })
