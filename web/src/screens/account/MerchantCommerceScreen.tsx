@@ -299,7 +299,10 @@ function CartDock({
     })
   }, [quantities])
   return (
-    <section aria-label={title} className="sticky bottom-0 z-10 mt-3 border-t border-border bg-background shadow-[0_-6px_16px_rgba(0,0,0,0.45)]">
+    <section
+      aria-label={title}
+      className="sticky bottom-0 z-10 mt-3 border-t border-border bg-background shadow-[0_-6px_16px_rgba(0,0,0,0.45)] md:top-2 md:bottom-auto md:mt-0 md:rounded-lg md:border md:shadow-none"
+    >
       <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex w-full items-center gap-2 px-3 py-2 text-left">
         <span className="font-mono text-xs uppercase text-muted-foreground">
           {title}
@@ -309,7 +312,7 @@ function CartDock({
         {open ? <ChevronDown className={summary ? 'size-4' : 'ml-auto size-4'} /> : <ChevronUp className={summary ? 'size-4' : 'ml-auto size-4'} />}
       </button>
       {open && (
-        <div ref={body} className="relative max-h-[40vh] overflow-y-auto px-3 pb-2">
+        <div ref={body} className="relative max-h-[40vh] overflow-y-auto px-3 pb-2 md:max-h-[calc(100dvh-12rem)]">
           {children}
         </div>
       )}
@@ -359,6 +362,8 @@ function BuyScreen({
       <ModeTabs mode="buy" setMode={setMode} />
       <p className="px-3 pb-1 text-xs text-muted-foreground">Choose anything sold for gold.</p>
       <SearchBar value={search} onChange={setSearch} />
+      {/* Wide screens: the cart is a column beside the list instead of a bottom bar. */}
+      <div className="md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:items-start md:gap-3 md:pr-3">
       {filtered.length === 0 ? (
         <EmptyState message="No buyable items found." />
       ) : (
@@ -423,6 +428,7 @@ function BuyScreen({
             )
           })}
       </CartDock>
+      </div>
     </AccountScreenScaffold>
   )
 }
@@ -513,6 +519,8 @@ function CraftScreen({
       <ModeTabs mode="craft" setMode={setMode} />
       <p className="px-3 pb-1 text-xs text-muted-foreground">Recipes account for materials held by the active party and in the latest bank snapshot.</p>
       <SearchBar value={search} onChange={setSearch} />
+      {/* Wide screens: the cart is a column beside the list instead of a bottom bar. */}
+      <div className="md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:items-start md:gap-3 md:pr-3">
       {filtered.length === 0 ? (
         <EmptyState message="No craftable recipes found." />
       ) : (
@@ -626,6 +634,7 @@ function CraftScreen({
             })}
           </div>}
       </CartDock>
+      </div>
     </AccountScreenScaffold>
   )
 }
@@ -780,6 +789,8 @@ function ExchangeScreen({
       <ModeTabs mode="exchange" setMode={setMode} />
       <p className="px-3 pb-1 text-xs text-muted-foreground">Choose exchange operations backed by the merchant inventory and latest bank snapshot.</p>
       <SearchBar value={search} onChange={setSearch} />
+      {/* Wide screens: the cart is a column beside the list instead of a bottom bar. */}
+      <div className="md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:items-start md:gap-3 md:pr-3">
       {filtered.length === 0 ? (
         <EmptyState message="No exchange operations available." />
       ) : (
@@ -834,6 +845,7 @@ function ExchangeScreen({
             </CartRow>
           ))}
       </CartDock>
+      </div>
 
       {selectedExchange && (
         <div role="group" aria-label="Exchange details" className="fixed inset-0 z-50 flex flex-col bg-background p-3">

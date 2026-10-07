@@ -56,7 +56,8 @@ export function SettingsScreen() {
 
   return (
     <AccountScreenScaffold title="Interface settings" onRefresh={() => void refreshNow()}>
-      <div className="flex flex-col gap-3 p-3">
+      {/* Wide screens: sections flow into two columns. */}
+      <div className="flex flex-col gap-3 p-3 md:block md:columns-2 md:gap-3 md:*:mb-3 md:*:break-inside-avoid">
         <p className="text-xs text-muted-foreground">Manage saved dashboard state, character connections, and market access.</p>
         <DashboardStateImport />
         <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }} />

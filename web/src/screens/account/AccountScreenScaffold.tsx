@@ -10,7 +10,7 @@ import { LatencyBadge } from '@/components/LatencyBadge'
 export function AccountScreenScaffold({ title, onRefresh, children }: { title: string; onRefresh?: () => void; children: ReactNode }) {
   const navigate = useNavigate()
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-5xl">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
         <Button variant="ghost" size="icon-sm" onClick={() => navigate(-1)} aria-label="Back">
           <ArrowLeft className="size-5" />
