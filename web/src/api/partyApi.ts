@@ -669,6 +669,15 @@ export class PartyApiClient {
     return this.post('hunt-blacklist', body)
   }
 
+  /** POST /party-api/achievement-hunt - settings patch and/or a blacklist
+   *  change (console branch achievement-hunt). */
+  async achievementHunt(body: {
+    settings?: Partial<{ enabled: boolean; monsters: string[]; blacklistDeaths: boolean; deathThreshold: number }>
+    blacklist?: { action: 'add' | 'remove' | 'clear'; monsterId?: string }
+  }): Promise<ApiResult<CommandResult>> {
+    return this.post('achievement-hunt', body)
+  }
+
   /** POST /party-api/hunt-settings - a partial patch; the server merges. */
   async saveHuntSettings(
     character: string,
