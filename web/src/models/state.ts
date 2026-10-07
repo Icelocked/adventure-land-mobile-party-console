@@ -581,6 +581,11 @@ export interface PartyStateDynamic {
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
   huntSettings?: HuntSettings | null
+  // Achievement Hunt (console branch achievement-hunt; absent on stock consoles).
+  achievementHunt?: AchievementHuntSettings | null
+  achievementBlacklist?: Record<string, AchievementBlacklistEntry> | null
+  achievementTarget?: { id: string; step: number; milestone: number; startedAt: number; deaths: number } | null
+  achievementMessage?: string | null
   // The party's current Hunt quest: which monster, for which member.
   monsterHunt?: MonsterHuntCycle | null
   // Per-character Hunt quest assignment, keyed by character name.
@@ -929,4 +934,19 @@ export interface AppearanceChoice {
   index: number
   html?: string | null
   layers?: unknown[]
+}
+
+/** Console runtime/coordinator/hunt/achievement-settings.ts. */
+export interface AchievementHuntSettings {
+  enabled: boolean
+  monsters: string[]
+  blacklistDeaths: boolean
+  deathThreshold: number
+}
+export interface AchievementBlacklistEntry {
+  monsterId: string
+  at: number
+  reason: string
+  deaths?: number
+  characters?: string[]
 }
