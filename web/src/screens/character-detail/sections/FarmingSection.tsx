@@ -22,12 +22,15 @@ function focusSummary(monsterFocus: string[], bestiaryCatalog: BestiaryMonster[]
   return monsterFocus.map((id) => bestiaryCatalog.find((m) => m.id === id)?.name ?? id).join(', ')
 }
 
-const MODES: { id: 'auto' | 'default' | 'scatter' | 'hunt'; label: string; description: string }[] = [
+type FarmingMode = 'auto' | 'default' | 'scatter' | 'hunt' | 'achievements'
+const MODES: { id: FarmingMode; label: string; description: string }[] = [
   { id: 'auto', label: 'Auto', description: 'Default, switching to scatter when learned conditions allow it' },
   { id: 'default', label: 'Default', description: 'Force the normal party formation' },
   { id: 'scatter', label: 'Scatter', description: 'Force one-shot scatter farming' },
   { id: 'hunt', label: 'Hunt', description: 'One quest at a time: leader first, then the next member if its monster is blacklisted' },
 ]
+// Achievement Hunt: only the party leader, and only on a console that has it (branch achievement-hunt).
+const ACHIEVEMENTS = { id: 'achievements' as const, label: 'Achievements', description: 'Farm the selected monsters for their kill achievements, weakest first' }
 
 /** The mode selector with effective-mode/follow indicator, hunt status, and
  *  this character's monster focus. Hunt settings and the blacklist are
@@ -127,7 +130,8 @@ export function FarmingSection({
 
   // Hunt needs a backup focus and location; without both, the setup picker
   // opens before anything is posted.
-  const selectMode = async (mode: (typeof MODES)[number]['id']) => {
+  const modes = isLeader && state.achievementHunt ? [...MODES, ACHIEVEMENTS] : MODES
+  const selectMode = async (mode: FarmingMode) => {
     setError(null)
     const profile = (state.farmingProfiles as Record<string, { monsterFocus?: string[]; farmingPolicy?: string; location?: unknown; monsterHunt?: { returnLocation?: unknown } }> | undefined)?.[characterName]
     const selected = profile?.monsterFocus || state.monsterFocusByCharacter?.[characterName] || (characterName === state.leader ? state.monsterFocus : [])
@@ -164,12 +168,12 @@ export function FarmingSection({
         <span className="font-mono text-[10px] uppercase text-muted-foreground">Farming settings</span>
         <span className="rounded border border-cyan-700 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan-400">
           {inherited ? 'Copy leader' : farmingPolicy}
-          {!inherited && (farmingPolicy === 'auto' || farmingPolicy === 'hunt') ? ` · ${liveMode}` : ''}
+          {!inherited && (farmingPolicy === 'auto' || farmingPolicy === 'hunt' || farmingPolicy === 'achievements') ? ` · ${liveMode}` : ''}
         </span>
       </div>
       {inherited && <p className="mb-1.5 text-xs text-cyan-500">Used when Follow is off.</p>}
       <div className="flex flex-wrap items-center gap-1.5">
-        {MODES.map((mode) => (
+        {modes.map((mode) => (
           <Chip key={mode.id} selected={farmingPolicy === mode.id} disabled={!configLoaded || pickingBackup || pickingArea} onClick={() => void selectMode(mode.id)}>
             {mode.label}
           </Chip>
