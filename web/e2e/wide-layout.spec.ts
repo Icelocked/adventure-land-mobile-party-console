@@ -35,3 +35,13 @@ test('A phone held upright keeps one column', async ({ page }) => {
   expect(Math.abs(equipment.x - formation.x)).toBeLessThan(2)
   expect(equipment.y).toBeGreaterThan(formation.y + formation.height)
 })
+
+test('The character switcher stays in view while the page scrolls', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await setup(page)
+  await page.goto('/characters/Merchy')
+  await page.getByRole('region', { name: 'Combat log' }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: /^Ranger1/ })).toBeInViewport()
+  await page.getByRole('button', { name: /^Ranger1/ }).click()
+  await expect(page).toHaveURL(/\/characters\/Ranger1$/)
+})
