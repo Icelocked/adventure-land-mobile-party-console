@@ -17,6 +17,9 @@ export interface AchievementMonster {
 
 // Phoenix needs a route order and the Fairy passive hunting; the console rejects both.
 const UNTARGETABLE = new Set(['phoenix', 'tinyp'])
+// G.maps marks these spawns `stype: "randomrespawn"` (cave: mvampire, main: phoenix, game
+// data 17665). The bestiary catalog does not carry spawn types.
+const RANDOM_RESPAWN = new Set(['mvampire', 'phoenix'])
 
 /** Every monster with achievements, weakest first: by XP (the game scales it with HP, damage and
  *  defenses), then threat, HP and name. Threat alone misranks: a Vampire Rat hits harder than a
@@ -35,7 +38,7 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
         xp: Number(monster.xp) || 0,
         threat: Number(monster.threat) || 0,
         hp: Number(monster.hp) || 0,
-        special: !!definition.special || !!definition.cooperative || !!definition.unlist || definition.stype === 'randomrespawn' || !routable.has(monster.id),
+        special: !!definition.special || !!definition.cooperative || !!definition.unlist || RANDOM_RESPAWN.has(monster.id) || !routable.has(monster.id),
         monster,
       }
     })
