@@ -18,9 +18,9 @@ function setup(settings: Record<string, unknown> | null) {
   server.addCharacter({ name: 'Leada', ctype: 'warrior', level: 70 })
   server.addCharacter({ name: 'Folla', ctype: 'priest', level: 70 })
   server.bestiaryCatalog = [
-    { id: 'bee', name: 'Bee', hp: 100, threat: 5, definition: { achievements: ladder(10, 100) } },
-    { id: 'goo', name: 'Goo', hp: 50, threat: 1, definition: { achievements: ladder(10, 100) } },
-    { id: 'wolf', name: 'White Wolf', hp: 48000, threat: 50, definition: { achievements: ladder(1, 100) } },
+    { id: 'bee', name: 'Bee', xp: 400, hp: 100, threat: 5, definition: { achievements: ladder(10, 100) } },
+    { id: 'goo', name: 'Goo', xp: 100, hp: 50, threat: 1, definition: { achievements: ladder(10, 100) } },
+    { id: 'wolf', name: 'White Wolf', xp: 48800, hp: 48000, threat: 50, definition: { achievements: ladder(1, 100) } },
     { id: 'dragold', name: 'Dragold', hp: 25600000, threat: 800, definition: { achievements: ladder(1, 10), special: true } },
     { id: 'phoenix', name: 'Phoenix', hp: 36000, threat: 300, definition: { achievements: ladder(1, 10) } },
   ]
