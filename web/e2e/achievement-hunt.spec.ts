@@ -66,6 +66,11 @@ test('Achievement Hunt lives in Farming settings: weakest-first selector, Up to 
   await deaths.fill('5')
   await deaths.blur()
   await expect.poll(() => sent.at(-1)).toEqual({ settings: { deathThreshold: 5 }, character: 'Leada' })
+  // Fill respawn waits is on unless a console saved it off.
+  const fill = section.getByRole('checkbox', { name: 'Fill respawn waits with nearby monsters' })
+  await expect(fill).toBeChecked()
+  await fill.click()
+  await expect.poll(() => sent.at(-1)).toEqual({ settings: { fillIdle: false }, character: 'Leada' })
 })
 
 test('Achievements is a farming mode on every character, with its status under the chips', async ({ page }) => {

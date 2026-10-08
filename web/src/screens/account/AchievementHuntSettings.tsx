@@ -9,7 +9,7 @@ import { achievementMonsters, nextStep, type AchievementMonster } from '@/lib/ac
 import type { AchievementBlacklistEntry, AchievementHuntSettings } from '@/models'
 
 // Server defaults (runtime/coordinator/hunt/achievement-settings.ts).
-const DEFAULT_SETTINGS: AchievementHuntSettings = { monsters: [], blacklistDeaths: true, deathThreshold: 3 }
+const DEFAULT_SETTINGS: AchievementHuntSettings = { monsters: [], blacklistDeaths: true, deathThreshold: 3, fillIdle: true }
 
 function progress(monster: AchievementMonster, kills: number): string {
   const step = nextStep(monster.ladder, kills)
@@ -135,6 +135,19 @@ export function AchievementHuntSettingsBlock({
         />
         deaths
       </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={settings.fillIdle !== false}
+          disabled={!editable || busy}
+          onChange={(e) => void run({ settings: { fillIdle: e.target.checked } })}
+          className="size-4"
+        />
+        Fill respawn waits with nearby monsters
+      </label>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        While the target respawns, the party fights weaker monsters that spawn within its search radius. The target always comes first.
+      </p>
       {entries.length > 0 && (
         <div aria-label="Achievement Hunt blacklist" className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
