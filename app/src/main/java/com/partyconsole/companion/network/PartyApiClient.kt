@@ -28,6 +28,7 @@ private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 private fun baseHttpClientBuilder(settings: ServerSettings): OkHttpClient.Builder {
     // The pairing cookie travels with every request, REST and stream alike.
     val builder = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).cookieJar(PartyCookies)
+        .addInterceptor(OriginInterceptor)
     when (settings.trustMode) {
         TrustMode.SYSTEM, TrustMode.CLEARTEXT -> {
             // Platform trust store; CLEARTEXT URLs are http:// so TLS never applies.
