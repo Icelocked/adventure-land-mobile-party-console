@@ -947,6 +947,7 @@ export interface AchievementHuntSettings {
   monsters: string[]
   blacklistDeaths: boolean
   deathThreshold: number
+  fillIdle?: boolean
 }
 export interface AchievementBlacklistEntry {
   monsterId: string

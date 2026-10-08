@@ -674,7 +674,7 @@ export class PartyApiClient {
   async achievementHunt(
     character: string,
     body: {
-      settings?: Partial<{ monsters: string[]; blacklistDeaths: boolean; deathThreshold: number }>
+      settings?: Partial<{ monsters: string[]; blacklistDeaths: boolean; deathThreshold: number; fillIdle: boolean }>
       blacklist?: { action: 'add' | 'remove' | 'clear'; monsterId?: string }
     },
   ): Promise<ApiResult<CommandResult>> {

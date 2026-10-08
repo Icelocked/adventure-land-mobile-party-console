@@ -27,7 +27,7 @@ const RANDOM_RESPAWN = new Set(['mvampire', 'phoenix'])
  *  event, cooperative and random-respawn monsters, and any without a regular spawn. */
 export function achievementMonsters(catalog: BestiaryMonster[], choices: MonsterLocationCatalog): AchievementMonster[] {
   const routable = new Set(choices.filter((choice) => (choice.locations || []).length > 0).map((choice) => choice.id))
-  return catalog
+  const monsters = catalog
     .filter((monster) => !UNTARGETABLE.has(monster.id))
     .map((monster) => {
       const definition = (monster.definition || {}) as Record<string, unknown>
@@ -44,6 +44,10 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
     })
     .filter((monster) => monster.ladder.length > 0)
     .sort((a, b) => a.xp - b.xp || a.threat - b.threat || a.hp - b.hp || a.name.localeCompare(b.name))
+  // The game names both `snake` and `osnake` "Snake"; a shared name shows the id.
+  const counts = new Map<string, number>()
+  for (const monster of monsters) counts.set(monster.name, (counts.get(monster.name) || 0) + 1)
+  return monsters.map((monster) => ((counts.get(monster.name) || 0) > 1 ? { ...monster, name: `${monster.name} (${monster.id})` } : monster))
 }
 
 /** Index of the first milestone not yet reached, or -1 once the ladder is complete. */
