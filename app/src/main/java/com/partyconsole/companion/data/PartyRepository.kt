@@ -319,6 +319,9 @@ class PartyRepository(
 
     private suspend fun fetchCatalog() {
         val revision = lastReferenceRevision
+        // At startup, core can request the catalog before the catalog poll starts; the poll's
+        // request then queues a second run. That run finds this revision loaded and stops here.
+        if (catalogLoaded && revision != null && revision == catalogRevision) return
         catalogRevision = revision
         val result = getObject("state?section=catalog")
         val value = (result as? ApiResult.Success)?.value

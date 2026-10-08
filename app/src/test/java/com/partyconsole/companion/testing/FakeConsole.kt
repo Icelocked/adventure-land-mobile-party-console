@@ -63,6 +63,11 @@ class FakeConsole : AutoCloseable {
                 val path = request.path.orEmpty()
                 requests += Request(request.method.orEmpty(), path, request.body.readUtf8())
                 if (unpaired) return MockResponse().setResponseCode(302).setHeader("Location", "/setup")
+                // party-console's tools/hosting/authorize.ts rejects every non-GET/HEAD request whose
+                // Origin is not the console's own address (scheme + Host header), before pairing.
+                if (request.method !in setOf("GET", "HEAD") && request.getHeader("Origin") != "http://${request.getHeader("Host")}") {
+                    return json("""{"error":"Dashboard origin required"}""").setResponseCode(403)
+                }
                 if (request.method == "POST") {
                     failOnce.remove(path.removePrefix("/party-api/"))?.let { (status, body) -> return json(body).setResponseCode(status) }
                     return json(postBody).setResponseCode(postStatus)

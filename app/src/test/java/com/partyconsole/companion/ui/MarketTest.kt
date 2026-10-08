@@ -85,7 +85,8 @@ class MarketTest {
     private fun showMarket(): PartyViewModel {
         val viewModel = PartyViewModel(console.settings)
         compose.setContent { MarketScreen(viewModel, onBack = {}, onOpenWtb = {}, onOpenSettings = {}, onOpenSetup = {}) }
-        eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.aldata?.merchantsUpdatedAt != null }
+        // Item names ("Bow +0") come from the catalog, which lands separately from the market.
+        eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.aldata?.merchantsUpdatedAt != null && viewModel.dynamicState.value.merchantCatalog != null }
         compose.waitForIdle()
         return viewModel
     }

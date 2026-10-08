@@ -44,7 +44,8 @@ class PartyRepositoryTest {
     @Test
     fun readsEachSectionOnItsOwnAndMergesThem() {
         val repo = repository()
-        eventually { repo.stateLoaded.value && repo.dynamicState.value.merchantCatalog != null && repo.dynamicState.value.bank != null }
+        // Each section lands on its own; wait for core's queue too, not only config, catalog and bank.
+        eventually { repo.stateLoaded.value && repo.dynamicState.value.merchantCatalog != null && repo.dynamicState.value.bank != null && repo.dynamicState.value.merchantQueue.isNotEmpty() }
         val state = repo.dynamicState.value
         // config
         assertEquals("Merchy", state.merchantCharacter)
