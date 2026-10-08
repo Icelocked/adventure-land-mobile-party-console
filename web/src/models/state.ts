@@ -746,6 +746,9 @@ export interface FarmingProfile {
   monsterHunt?: MonsterHuntCycle | null
   huntSettings?: HuntSettings
   huntBlacklist?: Record<string, HuntBlacklistEntry>
+  achievementHunt?: AchievementHuntSettings | null
+  achievementBlacklist?: Record<string, AchievementBlacklistEntry>
+  achievementMessage?: string
   monsterFocus?: string[]
 }
 
@@ -790,6 +793,9 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
     blacklist: effective?.huntBlacklist || (legacy ? state.huntBlacklist : undefined) || {},
     settings: effective?.huntSettings || (legacy ? state.huntSettings ?? undefined : undefined),
     hunt: effective?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
+    achievementSettings: effective?.achievementHunt || (legacy ? state.achievementHunt : undefined) || undefined,
+    achievementBlacklist: effective?.achievementBlacklist || (legacy ? state.achievementBlacklist : undefined) || {},
+    achievementMessage: effective?.achievementMessage ?? (legacy ? state.achievementMessage : undefined) ?? '',
   }
 }
 

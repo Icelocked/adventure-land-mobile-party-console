@@ -27,7 +27,7 @@ test("Hunt settings: an independent character edits its own profile, never the l
   const bodies = huntBodies(page)
 
   await page.goto('/characters/Solo/hunt-settings')
-  await expect(page.getByText('Hunt settings · Solo')).toBeVisible()
+  await expect(page.getByText('Farming settings · Solo')).toBeVisible()
   const deaths = page.getByRole('textbox', { name: 'Deaths before blacklisting' })
   await expect(deaths).toHaveValue('5')
   await deaths.fill('7')
@@ -54,7 +54,7 @@ test('Hunt settings: a follower sees the leader\'s settings read-only', async ({
   await server.install(page)
 
   await page.goto('/characters/Follower1/hunt-settings')
-  await expect(page.getByText('Hunt settings · MainLeader')).toBeVisible()
+  await expect(page.getByText('Farming settings · MainLeader')).toBeVisible()
   await expect(page.getByText(/inherited from the leader/)).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Deaths before blacklisting' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Clear all' })).toBeDisabled()
