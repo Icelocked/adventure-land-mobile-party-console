@@ -137,7 +137,7 @@ export function AchievementHuntSection({ state }: { state: PartyStateDynamic }) 
                 {regular.map((m, i) => row(m, i))}
               </section>
               <h3 className="pt-2 text-sm font-semibold">Special monsters</h3>
-              <p className="text-xs text-muted-foreground">Bosses, event, cooperative and random-respawn monsters, and any without a regular spawn. Never picked by “Up to here”.</p>
+              <p className="text-xs text-muted-foreground">Bosses, event, cooperative and random-respawn monsters, training dummies, Cave of Many Dreams monsters, and any without a regular spawn. Never picked by “Up to here”.</p>
               <section aria-label="Special monsters" className="space-y-1.5">
                 {special.map((m) => row(m, null))}
               </section>
