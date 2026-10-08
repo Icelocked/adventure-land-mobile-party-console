@@ -20,6 +20,14 @@ const UNTARGETABLE = new Set(['phoenix', 'tinyp'])
 // G.maps marks these spawns `stype: "randomrespawn"` (cave: mvampire, main: phoenix, game
 // data 17665). The bestiary catalog does not carry spawn types.
 const RANDOM_RESPAWN = new Set(['mvampire', 'phoenix'])
+// Boss-like monsters the game does not flag (console docs/achievement-hunt.md § 23).
+const BOSS_SPAWNS = 2
+const BOSS_HP = 50_000
+
+/** Spawns in the world from the spawn records, leaving out those the game marks "ignore". */
+function worldSpawns(choice: { spawnRecords?: { count?: number; restrictions?: string[] }[] } | undefined): number {
+  return (choice?.spawnRecords || []).reduce((total, record) => (record.restrictions?.includes('ignore') ? total : total + (Number(record.count) || 0)), 0)
+}
 
 /** Every monster with achievements, weakest first: by XP (the game scales it with HP, damage and
  *  defenses), then threat, HP and name. Threat alone misranks: a Vampire Rat hits harder than a
@@ -27,6 +35,13 @@ const RANDOM_RESPAWN = new Set(['mvampire', 'phoenix'])
  *  event, cooperative and random-respawn monsters, and any without a regular spawn. */
 export function achievementMonsters(catalog: BestiaryMonster[], choices: MonsterLocationCatalog): AchievementMonster[] {
   const routable = new Set(choices.filter((choice) => (choice.locations || []).length > 0).map((choice) => choice.id))
+  // Never respawns, or is a big single spawn: Stompy, Skeletor, the crypt bosses.
+  const bossLike = (monster: BestiaryMonster, definition: Record<string, unknown>) => {
+    const respawn = Number(definition.respawn)
+    if (Number.isFinite(respawn) && respawn < 0) return true
+    const spawns = worldSpawns(choices.find((choice) => choice.id === monster.id) as Parameters<typeof worldSpawns>[0])
+    return spawns > 0 && spawns <= BOSS_SPAWNS && (Number(monster.hp) || 0) >= BOSS_HP
+  }
   const monsters = catalog
     .filter((monster) => !UNTARGETABLE.has(monster.id))
     .map((monster) => {
@@ -38,7 +53,7 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
         xp: Number(monster.xp) || 0,
         threat: Number(monster.threat) || 0,
         hp: Number(monster.hp) || 0,
-        special: !!definition.special || !!definition.cooperative || !!definition.unlist || RANDOM_RESPAWN.has(monster.id) || !routable.has(monster.id),
+        special: !!definition.special || !!definition.cooperative || !!definition.unlist || RANDOM_RESPAWN.has(monster.id) || !routable.has(monster.id) || bossLike(monster, definition),
         monster,
       }
     })
