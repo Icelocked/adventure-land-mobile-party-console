@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/postcss'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig, loadEnv } from 'vite'
+import { APP_NAVIGATION_ALLOWLIST } from './src/lib/appRoutes.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -33,8 +34,9 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          // Only the app shell is cached; API and notifier calls always go
-          // to the network.
+          // Only the app shell is cached, and it answers only this app's own
+          // pages; API, notifier and other server paths always go to the network.
+          navigateFallbackAllowlist: APP_NAVIGATION_ALLOWLIST,
           navigateFallbackDenylist: [/^\/party-api\//, /^\/notify\//],
           runtimeCaching: [],
           // Push and notification-click handlers for web/notifier.
