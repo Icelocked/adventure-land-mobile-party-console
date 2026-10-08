@@ -20,7 +20,7 @@ const UNTARGETABLE = new Set(['phoenix', 'tinyp'])
 
 /** Every monster with achievements, weakest first: by XP (the game scales it with HP, damage and
  *  defenses), then threat, HP and name. Threat alone misranks: a Vampire Rat hits harder than a
- *  Fire Spirit but has a ninth of its HP. Special: bosses,
+ *  Fire Spirit but has a ninth of its HP. Special: unlisted (training dummies, Cave of Many Dreams), bosses,
  *  event, cooperative and random-respawn monsters, and any without a regular spawn. */
 export function achievementMonsters(catalog: BestiaryMonster[], choices: MonsterLocationCatalog): AchievementMonster[] {
   const routable = new Set(choices.filter((choice) => (choice.locations || []).length > 0).map((choice) => choice.id))
@@ -35,7 +35,7 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
         xp: Number(monster.xp) || 0,
         threat: Number(monster.threat) || 0,
         hp: Number(monster.hp) || 0,
-        special: !!definition.special || !!definition.cooperative || definition.stype === 'randomrespawn' || !routable.has(monster.id),
+        special: !!definition.special || !!definition.cooperative || !!definition.unlist || definition.stype === 'randomrespawn' || !routable.has(monster.id),
         monster,
       }
     })
