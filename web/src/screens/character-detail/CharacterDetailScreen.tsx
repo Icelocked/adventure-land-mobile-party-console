@@ -14,7 +14,6 @@ import { MerchantQueueSection } from './sections/MerchantQueueSection'
 import { RuleConflictsSection } from './sections/RuleConflictsSection'
 import { MerchantControlsSection } from './sections/MerchantControlsSection'
 import { FarmingSection } from './sections/FarmingSection'
-import { AchievementHuntSection } from './sections/AchievementHuntSection'
 import { EquipmentSection } from './sections/EquipmentSection'
 import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
@@ -150,7 +149,6 @@ export function CharacterDetailScreen() {
                 huntBlacklist={farming.blacklist}
               />
             )}
-            {dynamicState.leader === name && <AchievementHuntSection state={dynamicState} />}
             {isMerchant && <MerchantQueueSection />}
             {isMerchant && (
               <MerchantControlsSection forceStand={dynamicState.merchantForceStand} gatheringModes={dynamicState.gatheringModes} />

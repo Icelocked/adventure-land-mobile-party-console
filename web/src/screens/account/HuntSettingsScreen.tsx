@@ -12,6 +12,7 @@ import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type MonsterChoiceEntry } from './HuntExtras'
 import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
+import { AchievementHuntSettingsBlock } from './AchievementHuntSettings'
 
 // Server defaults (runtime/coordinator/hunt/settings.ts).
 const DEFAULT_HUNT_SETTINGS: HuntSettings = {
@@ -22,7 +23,8 @@ const DEFAULT_HUNT_SETTINGS: HuntSettings = {
   expirationThreshold: 1,
 }
 
-/** Hunt settings and blacklist for one character. Every control saves its
+/** Farming settings for one character: Hunt settings and blacklist, then
+ *  Achievement Hunt when the console has it. Every control saves its
  *  own field as soon as it changes (thresholds on blur), always scoped with
  *  `character`; a character following the leader sees the leader's settings
  *  read-only. */
@@ -114,7 +116,7 @@ export function HuntSettingsScreen() {
   }
 
   return (
-    <AccountScreenScaffold title={`Hunt settings · ${context.owner}`} onRefresh={() => void refreshNow()}>
+    <AccountScreenScaffold title={`Farming settings · ${context.owner}`} onRefresh={() => void refreshNow()}>
       <fieldset disabled={!editable || busy} className="flex flex-col gap-3 p-3">
         <p className="text-xs text-muted-foreground">Configure Hunt relocation and automatic blacklisting. Blacklisted quests are skipped until you clear the entry. Normal farming selections are unaffected.</p>
         {inherited && <p className="text-xs text-muted-foreground">Settings inherited from the leader ({context.owner}).</p>}
@@ -243,6 +245,15 @@ export function HuntSettingsScreen() {
             </div>
           ))}
         </div>
+      )}
+      {context.achievementSettings && (
+        <AchievementHuntSettingsBlock
+          character={name}
+          value={context.achievementSettings}
+          blacklist={context.achievementBlacklist}
+          editable={editable}
+          onInspect={inspectMonster}
+        />
       )}
       {inspectError && (
         <p role="alert" className="px-3 pb-3 text-sm text-destructive">

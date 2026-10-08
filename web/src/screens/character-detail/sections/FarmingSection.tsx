@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
 import type { Catalog } from '@/lib/farmingZones'
+import { resolveFarmingContext } from '@/models'
 import type { BestiaryMonster, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 
 /** Trigger-button label showing the current selection (names, or a count
@@ -29,7 +30,7 @@ const MODES: { id: FarmingMode; label: string; description: string }[] = [
   { id: 'scatter', label: 'Scatter', description: 'Force one-shot scatter farming' },
   { id: 'hunt', label: 'Hunt', description: 'One quest at a time: leader first, then the next member if its monster is blacklisted' },
 ]
-// Achievement Hunt: only the party leader, and only on a console that has it (branch achievement-hunt).
+// Achievement Hunt: only on a console that has it (branch achievement-hunt).
 const ACHIEVEMENTS = { id: 'achievements' as const, label: 'Achievements', description: 'Farm the selected monsters for their kill achievements, weakest first' }
 
 /** The mode selector with effective-mode/follow indicator, hunt status, and
@@ -130,7 +131,8 @@ export function FarmingSection({
 
   // Hunt needs a backup focus and location; without both, the setup picker
   // opens before anything is posted.
-  const modes = isLeader && state.achievementHunt ? [...MODES, ACHIEVEMENTS] : MODES
+  const achievement = resolveFarmingContext(state, characterName)
+  const modes = achievement.achievementSettings ? [...MODES, ACHIEVEMENTS] : MODES
   const selectMode = async (mode: FarmingMode) => {
     setError(null)
     const profile = (state.farmingProfiles as Record<string, { monsterFocus?: string[]; farmingPolicy?: string; location?: unknown; monsterHunt?: { returnLocation?: unknown } }> | undefined)?.[characterName]
@@ -187,6 +189,12 @@ export function FarmingSection({
         </p>
       )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
+      {effectiveMode === 'achievements' && (
+        <section aria-label="Achievement Hunt status" className="mt-2 border-t border-rose-900/70 pt-2 font-mono text-[10px] text-rose-400">
+          <p className="font-semibold">Achievement Hunt status</p>
+          <p>{achievement.achievementMessage || 'Choosing the next monster'}</p>
+        </section>
+      )}
       <HuntStatusBlock effectivePolicy={effectiveMode} hunt={monsterHunt} characterHunt={characterHunt} blacklist={huntBlacklist} />
       </>
       )}
@@ -281,7 +289,7 @@ export function FarmingSection({
           <MapPin className="size-4" />
         </Button>
         <Button variant="outline" size="sm" onClick={() => navigate(`/characters/${encodeURIComponent(characterName)}/hunt-settings`)}>
-          Hunt settings...
+          Farming settings...
         </Button>
       </div>
       {showFocus && (
