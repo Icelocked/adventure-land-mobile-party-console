@@ -3,10 +3,11 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useMail, useDynamicState } from '@/data/PartyDataProvider'
 import { occupiedStandSlots } from '@/lib/standInspection'
 import { useStandMerchant } from '@/screens/account/StandScreen'
+import { loadMenuLinks } from '@/lib/menuLinks'
 
 /** The account-wide tools menu behind any character's hamburger icon:
  *  Mail, Catalog, Bestiary, Skills, Inspect Stand, View Market, Inspect
- *  Bank, Logs, Settings. */
+ *  Bank, Logs, Settings, then any links saved in Settings > Menu links. */
 const ITEMS: { label: string; path: string }[] = [
   { label: 'Mail', path: '/mail' },
   { label: 'Catalog', path: '/catalog' },
@@ -45,6 +46,12 @@ export function AccountMenu({ onClose }: { onClose: () => void }) {
               {item.label}
               {item.path === '/mail' && mailCount > 0 ? ` (${mailCount})` : ''}
               {item.path === '/stand' ? ` · ${standCount}/16` : ''}
+            </button>
+          ))}
+          {/* A full page load, so the service worker hands pages outside this app to the server. */}
+          {loadMenuLinks().map((link) => (
+            <button key={link.path} className="rounded-md px-2 py-2.5 text-left text-sm hover:bg-accent" onClick={() => window.location.assign(link.path)}>
+              {link.label}
             </button>
           ))}
         </div>
