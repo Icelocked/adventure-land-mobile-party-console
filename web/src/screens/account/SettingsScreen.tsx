@@ -7,6 +7,7 @@ import { ConsoleUpdateSettings, HostingSettings } from './settings/ConsoleSettin
 import { AccountMembers } from './settings/AccountMembers'
 import { NotificationsSection } from './settings/NotificationsSection'
 import { PwaUpdateSettings } from './settings/PwaUpdates'
+import { MenuLinksSettings } from './settings/MenuLinks'
 import { About } from './settings/About'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { Copy, Eye, EyeOff } from 'lucide-react'
@@ -118,6 +119,8 @@ export function SettingsScreen() {
             Change server address
           </Button>
         </div>
+
+        <MenuLinksSettings />
 
         <PwaUpdateSettings />
 
