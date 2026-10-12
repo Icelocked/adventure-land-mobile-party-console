@@ -662,6 +662,8 @@ export interface PartyStateDynamic {
   activeConvoy?: unknown
   // Upgrades
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
+  // Gapped bank sort layout (console 1.4 merchant/bank-sort.ts): "gapped" starts each item category on its own row with free slots after it.
+  bankSortLayout?: 'packed' | 'gapped'
 }
 
 /** Merchant rules shared across characters. `conflicts` is left opaque. */
@@ -907,6 +909,8 @@ export interface CharacterDiagnostics {
   tracktrix?: unknown
   anniversaryVisit?: unknown
   anniversaryState?: unknown
+  // Cosmetics panel (console 1.4): the character's CX jars, owned and worn cosmetics.
+  cosmetics?: CosmeticsReport | null
   [field: string]: unknown
 }
 
@@ -960,4 +964,30 @@ export interface AchievementBlacklistEntry {
   reason: string
   deaths?: number
   characters?: string[]
+}
+
+// Cosmetics panel (console 1.4 dashboard char.tsx, reported by characters/shared.js cosmeticsSnapshot).
+/** `label` is the game's display name for emotes and the ID for appearance
+ *  pieces; `sprite` previews the cosmetic's layer or the emote's skill icon.
+ *  Emote fields come from the skill definition. Older reports leave the
+ *  optional fields out. */
+export interface CosmeticKind {
+  kind: 'appearance' | 'emote' | 'unknown' | 'empty'
+  type: string | null
+  slot: string | null
+  label?: string | null
+  sprite?: Sprite | null
+  explanation?: string | null
+  mp?: number
+  cooldownMs?: number
+  range?: number | null
+  noSelf?: boolean
+  cooldownLeftMs?: number
+}
+export interface CosmeticsReport {
+  jars: (CosmeticKind & { inventorySlot: number; data: string | null; locked: boolean; usable: boolean })[]
+  owned: (CosmeticKind & { name: string; count: number })[]
+  worn: Record<string, string>
+  nearbyPlayers?: { name: string; distance: number }[]
+  lastEmote?: { name: string; target: string | null; at: number; ok: boolean; reason: string | null } | null
 }

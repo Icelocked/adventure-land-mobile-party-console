@@ -895,4 +895,36 @@ export class PartyApiClient {
   async buyPonty(listing: { key?: string; keys?: string[]; quantity: number; unitPrice?: number }): Promise<ApiResult<CommandResult>> {
     return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
   }
+
+  // Bank sort layout, access-code pairing and cosmetics (console 1.4).
+  /** POST /party-api/merchant/bank-sort {layout} - "gapped" starts each item
+   *  category on its own row and leaves free slots after it; the server
+   *  falls back to packed sorting when the bank is too full. */
+  async setBankSortLayout(layout: 'packed' | 'gapped'): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/bank-sort', { layout })
+  }
+
+  /** POST /setup/pair {code} - pairs this browser with the access code a
+   *  paired browser shows. The server ignores case, spaces and dashes, and
+   *  answers 400 "Access code is invalid or expired" (tools/hosting/access.ts). */
+  async pairWithAccessCode(code: string): Promise<ApiResult<string>> {
+    return this.postRoot('setup/pair', { code })
+  }
+
+  /** POST /setup/invite - a one-use pairing link token plus a one-use access
+   *  code: {token, code, expiresAt, expiresIn}. Issuing one replaces the
+   *  previous code (tools/hosting/setup-routes.ts). */
+  async invitePairing(): Promise<ApiResult<string>> {
+    return this.postRoot('setup/invite', {})
+  }
+
+  /** POST /party-api/command cx-open-jar / cx-wear / cx-remove / cx-emote.
+   *  The server checks each against the character's latest cosmetics report
+   *  (characters/cosmetic-commands.ts). */
+  async cosmeticCommand(
+    character: string,
+    command: { type: 'cx-open-jar'; inventorySlot: number } | { type: 'cx-wear'; name: string; slot: string } | { type: 'cx-remove'; slot: string } | { type: 'cx-emote'; name: string; target: string | null },
+  ): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, command)
+  }
 }

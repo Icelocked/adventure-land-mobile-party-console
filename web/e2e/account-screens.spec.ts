@@ -106,7 +106,7 @@ test('Bank: marking an item for NPC sale shows a marked indicator', async ({ pag
   // The sale panel (which names the item) closes once the sale is queued.
   await expect(page.getByRole('group', { name: 'Sell to NPC' })).toHaveCount(0)
   await expect(page.getByText('Iron Ore')).toBeVisible()
-  await expect(page.getByText('NPC', { exact: true })).toBeVisible()
+  await expect(page.getByText('NPC sale', { exact: true })).toBeVisible()
 })
 
 test('Bank: marking for stand shows as already-marked and can be unmarked', async ({ page }) => {

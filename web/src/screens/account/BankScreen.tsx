@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
 import { MluckClover } from '@/components/ItemTileParts'
+import { bankItemBanner } from '@/lib/bankItemBanner'
 import type { BankVault, CatalogItem, CharacterState, InventoryEntry } from '@/models'
 
 /** Shared bank vault browser. Item actions: mark/unmark for withdrawal
@@ -305,7 +306,7 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
       {confirmFirst && (
         <div role="group" aria-label="Create first BankBoi?" className="flex flex-col gap-2 rounded-md border border-border p-2.5">
           <p className="text-sm font-medium">Create first BankBoi?</p>
-          <p className="text-xs text-muted-foreground">This will reserve 7 slots from bank pane 1 for BankBoi logistics.</p>
+          <p className="text-xs text-muted-foreground">This will reserve the final 7 slots of bank pane 1 for BankBoi logistics. Items already in those slots will be moved into BankBoi storage.</p>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmFirst(false)}>
               Cancel
@@ -372,8 +373,10 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
 }
 
 /** One bank item as a list row: every pending mark shows at
- *  once (withdrawal border + Withdraw / Stand / NPC / Deconstruct labels),
- *  plus the stat-scroll badge and RESERVED on items1's last seven slots while BankBois exist.
+ *  once (withdrawal border + Withdraw / Stand / Deconstruct labels),
+ *  plus the stat-scroll badge, RESERVED on items1's last seven slots while
+ *  BankBois exist, and one banner for the manual NPC sale mark or the
+ *  automatic rules that match the item (lib/bankItemBanner.ts).
  *  Tapping opens the item's options (BankItemPanel). */
 function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: InventoryEntry; pack: string; catalogFor: (id: string) => CatalogItem | undefined; dimmed: boolean; onOpen: () => void }) {
   const state = useDynamicState()
@@ -381,16 +384,15 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
   const { item } = entry
   const withdrawMarked = !!merchant && (state.withdrawals[merchant] ?? []).some((w) => w.pack === pack && w.slot === entry.slot && sameMarkedItem(w.item, item))
   const standMarked = state.standListings.some((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, item))
-  const npcMarked = state.npcSaleMarks.some((mark) => mark.pack === pack && mark.slot === entry.slot && sameMarkedItem(mark.item, item))
+  // A manual mark only; the auto NPC rule's own marks show through the banner as "Auto NPC".
+  const npcMarked = state.npcSaleMarks.some((mark) => !mark.auto && mark.pack === pack && mark.slot === entry.slot && sameMarkedItem(mark.item, item))
   const deconstructionMarked = state.deconstructionMarks.some(
     (mark) => mark.state !== 'complete' && mark.storage?.pack === pack && mark.storage?.slot === entry.slot && sameMarkedItem(mark.item, item),
   )
   const reserved = state.bankbois.length > 0 && pack === 'items1' && entry.slot >= 35
-  const autoStand = state.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined
-  // The merchant's account-wide auto sale rule. The dashboard's bank doesn't
-  // show it, so marking looked like it did nothing; its inventory does.
-  const autoNpc = !!state.autoNpcSales[automaticCommerceRuleKey(item)]
-  const marks = [withdrawMarked && 'Withdraw', standMarked && !autoStand && 'Stand', npcMarked && 'NPC', deconstructionMarked && 'Deconstruct'].filter(Boolean) as string[]
+  const autoStand = !!state.autoStandMarks[automaticCommerceRuleKey(item)]
+  const banner = bankItemBanner(item, state, npcMarked)
+  const marks = [withdrawMarked && 'Withdraw', standMarked && !autoStand && 'Stand', deconstructionMarked && 'Deconstruct'].filter(Boolean) as string[]
   return (
     <button
       type="button"
@@ -408,14 +410,9 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
         {item.stat_type && <span className="ml-1 rounded bg-primary/15 px-1 font-mono text-[10px] uppercase text-primary">{item.stat_type}</span>}
       </span>
       {reserved && <span className="shrink-0 font-mono text-[9px] font-bold tracking-widest text-fuchsia-400">RESERVED</span>}
-      {autoStand && (
-        <span title={`Auto stand · ${Number(autoStand.price || 0).toLocaleString()}g`} className="shrink-0 rounded border border-amber-700 bg-amber-950 px-1 text-[10px] text-amber-200">
-          Auto stand
-        </span>
-      )}
-      {autoNpc && (
-        <span title="Auto NPC sale: matching items the merchant receives are sold" className="shrink-0 rounded border border-rose-800 bg-rose-950 px-1 text-[10px] text-rose-200">
-          Auto NPC
+      {banner && (
+        <span data-testid="bank-item-banner" title={banner.title || banner.label} className={`shrink-0 rounded border px-1 text-[10px] ${banner.colors} ${banner.border}`}>
+          {banner.label}
         </span>
       )}
       {marks.map((label) => (

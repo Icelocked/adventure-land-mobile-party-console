@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemOperationOverlay, LuckySlotOutline, MluckClover, SuggestedPriceDetails, itemLevelLabelClass } from '@/components/ItemTileParts'
-import { compactInventory, itemActionBanner, physicalInventory, statBadgeClass, validLuckySlot } from '@/lib/itemActionBanner'
+import { compactInventory, heldInventorySlots, itemActionBanner, physicalInventory, statBadgeClass, validLuckySlot } from '@/lib/itemActionBanner'
 import { aggregateSlotTracking, luckySlotSearch, normalizeSlotTracking } from '@/lib/luckySlot'
 import { TapRow } from '@/screens/itempanel/ItemActionPanel'
 import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
@@ -39,6 +39,7 @@ export function InventorySection({
   onItemTap,
   onLuckySlotData,
   localLucky,
+  reservedInventory,
 }: {
   characterName: string
   isMerchant: boolean
@@ -50,6 +51,8 @@ export function InventorySection({
   onItemTap: (entry: InventoryEntry, lucky: boolean) => void
   onLuckySlotData: () => void
   localLucky?: unknown
+  // Live vitals.reservedInventory: gear-set members and swapped-out gear that automatic rules skip.
+  reservedInventory?: unknown
 }) {
   const [open, setOpen] = useSectionOpen('character:Inventory')
   const [details, setDetails] = useState<TileDetails | null>(null)
@@ -83,6 +86,8 @@ export function InventorySection({
   const localLuckyStream = (localLucky ? normalizeSlotTracking(localLucky) : undefined) as Parameters<typeof aggregateSlotTracking>[1]
   const nextUpgradeSlot = validLuckySlot(luckyUpgradeSlot) ? luckyUpgradeSlot : luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName] ?? {}, localLuckyStream)).nextSlot
   const luckySlotLabel = validLuckySlot(luckyUpgradeSlot) ? 'Verified lucky upgrade slot' : 'Next upgrade will test for lucky upgrade'
+  // gearSets is read by name: the PWA has no gear set screen yet, so the state model doesn't declare it.
+  const heldSlots = heldInventorySlots(reservedInventory, (Reflect.get(state, 'gearSets') as Record<string, unknown> | undefined)?.[characterName])
 
   return (
     <section aria-label="Inventory" className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">
@@ -132,7 +137,7 @@ export function InventorySection({
             const compoundGroup = compoundGroups.find((group) => group.items.some((mark) => mark.slot === entry.slot && sameMarkedItem(mark.item, entry.item)))
             const autoCompoundMark = autoCompoundMarks.find((mark) => mark.name === entry.item.name)
             const autoCompoundPending = !!autoCompoundMark && Number(entry.item.level || 0) < autoCompoundMark.targetTier && Number(autoCompoundMark.quantity) !== 0
-            const autoExchangeMarked = isMerchant && !!state.autoExchanges[`${entry.item.name}@${entry.item.level || 0}`]
+            const autoExchangeMarked = !!merchant && !!state.autoExchanges[`${entry.item.name}@${entry.item.level || 0}`]
             const automaticSaleKey = automaticCommerceRuleKey(entry.item)
             const autoNpcSaleMarked = !!state.autoNpcSales[sharedRules || isMerchant ? automaticSaleKey : JSON.stringify([characterName, automaticSaleKey])]
             const npcSale = state.npcSaleMarks.find(
@@ -151,22 +156,28 @@ export function InventorySection({
             const autoStandMarked = isMerchant && state.autoStandMarks[automaticSaleKey]
             const upgradeLevel = Number(upgradeMark?.item.level || 0)
             const upgradeTarget = upgradeLevel + Number(upgradeMark?.tiers || 1)
+            const held = heldSlots[entry.slot]
             const banner = itemActionBanner(
               [
+                !!held && { action: 'held', label: held, title: `${held}: automatic bank, merchant, compound, upgrade, sale and deconstruction rules skip this item` },
                 !!deconstruction && { action: 'deconstruction', label: 'Deconstruction' },
-                !!npcSale && { action: 'npc', label: 'NPC sale', automatic: !!npcSale.auto, title: npcSaleDetails || undefined },
+                !!npcSale && { action: 'npc', label: npcSale.auto ? 'Auto NPC' : 'NPC sale', automatic: !!npcSale.auto, title: npcSaleDetails || undefined },
                 !!inventoryStatScrollMark && { action: 'stat', label: 'Stat scroll' },
                 !!upgradeMark && { action: 'upgrade', automatic: !!upgradeMark.auto, label: upgradeMark.auto ? `Auto → +${upgradeTarget}` : `+${upgradeLevel} → +${upgradeTarget}` },
                 !!compoundGroup && { action: 'compound', label: `+${entry.item.level || 0} → +${Number(entry.item.level || 0) + 1}` },
                 standMarked && { action: 'stand', label: 'Stand sale' },
                 autoCompoundPending && { action: 'compound', automatic: true, label: `Auto compound → +${autoCompoundMark!.targetTier}` },
                 autoDeconstruct && { action: 'deconstruction', automatic: true, label: 'Auto deconstruction' },
-                autoNpcSaleMarked && { action: 'npc', automatic: true, label: 'NPC sale', title: npcSaleDetails || 'Auto NPC sale' },
+                autoNpcSaleMarked && { action: 'npc', automatic: true, label: 'Auto NPC', title: npcSaleDetails || 'Auto NPC sale' },
                 !!autoStandMarked && { action: 'stand', automatic: true, label: 'Auto stand' },
                 autoExchangeMarked && { action: 'exchange', automatic: true, label: 'Auto exchange' },
                 !!deliveryTarget && { action: 'delivery', label: `To ${deliveryTarget}` },
-                (autoMarkMode === 'bank' || markedIn(bankMarked, entry)) && { action: 'bank', label: autoMarkMode === 'bank' ? 'Auto bank' : 'Bank' },
-                (autoMarkMode === 'merchant' || markedIn(merchantMarked, entry)) && { action: 'merchant', label: autoMarkMode === 'merchant' ? 'Auto merchant' : 'Mark for merchant' },
+                (autoMarkMode === 'bank' || markedIn(bankMarked, entry)) && { action: 'bank', automatic: autoMarkMode === 'bank', label: autoMarkMode === 'bank' ? 'Auto bank' : 'Bank' },
+                (autoMarkMode === 'merchant' || markedIn(merchantMarked, entry)) && {
+                  action: 'merchant',
+                  automatic: autoMarkMode === 'merchant',
+                  label: autoMarkMode === 'merchant' ? 'Auto merchant' : 'Mark for merchant',
+                },
                 merchantWeaponMarked && { action: 'weapon', label: 'Merchant weapon' },
               ],
               isMerchant,

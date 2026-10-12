@@ -125,7 +125,7 @@ test('Bankbois: the first one asks before reserving bank slots; items open the b
   const section = page.getByRole('region', { name: 'Bankbois' })
   await expect(section.getByText('No BankBois yet. All bank slots are available for ordinary storage.')).toBeVisible()
   await section.getByRole('button', { name: 'Create bankboi' }).click()
-  await expect(section.getByText('This will reserve 7 slots from bank pane 1 for BankBoi logistics.')).toBeVisible()
+  await expect(section.getByText('This will reserve the final 7 slots of bank pane 1 for BankBoi logistics. Items already in those slots will be moved into BankBoi storage.')).toBeVisible()
   await section.getByRole('group', { name: 'Create first BankBoi?' }).getByRole('button', { name: 'Create BankBoi' }).click()
   await expect(section.getByText('Success: Vault0 created · provisioning queued')).toBeVisible()
   expect(bodies.some((b) => b.path === 'bankbois/create')).toBe(true)
@@ -177,7 +177,7 @@ test('Bank parity: Merchant’s Luck clover, Auto stand banner replacing the sta
 
   await expect(page.getByLabel("Merchant's Luck duplicate")).toHaveCount(1)
   const bow = page.getByRole('button', { name: /^Bow \+2/ })
-  await expect(bow.getByText('Auto stand')).toHaveAttribute('title', 'Auto stand · 1,500g')
+  await expect(bow.getByText('Auto stand')).toHaveAttribute('title', 'Auto stand')
   await expect(bow.getByText('Stand', { exact: true })).toHaveCount(0)
 
   await expect(page.getByText(/^Sorts all accessible bank floors after banking work\./)).toBeVisible()
