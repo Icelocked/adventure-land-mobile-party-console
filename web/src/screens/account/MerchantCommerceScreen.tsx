@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCharacters, useDomainInterest, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { inventoryCounts } from '@/lib/inventoryCounts'
-import { upgradeEstimate } from '@/lib/suggestedItemValue'
+import { estimateUpgradeBatch, highestUpgradeLevel, type UpgradeEstimate } from '@/lib/upgradeEstimate'
 import type { ApiResult } from '@/api/partyApi'
 import { automaticCommerceRuleKey } from '@/models'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -339,22 +339,34 @@ function BuyScreen({
   catalog: MerchantBuyItem[]
   cart: Record<string, { quantity: number; level: number }>
   setCart: (fn: (old: Record<string, { quantity: number; level: number }>) => Record<string, { quantity: number; level: number }>) => void
-  onSubmit: (lines: { id: string; quantity: number; level?: number; budget?: number; maxAttempts?: number }[]) => void
+  onSubmit: (lines: { id: string; quantity: number; level?: number; goldCap?: number; acknowledgeUnavailable?: boolean }[]) => void
   submitting: boolean
   error: string | null
 }) {
   const filtered = catalog.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()))
   const selected = catalog.filter((item) => (cart[item.id]?.quantity ?? 0) > 0)
-  const estimates = Object.fromEntries(selected.map((item) => [item.id, upgradeEstimate(item, cart[item.id].quantity, cart[item.id]?.level || 0)]))
+  const estimates = useBatchEstimates(selected, cart)
+  const [goldCaps, setGoldCaps] = useState<Record<string, string>>({})
+  const [confirmed, setConfirmed] = useState(false)
   const hasEstimatedGold = selected.some((item) => (cart[item.id]?.level || 0) > 0 && item.upgradeable)
-  const goldTotal = selected.reduce((sum, item) => sum + estimates[item.id].gold, 0)
-  const unlikely = selected.filter((item) => estimates[item.id].unlikely)
+  const pending = selected.some((item) => estimates[item.id] === 'pending')
+  const available = (id: string) => {
+    const estimate = estimates[id]
+    return estimate && estimate !== 'pending' && estimate.status === 'available' ? estimate : null
+  }
+  const goldTotal = selected.reduce((sum, item) => sum + (available(item.id)?.gold ?? 0), 0)
+  // Console 1.4 refuses a line it can't estimate unless it carries a confirmation and a gold cap.
+  const unavailable = selected.filter((item) => {
+    const estimate = estimates[item.id]
+    return estimate !== 'pending' && estimate?.status === 'unavailable'
+  })
+  const validCaps = unavailable.every((item) => Number.isSafeInteger(Number(goldCaps[item.id])) && Number(goldCaps[item.id]) > 0)
   const lines = () =>
     selected.map((item) => ({
       id: item.id,
       quantity: cart[item.id].quantity,
       ...(cart[item.id]?.level ? { level: cart[item.id].level } : {}),
-      ...(item.upgradeable ? { budget: estimates[item.id].gold, maxAttempts: estimates[item.id].attempts } : {}),
+      ...(unavailable.includes(item) ? { goldCap: Number(goldCaps[item.id]), acknowledgeUnavailable: true } : {}),
     }))
 
   return (
@@ -384,8 +396,8 @@ function BuyScreen({
       <CartDock
         title="Cart"
         quantities={Object.fromEntries(Object.entries(cart).map(([id, line]) => [id, line.quantity]))}
-        summary={`Gold${hasEstimatedGold ? ' (est)' : ''}: ${goldTotal.toLocaleString()}g`}
-        submit={<SubmitBar label="Buy all" disabled={!selected.length || unlikely.length > 0} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />}
+        summary={pending ? 'Gold: estimating…' : unavailable.length ? 'Gold total unavailable' : `Gold${hasEstimatedGold ? ' (est)' : ''}: ${goldTotal.toLocaleString()}g`}
+        submit={<SubmitBar label="Buy all" disabled={!selected.length || pending || (unavailable.length > 0 && (!confirmed || !validCaps))} submitting={submitting} error={error} onSubmit={() => onSubmit(lines())} />}
       >
           {!selected.length && <p className="text-xs text-muted-foreground">Nothing selected.</p>}
           {selected.map((item) => {
@@ -405,7 +417,7 @@ function BuyScreen({
                     <Input
                       aria-label={`${item.name} target level`}
                       value={`+${line.level}`}
-                      onChange={(e) => setCart((old) => ({ ...old, [item.id]: { ...old[item.id], level: Math.max(0, Math.min(13, Number(e.target.value.replace(/\D/g, '')) || 0)) } }))}
+                      onChange={(e) => setCart((old) => ({ ...old, [item.id]: { ...old[item.id], level: Math.max(0, Math.min(highestUpgradeLevel(item), Number(e.target.value.replace(/\D/g, '')) || 0)) } }))}
                       className="h-8 w-14 px-1.5 text-center text-xs"
                     />
                   </label>
@@ -413,12 +425,23 @@ function BuyScreen({
                 <Button variant="link" size="xs" className="text-destructive" onClick={() => setCart((old) => ({ ...old, [item.id]: { quantity: 0, level: 0 } }))}>
                   Remove
                 </Button>
-                {line.level > 0 && item.upgradeable && estimates[item.id].unlikely ? (
-                  <p className="ml-9 w-full text-[11px] text-amber-400">+{line.level} is too unlikely to estimate a budget for. Choose a lower target level.</p>
-                ) : line.level > 0 && item.upgradeable ? (
+                {line.level > 0 && item.upgradeable && estimates[item.id] === 'pending' ? (
+                  <p className="ml-9 w-full text-[10px] text-muted-foreground">Estimating…</p>
+                ) : unavailable.includes(item) ? (
+                  <label className="ml-9 flex w-full flex-wrap items-center gap-1.5 text-[11px] text-amber-400">
+                    Can't estimate +{line.level}. Maximum gold:
+                    <Input
+                      aria-label={`${item.name} maximum gold`}
+                      inputMode="numeric"
+                      value={goldCaps[item.id] || ''}
+                      onChange={(e) => setGoldCaps((old) => ({ ...old, [item.id]: e.target.value.replace(/\D/g, '') }))}
+                      className="h-7 w-28 px-1.5 text-xs"
+                    />
+                  </label>
+                ) : line.level > 0 && item.upgradeable && available(item.id) ? (
                   <p className="ml-9 w-full font-mono text-[10px] text-violet-300">
-                    90% budget: {estimates[item.id].attempts} base items ·{' '}
-                    {estimates[item.id].scrolls
+                    90% budget: {available(item.id)!.attempts} base items ·{' '}
+                    {available(item.id)!.scrolls
                       .map((count, grade) => (count ? `${count} scroll${grade}` : ''))
                       .filter(Boolean)
                       .join(' · ')}
@@ -427,12 +450,40 @@ function BuyScreen({
               </CartRow>
             )
           })}
+          {unavailable.length > 0 && (
+            <label className="mt-1 flex items-start gap-2 rounded border border-amber-700 p-2 text-[11px] text-amber-200">
+              <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 size-4" />
+              <span>
+                The console can't estimate how many operations {unavailable.length === 1 ? 'that line needs' : 'those lines need'}. Buy anyway, spending at most
+                each line's maximum gold on base items and scrolls? The cap stays in force after a restart.
+              </span>
+            </label>
+          )}
       </CartDock>
       </div>
     </AccountScreenScaffold>
   )
 }
 
+/** Every cart line estimated together, sharing one 60M-roll budget: the check the console runs on the order
+ *  (console 1.4 runtime/upgrade-estimate.ts). Lines read 'pending' until the current cart's batch is done. */
+function useBatchEstimates(
+  selected: MerchantBuyItem[],
+  cart: Record<string, { quantity: number; level: number }>,
+): Record<string, UpgradeEstimate | 'pending'> {
+  // The key carries each whole line, so the effect rebuilds the batch from it alone.
+  const key = JSON.stringify(selected.map((item) => ({ choice: item, quantity: cart[item.id].quantity, target: cart[item.id]?.level || 0 })))
+  const [result, setResult] = useState<{ key: string; estimates: Record<string, UpgradeEstimate> } | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    const batch = JSON.parse(key) as { choice: MerchantBuyItem; quantity: number; target: number }[]
+    estimateUpgradeBatch(batch, controller.signal)
+      .then((results) => setResult({ key, estimates: Object.fromEntries(batch.map((line, index) => [line.choice.id, results[index]])) }))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [key])
+  return result?.key === key ? result.estimates : Object.fromEntries(selected.map((item) => [item.id, 'pending' as const]))
+}
 
 function CraftScreen({
   search,

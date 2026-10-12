@@ -470,10 +470,11 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/merchant/order - queues an NPC buy and/or crafting
-   *  job. The server recomputes each buy's upgrade-attempt budget, so
-   *  `level` is what matters; client-side cost estimates are display-only. */
+   *  job. The server recomputes each buy's upgrade-attempt budget from
+   *  `level`. A line it can't estimate needs `acknowledgeUnavailable` and a
+   *  positive `goldCap`, or the order gets a 400 (console 1.4). */
   async submitMerchantOrder(
-    buys: { id: string; quantity: number; level?: number; budget?: number; maxAttempts?: number }[],
+    buys: { id: string; quantity: number; level?: number; goldCap?: number; acknowledgeUnavailable?: boolean }[],
     crafts: { id: string; quantity: number }[],
     removeAutoBankMark = false,
   ): Promise<ApiResult<CommandResult>> {

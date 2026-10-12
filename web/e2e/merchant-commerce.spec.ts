@@ -67,7 +67,7 @@ test('Exchange: submit disables when the cart is typed past what materials are o
   await expect(exchangeButton).toBeEnabled()
 })
 
-test('Buy: 90% budget estimate, Gold (est), 9999 cap, budget sent, and 409 missing details', async ({ page }) => {
+test('Buy: 90% budget estimate, Gold (est), 9999 cap, level only sent, and 409 missing details', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [] })
@@ -99,8 +99,48 @@ test('Buy: 90% budget estimate, Gold (est), 9999 cap, budget sent, and 409 missi
   await expect.poll(() => server.lastOrder).not.toBeNull()
   const buys = server.lastOrder!.buys as Record<string, unknown>[]
   expect(buys[0]).toEqual({ id: 'hpot0', quantity: 3 })
-  expect(buys[1]).toMatchObject({ id: 'bow', quantity: 1, level: 2, maxAttempts: 1 })
-  expect(typeof buys[1].budget).toBe('number')
+  // Console 1.4 recomputes the budget from the level; the old budget and maxAttempts fields are gone.
+  expect(buys[1]).toEqual({ id: 'bow', quantity: 1, level: 2 })
+})
+
+test('Buy: the target level stops at the item\'s highest level (console 1.4)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [] })
+  // Chances end at +4, so +4 is the highest level this item can reach.
+  server.buyable = [{ id: 'bow', name: 'Bow', cost: 1000, upgradeable: true, upgradeGrade: 0, grades: [9, 10, 11, 12], upgradeChances: [1, 1, 1, 1, 1] }]
+  await server.install(page)
+
+  await page.goto('/merchant/buy')
+  await page.locator('.rounded-md.border', { hasText: 'Bow' }).getByRole('button', { name: 'Add' }).click()
+  await page.getByLabel('Bow target level').fill('+9')
+  await expect(page.getByLabel('Bow target level')).toHaveValue('+4')
+})
+
+test('Buy: a line the console can\'t estimate needs a maximum gold and a confirmation (console 1.4)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [] })
+  // A near-impossible +2 completes too few simulated runs, so the estimate is unavailable.
+  server.buyable = [{ id: 'bow', name: 'Bow', cost: 1000, upgradeable: true, upgradeGrade: 0, grades: [9, 10, 11, 12], upgradeChances: [1, 1, 0.0000001] }]
+  await server.install(page)
+
+  await page.goto('/merchant/buy')
+  await page.locator('.rounded-md.border', { hasText: 'Bow' }).getByRole('button', { name: 'Add' }).click()
+  await page.getByLabel('Bow target level').fill('+2')
+  await expect(page.getByText('Gold total unavailable')).toBeVisible({ timeout: 30_000 })
+  const buy = page.getByRole('button', { name: 'Buy all' })
+  await expect(buy).toBeDisabled()
+
+  await page.getByLabel('Bow maximum gold').fill('250000')
+  await expect(buy).toBeDisabled()
+  await page.getByRole('checkbox').check()
+  await expect(buy).toBeEnabled()
+
+  await buy.click()
+  await expect.poll(() => server.lastOrder).not.toBeNull()
+  const buys = server.lastOrder!.buys as Record<string, unknown>[]
+  expect(buys[0]).toEqual({ id: 'bow', quantity: 1, level: 2, goldCap: 250000, acknowledgeUnavailable: true })
 })
 
 test('Craft: owned counts include bankbois, gold adds ingredient purchases, recipe preview shows the next craft cost', async ({ page }) => {

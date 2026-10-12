@@ -128,3 +128,25 @@ test('Anniversary: chat advertisement is disabled without a message and shows th
   await expect(page.getByText('Next round time unavailable')).toBeVisible()
   await expect(page.getByText('No anniversary activity yet.')).toBeVisible()
 })
+
+test('Events: a toggle keeps console 1.4 events selected elsewhere, in the saved priority order', async ({ page }) => {
+  const server = eventsServer()
+  server.extraState = {
+    ...server.extraState,
+    eventSchedules: [...(server.extraState.eventSchedules as object[]), { id: 'mrpumpkin', name: 'Mr. Pumpkin' }],
+    eventSelectionsByCharacter: { Leada: ['anniversary', 'mrpumpkin'] },
+    eventPrioritiesByCharacter: { Leada: ['mrpumpkin', 'anniversary'] },
+  }
+  await server.install(page)
+  const bodies = postBodies(page, 'formation')
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Events (2) ▾' }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  await expect(events.getByRole('checkbox', { name: 'Mr. Pumpkin' })).toBeChecked()
+  await expect(events.getByRole('checkbox').first()).toHaveAccessibleName('Mr. Pumpkin')
+
+  // 1.3's event list dropped Mr. Pumpkin from the saved selection here.
+  await events.getByRole('checkbox', { name: 'Goo Brawl' }).click()
+  await expect.poll(() => bodies[0]).toEqual({ character: 'Leada', eventSelections: ['mrpumpkin', 'anniversary', 'goobrawl'] })
+})

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
-import { eventPolicy, eventTimeLabel, selectedEvents, supportedEvents, type EventSchedule } from '@/lib/eventPolicy'
+import { eventDisplayNames, eventPolicy, eventPriorityOrder, eventTimeLabel, selectedEvents, supportedEvents, type EventSchedule } from '@/lib/eventPolicy'
 import { useClock } from '@/lib/duration'
 import { CaveEventRow } from '@/screens/dungeon/CaveEventRow'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
@@ -72,7 +72,10 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
   const [error, setError] = useState<string | null>(null)
   const policy = eventPolicy(state, name)
   const selected = selectedEvents(state, name)
-  const catalog: EventSchedule[] = state.eventSchedules?.length ? state.eventSchedules : supportedEvents.map((id) => ({ id, name: id }))
+  const catalog: EventSchedule[] = state.eventSchedules?.length ? state.eventSchedules : supportedEvents.map((id) => ({ id, name: eventDisplayNames[id] ?? id }))
+  // Events list in the character's priority order, as on the console; unsupported ones last.
+  const order = eventPriorityOrder(state, name)
+  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length)
   const onChange = async (events: string[]) => {
     setError(null)
     const result = await api.setEventSelections(name, events)
@@ -89,7 +92,7 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
           {policy.inherited && <p className="mb-2 text-amber-200">Using {policy.source}’s events</p>}
           <CaveEventRow />
           {[...catalog]
-            .sort((a, b) => a.name.localeCompare(b.name))
+            .sort((a, b) => rank(a.id) - rank(b.id) || a.name.localeCompare(b.name))
             .map((event) => {
               const supported = supportedEvents.includes(event.id)
               const allowed = supported

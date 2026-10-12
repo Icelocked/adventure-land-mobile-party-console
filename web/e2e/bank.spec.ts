@@ -27,12 +27,23 @@ function bankServer() {
   return server
 }
 
-test('Bank: search dims non-matches; reserved items1 slots are labelled', async ({ page }) => {
+test('Bank: items1 slots 35-41 are reserved only while BankBois exist (console 1.4)', async ({ page }) => {
+  const server = bankServer()
+  await server.install(page)
+  await page.goto('/bank')
+  await expect(page.getByRole('button', { name: /Bow \+2/ })).toBeVisible()
+  await expect(page.getByText('RESERVED', { exact: true })).toHaveCount(0)
+
+  server.extraState = { ...server.extraState, bankbois: [{ name: 'Bankboi0', ctype: 'merchant', state: 'ready', items: [] }] }
+  await page.reload()
+  await expect(page.getByText('RESERVED', { exact: true })).toBeVisible()
+})
+
+test('Bank: search dims non-matches', async ({ page }) => {
   const server = bankServer()
   await server.install(page)
 
   await page.goto('/bank')
-  await expect(page.getByText('RESERVED', { exact: true })).toBeVisible()
   await page.getByRole('searchbox', { name: 'Search bank items' }).fill('bow')
   await expect(page.getByRole('button', { name: /Bow \+2/ })).not.toHaveClass(/opacity-25/)
   await expect(page.getByRole('button', { name: /Iron Ore x5/ })).toHaveClass(/opacity-25/)
@@ -112,7 +123,7 @@ test('Bankbois: the first one asks before reserving bank slots; items open the b
 
   await page.goto('/bank')
   const section = page.getByRole('region', { name: 'Bankbois' })
-  await expect(section.getByText(/No bankbois yet/)).toBeVisible()
+  await expect(section.getByText('No BankBois yet. All bank slots are available for ordinary storage.')).toBeVisible()
   await section.getByRole('button', { name: 'Create bankboi' }).click()
   await expect(section.getByText('This will reserve 7 slots from bank pane 1 for BankBoi logistics.')).toBeVisible()
   await section.getByRole('group', { name: 'Create first BankBoi?' }).getByRole('button', { name: 'Create BankBoi' }).click()

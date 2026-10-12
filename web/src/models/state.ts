@@ -646,6 +646,9 @@ export interface PartyStateDynamic {
   // Events, hunting, location
   eventSchedules?: import('@/lib/eventPolicy').EventSchedule[]
   eventSelectionsByCharacter?: Record<string, string[]>
+  /** Console 1.4: each character's event priority order and per-event limits. */
+  eventPrioritiesByCharacter?: Record<string, string[]>
+  eventLimitsByCharacter?: Record<string, Record<string, import('@/lib/eventPolicy').EventLimits>>
   eventsByCharacter?: Record<string, boolean>
   monsterPrioritiesByCharacter?: Record<string, Record<string, number>>
   passiveHunting?: unknown

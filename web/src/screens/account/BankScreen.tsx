@@ -53,10 +53,10 @@ export function BankScreen() {
         <div className="flex flex-col gap-3 px-3">
           {Object.entries(bank.packs).map(([packName, entries]) => {
             const filled = entries.filter((e): e is InventoryEntry => e != null)
-            // items1's last 7 slots are reserved and never usable, even
-            // though the pack reports a full 42-length array, so they're
-            // excluded to keep "free" from overstating deposit room.
-            const usableEntries = packName === 'items1' ? entries.slice(0, 35) : entries
+            // With BankBois, the console reserves items1's last 7 slots for their
+            // logistics, so they're left out to keep "free" from overstating deposit
+            // room. Without any, every slot is ordinary storage (console 1.4).
+            const usableEntries = dynamicState.bankbois.length > 0 && packName === 'items1' ? entries.slice(0, 35) : entries
             const free = usableEntries.length - usableEntries.filter((e) => e != null).length
             const freeColor = free < 5 ? 'text-destructive' : free <= 10 ? 'text-amber-500' : 'text-muted-foreground'
             const expanded = !collapsedPacks.has(packName)
@@ -365,7 +365,7 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
           )
         })
       ) : (
-        <p className="py-2 text-center text-xs text-muted-foreground">No bankbois yet. Reserved overflow cargo will wait safely until one is created.</p>
+        <p className="py-2 text-center text-xs text-muted-foreground">No BankBois yet. All bank slots are available for ordinary storage.</p>
       )}
     </section>
   )
@@ -373,7 +373,7 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
 
 /** One bank item as a list row: every pending mark shows at
  *  once (withdrawal border + Withdraw / Stand / NPC / Deconstruct labels),
- *  plus the stat-scroll badge and RESERVED on items1's last seven slots.
+ *  plus the stat-scroll badge and RESERVED on items1's last seven slots while BankBois exist.
  *  Tapping opens the item's options (BankItemPanel). */
 function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: InventoryEntry; pack: string; catalogFor: (id: string) => CatalogItem | undefined; dimmed: boolean; onOpen: () => void }) {
   const state = useDynamicState()
@@ -385,7 +385,7 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
   const deconstructionMarked = state.deconstructionMarks.some(
     (mark) => mark.state !== 'complete' && mark.storage?.pack === pack && mark.storage?.slot === entry.slot && sameMarkedItem(mark.item, item),
   )
-  const reserved = pack === 'items1' && entry.slot >= 35
+  const reserved = state.bankbois.length > 0 && pack === 'items1' && entry.slot >= 35
   const autoStand = state.autoStandMarks[automaticCommerceRuleKey(item)] as { price?: number } | undefined
   // The merchant's account-wide auto sale rule. The dashboard's bank doesn't
   // show it, so marking looked like it did nothing; its inventory does.
