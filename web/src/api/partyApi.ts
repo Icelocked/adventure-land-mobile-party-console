@@ -2,6 +2,7 @@ import type { Item, MarketListing, RestockPolicy, StandListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 import { PARTY_ACTION_EVENT, type PartyActionDetail } from '@/data/queryActions'
+import type { EventLimits } from '@/lib/eventPolicy'
 
 export interface CommandResult {
   ok: boolean
@@ -894,5 +895,36 @@ export class PartyApiClient {
    *  combine several Ponty listings into one purchase. */
   async buyPonty(listing: { key?: string; keys?: string[]; quantity: number; unitPrice?: number }): Promise<ApiResult<CommandResult>> {
     return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
+  }
+
+  // Console 1.4 events and realms: event priority order, per-event limits,
+  // boss chase, daily event prediction and the realm hop blacklist.
+
+  /** POST /party-api/formation {character, eventPriorities}. The server
+   *  400s unless the list is a full permutation of supportedEvents, and
+   *  409s "using leader events" for followers. */
+  async setEventPriorities(character: string, eventPriorities: string[]): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { character, eventPriorities })
+  }
+
+  /** POST /party-api/formation {character, eventLimits: {event, limits}}.
+   *  A null limit means unlimited. */
+  async setEventLimits(character: string, event: string, limits: EventLimits): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { character, eventLimits: { event, limits } })
+  }
+
+  /** POST /party-api/realm/boss-chase. minEtaMinutes must be 0-600. */
+  async setBossChase(body: { enabled?: boolean; minEtaMinutes?: number }): Promise<ApiResult<CommandResult>> {
+    return this.post('realm/boss-chase', body)
+  }
+
+  /** POST /party-api/realm/daily-chase. leadMinutes must be 14-120. */
+  async setDailyChase(body: { enabled?: boolean; leadMinutes?: number; otherRegions?: boolean }): Promise<ApiResult<CommandResult>> {
+    return this.post('realm/daily-chase', body)
+  }
+
+  /** POST /party-api/realm/hop-blacklist {realms}: the whole list, replacing the saved one. */
+  async setRealmHopBlacklist(realms: string[]): Promise<ApiResult<CommandResult>> {
+    return this.post('realm/hop-blacklist', { realms })
   }
 }

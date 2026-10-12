@@ -36,14 +36,16 @@ test('Events: sorted schedule labels, a toggle saves the selection, followers us
   await page.getByRole('button', { name: 'Events (1) ▾' }).click()
   const events = page.getByRole('group', { name: 'Events' })
   await expect(events.getByText('Anniversary — LIVE')).toBeVisible()
-  await expect(events.getByText(/^Goo Brawl — .+ \(9m \d+s\)$/)).toBeVisible()
-  await expect(events.getByText('Giant Crab — Time not announced · timing stale')).toBeVisible()
+  // Console 1.4 names events from eventDisplayNames over the schedule feed's
+  // names, and marks daily/nightly rotations without a prediction.
+  await expect(events.getByText(/^Goobrawl — .+ \(9m \d+s\) · not predicted yet$/)).toBeVisible()
+  await expect(events.getByText('Crabxx — Time not announced · not predicted yet · timing stale')).toBeVisible()
   await expect(events.getByText('Halloween — Unsupported')).toBeVisible()
   await expect(events.getByRole('checkbox', { name: 'Halloween' })).toBeDisabled()
   await expect(events.getByText(/^Cave of Many Dreams — /)).toBeVisible()
   await expect(events.getByRole('checkbox').first()).toHaveAccessibleName('Anniversary')
 
-  await events.getByRole('checkbox', { name: 'Goo Brawl' }).click()
+  await events.getByRole('checkbox', { name: 'Goobrawl' }).click()
   await expect.poll(() => bodies[0]).toEqual({ character: 'Leada', eventSelections: ['anniversary', 'goobrawl'] })
   await expect(page.getByRole('button', { name: 'Events (2) ▾' })).toBeVisible()
 
@@ -51,10 +53,12 @@ test('Events: sorted schedule labels, a toggle saves the selection, followers us
   await page.getByRole('button', { name: 'Events (2) ▾' }).click()
   const followerEvents = page.getByRole('group', { name: 'Events' })
   await expect(followerEvents.getByText('Using Leada’s events')).toBeVisible()
-  await expect(followerEvents.getByRole('checkbox', { name: 'Goo Brawl' })).toBeChecked()
-  await expect(followerEvents.getByRole('checkbox', { name: 'Goo Brawl' })).toBeDisabled()
+  await expect(followerEvents.getByRole('checkbox', { name: 'Goobrawl' })).toBeChecked()
+  await expect(followerEvents.getByRole('checkbox', { name: 'Goobrawl' })).toBeDisabled()
 
+  // event-limits-dialog.tsx: the anniversary's settings link to its visit settings.
   await followerEvents.getByRole('button', { name: 'Anniversary settings' }).click()
+  await followerEvents.getByRole('button', { name: 'Anniversary visit settings' }).click()
   await expect(page).toHaveURL(/\/anniversary$/)
 })
 
@@ -147,6 +151,6 @@ test('Events: a toggle keeps console 1.4 events selected elsewhere, in the saved
   await expect(events.getByRole('checkbox').first()).toHaveAccessibleName('Mr. Pumpkin')
 
   // 1.3's event list dropped Mr. Pumpkin from the saved selection here.
-  await events.getByRole('checkbox', { name: 'Goo Brawl' }).click()
+  await events.getByRole('checkbox', { name: 'Goobrawl' }).click()
   await expect.poll(() => bodies[0]).toEqual({ character: 'Leada', eventSelections: ['mrpumpkin', 'anniversary', 'goobrawl'] })
 })

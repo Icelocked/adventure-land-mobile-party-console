@@ -120,7 +120,8 @@ test('Realm switch: tapping a realm asks first (with the Hop Sickness warning); 
 
   await page.getByText('EU I (30 players)').click()
   await page.getByRole('group', { name: 'Switch realm?' }).getByRole('checkbox').check()
-  await page.getByRole('button', { name: 'Switch all characters' }).click()
+  // Console 1.4 renames the confirmation once "Set as home realm" is checked.
+  await page.getByRole('group', { name: 'Change home realm?' }).getByRole('button', { name: 'Change home realm' }).click()
   await expect.poll(() => bodies.length).toBe(1)
   expect(bodies[0]).toEqual({ realm: 'EU I', setHome: true })
 })

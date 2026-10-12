@@ -470,6 +470,8 @@ export interface RealmCharacter {
   ctype: string
   realm: string | null
   online: boolean
+  // Console 1.4: set on a home-change operation's character once Adventure Land confirms the new home.
+  homeConfirmed?: boolean
 }
 
 /** A realm switch (and optional home change) in progress. */
@@ -488,12 +490,40 @@ export interface RealmControl {
   activeRealm?: string
   // Where the party actually is (activeRealm is where the coordinator aims it).
   currentRealm?: string | null
+  // Console 1.4: null when account characters' homes differ or are unconfirmed (roster-projection.ts homeRealm()).
   homeRealm?: string | null
+  homeCharacters?: { name: string; home: string | null }[]
   split: boolean
   merchantRealm?: string | null
   characters: RealmCharacter[]
   realms: RealmOption[]
   operation?: RealmOperation | null
+}
+
+// Console 1.4 events and realms. events/attendance-limits.ts AttendanceInstance,
+// trimmed to what the event list reads.
+export interface EventAttendanceInstance {
+  ended?: boolean
+  ignored?: 'death limit' | 'time limit'
+}
+// events/boss-chase.ts BossChaseState, trimmed to what the realm panel shows.
+export interface BossChaseState {
+  enabled: boolean
+  minEtaMinutes: number
+  trip: { boss: string; realm: string; respawnAt?: number; returnRealm: string | null; arrived: boolean } | null
+  lastError: string | null
+  checkedAt: number
+  sightings: { boss: string; realm: string; hp: number; etaMinutes: number | null; target: string | null }[]
+  respawns: { boss: string; realm: string; respawnAt: number }[]
+}
+// events/daily-chase.ts DailyChaseState, trimmed to what the realm panel and event list show.
+export interface DailyChaseState {
+  enabled: boolean
+  leadMinutes: number
+  otherRegions: boolean
+  trip: { event: string; realm: string; slotAt: number; returnRealm: string | null; arrived: boolean } | null
+  lastError: string | null
+  upcoming: { rotation: 'daily' | 'nightly'; region: string; slotAt: number; predictions: { realm: string; event: string }[] }[]
 }
 
 /** The polled slice of GET /party-api/state. `followers` maps character
@@ -662,6 +692,11 @@ export interface PartyStateDynamic {
   activeConvoy?: unknown
   // Upgrades
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
+  // Console 1.4 events and realms: per-instance event attendance, boss chase, daily event prediction, realm hop blacklist.
+  eventAttendance?: Record<string, Record<string, EventAttendanceInstance>>
+  bossChase?: BossChaseState | null
+  dailyChase?: DailyChaseState | null
+  realmHopBlacklist?: string[]
 }
 
 /** Merchant rules shared across characters. `conflicts` is left opaque. */

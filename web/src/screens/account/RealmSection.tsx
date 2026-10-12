@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,9 @@ const labelFor = (control: RealmControl, key?: string | null) => control.realms.
 /** Realm panel: where the party actually is
  *  (or "Mixed realms" with each character's realm), home realm, every realm
  *  with its population (PVP shown but disabled), the "Switch realm?"
- *  confirmation, and a running switch's progress. */
-export function RealmSection({ control }: { control: RealmControl }) {
+ *  confirmation, and a running switch's progress. `children` (the
+ *  console 1.4 chase settings) render at the bottom of the panel. */
+export function RealmSection({ control, children }: { control: RealmControl; children?: ReactNode }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [choosing, setChoosing] = useState(false)
@@ -44,6 +45,17 @@ export function RealmSection({ control }: { control: RealmControl }) {
         </div>
       )}
 
+      {!control.homeRealm && control.homeCharacters?.length ? (
+        <div className="mt-2 flex flex-col gap-0.5 rounded-md bg-amber-500/10 p-2 text-xs">
+          <p>Home realms differ or are unconfirmed:</p>
+          {control.homeCharacters.map((member) => (
+            <p key={member.name}>
+              {member.name}: {member.home || 'unconfirmed'}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {!destination && (
         <Button variant="link" size="xs" className="mt-1" disabled={blocked} onClick={() => setChoosing((v) => !v)}>
           {choosing ? 'Cancel' : 'Change realm…'}
@@ -57,8 +69,8 @@ export function RealmSection({ control }: { control: RealmControl }) {
               variant="link"
               size="xs"
               className="justify-start"
-              // Nothing to do when the whole party is already there.
-              disabled={realm.pvp || blocked || (!control.split && realm.key === control.currentRealm)}
+              // Nothing to do when the whole party is already there and it is already home.
+              disabled={realm.pvp || blocked || (!control.split && realm.key === control.currentRealm && realm.key === control.homeRealm)}
               onClick={() => {
                 setError(null)
                 setSetHome(false)
@@ -72,10 +84,11 @@ export function RealmSection({ control }: { control: RealmControl }) {
       )}
 
       {destination && (
-        <div role="group" aria-label="Switch realm?" className="mt-2 flex flex-col gap-2 rounded-md border border-border p-3">
-          <p className="text-sm font-medium">Switch realm?</p>
+        <div role="group" aria-label={setHome ? 'Change home realm?' : 'Switch realm?'} className="mt-2 flex flex-col gap-2 rounded-md border border-border p-3">
+          <p className="text-sm font-medium">{setHome ? 'Change home realm?' : 'Switch realm?'}</p>
           <p className="text-xs text-muted-foreground">
             This switches every active party character to {labelFor(control, destination)} and gives non-merchant characters Realm Fatigue.
+            {setHome && <span className="mt-2 block text-amber-200">This will change for all characters in the account including characters not currently logged in.</span>}
           </p>
           <div className="flex flex-col gap-1 rounded-md bg-amber-500/10 p-2 text-xs">
             <p>
@@ -96,8 +109,9 @@ export function RealmSection({ control }: { control: RealmControl }) {
               <span>
                 <strong>Set as home realm</strong>
                 <span className="block text-muted-foreground">
-                  After switching, one non-merchant will visit Bean in Main and request the home change. Current game data exposes no separate home-change
-                  cooldown.
+                  Every account character will request the native home change. Offline characters log in temporarily, one at a time, then log out. One
+                  headless character may briefly disconnect to make room and will reconnect afterwards. Adventure Land enforces a 36-hour home-change cooldown
+                  per character.
                 </span>
               </span>
             </label>
@@ -123,7 +137,7 @@ export function RealmSection({ control }: { control: RealmControl }) {
                 }
               }}
             >
-              {busy ? 'Starting…' : 'Switch all characters'}
+              {busy ? 'Starting…' : setHome ? 'Change home realm' : 'Switch all characters'}
             </Button>
           </div>
         </div>
@@ -140,10 +154,12 @@ export function RealmSection({ control }: { control: RealmControl }) {
           {(operation.characters ?? []).map((member) => (
             <p key={member.name}>
               {member.name}: {member.realm || 'waiting'}
+              {operation.setHome ? (member.homeConfirmed ? ' — home confirmed' : ' — waiting for home confirmation') : ''}
             </p>
           ))}
         </div>
       )}
+      {children}
     </div>
   )
 }

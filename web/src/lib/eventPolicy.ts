@@ -3,6 +3,15 @@ export interface EventLimits {
   deathLimit: number | null
   timeLimitMinutes: number | null
 }
+/** Blank (null) means unlimited; a death limit is a whole number >= 0, a time limit a positive number of minutes. */
+export function validEventLimits(value: unknown): value is EventLimits {
+  if (!value || typeof value !== 'object') return false
+  const { deathLimit, timeLimitMinutes } = value as EventLimits
+  return (
+    (deathLimit === null || (Number.isSafeInteger(deathLimit) && deathLimit >= 0)) &&
+    (timeLimitMinutes === null || (typeof timeLimitMinutes === 'number' && Number.isFinite(timeLimitMinutes) && timeLimitMinutes > 0))
+  )
+}
 interface EventFormation {
   leader?: string | null
   merchantCharacter?: string | null

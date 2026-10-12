@@ -86,7 +86,21 @@ const CONFIG_FIELDS = [
   'farmingPolicy',
   'huntBlacklist', 'huntSettings',
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
+  // Console 1.4 events and realms.
+  'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'dailyChase', 'realmHopBlacklist',
 ] as const
+// Console 1.4 events and realms: dashboard/lib/event-policy.ts supportedEvents,
+// which /formation's eventPriorities must permute and eventLimits must name.
+const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin']
+const validEventLimits = (value: unknown) => {
+  const { deathLimit, timeLimitMinutes } = (value ?? {}) as Record<string, unknown>
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (deathLimit === null || (Number.isSafeInteger(deathLimit) && Number(deathLimit) >= 0)) &&
+    (timeLimitMinutes === null || (typeof timeLimitMinutes === 'number' && Number.isFinite(timeLimitMinutes) && timeLimitMinutes > 0))
+  )
+}
 const CONFIG_EXTRA_KEYS = ['roster', 'classChoices', 'eventStrategy', 'giveawayRealms', 'autoUpgradeMarks'] as const
 // public-state.ts catalogs() - served only by section=catalog (core omits them).
 const CATALOG_FIELDS = ['travelPlaces', 'monsterChoices', 'bestiaryCatalog', 'skillCatalog', 'appearanceChoices', 'merchantCatalog', 'bankVaults'] as const
@@ -296,9 +310,21 @@ export class MockPartyServer {
       activeSlots: this.characters.map((c, index) => ({ index, kind: 'headless', character: c.name, state: 'online' })),
       gameVersion: 830,
       merchantCharacter: this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null),
+      // Console 1.4 events and realms.
+      eventAttendance: this.eventAttendance,
+      bossChase: this.bossChase,
+      dailyChase: this.dailyChase,
+      realmHopBlacklist: this.realmHopBlacklist,
       ...this.extraState,
     }
   }
+
+  // Console 1.4 events and realms: initial-core.ts defaults (initialBossChase,
+  // initialDailyChase, initialRealmHopBlacklist) until a test or POST changes them.
+  eventAttendance: Record<string, Record<string, { ended: boolean; ignored?: string }>> = {}
+  bossChase: Record<string, unknown> = { enabled: false, minEtaMinutes: 15, trip: null, returning: null, retryAt: 0, lastError: null, checkedAt: 0, sightings: [], respawns: [] }
+  dailyChase: Record<string, unknown> = { enabled: false, leadMinutes: 16, otherRegions: false, observations: {}, gameVersion: 0, trip: null, returning: null, retryAt: 0, lastError: null, upcoming: [] }
+  realmHopBlacklist: string[] = []
 
   /** Any other state field a test needs (merchantForceStand, threshold,
    *  goldTargets, merchantCharacter, ...). Routed to its section exactly
@@ -524,6 +550,29 @@ export class MockPartyServer {
       if (body.character !== undefined && body.follow !== undefined) {
         if (typeof body.follow !== 'boolean') return { status: 400, json: { error: 'invalid follower' } }
         this.followers = { ...this.followers, [String(body.character)]: body.follow }
+      }
+      // Console 1.4 events and realms: http/formation.ts limits() then
+      // priorities(), each 400 on a bad value before the follower 409.
+      if (body.character !== undefined && (body.eventLimits !== undefined || body.eventPriorities !== undefined)) {
+        const name = String(body.character)
+        const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const inherited = !!this.leader && name !== this.leader && name !== merchant && this.followers[name] === true
+        const state = this.extraState as { eventLimitsByCharacter?: Record<string, Record<string, unknown>>; eventPrioritiesByCharacter?: Record<string, string[]> }
+        if (body.eventLimits !== undefined) {
+          const patch = (body.eventLimits ?? {}) as { event?: unknown; limits?: { deathLimit: unknown; timeLimitMinutes: unknown } }
+          if (!SUPPORTED_EVENTS.includes(String(patch.event)) || !validEventLimits(patch.limits)) return { status: 400, json: { error: 'invalid event limits' } }
+          if (inherited) return { status: 409, json: { error: 'using leader events' } }
+          const limits = { deathLimit: patch.limits!.deathLimit, timeLimitMinutes: patch.limits!.timeLimitMinutes }
+          const saved = { ...state.eventLimitsByCharacter, [name]: { ...state.eventLimitsByCharacter?.[name], [String(patch.event)]: limits } }
+          this.extraState = { ...this.extraState, eventLimitsByCharacter: saved }
+        }
+        if (body.eventPriorities !== undefined) {
+          const value = body.eventPriorities
+          if (!Array.isArray(value) || value.length !== SUPPORTED_EVENTS.length || new Set(value).size !== value.length || value.some((id) => !SUPPORTED_EVENTS.includes(id)))
+            return { status: 400, json: { error: 'invalid event priorities' } }
+          if (inherited) return { status: 409, json: { error: 'using leader events' } }
+          this.extraState = { ...this.extraState, eventPrioritiesByCharacter: { ...state.eventPrioritiesByCharacter, [name]: [...value] } }
+        }
       }
       if (body.character !== undefined && body.eventSelections !== undefined) {
         // http/formation.ts: followers of a leader use the leader's events.
@@ -914,6 +963,43 @@ export class MockPartyServer {
       // Simplified: the real switch runs as an operation; the mock completes it at once.
       this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, currentRealm: body.realm, split: false, ...(body.setHome ? { homeRealm: body.realm } : {}) }
       return { status: 200, json: { ok: true } }
+    }
+    // Console 1.4 events and realms: events/boss-chase.ts and daily-chase.ts
+    // update(), navigation/realm-hop-blacklist.ts.
+    if (path === 'realm/boss-chase') {
+      const chase = { ...this.bossChase }
+      if (body.enabled !== undefined) chase.enabled = body.enabled === true
+      if (body.minEtaMinutes !== undefined) {
+        const minEta = Number(body.minEtaMinutes)
+        if (!Number.isFinite(minEta) || minEta < 0 || minEta > 600) return { status: 400, json: { error: 'minEtaMinutes must be between 0 and 600' } }
+        chase.minEtaMinutes = minEta
+      }
+      if (!chase.enabled) Object.assign(chase, { trip: null, returning: null })
+      this.bossChase = chase
+      return { status: 200, json: { ok: true, bossChase: chase } }
+    }
+    if (path === 'realm/daily-chase') {
+      const chase = { ...this.dailyChase }
+      if (body.enabled !== undefined) chase.enabled = body.enabled === true
+      if (body.otherRegions !== undefined) chase.otherRegions = body.otherRegions === true
+      if (body.leadMinutes !== undefined) {
+        const lead = Number(body.leadMinutes)
+        if (!Number.isFinite(lead) || lead < 14 || lead > 120) return { status: 400, json: { error: 'leadMinutes must be between 14 and 120' } }
+        chase.leadMinutes = lead
+      }
+      if (!chase.enabled) Object.assign(chase, { trip: null, returning: null })
+      this.dailyChase = chase
+      return { status: 200, json: { ok: true, dailyChase: chase } }
+    }
+    if (path === 'realm/hop-blacklist') {
+      const realms = body.realms
+      if (!Array.isArray(realms) || !realms.every((realm) => typeof realm === 'string')) return { status: 400, json: { error: 'realms must be a list of realm keys' } }
+      if (new Set(realms).size !== realms.length) return { status: 400, json: { error: 'realms must not repeat' } }
+      const known = ((this.realmControl?.realms as { key: string }[] | undefined) ?? []).map((realm) => realm.key)
+      const unknown = realms.filter((realm) => !known.includes(realm))
+      if (unknown.length) return { status: 400, json: { error: 'unknown Adventure Land realm: ' + unknown.join(', ') } }
+      this.realmHopBlacklist = realms
+      return { status: 200, json: { ok: true, realmHopBlacklist: realms } }
     }
     if (path === 'command' && body.type === 'give') {
       const target = String(body.target)
