@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings } from 'lucide-react'
-import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { useCharacters, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { eventDisplayNames, eventPolicy, eventPriorityOrder, eventTimeLabel, selectedEvents, supportedEvents, type EventSchedule } from '@/lib/eventPolicy'
 import { useClock } from '@/lib/duration'
 import { CaveEventRow } from '@/screens/dungeon/CaveEventRow'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { Chip } from '@/components/Chip'
 import { SectionCard } from '../SectionCard'
+import { GearSetControl } from './GearSetControl'
+import { FrankyRoutineControl } from './FrankyRoutineControl'
 import type { PartyStateDynamic } from '@/models'
 
 /** Two independent tap targets on POST /party-api/formation. "Leader" sends
@@ -20,6 +22,8 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
   const isLeader = dynamicState.leader === characterName
   const isFollowing = dynamicState.followers[characterName] === true
   const [formationError, setFormationError] = useState<string | null>(null)
+  // Merchant-class characters get neither gear sets nor a Franky routine (connected-character-card.tsx).
+  const combat = useCharacters()[characterName]?.vitals?.ctype !== 'merchant'
 
   return (
     <SectionCard title="Formation">
@@ -49,7 +53,8 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         >
           Follow
         </Chip>
-        <EventSelectionControl state={dynamicState} name={characterName} />
+        <EventSelectionControl state={dynamicState} name={characterName} combat={combat} />
+        {combat && <GearSetControl name={characterName} state={dynamicState} />}
       </div>
       <ConfigLoadingNote />
       {formationError && (
@@ -63,13 +68,14 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
 }
 
 /** The "Events (n)" selection as an inline list. Followers use their leader's events (the server 409s for them). */
-function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name: string }) {
+function EventSelectionControl({ state, name, combat }: { state: PartyStateDynamic; name: string; combat: boolean }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const navigate = useNavigate()
   const now = useClock()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [franky, setFranky] = useState(false)
   const policy = eventPolicy(state, name)
   const selected = selectedEvents(state, name)
   const catalog: EventSchedule[] = state.eventSchedules?.length ? state.eventSchedules : supportedEvents.map((id) => ({ id, name: eventDisplayNames[id] ?? id }))
@@ -116,10 +122,16 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
                       <Settings className="size-4" />
                     </button>
                   )}
+                  {event.id === 'franky' && combat && (
+                    <button type="button" aria-label="Franky routine settings" aria-expanded={franky} onClick={() => setFranky(!franky)} className="ml-auto rounded border border-border p-2 text-amber-200">
+                      <Settings className="size-4" />
+                    </button>
+                  )}
                 </div>
               )
             })}
           {error && <p role="alert" className="mt-1 text-sm text-destructive">{error}</p>}
+          {franky && combat && <FrankyRoutineControl name={name} state={state} />}
         </div>
       )}
     </>

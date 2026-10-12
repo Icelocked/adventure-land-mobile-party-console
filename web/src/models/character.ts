@@ -32,6 +32,9 @@ export interface CharacterVitals {
   standOpen?: boolean
   // The live local lucky-slot evidence stream, when the record carries it.
   luckySlotTracking?: unknown
+  // Console 1.4: bag slots held by a gear set or by gear swapped out for
+  // one; automatic rules skip them (inventory/swap-reservations.ts).
+  reservedInventory?: { slot: number; item: { name?: string; level?: number } | null }[]
 }
 
 /** Carried items and equipment. Updates independently of vitals. */

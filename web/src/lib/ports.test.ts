@@ -149,6 +149,11 @@ describe('item-action-banner.ts', () => {
     expect(conflict).toMatchObject({ label: 'Rule conflict', title: 'npc · deconstruction', border: 'border-red-400' })
     expect(itemActionBanner([{ action: 'upgrade', automatic: true, label: 'Auto → +3' }, { action: 'compound', automatic: true, label: 'Auto compound → +2' }], true)?.label).toBe('Auto → +3')
   })
+  it('a gear-set hold drops automatic rules but still yields to a manual mark', () => {
+    const hold = itemActionBanner([{ action: 'held', label: 'Luck set' }, { action: 'npc', automatic: true, label: 'NPC sale' }, { action: 'deconstruction', automatic: true, label: 'Auto deconstruction' }], false)
+    expect(hold).toMatchObject({ label: 'Luck set', border: 'border-teal-300' })
+    expect(itemActionBanner([{ action: 'held', label: 'Luck set' }, { action: 'bank', label: 'Bank' }], false)?.label).toBe('Bank')
+  })
 })
 
 describe('suggested-item-value.tsx / upgrade-estimate.tsx', () => {

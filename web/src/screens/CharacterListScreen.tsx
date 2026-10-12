@@ -18,6 +18,7 @@ import { pendingCharacters, pendingHelp, pendingLabels, type PendingCharacter } 
 import { RosterPickerSheet } from '@/screens/roster/RosterPickerSheet'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
+import { PartyRolesSettings } from '@/screens/PartyRolesSettings'
 import type { BestiaryMonster, CharacterState } from '@/models'
 
 /** Party overview: class icon, level/class, HP/MP, one-line activity, gold
@@ -106,6 +107,7 @@ export function CharacterListScreen() {
       {/* The dungeon panel heads the party while a visit runs. */}
       <DungeonPanel />
       {(names.length > 0 || pending.length > 0) && <PartyControls />}
+      {(names.length > 0 || pending.length > 0) && <PartyRolesSettings tank={dynamicState.designatedTank || null} characters={names} />}
 
       {names.length === 0 && !pending.length ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
@@ -177,6 +179,9 @@ function PartyControls() {
   const [error, setError] = useState<string | null>(null)
 
   const running = !!escape && !['complete', 'failed-hold', 'released'].includes(escape.stage)
+  // Console 1.4 escape-control.tsx: a finished or failed escape holds automation until resumed.
+  const held = !!escape && ['complete', 'failed-hold'].includes(escape.stage)
+  const holdError = escape?.stage !== 'released' ? escape?.error : null
   const failed = !!error || !!escapeReadError || (!!escape && escape.stage !== 'released' && (!!escape.error || escape.stage === 'failed-hold'))
   const label = failed ? 'Escape - failed' : escape?.stage === 'complete' ? 'Escape - success' : 'Escape'
   const [townError, setTownError] = useState<string | null>(null)
@@ -222,6 +227,31 @@ function PartyControls() {
         <p role="alert" className="mt-1 text-sm text-destructive">
           {townError || error}
         </p>
+      )}
+      {!inDungeon && !error && holdError && (
+        <p role="alert" className="mt-1 text-sm text-destructive">
+          {holdError}
+        </p>
+      )}
+      {!inDungeon && held && (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted-foreground">Automation is held until you resume it.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              setError(null)
+              const result = await api.resumeEscape()
+              if (result.kind === 'failure') setError(result.message)
+              await refreshNow()
+              setBusy(false)
+            }}
+          >
+            Resume automation
+          </Button>
+        </div>
       )}
       {inDungeon && dungeon.actionError && (
         <p role="alert" className="mt-1 text-sm text-destructive">
