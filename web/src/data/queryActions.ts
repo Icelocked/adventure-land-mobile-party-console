@@ -66,6 +66,10 @@ export const actionDomains = {
   '/aldata/key': core,
   '/aldata/refresh': ['market', 'core', 'config'],
   '/anniversary/chat-advertise': core,
+  // Console 1.4 combat and party: gear sets, Franky routine, escape resume.
+  '/gear-sets': core,
+  '/encounter-mode': core,
+  '/escape/resume': core,
 } satisfies Record<string, readonly Domain[]>
 
 export function affectedDomains(path: string, body?: unknown): readonly Domain[] {

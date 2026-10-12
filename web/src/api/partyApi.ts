@@ -927,4 +927,34 @@ export class PartyApiClient {
   async setRealmHopBlacklist(realms: string[]): Promise<ApiResult<CommandResult>> {
     return this.post('realm/hop-blacklist', { realms })
   }
+
+  // Console 1.4 combat and party: designated tank, gear sets, Franky routine, escape resume.
+  /** POST /party-api/formation {tank}. null clears the designated tank
+   *  (http/formation.ts assignManaged). */
+  async setDesignatedTank(tank: string | null): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { tank })
+  }
+
+  /** POST /party-api/gear-sets. "save" captures the gear the character is
+   *  wearing and 409s without an equipment report from the last 10s
+   *  (characters/gear-sets.ts). */
+  async gearSet(character: string, set: 'luck' | 'tank', action: 'save' | 'clear'): Promise<ApiResult<CommandResult>> {
+    return this.post('gear-sets', { character, set, action })
+  }
+
+  /** POST /party-api/encounter-mode {character, encounter, mode}. */
+  async setEncounterMode(character: string, encounter: 'franky', mode: 'auto' | 'offtank' | 'tank'): Promise<ApiResult<CommandResult>> {
+    return this.post('encounter-mode', { character, encounter, mode })
+  }
+
+  /** POST /party-api/encounter-mode {character, encounter, deathLimit}. */
+  async setEncounterAutoLimit(character: string, encounter: 'franky', deathLimit: number): Promise<ApiResult<CommandResult>> {
+    return this.post('encounter-mode', { character, encounter, deathLimit })
+  }
+
+  /** POST /party-api/escape/resume - releases the automation hold an escape
+   *  leaves at `complete` or `failed-hold`; answers {escape}. */
+  async resumeEscape(): Promise<ApiResult<CommandResult>> {
+    return this.post('escape/resume', {})
+  }
 }

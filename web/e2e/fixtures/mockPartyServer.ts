@@ -46,6 +46,8 @@ export interface MockCharacter {
   // This character's Hunt quest (state.statuses[name].monsterHunt), served in
   // characterDetails by section=core&dashboard=1.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
+  // Console 1.4: live vitals.reservedInventory, the bag slots a gear set holds (inventory/swap-reservations.ts).
+  reservedInventory?: { slot: number; item: MockItem | null }[]
 }
 
 export interface MockCatalogEntry {
@@ -88,6 +90,8 @@ const CONFIG_FIELDS = [
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
   // Console 1.4 events and realms.
   'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'dailyChase', 'realmHopBlacklist',
+  // Console 1.4 combat and party: designated tank and gear sets.
+  'designatedTank', 'gearSets',
 ] as const
 // Console 1.4 events and realms: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
@@ -232,6 +236,19 @@ export class MockPartyServer {
 
   paired = false
 
+  // Console 1.4 combat and party: designated tank, gear sets, Franky routine, escape.
+  designatedTank: string | null = null
+  gearSets: Record<string, Record<string, { slots: Record<string, MockItem & { p?: string }>; savedAt: number }>> = {}
+  // Characters whose equipment report is older than gear-sets.ts's 10s freshness window.
+  staleEquipment: string[] = []
+  // The leader scope's routine; other scopes keep theirs in farmingProfiles (navigation/initial-focus.ts defaults {}).
+  encounterRoutines: Record<string, string> = {}
+  encounterAutoDeathLimits: Record<string, number> = {}
+  encounterAutoDeaths: Record<string, number> = {}
+  // GET /party-api/escape's `escape`, and every escape POST path in order.
+  escape: { id: string; stage: string; error: string | null; progress: Record<string, unknown> } | null = null
+  escapeActions: string[] = []
+
   addCharacter(character: MockCharacter): this {
     this.characters.push(character)
     for (const item of character.items ?? []) {
@@ -315,6 +332,12 @@ export class MockPartyServer {
       bossChase: this.bossChase,
       dailyChase: this.dailyChase,
       realmHopBlacklist: this.realmHopBlacklist,
+      // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
+      designatedTank: this.designatedTank,
+      gearSets: this.gearSets,
+      encounterRoutines: this.encounterRoutines,
+      encounterAutoDeathLimits: this.encounterAutoDeathLimits,
+      encounterAutoDeaths: this.encounterAutoDeaths,
       ...this.extraState,
     }
   }
@@ -359,7 +382,7 @@ export class MockPartyServer {
       return {
         characters: Object.fromEntries(
           // fastCharacters: the whole status minus items/slots and other omitted fields.
-          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}) }]),
+          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}) }]),
         ),
       }
     if (section === 'inventory')
@@ -418,6 +441,7 @@ export class MockPartyServer {
           inventorySize: (c.items ?? []).length,
           ...(c.target ? { target: c.target } : {}),
           ...(c.conditions ? { conditions: c.conditions } : {}),
+          ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}),
         },
         items,
         slots: c.slots ?? {},
@@ -543,6 +567,61 @@ export class MockPartyServer {
       delete this.failOnceBody[path]
       return { status: 409, json: { ok: false, error, ...extra } }
     }
+    // Console 1.4 designated tank: http/formation.ts assigns `tank` after
+    // `leader` and before the character fields; null clears it.
+    if (path === 'formation' && body.tank !== undefined) {
+      if (body.tank !== null && !this.characters.some((c) => c.name === body.tank)) return { status: 400, json: { error: 'unknown tank' } }
+      this.designatedTank = body.tank === null ? null : String(body.tank)
+    }
+    // Console 1.4 gear sets: characters/gear-sets.ts.
+    if (path === 'gear-sets') {
+      const name = String(body.character ?? '')
+      const set = String(body.set ?? '')
+      const member = this.characters.find((c) => c.name === name)
+      if (!member) return { status: 400, json: { error: 'invalid character' } }
+      if (!['luck', 'tank', 'gold'].includes(set)) return { status: 400, json: { error: 'invalid gear set' } }
+      const sets = (this.gearSets[name] ||= {})
+      if (body.action === 'clear') delete sets[set]
+      else if (body.action === 'save') {
+        if (!member.slots || this.staleEquipment.includes(name)) return { status: 409, json: { error: 'no fresh equipment report for ' + name } }
+        const slots: Record<string, MockItem & { p?: string }> = {}
+        for (const slot of ['chest', 'pants', 'helmet', 'gloves', 'shoes', 'cape', 'belt', 'orb', 'amulet', 'ring1', 'ring2', 'earring1', 'earring2']) {
+          const item = member.slots[slot]?.item as (MockItem & { p?: string }) | undefined
+          if (item?.name)
+            slots[slot] = { name: item.name, ...(item.level !== undefined ? { level: item.level } : {}), ...(item.p ? { p: item.p } : {}), ...(item.stat_type ? { stat_type: item.stat_type } : {}) }
+        }
+        if (!Object.keys(slots).length) return { status: 409, json: { error: 'nothing is equipped in the gear set slots' } }
+        sets[set] = { slots, savedAt: Date.now() }
+      } else return { status: 400, json: { error: 'invalid gear set action' } }
+      return { status: 200, json: { ok: true, gearSets: this.gearSets[name] } }
+    }
+    // Console 1.4 Franky routine: http/encounter-mode.ts behind the
+    // farming-scope.ts wrapper, which refuses followers and merchants.
+    if (path === 'encounter-mode') {
+      const scope = this.huntScope(body.character)
+      if ('error' in scope) return { status: scope.status, json: { error: scope.error } }
+      const encounter = String(body.encounter ?? '')
+      if (encounter !== 'franky') return { status: 400, json: { error: 'invalid encounter mode' } }
+      if (body.mode === undefined && body.deathLimit === undefined) return { status: 400, json: { error: 'no encounter setting provided' } }
+      if (body.mode !== undefined && !['auto', 'offtank', 'tank'].includes(String(body.mode))) return { status: 400, json: { error: 'invalid encounter mode' } }
+      const deathLimit = Number(body.deathLimit)
+      if (body.deathLimit !== undefined && (!Number.isInteger(deathLimit) || deathLimit < 0)) return { status: 400, json: { error: 'invalid death limit' } }
+      const profile = scope.profile ? (this.farmingProfiles[scope.profile] ?? {}) : null
+      const routines = { ...((profile ? profile.encounterRoutines : this.encounterRoutines) as Record<string, string> | undefined), ...(body.mode !== undefined ? { [encounter]: String(body.mode) } : {}) }
+      const limits = { ...((profile ? profile.encounterAutoDeathLimits : this.encounterAutoDeathLimits) as Record<string, number> | undefined), ...(body.deathLimit !== undefined ? { [encounter]: deathLimit } : {}) }
+      if (scope.profile) this.updateProfile(scope.profile, { encounterRoutines: routines, encounterAutoDeathLimits: limits })
+      else {
+        this.encounterRoutines = routines
+        this.encounterAutoDeathLimits = limits
+      }
+      // farming-scope.ts resultResponse adds the scope's owner and policies when `character` was sent.
+      const owner = body.character === undefined ? null : String(body.character)
+      const policy = (name: string) => (this.farmingProfiles[name]?.farmingPolicy as string | undefined) ?? (name === this.leader ? (this.extraState.farmingPolicy as string | undefined) : undefined)
+      return {
+        status: 200,
+        json: { ok: true, encounter, mode: routines[encounter], deathLimit: limits[encounter], ...(owner ? { farmingOwner: owner, savedFarmingPolicy: policy(owner), effectiveFarmingPolicy: policy(owner) } : {}) },
+      }
+    }
     if (path === 'formation') {
       // http/formation.ts: `leader` is only touched when the key is
       // present (null clears it), `follow` only when `character` is sent.
@@ -582,7 +661,7 @@ export class MockPartyServer {
         const current = (this.extraState.eventSelectionsByCharacter as Record<string, string[]> | undefined) ?? {}
         this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
       }
-      return { status: 200, json: { ok: true, leader: this.leader, followers: this.followers } }
+      return { status: 200, json: { ok: true, leader: this.leader, tank: this.designatedTank, followers: this.followers } }
     }
     if (path === 'merchant/auto-npc-sale') {
       // http/automatic-sales.ts npc(): with `character` the rule is per-player
@@ -1123,7 +1202,21 @@ export class MockPartyServer {
     await page.route('**/console-update', (route) =>
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
     )
-    await page.route('**/party-api/escape**', (route) => route.fulfill({ json: { escape: null } }))
+    // Console 1.4 escape resume: http/party-actions.ts escapeState/escape/resume
+    // all answer {escape}; resume releases the hold (party-escape.cjs stage "released").
+    await page.route('**/party-api/escape**', (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fulfill({ json: { escape: this.escape } })
+      const path = new URL(request.url()).pathname.replace(/^.*\/party-api\//, '')
+      this.escapeActions.push(path)
+      if (this.failOnce[path] !== undefined) {
+        const error = this.failOnce[path]
+        delete this.failOnce[path]
+        return route.fulfill({ status: 409, json: { error } })
+      }
+      if (path === 'escape/resume' && this.escape) this.escape = { ...this.escape, stage: 'released' }
+      return route.fulfill({ json: { escape: this.escape } })
+    })
     // tools/update + debug-instance + dashboard-state (settings).
     await page.route('**/console-update/*', async (route) => {
       const name = new URL(route.request().url()).pathname.split('/').pop() ?? ''

@@ -188,6 +188,7 @@ export function CharacterDetailScreen() {
               }}
               onLuckySlotData={() => setLuckySlotOpen(true)}
               localLucky={vitals.luckySlotTracking}
+              reservedInventory={vitals.reservedInventory}
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             {name === dynamicState.merchantCharacter && <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} gold={vitals.gold ?? 0} />}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronUp, Settings } from 'lucide-react'
-import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { useCharacters, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import {
   eventDisplayNames,
   eventLimits,
@@ -21,6 +21,8 @@ import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
+import { GearSetControl } from './GearSetControl'
+import { FrankyRoutineControl } from './FrankyRoutineControl'
 import type { PartyStateDynamic } from '@/models'
 
 /** Two independent tap targets on POST /party-api/formation. "Leader" sends
@@ -33,6 +35,8 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
   const isLeader = dynamicState.leader === characterName
   const isFollowing = dynamicState.followers[characterName] === true
   const [formationError, setFormationError] = useState<string | null>(null)
+  // Merchant-class characters get neither gear sets nor a Franky routine (connected-character-card.tsx).
+  const combat = useCharacters()[characterName]?.vitals?.ctype !== 'merchant'
 
   return (
     <SectionCard title="Formation">
@@ -62,7 +66,8 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         >
           Follow
         </Chip>
-        <EventSelectionControl state={dynamicState} name={characterName} />
+        <EventSelectionControl state={dynamicState} name={characterName} combat={combat} />
+        {combat && <GearSetControl name={characterName} state={dynamicState} />}
       </div>
       <ConfigLoadingNote />
       {formationError && (
@@ -90,7 +95,7 @@ function predictedEvent(state: PartyStateDynamic, rotation: string): string | nu
  *  event-selection-control.tsx). Followers use their leader's events (the
  *  server 409s for them). Up/down buttons replace the console's drag to
  *  reorder; each move saves the whole priority order. */
-function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name: string }) {
+function EventSelectionControl({ state, name, combat }: { state: PartyStateDynamic; name: string; combat: boolean }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const navigate = useNavigate()
@@ -98,6 +103,7 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [settings, setSettings] = useState<string | null>(null)
+  const [franky, setFranky] = useState(false)
   const policy = eventPolicy(state, name)
   const selected = selectedEvents(state, name)
   const order = eventPriorityOrder(state, name)
@@ -217,6 +223,15 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
                     }}
                     onAnniversary={() => navigate('/anniversary')}
                   />
+                )}
+                {/* Console 1.4 reaches the Franky routine from inside Franky's event settings (event-limits-dialog.tsx). */}
+                {settings === event.id && event.id === 'franky' && combat && (
+                  <div className="mb-2 flex flex-col gap-2">
+                    <Button size="sm" variant="outline" aria-expanded={franky} onClick={() => setFranky(!franky)}>
+                      Franky routine settings
+                    </Button>
+                    {franky && <FrankyRoutineControl name={name} state={state} />}
+                  </div>
                 )}
               </div>
             )
