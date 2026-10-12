@@ -948,6 +948,8 @@ export interface AchievementHuntSettings {
   blacklistDeaths: boolean
   deathThreshold: number
   fillIdle?: boolean
+  fillSelectedOnly?: boolean
+  bossRecheckMinutes?: number
 }
 export interface AchievementBlacklistEntry {
   monsterId: string

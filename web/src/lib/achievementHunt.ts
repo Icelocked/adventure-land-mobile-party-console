@@ -12,20 +12,26 @@ export interface AchievementMonster {
   threat: number
   hp: number
   special: boolean
+  /** A random respawn or one of passive hunting's rares: the console fights it when seen and never makes it the target. */
+  rare: boolean
   monster: BestiaryMonster
 }
 
-// Phoenix needs a route order and the Fairy passive hunting; the console rejects both.
-const UNTARGETABLE = new Set(['phoenix', 'tinyp'])
-// G.maps marks these spawns `stype: "randomrespawn"` (cave: mvampire, main: phoenix, game
-// data 17665). The bestiary catalog does not carry spawn types.
-const RANDOM_RESPAWN = new Set(['mvampire', 'phoenix'])
+// Passive hunting's own rares (console runtime/coordinator/navigation/passive-settings.ts legacyPriorities).
+const PASSIVE_RARES = new Set(['tinyp', 'phoenix', 'goldenbat', 'cutebee', 'hen', 'rooster'])
 // Boss-like monsters the game does not flag (console docs/achievement-hunt.md § 23).
 const BOSS_SPAWNS = 2
 const BOSS_HP = 50_000
 
+type SpawnChoice = { spawnRecords?: { count?: number; restrictions?: string[]; stype?: string }[] } | undefined
+
+/** G.maps marks a spawn that moves between places `stype: "randomrespawn"` (Dracul, Phoenix); the console copies it into each spawn record. */
+function randomRespawn(choice: SpawnChoice): boolean {
+  return (choice?.spawnRecords || []).some((record) => record.stype === 'randomrespawn')
+}
+
 /** Spawns in the world from the spawn records, leaving out those the game marks "ignore". */
-function worldSpawns(choice: { spawnRecords?: { count?: number; restrictions?: string[] }[] } | undefined): number {
+function worldSpawns(choice: SpawnChoice): number {
   return (choice?.spawnRecords || []).reduce((total, record) => (record.restrictions?.includes('ignore') ? total : total + (Number(record.count) || 0)), 0)
 }
 
@@ -39,13 +45,13 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
   const bossLike = (monster: BestiaryMonster, definition: Record<string, unknown>) => {
     const respawn = Number(definition.respawn)
     if (Number.isFinite(respawn) && respawn < 0) return true
-    const spawns = worldSpawns(choices.find((choice) => choice.id === monster.id) as Parameters<typeof worldSpawns>[0])
+    const spawns = worldSpawns(choices.find((choice) => choice.id === monster.id) as SpawnChoice)
     return spawns > 0 && spawns <= BOSS_SPAWNS && (Number(monster.hp) || 0) >= BOSS_HP
   }
   const monsters = catalog
-    .filter((monster) => !UNTARGETABLE.has(monster.id))
     .map((monster) => {
       const definition = (monster.definition || {}) as Record<string, unknown>
+      const rare = PASSIVE_RARES.has(monster.id) || randomRespawn(choices.find((choice) => choice.id === monster.id) as SpawnChoice)
       return {
         id: monster.id,
         name: monster.name || monster.id,
@@ -53,7 +59,8 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
         xp: Number(monster.xp) || 0,
         threat: Number(monster.threat) || 0,
         hp: Number(monster.hp) || 0,
-        special: !!definition.special || !!definition.cooperative || !!definition.unlist || RANDOM_RESPAWN.has(monster.id) || !routable.has(monster.id) || bossLike(monster, definition),
+        special: !!definition.special || !!definition.cooperative || !!definition.unlist || rare || !routable.has(monster.id) || bossLike(monster, definition),
+        rare,
         monster,
       }
     })
