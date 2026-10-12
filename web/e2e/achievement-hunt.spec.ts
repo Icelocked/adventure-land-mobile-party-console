@@ -53,9 +53,11 @@ test('Achievement Hunt lives in Farming settings: weakest-first selector, Up to 
   await expect(regular.getByRole('checkbox')).toHaveCount(3)
   const names = await regular.locator('p.font-medium').allTextContents()
   expect(names).toEqual(['Goo', 'Bee', 'White Wolf'])
-  // Dragold is special; Phoenix can't be targeted at all.
-  await expect(page.getByRole('region', { name: 'Special monsters' }).getByText('Dragold')).toBeVisible()
-  await expect(page.getByText('Phoenix')).toHaveCount(0)
+  // Dragold is special. Phoenix is a rare: listed as special and fought when seen, never a target.
+  const special = page.getByRole('region', { name: 'Special monsters' })
+  await expect(special.getByText('Dragold')).toBeVisible()
+  await expect(special.getByText('Phoenix')).toBeVisible()
+  await expect(special.getByText(/fought when seen/)).toBeVisible()
   await regular.getByRole('button', { name: 'Up to here' }).nth(1).click()
   await expect.poll(() => sent.at(-1)).toEqual({ settings: { monsters: ['goo', 'bee'] }, character: 'Leada' })
   await page.keyboard.press('Escape')
