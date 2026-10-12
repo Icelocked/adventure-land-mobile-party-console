@@ -171,7 +171,9 @@ test('Auto exchange: an already-marked item is not offered again (the server wou
   expect(bodies.filter((b) => b.type === 'auto-exchange')).toHaveLength(0)
 })
 
-test('Auto exchange: only offered on the configured merchant', async ({ page }) => {
+// Console 1.4 inventory-panel.tsx gates exchanges on a configured merchant,
+// not on the character being that merchant.
+test('Auto exchange: offered on other characters once a merchant is configured', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
@@ -183,7 +185,8 @@ test('Auto exchange: only offered on the configured merchant', async ({ page }) 
   await page.goto('/characters/Bankboi0')
   await page.getByTestId('inventory-slot-0').click()
   await expect(page.getByRole('button', { name: 'Mark for bank', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Auto exchange/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Auto exchange', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Exchange', exact: true })).toBeVisible()
 })
 
 test('Auto compound: targets stop at +7 even when the item could go higher', async ({ page }) => {

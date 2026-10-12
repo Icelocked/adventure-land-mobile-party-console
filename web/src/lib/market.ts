@@ -165,10 +165,9 @@ export function groupPonty(listings: PontyListing[], query: string, now: number,
   const filtered = listings
     .filter((listing) => listing.serverIdentifier !== 'PVP' && `${nameFor(listing.item.name) || ''} ${listing.item.name}`.toLowerCase().includes(text))
     .sort((a, b) => a.unitPrice - b.unitPrice || a.item.name.localeCompare(b.item.name))
-  const freshCutoff = now - 120000
   const groups = new Map<string, PontyGroup>()
   filtered.forEach((listing) => {
-    const stale = !listing.seenAt || listing.seenAt <= freshCutoff
+    const stale = !marketListingFresh(listing.seenAt, now)
     const key = `${listing.groupKey || listing.key}|${stale ? 'stale' : 'fresh'}`
     const realm = `${listing.serverRegion || '?'} ${listing.serverIdentifier || '?'}`
     const existing = groups.get(key)
@@ -192,4 +191,23 @@ export function priceComparison(price: number, suggested: number) {
   const priceDifference = Math.round(Math.abs(price / suggested - 1) * 100)
   const comparison = deal ? `deal · ${dealDiscount}% off` : price > suggested ? `${priceDifference}% above` : price < suggested ? `${priceDifference}% below` : 'at suggested'
   return { deal, badDeal, comparison }
+}
+
+// Console 1.4 runtime/market-preferences.ts: ignored items and the shared
+// two-minute freshness rule.
+
+/** One ignored-item identity per name and level; a missing level is +0. */
+export const marketItemKey = (item: { name: string; level?: number | null }) => `${item.name}|${item.level ?? 0}`
+
+/** Seen within the last two minutes. An unknown observation time is stale. */
+export function marketListingFresh(seenAt: number | undefined, now: number): boolean {
+  return typeof seenAt === 'number' && Number.isFinite(seenAt) && seenAt >= now - 120000
+}
+
+/** stand-sheet.tsx marketItemLabel: "+level" only for upgradeable or
+ *  compoundable items, or any item listed above +0. */
+export function marketItemLabel(item: { name: string; level?: number | null }, catalogFor: (id: string) => CatalogItem | undefined): string {
+  const known = catalogFor(item.name)
+  const leveled = known?.upgradeable || known?.compoundable || known?.meta?.upgradeable || known?.meta?.compoundable || item.level
+  return `${known?.name || item.name}${leveled ? ` +${item.level ?? 0}` : ''}`
 }

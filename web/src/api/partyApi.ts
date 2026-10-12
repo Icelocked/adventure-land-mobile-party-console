@@ -873,10 +873,12 @@ export class PartyApiClient {
 
   /** POST /party-api/merchant/aldata-order - buys from one ALData
    *  listing, sent as received minus client-only fields. The listing must
-   *  still exist and be under 120s old. */
-  async buyAlData(listing: MarketListing | Record<string, unknown>, buyQuantity: number): Promise<ApiResult<CommandResult>> {
+   *  still exist and be under 120s old unless `check` is set: console 1.4's
+   *  "Check" sends the merchant to verify a stale listing in person
+   *  (manual-market-orders.ts). */
+  async buyAlData(listing: MarketListing | Record<string, unknown>, buyQuantity: number, check = false): Promise<ApiResult<CommandResult>> {
     const { origin: _origin, groupedListings: _grouped, ...wire } = listing as Record<string, unknown>
-    return this.post('merchant/aldata-order', { listing: wire, buyQuantity })
+    return this.post('merchant/aldata-order', { listing: wire, buyQuantity, ...(check ? { check: true } : {}) })
   }
 
   /** POST /party-api/combat-log/:character/clear. */
@@ -885,14 +887,32 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/merchant/aldata-sale - sells owned copies into a
-   *  live ALData buy order. */
-  async sellAlData(order: Record<string, unknown>, sellQuantity: number): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/aldata-sale', { order, sellQuantity })
+   *  live ALData buy order. `check` skips the staleness refusal, as in
+   *  buyAlData. */
+  async sellAlData(order: Record<string, unknown>, sellQuantity: number, check = false): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/aldata-sale', { order, sellQuantity, ...(check ? { check: true } : {}) })
   }
 
   /** POST /party-api/merchant/ponty-order - `keys` lets the server
    *  combine several Ponty listings into one purchase. */
   async buyPonty(listing: { key?: string; keys?: string[]; quantity: number; unitPrice?: number }): Promise<ApiResult<CommandResult>> {
     return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
+  }
+
+  // Console 1.4 merchant and market: ignored market items and lucky slot locks.
+
+  /** POST /party-api/market/ignored-items. The dashboard spreads the whole
+   *  listing item into the body and forces `level` (stand-sheet.tsx
+   *  updateIgnored), so "clear" also carries level 0. The server caps the
+   *  list at 2048 entries. */
+  async updateMarketIgnoredItems(action: 'add' | 'remove' | 'clear', item?: { name: string; level?: number }): Promise<ApiResult<CommandResult>> {
+    return this.post('market/ignored-items', { action, ...item, level: item?.level ?? 0 })
+  }
+
+  /** POST /party-api/merchant/config with a lucky slot action. The
+   *  dashboard sends the row's `slot` on unlock too; the server reads it
+   *  only for a lock. An unlock resumes discovery at the next square. */
+  async setLuckySlotLock(character: string, slot: number, unlock: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/config', { character, slot, action: unlock ? 'unlock-lucky-slot' : 'lock-lucky-slot' })
   }
 }

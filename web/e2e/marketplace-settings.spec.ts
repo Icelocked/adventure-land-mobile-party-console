@@ -34,7 +34,7 @@ test('Marketplace settings: auto stand buys, blacklist toggle, manual block, per
 
   await strike.getByRole('button', { name: 'Clear' }).click()
   await expect(page.getByRole('group', { name: 'Strike Flaky' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Clear all' }).click()
+  await page.getByRole('button', { name: 'Clear all', exact: true }).click()
   await page.getByRole('button', { name: 'Really clear all?' }).click()
   await expect(page.getByText('No merchant strike records.')).toBeVisible()
 })

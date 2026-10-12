@@ -352,6 +352,9 @@ export interface SlotRollStatistics {
 export interface LuckySlotTracking {
   version: 1
   streamId?: string
+  // Console 1.4: the square after the last observed roll, where sequential
+  // discovery resumes. `rolls` is the stream's roll total at that moment.
+  cursor?: { slot: number; at: number; rolls: number }
   slots: Record<string, SlotRollStatistics>
 }
 export type LuckySlotStreams = Record<string, LuckySlotTracking>
@@ -662,6 +665,21 @@ export interface PartyStateDynamic {
   activeConvoy?: unknown
   // Upgrades
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
+
+  // Console 1.4 merchant and market: lucky slot position locks
+  // (http/merchant-settings.ts) and market ignored items
+  // (http/market-ignored-items.ts). luckySlotResume is the square an
+  // unlock hands back to discovery; it lapses once that square gets a roll.
+  luckySlotLocks?: Record<string, number | null>
+  luckySlotResume?: Record<string, { slot: number; rolls: number }>
+  marketIgnoredItems?: MarketIgnoredItem[]
+}
+
+/** Console 1.4 runtime/market-preferences.ts: a hidden market item. An
+ *  omitted level saves as +0. */
+export interface MarketIgnoredItem {
+  name: string
+  level: number
 }
 
 /** Merchant rules shared across characters. `conflicts` is left opaque. */
