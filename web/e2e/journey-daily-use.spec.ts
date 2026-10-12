@@ -103,8 +103,8 @@ test('Daily use: switching characters mid-task, then a full merchant errand run,
   await expect(page.getByRole('button', { name: 'Edit price for Iron Ore' })).toHaveText('50g')
 
   // 6. Back on the party overview, every change has stuck, including
-  // Priestname's auto-sell mark from step 3. (A per-player rule shows as the
-  // tile's banner; rule lists are merchant-only.)
+  // Priestname's auto-sell mark from step 3. (A per-player rule shows as the tile's "Auto NPC"
+  // banner; rule lists are merchant-only.)
   await page.goto('/characters/Priestname')
-  await expect(page.getByTestId('inventory-slot-0')).toContainText('NPC sale')
+  await expect(page.getByTestId('inventory-slot-0')).toContainText('Auto NPC')
 })

@@ -248,6 +248,14 @@ export class MockPartyServer {
   // GET /party-api/escape's `escape`, and every escape POST path in order.
   escape: { id: string; stage: string; error: string | null; progress: Record<string, unknown> } | null = null
   escapeActions: string[] = []
+  // Access-code pairing (tools/hosting/access.ts): the newest code from
+  // /setup/invite, its expiry and wrong guesses (the 5th cancels it), plus
+  // every /setup/pair body. Set accessCode = null to model another browser
+  // pairing with it.
+  accessCode: { code: string; expiresAt: number; failures: number } | null = null
+  nextAccessCode = 'K7MQ-2PXA'
+  accessCodeTtlMs = 10 * 60_000
+  pairRequests: Record<string, unknown>[] = []
 
   addCharacter(character: MockCharacter): this {
     this.characters.push(character)
@@ -1126,7 +1134,50 @@ export class MockPartyServer {
       }
       return { status: 200, json: { ok: true } }
     }
+    // Bank sort mode, layout and one-shot request (merchant/bank-sort.ts configure()).
+    if (path === 'merchant/bank-sort') {
+      const valid =
+        (body.mode === undefined || body.mode === 'automatic' || body.mode === 'request') &&
+        (body.enabled === undefined || typeof body.enabled === 'boolean') &&
+        (body.layout === undefined || body.layout === 'packed' || body.layout === 'gapped')
+      if (!valid) return { status: 400, json: { error: 'invalid bank sort setting' } }
+      const next = { ...this.extraState }
+      if (body.mode === 'request' || body.mode === 'automatic') next.bankSortMode = body.mode
+      if (body.layout === 'packed' || body.layout === 'gapped') next.bankSortLayout = body.layout
+      if (next.bankSortMode !== 'request' || body.enabled === false) next.bankSortRequest = null
+      else if (body.enabled === true && !next.bankSortRequest) next.bankSortRequest = { id: 'sort-1', requestedAt: Date.now(), status: 'queued' }
+      this.extraState = next
+      return { status: 200, json: { ok: true } }
+    }
+    // Cosmetics (characters/cosmetic-commands.ts): each command is checked
+    // against the character's latest cosmetics report, then queued.
+    if (path === 'command' && typeof body.type === 'string' && body.type.startsWith('cx-')) {
+      const report = this.characters.find((c) => c.name === body.character)?.diagnostics?.cosmetics as
+        | { jars: { inventorySlot: number; data: string | null; usable: boolean }[]; owned: { name: string; kind: string; slot: string | null }[]; worn: Record<string, string> }
+        | undefined
+      if (!report) return { status: 409, json: { error: 'No cosmetics report from this character yet' } }
+      const owned = report.owned.find((entry) => entry.name === body.name)
+      if (body.type === 'cx-open-jar') {
+        const jar = report.jars.find((entry) => entry.inventorySlot === body.inventorySlot)
+        if (!jar?.usable || !jar.data) return { status: 400, json: { error: 'That inventory slot has no usable CX jar' } }
+      } else if (body.type === 'cx-wear') {
+        if (!owned || owned.kind !== 'appearance' || !owned.slot || owned.slot !== body.slot)
+          return { status: 400, json: { error: 'Only an owned appearance cosmetic can be worn, in its own slot' } }
+      } else if (body.type === 'cx-emote') {
+        if (!owned || owned.kind !== 'emote') return { status: 400, json: { error: 'Only an owned emote can be used' } }
+        const target = body.target === undefined || body.target === null ? null : String(body.target)
+        if (target !== null && (!target || target.length > 40)) return { status: 400, json: { error: 'Invalid emote target' } }
+      } else if (body.type === 'cx-remove') {
+        if (body.slot === 'skin' || !report.worn[String(body.slot)]) return { status: 400, json: { error: 'Nothing removable is worn in that slot' } }
+      } else return { status: 400, json: { error: 'invalid command' } }
+      return { status: 200, json: { ok: true } }
+    }
     return { status: 200, json: { ok: true } }
+  }
+
+  private activeAccessCode() {
+    if (this.accessCode && Date.now() >= this.accessCode.expiresAt) this.accessCode = null
+    return this.accessCode
   }
 
   private removeBankItem(pack: string, slot: number) {
@@ -1165,12 +1216,34 @@ export class MockPartyServer {
     })
 
     await page.route('**/setup/state', (route) => {
-      if (this.paired) return route.fulfill({ status: 200, json: { ok: true, requirePairing: this.requirePairing } })
+      // setup-routes.ts setupState(): accessCodeExpiresAt only while pairing is required, null once the code is used, expired or cancelled.
+      const accessCode = this.requirePairing ? { accessCodeExpiresAt: this.activeAccessCode()?.expiresAt ?? null } : {}
+      if (this.paired) return route.fulfill({ status: 200, json: { ok: true, requirePairing: this.requirePairing, ...accessCode } })
       return route.fulfill({ status: 401, json: { error: 'not paired' } })
     })
     await page.route('**/setup/pair', (route) => {
+      const body = (route.request().postDataJSON() as Record<string, unknown>) ?? {}
+      this.pairRequests.push(body)
+      // setup-routes.ts pair(): a code takes precedence over a token; access.ts
+      // pairCode() ignores case, spaces and dashes, and a failure answers 400.
+      if (typeof body.code === 'string' && body.code) {
+        const code = this.activeAccessCode()
+        const typed = body.code.toUpperCase().replace(/[\s-]/g, '')
+        if (!code) return route.fulfill({ status: 400, json: { error: 'Access code is invalid or expired' } })
+        if (typed !== code.code.replace(/-/g, '')) {
+          if (++code.failures >= 5) this.accessCode = null
+          return route.fulfill({ status: 400, json: { error: 'Access code is invalid or expired' } })
+        }
+        this.accessCode = null
+      }
       this.paired = true
       return route.fulfill({ status: 200, json: { ok: true } })
+    })
+    await page.route('**/setup/invite', (route) => {
+      if (this.requirePairing && !this.paired) return route.fulfill({ status: 401, json: { error: 'Pair this browser before changing setup' } })
+      // access.ts accessCode(): each invitation replaces the previous code.
+      this.accessCode = { code: this.nextAccessCode, expiresAt: Date.now() + this.accessCodeTtlMs, failures: 0 }
+      return route.fulfill({ json: { token: 'c0ffee'.repeat(10) + 'c0de', code: this.accessCode.code, expiresAt: this.accessCode.expiresAt, expiresIn: this.accessCodeTtlMs } })
     })
     await page.route('**/setup/pairing', async (route) => {
       const body = (route.request().postDataJSON() as { requirePairing?: boolean }) ?? {}

@@ -158,7 +158,7 @@ test('Bank: selling a modified item to NPC requires confirming the warning first
   // The sale panel (which names the item) closes once the sale is queued.
   await expect(page.getByRole('group', { name: 'Sell to NPC' })).toHaveCount(0)
   await expect(page.getByText('Wolf Coat')).toBeVisible()
-  await expect(page.getByText('NPC', { exact: true })).toBeVisible()
+  await expect(page.getByText('NPC sale', { exact: true })).toBeVisible()
 })
 
 test('ItemActionPanel: marking an item for NPC sale shows a badge on its inventory slot', async ({ page }) => {

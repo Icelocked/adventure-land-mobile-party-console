@@ -7,7 +7,8 @@ import { SectionCard } from '../SectionCard'
 import type { TravelPlace } from '@/models'
 
 /** Quick-travel buttons: "Send to..." / "Return to leader" (every character)
- *  and "Send merchant to..." / "Go home" (merchant only). "Send to..." opens
+ *  and "Send merchant to..." (Visit bank or an online character) / "Go home"
+ *  (merchant only). "Send to..." opens
  *  the preset location list (travelPlaces) rather than raw coordinate entry. */
 export function TravelSection({
   characterName,
@@ -33,6 +34,25 @@ export function TravelSection({
     .filter(([name, detail]) => name !== state.merchantCharacter && detail.ctype !== 'merchant' && Number(detail.seenAt) > 0 && now - Number(detail.seenAt) < 10_000)
     .map(([name]) => name)
   const [error, setError] = useState<string | null>(null)
+  const merchant = state.merchantCharacter
+  // A "bank" command for another character queues a merchant visit to it;
+  // for the merchant itself it queues a bank visit (merchant-visit-control.tsx).
+  const visit = async (name: string) => {
+    if (visitRef.current) return
+    visitRef.current = true
+    setQueuingVisit(true)
+    setError(null)
+    setVisitMessage(null)
+    try {
+      const result = await api.sendCommand(name, { type: 'bank' })
+      if (result.kind === 'failure') return setError(result.message)
+      setVisitMessage(name === merchant ? 'Bank visit queued' : `Merchant visit queued for ${name}`)
+      setShowVisits(false)
+    } finally {
+      visitRef.current = false
+      setQueuingVisit(false)
+    }
+  }
   // A different leader, seen recently.
   const leader = state.leader
   const leaderOnline = !!leader && leader !== characterName && now - Number(diagnostics[leader]?.seenAt || 0) < 10_000
@@ -67,31 +87,13 @@ export function TravelSection({
           {visitMessage && <p role="status" className="mt-1 text-xs text-amber-500">{visitMessage}</p>}
           {showVisits && (
             <div className="mt-2 flex flex-col gap-1">
+              {merchant && (
+                <Button variant="outline" size="sm" className="justify-start" disabled={queuingVisit} onClick={() => void visit(merchant)}>
+                  Visit bank
+                </Button>
+              )}
               {eligible.map((name) => (
-                <Button
-                  key={name}
-                  variant="outline"
-                  size="sm"
-                  className="justify-start"
-                  disabled={queuingVisit}
-                  onClick={async () => {
-                    if (visitRef.current) return
-                    visitRef.current = true
-                    setQueuingVisit(true)
-                    setError(null)
-                    setVisitMessage(null)
-                    try {
-                      // Queue a merchant visit to that character.
-                      const result = await api.sendCommand(name, { type: 'bank' })
-                      if (result.kind === 'failure') return setError(result.message)
-                      setVisitMessage(`Merchant visit queued for ${name}`)
-                      setShowVisits(false)
-                    } finally {
-                      visitRef.current = false
-                      setQueuingVisit(false)
-                    }
-                  }}
-                >
+                <Button key={name} variant="outline" size="sm" className="justify-start" disabled={queuingVisit} onClick={() => void visit(name)}>
                   {name}
                 </Button>
               ))}
