@@ -202,3 +202,25 @@ test('Cave map: full floor from the participants’ streams, waypoint placement 
   await expect.poll(() => server.dungeonActions[0]).toMatchObject({ action: 'waypoint', map: 'zone_ab12_1', run: 'ab12', x: expect.any(Number), y: expect.any(Number) })
   await expect(map).toHaveCount(0)
 })
+
+test('A dungeon start opens the Party screen once; other screens show a bar back to the controls', async ({ page }) => {
+  const server = partyServer()
+  server.dailyDungeon = { state: { phase: 'idle', participants: ['Leada', 'Folla'], protectFromEvents: true, commands: {} }, members: [member('Leada'), member('Folla')] }
+  await server.install(page)
+  await page.goto('/characters/Leada')
+  await expect(page.getByText('Cave of Many Dreams is running.')).toHaveCount(0)
+
+  server.dailyDungeon = activeCave()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('button', { name: 'Fountain' })).toBeVisible()
+
+  // Only the start redirects; later visits keep the user where they went and offer the bar.
+  await page.goto('/characters/Leada')
+  const bar = page.getByText('Cave of Many Dreams is running.')
+  await expect(bar).toBeVisible()
+  await page.waitForTimeout(1500)
+  await expect(page).toHaveURL(/\/characters\/Leada$/)
+  await page.getByRole('button', { name: 'Dungeon controls' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByText('Cave of Many Dreams is running.')).toHaveCount(0)
+})

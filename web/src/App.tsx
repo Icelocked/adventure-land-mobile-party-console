@@ -28,6 +28,7 @@ import { WtbScreen } from '@/screens/account/WtbScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
 import { clearRecoveryHistory } from '@/lib/dashboardRecovery'
 import { AlDataAuthWatcher } from '@/components/AlDataAuthWatcher'
+import { DungeonNavigator } from '@/components/DungeonNavigator'
 import { AnniversaryScreen } from '@/screens/account/AnniversaryScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
@@ -71,6 +72,7 @@ export default function App() {
             <BrowserRouter>
               {/* The ALData auth wait runs whichever screen the user is on. */}
               <AlDataAuthWatcher />
+              <DungeonNavigator />
               <ErrorBoundary>
               <Routes>
                 <Route path="/" element={<CharacterListScreen />} />
