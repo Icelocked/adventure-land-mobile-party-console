@@ -159,6 +159,8 @@ export function CharacterDetailScreen() {
                 characterName={name}
                 streams={dynamicState.luckySlotTracking[name] ?? {}}
                 verified={dynamicState.luckyUpgradeSlots[name]}
+                lockedSlot={dynamicState.luckySlotLocks?.[name]}
+                resumingSlot={dynamicState.luckySlotResume?.[name]?.slot}
                 open={luckySlotOpen}
                 onOpenChange={setLuckySlotOpen}
                 localLucky={vitals.luckySlotTracking}

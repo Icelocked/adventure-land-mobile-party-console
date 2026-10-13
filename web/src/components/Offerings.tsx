@@ -12,6 +12,31 @@ export const upgradeOfferings = UPGRADE_OFFERING_LABELS
 export function offeringOverlap(rules: readonly UpgradeOfferingRule[], next: UpgradeOfferingRule) {
   return rules.find((rule) => rule.id !== next.id && rule.name === next.name && rule.floor < next.ceiling && next.floor < rule.ceiling)
 }
+export function offeringRule(rules: readonly UpgradeOfferingRule[], name: string, level: number) {
+  return rules.find((rule) => rule.name === name && rule.floor <= level && level < rule.ceiling)
+}
+
+/** Console 1.4 upgrade-actions.tsx destinationOffering: the offering rule
+ *  covering the last step of an upgrade to +level+tiers, shown next to that
+ *  tier. An optional rule is wrapped in parentheses. Display only. */
+export function DestinationOffering({ name, level, tiers }: { name: string; level: number; tiers: number }) {
+  const state = useDynamicState()
+  const catalogFor = useCatalogLookup(state.merchantCatalog)
+  const step = level + tiers - 1
+  const rule = offeringRule(state.upgradeOfferingRules ?? [], name, step)
+  if (!rule) return null
+  const label = upgradeOfferings[rule.offering]
+  const sprite = catalogFor(rule.offering)?.sprite
+  return (
+    <span className="inline-flex items-center gap-1" title={`+${step} → +${step + 1}: ${label} (${rule.required ? 'required' : 'optional'})`}>
+      {!rule.required && '('}
+      <span role="img" aria-label={label} className="relative inline-block h-5 w-5 overflow-hidden">
+        {sprite && <SpriteIcon sprite={sprite} size={20} />}
+      </span>
+      {!rule.required && ')'}
+    </span>
+  )
+}
 const previewOptions = ['none', 'offeringp', 'offering', 'offeringx'] as const
 type PreviewResult = { preview: { chance: number }; observedAt: number } | { reason: string }
 

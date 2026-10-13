@@ -79,7 +79,7 @@ const CONFIG_FIELDS = [
   'marked', 'merchantMarked', 'autoItemMarks', 'merchantDeliveries',
   'standListings', 'npcSaleMarks', 'deconstructionMarks', 'autoDeconstruction',
   'deconstructionCatalog', 'autoNpcSales', 'autoStandMarks',
-  'merchantRoutinePriorities', 'merchantAutomations', 'merchantBlacklist',
+  'merchantRoutinePriorities', 'merchantAutomations', 'merchantBlacklist', 'marketIgnoredItems',
   'standBids', 'autoStandBuys', 'autoBlacklistMerchants', 'standSearch',
   'upgrades', 'statScrolls', 'compounds', 'autoCompounds', 'autoExchanges', 'goldTargets',
   'leader', 'followers', 'eventsByCharacter', 'eventSelectionsByCharacter',
@@ -894,6 +894,9 @@ export class MockPartyServer {
       }
       return { status: 200, json: { ok: true } }
     }
+    // Console 1.4 merchant and market routes (see applyMerchantMarket14).
+    const merchantMarket14 = this.applyMerchantMarket14(path, body)
+    if (merchantMarket14) return merchantMarket14
     if (
       path === 'merchant/order' ||
       path === 'merchant/exchange-order' ||
@@ -1178,6 +1181,88 @@ export class MockPartyServer {
   private activeAccessCode() {
     if (this.accessCode && Date.now() >= this.accessCode.expiresAt) this.accessCode = null
     return this.accessCode
+  }
+
+  // Console 1.4 merchant and market. Returns null for anything it doesn't
+  // answer, so applyCommand carries on (aldata orders that pass the
+  // staleness check are still recorded in lastOrder there).
+  private applyMerchantMarket14(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } | null {
+    const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null)
+    if (path === 'market/ignored-items') {
+      // http/market-ignored-items.ts + runtime/market-preferences.ts.
+      let items = (this.extraState.marketIgnoredItems as { name: string; level: number }[] | undefined) ?? []
+      if (body.action === 'clear') items = []
+      else if (body.action === 'add' || body.action === 'remove') {
+        const item = { name: body.name, level: body.level ?? 0 }
+        const valid = typeof item.name === 'string' && /^[a-z0-9_]{1,80}$/i.test(item.name) && typeof item.level === 'number' && Number.isSafeInteger(item.level) && item.level >= 0 && item.level <= 100
+        if (!valid) return { status: 400, json: { error: 'Provide an item name and nonnegative whole item level' } }
+        const key = `${item.name}|${item.level}`
+        items = items.filter((entry) => `${entry.name}|${entry.level ?? 0}` !== key)
+        if (body.action === 'add') {
+          if (items.length >= 2048) return { status: 400, json: { error: 'The ignored-item list is full; remove an entry first' } }
+          items.push(item as { name: string; level: number })
+        }
+      } else return { status: 400, json: { error: 'Choose add, remove, or clear' } }
+      this.extraState = { ...this.extraState, marketIgnoredItems: items }
+      return { status: 200, json: { ok: true, items } }
+    }
+    if (path === 'merchant/config' && (body.action === 'lock-lucky-slot' || body.action === 'unlock-lucky-slot')) {
+      // http/merchant-settings.ts luckySlotAction.
+      const name = body.character
+      if (typeof name !== 'string' || this.characters.find((c) => c.name === name)?.ctype !== 'merchant') return { status: 400, json: { error: 'select an owned merchant character' } }
+      if (name !== merchant) return { status: 409, json: { error: 'merchant is no longer configured' } }
+      const locks = { ...((this.extraState.luckySlotLocks as Record<string, number | null> | undefined) ?? {}) }
+      const resume = { ...((this.extraState.luckySlotResume as Record<string, { slot: number; rolls: number }> | undefined) ?? {}) }
+      const validSlot = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 0 && Number(value) < 42
+      if (body.action === 'unlock-lucky-slot') {
+        const locked = locks[name]
+        if (!validSlot(locked)) return { status: 409, json: { error: 'lucky slot is not locked' } }
+        const slot = (locked + 1) % 42
+        const rolls = Object.values(this.luckySlotTracking[name] ?? {}).reduce((sum, stream) => sum + (stream.slots[slot]?.totalRolls ?? 0), 0)
+        resume[name] = { slot, rolls }
+        delete locks[name]
+      } else {
+        if (!validSlot(body.slot)) return { status: 400, json: { error: 'invalid lucky slot' } }
+        locks[name] = body.slot
+        delete resume[name]
+      }
+      this.extraState = { ...this.extraState, luckySlotLocks: locks, luckySlotResume: resume }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'merchant/aldata-order' || path === 'merchant/aldata-sale') {
+      // http/manual-market-orders.ts: a snapshot entry older than two
+      // minutes is refused unless `check` is true. The mock only judges
+      // entries it can find in its own snapshot.
+      const sale = path === 'merchant/aldata-sale'
+      const requested = (sale ? body.order : body.listing) as { key?: string } | undefined
+      const aldata = (this.extraState.aldata as { listings?: Record<string, unknown>[]; buyOrders?: Record<string, unknown>[] } | undefined) ?? { listings: this.aldataListings }
+      const listing = ((sale ? aldata.buyOrders : aldata.listings) ?? []).find((entry) => entry.key === requested?.key)
+      if (listing?.serverIdentifier === 'PVP') return { status: 409, json: { error: 'automatic PVP realm travel is disabled' } }
+      if (listing && body.check !== true && Number(listing.seenAt) < Date.now() - 120000)
+        return { status: 409, json: { error: sale ? 'buy order is stale; refresh the market first' : 'listing is stale; refresh the market first' } }
+      return null
+    }
+    if (path === 'command' && body.type === 'exchange') {
+      // inventory/merchant-item-commands.ts once(): a manual exchange job,
+      // plus a pickup job when the item is in another character's bag.
+      const name = String(body.character)
+      if (!merchant || !this.characters.some((c) => c.name === name) || !Number.isSafeInteger(body.slot)) return null
+      const item = this.characters.find((c) => c.name === name)?.items?.[Number(body.slot)]
+      if (!item || JSON.stringify(item) !== JSON.stringify(body.item)) return { status: 409, json: { error: 'merchant inventory item changed; refresh and try again' } }
+      const level = Number(item.level) || 0
+      const choice = this.exchangeable.find((line) => !line.reward && line.id === item.name && (Number(line.level) || 0) === level)
+      const quantity = Math.floor((Number(item.q) || 1) / Math.max(1, Number(choice?.required) || 1))
+      if (!choice || !quantity) return { status: 400, json: { error: 'not enough stock for this exchange' } }
+      const id = `exchange-${this.merchantQueue.length + 1}`
+      const job: Record<string, unknown> = { id, target: merchant, reason: 'exchange', routine: 'manual exchange', manual: true, queuedAt: Date.now(), exchanges: [{ id: item.name, level, quantity }] }
+      if (name !== merchant) {
+        job.exchangePickupId = `${id}-pickup`
+        this.merchantQueue.push({ id: `${id}-pickup`, target: name, reason: 'exchange pickup', routine: 'manual exchange', manual: true, queuedAt: job.queuedAt, exchangeDeliveryId: id })
+      }
+      this.merchantQueue.push(job)
+      return { status: 200, json: { ok: true } }
+    }
+    return null
   }
 
   private removeBankItem(pack: string, slot: number) {

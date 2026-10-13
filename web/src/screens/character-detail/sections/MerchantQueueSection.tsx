@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { useDomainInterest, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useCharacterDiagnostics, useCharacters, useDomainInterest, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { AUTOMATIC_ROUTINE_KEYS, ROUTINE_LABELS, routineFor } from '@/lib/routineLabels'
 import { merchantJobLabel } from '@/lib/merchantJobLabel'
-import { durationLabel } from '@/lib/duration'
+import { durationLabel, useClock } from '@/lib/duration'
+import { dueGatheringModes, merchantAtCapacity, queuedJobStatus } from '@/lib/merchantCapacity'
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
 import type { ActivityEntry, MerchantJob } from '@/models'
@@ -28,12 +29,18 @@ function stuckReason(job: MerchantJob | null | undefined): string | null {
  *  with its cleanup actions. Only ever rendered for the merchant. */
 export function MerchantQueueSection() {
   const state = useDynamicState()
+  const characters = useCharacters()
+  const merchantDetails = useCharacterDiagnostics(state.merchantCharacter ?? '')
+  const now = useClock()
   const catalog = state.merchantCatalog?.allItems ?? []
   const current = state.merchantCurrent
   const queue = state.merchantQueue
   const stuck = stuckReason(current)
   const jobLabel = (job: MerchantJob) => merchantJobLabel(job, catalog)
   const report = current?.commandReport as { state?: string; reason?: string } | undefined
+  const merchantItems = state.merchantCharacter ? characters[state.merchantCharacter]?.inventory?.items : undefined
+  const atCapacity = merchantAtCapacity(merchantItems)
+  const capacityReason = `Merchant capacity blocked (${merchantItems?.filter(Boolean).length}/${merchantItems?.length} slots occupied; three slots reserved)`
   const jobs = [
     ...(current
       ? [
@@ -48,7 +55,13 @@ export function MerchantQueueSection() {
           },
         ]
       : []),
-    ...queue.map((job) => ({ job, status: 'queued' })),
+    // Console 1.4: jobs waiting on merchant bag space show as blocked, and
+    // due fishing/mining modes get a row of their own.
+    ...queue.map((job) => ({ job, status: queuedJobStatus(job, state.merchantCharacter, atCapacity) as string })),
+    ...dueGatheringModes(state.gatheringModes, { own: merchantDetails?.gatheringCooldowns as Record<string, unknown> | undefined, party: state.gatheringCooldowns }, [current, ...queue], now).map((mode) => ({
+      job: { reason: mode, target: state.merchantCharacter || '' } as MerchantJob,
+      status: atCapacity ? 'BLOCKED' : 'queued',
+    })),
   ]
   const mluck = state.mluckSchedule
 
@@ -65,16 +78,17 @@ export function MerchantQueueSection() {
         {!jobs.length && <p className="text-muted-foreground">No queued work</p>}
         {jobs.map(({ job, status }, index) => {
           const target = job.target && job.reason !== 'join giveaway' ? ` · ${job.target}` : ''
-          const side = job.realmBlockedReason || (job.retryAt && job.retryAt > Date.now() ? `Retry at ${new Date(job.retryAt).toLocaleTimeString()}` : job.pauseReason || status)
+          const blocked = status.toLowerCase() === 'blocked'
+          const side = blocked ? status : job.realmBlockedReason || (job.retryAt && job.retryAt > now ? `Retry at ${new Date(job.retryAt).toLocaleTimeString()}` : job.pauseReason || status)
           return (
             <div key={job.id || `${job.reason}-${index}`} className="flex min-w-0 items-center gap-2">
-              {status === 'queued' && job.reason !== 'fishing' && job.reason !== 'mining' && <CancelJobControl job={job} label={jobLabel(job)} />}
+              {(status === 'queued' || status === 'blocked') && job.reason !== 'fishing' && job.reason !== 'mining' && <CancelJobControl job={job} label={jobLabel(job)} />}
               <span title={`${jobLabel(job)}${target}`} className={`min-w-0 flex-1 truncate ${index === 0 && current ? 'text-amber-500' : 'text-muted-foreground'}`}>
                 <span className="mr-1 text-amber-600">P{job.priority ?? state.merchantRoutinePriorities[routineFor(job)] ?? 50}</span>
                 {jobLabel(job)}
                 {target}
               </span>
-              <span className="max-w-32 shrink-0 truncate text-muted-foreground" title={side}>
+              <span className={`max-w-32 shrink-0 truncate ${blocked ? 'text-red-400' : 'text-muted-foreground'}`} title={blocked ? capacityReason : job.realmBlockedReason || job.pauseReason || status}>
                 {side}
               </span>
               {job.realmRetryExhausted && <RetryJobButton id={job.id} />}

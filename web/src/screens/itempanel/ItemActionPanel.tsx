@@ -7,7 +7,7 @@ import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { standIsFull } from '@/lib/standInspection'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
-import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
+import { AddUpgradeRule, DestinationOffering, OfferingRows } from '@/components/Offerings'
 import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem } from '@/models'
@@ -241,8 +241,11 @@ function InventoryActions({
   const statScrollMark = isMerchant ? (state.statScrolls[characterName] ?? []).find((mark) => !mark.equipped && mark.slot === slot && sameMarkedItem(mark.item, item)) : undefined
   const compoundGroup = (state.compounds[characterName] ?? []).find((group) => group.items.some((mark) => mark.slot === slot && sameMarkedItem(mark.item, item)))
   const autoCompoundMark = (state.autoCompounds[ruleName] ?? []).find((mark) => mark.name === item.name)
-  const autoExchangeMarked = isMerchant && !!state.autoExchanges[`${item.name}@${item.level || 0}`]
-  const exchangeable = isMerchant && Number(meta?.definition.e || 0) > 0
+  // Console 1.4: exchanges, one-off and automatic, apply to every party
+  // member's items once a merchant is configured; the merchant collects
+  // them first (merchant-item-commands.ts).
+  const autoExchangeMarked = !!merchant && !!state.autoExchanges[`${item.name}@${item.level || 0}`]
+  const exchangeable = !!merchant && Number(meta?.definition.e || 0) > 0
   const automaticSaleKey = automaticCommerceRuleKey(item)
   const autoNpcSaleMarked = !!state.autoNpcSales[sharedRules || isMerchant ? automaticSaleKey : JSON.stringify([characterName, automaticSaleKey])]
   const npcSale = state.npcSaleMarks.find(
@@ -340,8 +343,10 @@ function InventoryActions({
         </>
       ) : null}
 
+      {/* Queues one manual exchange of this stack (console 1.4). */}
+      {exchangeable && <TapRow label="Exchange" onClick={() => command('exchange', slot)} />}
       {/* The server toggles this rule. */}
-      {!!merchant && exchangeable && <TapRow label="Auto exchange" disabled={!configLoaded || autoExchangeMarked} onClick={() => command('auto-exchange', slot)} />}
+      {exchangeable && <TapRow label="Auto exchange" disabled={!configLoaded || autoExchangeMarked} onClick={() => command('auto-exchange', slot)} />}
 
       <TapRow label="Mark for bank" disabled={bankMarked} onClick={() => command('mark', slot)} />
       {!!merchant && <TapRow label="Auto mark for bank" disabled={autoMarkMode === 'bank'} onClick={() => command('auto-item-mark', undefined, { mode: 'bank' })} />}
@@ -382,14 +387,14 @@ function InventoryActions({
           <TapRow label={`Mark for upgrade${upgradeMark ? ` · ${upgradeMark.tiers || 1} tier${(upgradeMark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
           {expanded === 'upgrade' && (
             <>
-              <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => command('upgrade-mark', slot, { tiers })} />
+              <UpgradeTierPicker meta={meta} level={level} name={item.name} onPick={(tiers) => command('upgrade-mark', slot, { tiers })} />
               <OfferingRows character={characterName} item={item} meta={meta} source={{ slot }} />
             </>
           )}
           <TapRow label={`Auto mark for upgrade${autoUpgradeTiers ? ` · ${autoUpgradeTiers} tier${autoUpgradeTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('autoupgrade')} />
           {expanded === 'autoupgrade' && (
             <>
-              <UpgradeTierPicker meta={meta} level={level} current={autoUpgradeTiers} onPick={(tiers) => command('auto-upgrade-mark', slot, { tiers })} />
+              <UpgradeTierPicker meta={meta} level={level} name={item.name} current={autoUpgradeTiers} onPick={(tiers) => command('auto-upgrade-mark', slot, { tiers })} />
               <AddUpgradeRule character={characterName} item={item} meta={meta} />
             </>
           )}
@@ -516,7 +521,8 @@ function EquipmentActions({
       (state.autoCompounds[ruleName] ?? []).some((rule) => rule.name === item.name) ||
       (state.autoDeconstruction[ruleName] ?? {})[commerceKey] ||
       state.autoNpcSales[sharedRules || isMerchant ? commerceKey : JSON.stringify([characterName, commerceKey])] ||
-      (isMerchant && (state.autoStandMarks[commerceKey] || state.autoExchanges[`${item.name}@${item.level || 0}`] || (state.merchantWeapon?.item && sameMarkedItem(item, state.merchantWeapon.item)))),
+      (!!merchant && state.autoExchanges[`${item.name}@${item.level || 0}`]) ||
+      (isMerchant && (state.autoStandMarks[commerceKey] || (state.merchantWeapon?.item && sameMarkedItem(item, state.merchantWeapon.item)))),
   )
 
   return (
@@ -528,7 +534,7 @@ function EquipmentActions({
           <TapRow label={`Mark for upgrade${mark ? ` · ${mark.tiers || 1} tier${(mark.tiers || 1) === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
           {expanded === 'upgrade' && (
             <>
-              <UpgradeTierPicker meta={meta} level={level} onPick={(tiers) => run(() => api.itemCommand('upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))} />
+              <UpgradeTierPicker meta={meta} level={level} name={item.name} onPick={(tiers) => run(() => api.itemCommand('upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))} />
               <OfferingRows character={characterName} item={item} meta={meta} source={{ slot: slotName, equipped: true }} />
             </>
           )}
@@ -537,6 +543,7 @@ function EquipmentActions({
             <UpgradeTierPicker
               meta={meta}
               level={level}
+              name={item.name}
               current={autoTiers}
               onPick={(tiers) => run(() => api.itemCommand('auto-upgrade-mark', characterName, item, slotName, { equipped: true, tiers }))}
             />
@@ -557,8 +564,9 @@ function EquipmentActions({
 }
 
 /** Upgrade tier picker as an inline list: one row per achievable target
- *  tier, "+N → +N+tiers" with the scroll gold cost. */
-export function UpgradeTierPicker({ meta, level, current, onPick }: { meta: ItemMeta | undefined; level: number; current?: number; onPick: (tiers: number) => void }) {
+ *  tier, "+N → +N+tiers" with the scroll gold cost. With `name`, each row
+ *  also shows the offering rule that covers its last step. */
+export function UpgradeTierPicker({ meta, level, current, onPick, name }: { meta: ItemMeta | undefined; level: number; current?: number; onPick: (tiers: number) => void; name?: string }) {
   const max = Math.max(0, itemMaximumLevel(meta) - level)
   if (max <= 0) return null
   return (
@@ -570,10 +578,12 @@ export function UpgradeTierPicker({ meta, level, current, onPick }: { meta: Item
           onClick={() => onPick(tiers)}
           className="flex w-full items-center justify-between rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
         >
-          <span>
-            +{level} → +{level + tiers}
+          <span className="inline-flex items-center gap-1">
+            +{level} → +{level + tiers} {name && <DestinationOffering name={name} level={level} tiers={tiers} />}
           </span>
-          <span className="font-mono text-xs text-muted-foreground">{upgradeScrollCost(meta, level, tiers).toLocaleString()}g</span>
+          <span title="Scroll cost" className="font-mono text-xs text-muted-foreground">
+            {upgradeScrollCost(meta, level, tiers).toLocaleString()}g
+          </span>
         </button>
       ))}
     </div>

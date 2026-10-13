@@ -80,11 +80,19 @@ export function InventorySection({
   const totalSlots = inventorySize || items.length
   const freeSlots = Math.max(0, totalSlots - occupiedSlots)
   const capacityColor = freeSlots < 5 ? 'text-rose-400' : freeSlots <= 10 ? 'text-orange-400' : 'text-muted-foreground'
-  const luckyUpgradeSlot = state.luckyUpgradeSlots[characterName]
+  // Console 1.4 connected-inventory.tsx: a position lock wins, then the
+  // square an unlock resumes from, then the verified slot.
+  const luckySlotLocked = state.luckySlotLocks?.[characterName] != null
+  const luckySlotResuming = !luckySlotLocked && state.luckySlotResume?.[characterName] != null
+  const luckyUpgradeSlot = state.luckySlotLocks?.[characterName] ?? state.luckySlotResume?.[characterName]?.slot ?? state.luckyUpgradeSlots[characterName]
   // Merge the character's live local stream.
-  const localLuckyStream = (localLucky ? normalizeSlotTracking(localLucky) : undefined) as Parameters<typeof aggregateSlotTracking>[1]
+  const localLuckyStream = localLucky ? normalizeSlotTracking(localLucky) : undefined
   const nextUpgradeSlot = validLuckySlot(luckyUpgradeSlot) ? luckyUpgradeSlot : luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName] ?? {}, localLuckyStream)).nextSlot
-  const luckySlotLabel = validLuckySlot(luckyUpgradeSlot) ? 'Verified lucky upgrade slot' : 'Next upgrade will test for lucky upgrade'
+  const luckySlotLabel = luckySlotLocked
+    ? 'Locked lucky upgrade position'
+    : validLuckySlot(luckyUpgradeSlot) && !luckySlotResuming
+      ? 'Verified lucky upgrade slot'
+      : 'Next upgrade will test for lucky upgrade'
   // Console connected-inventory.tsx heldSlots: a reserved slot names the
   // first saved set with a matching member, by name and level only.
   const gearSets = state.gearSets?.[characterName]
@@ -144,6 +152,7 @@ export function InventorySection({
             const compoundGroup = compoundGroups.find((group) => group.items.some((mark) => mark.slot === entry.slot && sameMarkedItem(mark.item, entry.item)))
             const autoCompoundMark = autoCompoundMarks.find((mark) => mark.name === entry.item.name)
             const autoCompoundPending = !!autoCompoundMark && Number(entry.item.level || 0) < autoCompoundMark.targetTier && Number(autoCompoundMark.quantity) !== 0
+            // Console 1.4: auto exchange rules cover every party member's bag once a merchant is configured.
             const autoExchangeMarked = !!merchant && !!state.autoExchanges[`${entry.item.name}@${entry.item.level || 0}`]
             const automaticSaleKey = automaticCommerceRuleKey(entry.item)
             const autoNpcSaleMarked = !!state.autoNpcSales[sharedRules || isMerchant ? automaticSaleKey : JSON.stringify([characterName, automaticSaleKey])]

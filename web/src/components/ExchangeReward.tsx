@@ -261,7 +261,7 @@ function AutomaticItemActions({
           <TapRow label={`Auto mark for upgrade${upgradeTiers ? ` · ${upgradeTiers} tier${upgradeTiers === 1 ? '' : 's'}` : ''}`} onClick={() => toggle('upgrade')} />
           {expanded === 'upgrade' && (
             <>
-              <UpgradeTierPicker meta={meta} level={level} current={upgradeTiers} onPick={(tiers) => void command('auto-upgrade-mark', { slot: -1, tiers })} />
+              <UpgradeTierPicker meta={meta} level={level} name={item.name} current={upgradeTiers} onPick={(tiers) => void command('auto-upgrade-mark', { slot: -1, tiers })} />
               {/* Rewards take their offerings from the merchant. */}
               <AddUpgradeRule character={merchant} item={item} meta={meta} />
             </>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
@@ -10,6 +11,9 @@ import {
   filterBuyOrders,
   groupAlData,
   groupPonty,
+  marketItemKey,
+  marketItemLabel,
+  marketListingFresh,
   ownedCounts,
   ownedKey,
   ownedSource,
@@ -33,6 +37,17 @@ import type { ApiResult, CommandResult } from '@/api/partyApi'
 import type { InventoryEntry, Item } from '@/models'
 
 type Tab = 'wts' | 'wtb' | 'classifieds' | 'ponty'
+
+// stand-sheet.tsx keeps "Hide stale listings" per tab in browser storage
+// (useStoredBoolean `party-market-hide-stale-${tab}`).
+const hideStaleKey = (tab: Tab) => `party-market-hide-stale-${tab}`
+function storedHideStale(tab: Tab): boolean {
+  try {
+    return localStorage.getItem(hideStaleKey(tab)) === 'true'
+  } catch {
+    return false
+  }
+}
 const ageLabel = (age: number) => (age < 3600 ? `${age}s` : `${Math.floor(age / 3600)}h`)
 
 /** Inline Yes/Cancel confirmation. */
@@ -64,7 +79,9 @@ function Confirm({ title, text, busy, error, onYes, onCancel }: { title: string;
  *  deal colouring and stale dimming, confirmed buys split across grouped
  *  listings, "Make WTB" for stale rows, selling into live WTB offers (or
  *  "List" at the WTB price when stale), classifieds' Add to WTB / Add to
- *  stand, and Ponty's grouped lots. Every row inspects its item. */
+ *  stand, and Ponty's grouped lots. Every row inspects its item. Console
+ *  1.4 adds a per-row ignore button, "Hide stale listings", and "Check" on
+ *  stale WTS rows and stale WTB offers the merchant can fill. */
 export function MarketScreen() {
   useDomainInterest('market')
   const api = usePartyApi()
@@ -82,6 +99,21 @@ export function MarketScreen() {
   const [hideUnaffordable, setHideUnaffordable] = useState(false)
   const [hideBlacklisted, setHideBlacklisted] = useState(true)
   const [hideUnowned, setHideUnowned] = useState(false)
+  // Console 1.4 market preferences: the per-tab stale toggle and ignored items.
+  const [hideStaleByTab, setHideStaleByTab] = useState<Partial<Record<Tab, boolean>>>({})
+  const hideStale = hideStaleByTab[tab] ?? storedHideStale(tab)
+  const setHideStale = (value: boolean) => {
+    setHideStaleByTab((previous) => ({ ...previous, [tab]: value }))
+    try {
+      localStorage.setItem(hideStaleKey(tab), String(value))
+    } catch {
+      // Storage can be unavailable (private mode); the toggle still works for this visit.
+    }
+  }
+  const [ignoring, setIgnoring] = useState(false)
+  const [ignoreError, setIgnoreError] = useState('')
+  // Set together with `confirming`: true when the confirmation is a stale-listing Check.
+  const [checking, setChecking] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -97,31 +129,37 @@ export function MarketScreen() {
   const bankPacks = state.bank?.packs ?? {}
   const catalog = state.merchantCatalog?.allItems ?? []
   const nameFor = (id: string) => catalogFor(id)?.name
-  const aldata = (state.aldata ?? {}) as { listings?: unknown[]; buyOrders?: unknown[]; trades?: unknown[]; auth?: string; error?: string | null; merchantsUpdatedAt?: number }
+  const aldata = (state.aldata ?? {}) as { listings?: unknown[]; buyOrders?: unknown[]; trades?: unknown[]; auth?: string; error?: string | null; merchantsUpdatedAt?: number; tradesUpdatedAt?: number }
   const ponty = (state.ponty ?? {}) as { listings?: unknown[]; error?: string | null }
   const allAlData = (aldata.listings ?? []) as AlDataListing[]
+  const ignoredKeys = new Set((state.marketIgnoredItems ?? []).map(marketItemKey))
+  const shown = (item: { name: string; level?: number | null }, seenAt: number | undefined) => !ignoredKeys.has(marketItemKey(item)) && (!hideStale || marketListingFresh(seenAt, now))
   const allBuyOrders = ((aldata.buyOrders ?? []) as AlDataBuyOrder[]).filter((order) => order.buyer !== merchantName)
   const blacklist = (state.merchantBlacklist ?? {}) as Record<string, BlacklistRecord>
   const bankGold = Number(state.bank?.gold ?? state.bankGold ?? 0)
   const values = useMemo(() => dealValuesByItem(catalog, state.merchantCatalog?.buyable ?? []), [catalog, state.merchantCatalog?.buyable])
   const listingValue = (entry: AlDataListing) => values.get(entry.item.name) || 1
-  const grouped = useMemo(() => groupAlData(allAlData), [allAlData])
+  // stand-sheet.tsx drops stale rows before grouping; ignored items go after.
+  const grouped = useMemo(() => groupAlData(allAlData.filter((entry) => !hideStale || marketListingFresh(entry.seenAt, now))), [allAlData, hideStale, now])
   const wts = filterAlData(grouped, query, now, nameFor).filter(
     (entry) =>
+      shown(entry.item, entry.seenAt) &&
       (!showDealsOnly || entry.price < listingValue(entry) * 0.5) &&
       (!hideBadDeals || !(entry.price > listingValue(entry) * 2)) &&
       (!hideUnaffordable || entry.price <= bankGold) &&
       (!hideBlacklisted || !blacklistRecord(blacklist, !!state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier)),
   )
   const owned = ownedCounts(merchantItems, bankPacks)
-  const buyOrders = filterBuyOrders(allBuyOrders, query, now, hideUnowned, owned, nameFor)
+  const buyOrders = filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor)
   const bankWtb = buyOrders.filter((order) => owned.has(ownedKey(order.item)))
   const ownOwner = merchantName && diagnostics[merchantName]?.owner != null ? String(diagnostics[merchantName]?.owner) : ''
   const publicTrades = ((aldata.trades ?? []) as AlDataPublicTrade[]).filter((owner) => String(owner.owner) !== ownOwner).flatMap((owner) => (owner.listings || []).map((entry) => ({ owner, listing: entry })))
+  // Classifieds have no per-listing time, so their freshness is the feed's last refresh.
   const classifieds = publicTrades.filter(({ owner, listing: entry }) =>
+    shown(entry, aldata.tradesUpdatedAt) &&
     `${nameFor(entry.name) || ''} ${entry.name} ${owner.label || ''} ${owner.characters?.join(' ') || ''}`.toLowerCase().includes(query.trim().toLowerCase()),
   )
-  const pontyRows = groupPonty((ponty.listings ?? []) as PontyListing[], query, now, nameFor)
+  const pontyRows = groupPonty(((ponty.listings ?? []) as PontyListing[]).filter((entry) => shown(entry.item, entry.seenAt)), query, now, nameFor)
 
   const run = async (key: string, action: () => Promise<ApiResult<CommandResult> | string | null>) => {
     setBusy(key)
@@ -133,13 +171,14 @@ export function MarketScreen() {
     setConfirming(null)
     await refreshNow()
   }
-  // Split the purchase quantity across the grouped listings.
-  const buyGrouped = async (entry: AlDataListing, quantity: number) => {
+  // Split the purchase quantity across the grouped listings. `check` asks
+  // the merchant to verify a stale listing in person (console 1.4).
+  const buyGrouped = async (entry: AlDataListing, quantity: number, check = false) => {
     let remaining = quantity
     for (const physical of entry.groupedListings || [entry]) {
       if (remaining <= 0) break
       const purchasing = Math.min(remaining, Math.max(1, Number(physical.quantity) || 1))
-      const result = await api.buyAlData(physical as unknown as Record<string, unknown>, purchasing)
+      const result = await api.buyAlData(physical as unknown as Record<string, unknown>, purchasing, check)
       if (result.kind === 'failure') return result.message
       remaining -= purchasing
     }
@@ -175,6 +214,24 @@ export function MarketScreen() {
   const itemLabel = (item: Item) => {
     const entry = catalogFor(item.name)
     return `${entry?.name || item.name}${entry && (entry.upgradeable || entry.compoundable) ? ` +${item.level || 0}` : ''}`
+  }
+
+  // Marketplace settings manages the list; rows only add to it.
+  const ignore = async (item: { name: string; level?: number }) => {
+    setIgnoreError('')
+    setIgnoring(true)
+    const result = await api.updateMarketIgnoredItems('add', item)
+    setIgnoring(false)
+    if (result.kind === 'failure') return setIgnoreError(result.message || 'Could not save ignored items')
+    await refreshNow()
+  }
+  const ignoreButton = (item: { name: string; level?: number }) => {
+    const label = marketItemLabel(item, catalogFor)
+    return (
+      <Button type="button" size="icon-xs" variant="outline" aria-label={`Ignore listings of ${label}`} title={`Ignore listings of ${label}`} disabled={ignoring} onClick={() => void ignore(item)} className="shrink-0 border-red-800 text-red-400">
+        <X className="size-4" />
+      </Button>
+    )
   }
 
   const tabs: [Tab, string][] = [
@@ -227,6 +284,14 @@ export function MarketScreen() {
           ))}
         </div>
         <Input aria-label="Search market" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search item, seller, server, or map…" />
+        <div className="flex flex-wrap gap-2" title="Hide observations older than two minutes; classifieds use the last successful feed refresh.">
+          {check('Hide stale listings', hideStale, setHideStale)}
+        </div>
+        {ignoreError && (
+          <p role="alert" className="text-sm text-destructive">
+            {ignoreError}
+          </p>
+        )}
         {tab === 'wts' && (
           <div className="flex flex-wrap gap-2">
             {check('Show deals only', showDealsOnly, setShowDealsOnly)}
@@ -255,12 +320,13 @@ export function MarketScreen() {
               const stackable = Number(item?.meta?.definition?.s || 1) > 1
               const multiple = entry.quantity > 1
               const age = Math.max(0, Math.floor((now - entry.seenAt) / 1000))
-              const fresh = age <= 120 && entry.serverIdentifier !== 'PVP'
+              const fresh = marketListingFresh(entry.seenAt, now) && entry.serverIdentifier !== 'PVP'
               const suggested = listingValue(entry)
               const { deal, badDeal, comparison } = priceComparison(entry.price, suggested)
               const quantity = Number(quantities[key] || 1)
               return (
                 <div key={key} role="group" aria-label={`WTS ${itemLabel(entry.item)} from ${entry.seller}`} className={`flex flex-wrap items-center gap-2 rounded border border-cyan-950 p-2 ${fresh ? '' : 'opacity-65'}`}>
+                  {ignoreButton(entry.item)}
                   <button type="button" onClick={() => {
                     setInspectSource(`${entry.seller}'s ALData listing`)
                     setInspecting(entry.item)
@@ -299,6 +365,7 @@ export function MarketScreen() {
                         onClick={() => {
                           if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > entry.quantity) return
                           setRowError(null)
+                          setChecking(false)
                           setConfirming(key)
                         }}
                       >
@@ -306,20 +373,44 @@ export function MarketScreen() {
                       </Button>
                     </>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => setWtbItem({ name: entry.item.name, level: Number(entry.item.level || 0) })}>
-                      Make WTB
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === key}
+                        onClick={() => {
+                          setRowError(null)
+                          setChecking(true)
+                          setConfirming(key)
+                        }}
+                      >
+                        Check
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setWtbItem({ name: entry.item.name, level: Number(entry.item.level || 0) })}>
+                        Make WTB
+                      </Button>
+                    </>
                   )}
-                  {confirming === key && (
-                    <Confirm
-                      title="Confirm marketplace purchase"
-                      text={`Really buy ${quantity.toLocaleString()} ${nameFor(entry.item.name) || entry.item.name} for ${(quantity * entry.price).toLocaleString()}g?`}
-                      busy={busy === key}
-                      error={rowError?.key === key ? rowError.message : null}
-                      onCancel={() => setConfirming(null)}
-                      onYes={() => void run(key, () => buyGrouped(entry, quantity))}
-                    />
-                  )}
+                  {confirming === key &&
+                    (checking ? (
+                      <Confirm
+                        title="Check stale listing"
+                        text={`Send the merchant to check whether ${entry.seller}'s listing for ${nameFor(entry.item.name) || entry.item.name} is still live, and buy up to ${entry.quantity.toLocaleString()} for ${entry.price.toLocaleString()}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.`}
+                        busy={busy === key}
+                        error={rowError?.key === key ? rowError.message : null}
+                        onCancel={() => setConfirming(null)}
+                        onYes={() => void run(key, () => buyGrouped(entry, entry.quantity, true))}
+                      />
+                    ) : (
+                      <Confirm
+                        title="Confirm marketplace purchase"
+                        text={`Really buy ${quantity.toLocaleString()} ${nameFor(entry.item.name) || entry.item.name} for ${(quantity * entry.price).toLocaleString()}g?`}
+                        busy={busy === key}
+                        error={rowError?.key === key ? rowError.message : null}
+                        onCancel={() => setConfirming(null)}
+                        onYes={() => void run(key, () => buyGrouped(entry, quantity))}
+                      />
+                    ))}
                 </div>
               )
             })
@@ -337,11 +428,12 @@ export function MarketScreen() {
                 const have = owned.get(ownedKey(order.item)) || 0
                 const source = ownedSource(order.item, merchantItems, bankPacks)
                 const age = Math.max(0, Math.floor((now - order.seenAt) / 1000))
-                const fresh = age <= 120 && order.serverIdentifier !== 'PVP'
+                const fresh = marketListingFresh(order.seenAt, now) && order.serverIdentifier !== 'PVP'
                 const maximum = Math.min(have, order.quantity)
                 const quantity = Number(quantities[key] || 1)
                 return (
                   <div key={key} role="group" aria-label={`WTB ${itemLabel(order.item)} from ${order.buyer}`} className={`flex flex-wrap items-center gap-2 rounded border p-2 ${have ? 'border-emerald-900' : 'border-violet-950'} ${fresh ? '' : 'opacity-60'}`}>
+                    {ignoreButton(order.item)}
                     <button type="button" onClick={() => {
                       setInspectSource(`${order.buyer}'s live WTB`)
                       setInspecting(order.item)
@@ -374,11 +466,32 @@ export function MarketScreen() {
                           onClick={() => {
                             if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > maximum) return
                             setRowError(null)
+                            setChecking(false)
                             setConfirming(key)
                           }}
                         >
                           Sell
                         </Button>
+                      </>
+                    ) : !fresh && maximum > 0 ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === key}
+                          onClick={() => {
+                            setRowError(null)
+                            setChecking(true)
+                            setConfirming(key)
+                          }}
+                        >
+                          Check
+                        </Button>
+                        {source && (
+                          <Button size="sm" variant="outline" onClick={() => listFor(key, order.item, order.price, maximum)}>
+                            List
+                          </Button>
+                        )}
                       </>
                     ) : !fresh && source ? (
                       <Button size="sm" variant="outline" onClick={() => listFor(key, order.item, order.price, maximum)}>
@@ -387,16 +500,26 @@ export function MarketScreen() {
                     ) : (
                       <span className="font-mono text-[10px] uppercase text-muted-foreground">{!fresh ? 'Stale · no match owned' : 'No match owned'}</span>
                     )}
-                    {confirming === key && (
-                      <Confirm
-                        title="Confirm marketplace sale"
-                        text={`Really sell ${quantity.toLocaleString()} ${nameFor(order.item.name) || order.item.name} to ${order.buyer} for ${(quantity * order.price).toLocaleString()}g?`}
-                        busy={busy === key}
-                        error={rowError?.key === key ? rowError.message : null}
-                        onCancel={() => setConfirming(null)}
-                        onYes={() => void run(key, () => api.sellAlData(order as unknown as Record<string, unknown>, quantity))}
-                      />
-                    )}
+                    {confirming === key &&
+                      (checking ? (
+                        <Confirm
+                          title="Check stale WTB listing"
+                          text={`Send the merchant to check whether ${order.buyer}'s WTB listing for ${nameFor(order.item.name) || order.item.name} is still live, and sell up to ${maximum.toLocaleString()} for ${order.price.toLocaleString()}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.`}
+                          busy={busy === key}
+                          error={rowError?.key === key ? rowError.message : null}
+                          onCancel={() => setConfirming(null)}
+                          onYes={() => void run(key, () => api.sellAlData(order as unknown as Record<string, unknown>, maximum, true))}
+                        />
+                      ) : (
+                        <Confirm
+                          title="Confirm marketplace sale"
+                          text={`Really sell ${quantity.toLocaleString()} ${nameFor(order.item.name) || order.item.name} to ${order.buyer} for ${(quantity * order.price).toLocaleString()}g?`}
+                          busy={busy === key}
+                          error={rowError?.key === key ? rowError.message : null}
+                          onCancel={() => setConfirming(null)}
+                          onYes={() => void run(key, () => api.sellAlData(order as unknown as Record<string, unknown>, quantity))}
+                        />
+                      ))}
                     {listingForm(key)}
                   </div>
                 )
@@ -416,6 +539,7 @@ export function MarketScreen() {
               const key = `${owner.owner}-${entry.name}-${index}`
               return (
                 <div key={key} role="group" aria-label={`Classified ${entry.name}`} className="flex flex-wrap items-center gap-2 rounded border border-border p-2">
+                  {ignoreButton(requested)}
                   <button type="button" onClick={() => {
                     setInspectSource('Published trade intention')
                     setInspecting(requested)
@@ -492,6 +616,7 @@ export function MarketScreen() {
     const name = item?.name || group.item.name
     return (
       <div key={group.key} role="group" aria-label={`Ponty ${name}`} className="flex flex-wrap items-center gap-2 rounded border border-fuchsia-900 p-2">
+        {ignoreButton(group.item)}
         <button type="button" onClick={() => {
           setInspectSource("Ponty's inventory")
           setInspecting(group.item)

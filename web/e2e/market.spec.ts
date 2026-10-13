@@ -111,7 +111,7 @@ test('Live WTB: owned offers sell after confirming; a stale owned offer offers L
 
   await expect(page.getByRole('group', { name: 'WTB Iron Ore from Buyer3' }).getByText(/^no match owned$/i)).toBeVisible()
   const stale = page.getByRole('group', { name: 'WTB Wolf Coat from Buyer2' })
-  await stale.getByRole('button', { name: 'List' }).click()
+  await stale.getByRole('button', { name: 'List', exact: true }).click()
   await expect(stale.getByRole('textbox', { name: 'Stand price' })).toHaveValue('2200')
 
   await page.getByRole('checkbox', { name: 'Hide unowned' }).check()

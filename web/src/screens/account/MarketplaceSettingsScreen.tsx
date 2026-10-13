@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { ChevronDown, ChevronRight, X } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { WtbPreference, autoStandExplanation } from '@/components/Wtb'
 import { useClock } from '@/lib/duration'
+import { useCatalogLookup } from '@/lib/catalogLookup'
+import { marketItemKey, marketItemLabel } from '@/lib/market'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 
@@ -23,7 +26,7 @@ interface StrikeRecord {
 /** "Marketplace settings": auto-fill empty stand slots with
  *  the highest priority buy order, the merchant blacklist toggle, a manual
  *  block (minutes, -1 = forever), every strike record with Clear, and a
- *  two-step Clear all. */
+ *  two-step Clear all. Console 1.4 adds the ignored market items list. */
 export function MarketplaceSettingsScreen() {
   const api = usePartyApi()
   const state = useDynamicState()
@@ -49,6 +52,10 @@ export function MarketplaceSettingsScreen() {
     return true
   }
   const blacklist = (payload: Record<string, unknown>) => save(() => api.post('merchant/blacklist', payload))
+  // Console 1.4 market-preferences.tsx IgnoredMarketItems: collapsed by default.
+  const catalogFor = useCatalogLookup(state.merchantCatalog)
+  const ignoredItems = state.marketIgnoredItems ?? []
+  const [ignoredOpen, setIgnoredOpen] = useState(false)
 
   return (
     <AccountScreenScaffold title="Marketplace settings" onRefresh={() => void refreshNow()}>
@@ -65,6 +72,37 @@ export function MarketplaceSettingsScreen() {
             disabled={saving}
             onChange={(enabled) => void save(() => api.post('merchant/native-stand', { action: 'configure', enabled }))}
           />
+        </section>
+        <section aria-label="Ignored items" className="flex flex-col gap-3 rounded border border-slate-600 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <Button variant="outline" aria-label="Ignored items" aria-expanded={ignoredOpen} onClick={() => setIgnoredOpen((value) => !value)} className="min-w-0 justify-start">
+              {ignoredOpen ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
+              Ignored items <span className="text-muted-foreground">({ignoredItems.length})</span>
+            </Button>
+            <Button variant="outline" aria-label="Clear all ignored items" disabled={saving || !ignoredItems.length} onClick={() => void save(() => api.updateMarketIgnoredItems('clear'))} className="shrink-0 border-rose-600 text-rose-400">
+              Clear all
+            </Button>
+          </div>
+          {ignoredOpen &&
+            (ignoredItems.length ? (
+              ignoredItems.map((item) => (
+                <div key={marketItemKey(item)} className="flex items-center justify-between gap-3 rounded border border-border p-2">
+                  <span className="text-sm">{marketItemLabel(item, catalogFor)}</span>
+                  <Button
+                    size="icon-xs"
+                    variant="outline"
+                    disabled={saving}
+                    aria-label={`Remove ${marketItemLabel(item, catalogFor)} from ignored items`}
+                    onClick={() => void save(() => api.updateMarketIgnoredItems('remove', item))}
+                    className="shrink-0 border-rose-700 text-rose-400"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No ignored items.</p>
+            ))}
         </section>
         <section aria-label="Marketplace merchant blacklist" className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold">Marketplace merchant blacklist</h3>
