@@ -328,7 +328,6 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
         bankbois.map((bankboi) => {
           const items = bankboi.items ?? []
           const occupied = items.filter(Boolean).length
-          const empty = occupied === 0 && !Object.keys(bankboi.slots || {}).length && !Number(bankboi.gold)
           const pack = `bankboi:${bankboi.name}`
           return (
             <div key={bankboi.name} className="rounded-md border border-border p-2.5">
@@ -344,7 +343,6 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
                   <Button
                     size="xs"
                     variant={deleting === bankboi.name ? 'destructive' : 'outline'}
-                    disabled={!empty}
                     onClick={async () => {
                       if (deleting !== bankboi.name) return setDeleting(bankboi.name)
                       setDeleteError(null)

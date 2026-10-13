@@ -115,7 +115,7 @@ test('Bank storage: floors show access, key unlocks show owned count, gold unloc
   await expect.poll(() => bodies.find((b) => b.path === 'bank/unlock')?.body).toEqual({ pack: 'items3', kind: 'gold' })
 })
 
-test('Bankbois: the first one asks before reserving bank slots; items open the bank options; delete is two-step and only when empty', async ({ page }) => {
+test('Bankbois: the first one asks before reserving bank slots; items open the bank options; delete is two-step and the server refuses a non-empty one', async ({ page }) => {
   const server = bankServer()
   server.extraState = { bankboiPrefix: 'Vault' }
   await server.install(page)
@@ -139,7 +139,10 @@ test('Bankbois: the first one asks before reserving bank slots; items open the b
   }
   await expect(section.getByText('Vault1')).toBeVisible({ timeout: 20_000 })
   const card = section.locator('div.rounded-md', { hasText: 'Vault1' }).first()
-  await expect(card.getByRole('button', { name: 'Delete' })).toBeDisabled()
+  // Console 1.4 leaves the button enabled and lets the server refuse.
+  await card.getByRole('button', { name: 'Delete' }).click()
+  await card.getByRole('button', { name: 'Really? ×' }).click()
+  await expect(section.getByRole('alert')).toHaveText('bankboi must have no inventory, equipment, gold, or pending work')
 
   await card.getByRole('button', { name: /Iron Ore x9/ }).click()
   await page.getByRole('button', { name: 'Mark for withdrawal' }).click()

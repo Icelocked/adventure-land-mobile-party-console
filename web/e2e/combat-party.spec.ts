@@ -128,7 +128,7 @@ test('Gear sets: reserved bag slots read "Luck set" or "Swapped-out gear" over a
   await expect(inventory.getByTestId('inventory-slot-2').locator('[data-item-action-banner]')).toHaveCount(0)
 })
 
-test('Franky routine: Franky's event settings open the routine; mode and death limit post per character', async ({ page }) => {
+test("Franky routine: Franky's event settings open the routine; mode and death limit post per character", async ({ page }) => {
   const server = partyServer()
   server.farmingProfiles = { Folla: { encounterAutoDeaths: { franky: 2 } } }
   await server.install(page)

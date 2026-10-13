@@ -916,6 +916,18 @@ export class MockPartyServer {
       this.extraState = { ...this.extraState, bankbois: [...existing, { name, ctype: 'merchant', state: 'provisioning', items: [] }] }
       return { status: 200, json: { ok: true, bankboi: { name } } }
     }
+    // Console 1.4 http/bankboi-delete.ts: the server, not the dashboard, refuses a BankBoi that still holds anything.
+    const bankboiDelete = /^bankbois\/([^/]+)\/delete$/.exec(path)
+    if (bankboiDelete) {
+      const name = decodeURIComponent(bankboiDelete[1])
+      const existing = (this.extraState.bankbois as { name: string; items?: unknown[]; gold?: number; slots?: Record<string, unknown> }[] | undefined) ?? []
+      const entry = existing.find((bankboi) => bankboi.name === name)
+      if (!entry) return { status: 404, json: { error: 'unknown bankboi' } }
+      if ((entry.items ?? []).some(Boolean) || Number(entry.gold) || Object.keys(entry.slots ?? {}).length)
+        return { status: 409, json: { error: 'bankboi must have no inventory, equipment, gold, or pending work' } }
+      this.extraState = { ...this.extraState, bankbois: existing.filter((bankboi) => bankboi.name !== name) }
+      return { status: 200, json: { ok: true } }
+    }
     if (path === 'dashboard-preferences') {
       // http/dashboard-import.ts preferences().
       const prefix = body.bankboiPrefix
