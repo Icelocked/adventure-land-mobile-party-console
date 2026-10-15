@@ -224,3 +224,25 @@ test('A dungeon start opens the Party screen once; other screens show a bar back
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByText('Cave of Many Dreams is running.')).toHaveCount(0)
 })
+
+test('Without crypto.randomUUID (plain HTTP by LAN address) dungeon actions still carry a fresh operationId', async ({ page }) => {
+  const server = partyServer()
+  server.dailyDungeon = { state: { phase: 'idle', participants: ['Leada', 'Folla'], protectFromEvents: true, commands: {} }, members: [member('Leada'), member('Folla')] }
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, 'randomUUID', { value: undefined, configurable: true })
+  })
+  await server.install(page)
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: /^Events \(\d+\) ▾$/ }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  await events.getByRole('button', { name: 'Cave of Many Dreams settings' }).click()
+  const settings = page.getByRole('group', { name: 'Cave of Many Dreams' })
+  await settings.getByRole('checkbox', { name: 'Don’t leave the Cave of Many Dreams for other events' }).click()
+  await settings.getByRole('button', { name: 'Enter now' }).click()
+  // dungeon-query.ts operationId(): 16 random bytes as hex.
+  await expect.poll(() => server.dungeonActions.length).toBe(2)
+  expect(server.dungeonActions[0]).toMatchObject({ action: 'settings', operationId: expect.stringMatching(/^[0-9a-f]{32}$/) })
+  expect(server.dungeonActions[1]).toMatchObject({ action: 'enter', operationId: expect.stringMatching(/^[0-9a-f]{32}$/) })
+  expect(server.dungeonActions[0].operationId).not.toEqual(server.dungeonActions[1].operationId)
+})

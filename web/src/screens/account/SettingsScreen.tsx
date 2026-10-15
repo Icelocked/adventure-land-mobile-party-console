@@ -14,6 +14,7 @@ import { Copy, Eye, EyeOff } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useAlDataAuthPending, useAlDataAuthStatus } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { useOpenServerSettings } from '@/lib/ServerSettingsDialogContext'
+import { copyText } from '@/lib/copyText'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
@@ -241,7 +242,13 @@ function ALDataSection() {
         >
           {keyVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </Button>
-        <Button size="icon" variant="outline" aria-label="Copy key" disabled={!key} onClick={() => void navigator.clipboard.writeText(key)}>
+        <Button size="icon" variant="outline" aria-label="Copy key" disabled={!key} onClick={() =>
+            void copyText(key).then((copied) => {
+              if (copied) return
+              setKeyVisible(true)
+              setError('Copy failed; the key is shown so you can copy it manually.')
+            })
+          }>
           <Copy className="size-4" />
         </Button>
       </div>
