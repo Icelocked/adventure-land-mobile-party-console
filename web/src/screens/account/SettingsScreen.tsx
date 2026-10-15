@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
-import { BossChaseSetting, DailyChaseSetting, RealmHopBlacklistSetting } from './RealmChaseSettings'
+import { BossChaseSetting, RealmHopBlacklistSetting } from './RealmChaseSettings'
 
 /** Interface settings, in the console's order: state import/export, realm, characters (create, member grid,
  *  bankboi name), ALData, hosting, console updates and debugging - then
@@ -64,7 +64,6 @@ export function SettingsScreen() {
         <DashboardStateImport />
         <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }}>
           <BossChaseSetting chase={dynamicState.bossChase} />
-          <DailyChaseSetting chase={dynamicState.dailyChase} />
           <RealmHopBlacklistSetting realms={dynamicState.realmControl?.realms || []} blacklist={dynamicState.realmHopBlacklist} />
         </RealmSection>
 

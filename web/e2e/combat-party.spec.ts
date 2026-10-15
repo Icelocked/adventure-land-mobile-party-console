@@ -108,6 +108,29 @@ test('Gear sets: saving captures the worn gear, shows worn/bag/missing pieces, c
   await expect(page.getByRole('button', { name: /^Gear sets/ })).toHaveCount(0)
 })
 
+test('Gear sets: Equip shows only for a saved set, posts action equip, and shows a 409', async ({ page }) => {
+  const server = partyServer()
+  server.gearSets = { Leada: { tank: { slots: { chest: { name: 'coat', level: 7 } }, savedAt: 1 } } }
+  await server.install(page)
+  const bodies = postBodies(page, 'gear-sets')
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Gear sets (1) ▾' }).click()
+  await expect(page.getByRole('group', { name: 'Gear sets' })).toContainText('Equip wears a saved set from the bag (never the elixir)')
+  await expect(page.getByRole('region', { name: 'Luck gear set' }).getByRole('button', { name: 'Equip Luck' })).toHaveCount(0)
+  const tank = page.getByRole('region', { name: 'Tank gear set' })
+  await tank.getByRole('button', { name: 'Equip Tank' }).click()
+  await expect.poll(() => bodies.length).toBe(1)
+  expect(bodies[0]).toEqual({ character: 'Leada', set: 'tank', action: 'equip' })
+  // Equipping leaves the saved set in place.
+  expect(server.gearSets.Leada.tank.slots).toEqual({ chest: { name: 'coat', level: 7 } })
+  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveCount(0)
+
+  server.failOnce['gear-sets'] = 'that gear set is not saved'
+  await tank.getByRole('button', { name: 'Equip Tank' }).click()
+  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveText('that gear set is not saved')
+})
+
 test('Gear sets: reserved bag slots read "Luck set" or "Swapped-out gear" over automatic rules', async ({ page }) => {
   const server = partyServer()
   const leada = server.characters[0]

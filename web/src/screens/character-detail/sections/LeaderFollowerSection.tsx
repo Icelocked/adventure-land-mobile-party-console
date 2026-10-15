@@ -80,17 +80,6 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
   )
 }
 
-// Each server fires exactly one event of a rotation per slot (node/server.js dailies/nightlies).
-const rotations: Record<string, 'daily' | 'nightly'> = { crabxx: 'daily', goobrawl: 'daily', abtesting: 'daily', icegolem: 'nightly', franky: 'nightly' }
-
-/** The event-prediction panel's guess for the party's current realm at the rotation's next slot. */
-function predictedEvent(state: PartyStateDynamic, rotation: string): string | null {
-  const realm = state.realmControl?.currentRealm
-  const region = realm && /^SR_(US|EU|ASIA)/.exec(realm)?.[1]
-  const next = region ? state.dailyChase?.upcoming?.find((entry) => entry.rotation === rotation && entry.region === region) : undefined
-  return next?.predictions.find((entry) => entry.realm === realm)?.event ?? null
-}
-
 /** The "Events (n)" selection as an inline list (console 1.4
  *  event-selection-control.tsx). Followers use their leader's events (the
  *  server 409s for them). Up/down buttons replace the console's drag to
@@ -148,12 +137,9 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
           {rows.map((event) => {
             const supported = supportedEvents.includes(event.id)
             const allowed = supported
-            const rotation = rotations[event.id]
-            const predicted = rotation && !event.live ? predictedEvent(state, rotation) : undefined
-            const prediction =
-              predicted === undefined ? '' : predicted === null ? ' · not predicted yet' : predicted === event.id ? ' · predicted here' : ' · not here this slot'
+            // A leader's manual travel skip stays on the leader; followers still attend (attendance-limits.ts).
             const ignored = [state.eventAttendance?.[name]?.[event.id], state.eventAttendance?.[policy.source]?.[event.id]].find(
-              (entry) => entry?.ignored && !entry.ended,
+              (entry, index) => entry?.ignored && !entry.ended && (index === 0 || entry.ignored !== 'manual travel'),
             )?.ignored
             const index = order.indexOf(event.id)
             return (
@@ -193,7 +179,6 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
                   <span>
                     {event.name} —{' '}
                     {!supported ? 'Unsupported' : event.live ? 'LIVE' : event.next ? eventTimeLabel(event.next, now) : event.slotAt ? `Next chance: ${eventTimeLabel(event.slotAt, now)}` : 'Time not announced'}
-                    {prediction}
                     {event.stale ? ' · timing stale' : ''}
                     {ignored && <span className="block text-amber-200">Skipped this instance: {ignored}</span>}
                   </span>

@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
 // Console 1.4 event-selection-control.tsx and event-limits-dialog.tsx:
-// priority order, per-event limits, skipped instances and predictions.
+// priority order, per-event limits and skipped instances.
 
 function postBodies(page: Page, path: string): Record<string, unknown>[] {
   const bodies: Record<string, unknown>[] = []
@@ -150,27 +150,39 @@ test('Event attendance: a skipped, unfinished instance shows its reason, includi
   await expect(page.getByRole('group', { name: 'Events' }).getByText('Skipped this instance: death limit')).toBeVisible()
 })
 
-test('Event prediction: daily chase upcoming slots mark the current realm’s predicted rotation event', async ({ page }) => {
+test('Event list: rotation events show no realm prediction suffix', async ({ page }) => {
   const server = partyServer()
   server.realmControl = { activeRealm: 'SR_USI', currentRealm: 'SR_USI', homeRealm: 'SR_USI', split: false, characters: [], realms: [] }
-  server.dailyChase = {
-    ...server.dailyChase,
-    upcoming: [
-      { rotation: 'daily', region: 'US', slotAt: Date.now() + 3_600_000, predictions: [{ realm: 'SR_USI', event: 'goobrawl' }] },
-      { rotation: 'nightly', region: 'US', slotAt: Date.now() + 7_200_000, predictions: [{ realm: 'SR_USII', event: 'franky' }] },
-    ],
-  }
   server.extraState = { eventSchedules: [{ id: 'icegolem', name: 'Ice Golem', live: true }] }
   await server.install(page)
 
   await page.goto('/characters/Leada')
   await page.getByRole('button', { name: 'Events (1) ▾' }).click()
   const events = page.getByRole('group', { name: 'Events' })
-  await expect(events.getByText('Goobrawl — Time not announced · predicted here')).toBeVisible()
-  await expect(events.getByText('Crabxx — Time not announced · not here this slot')).toBeVisible()
-  await expect(events.getByText('A/B Testing — Time not announced · not here this slot')).toBeVisible()
-  // The nightly slot predicts nothing for this realm; a live event shows no prediction.
-  await expect(events.getByText('Franky — Time not announced · not predicted yet')).toBeVisible()
-  await expect(events.getByText('Ice Golem — LIVE')).toBeVisible()
-  await expect(events.getByText('Snowman — Time not announced')).toBeVisible()
+  // Console 6fa7b0f removed the daily chase predictions these rows once carried.
+  await expect(events.getByText('Goobrawl — Time not announced', { exact: true })).toBeVisible()
+  await expect(events.getByText('Franky — Time not announced', { exact: true })).toBeVisible()
+  await expect(events.getByText('Ice Golem — LIVE', { exact: true })).toBeVisible()
+  await expect(events.getByText(/predicted|this slot/)).toHaveCount(0)
+})
+
+test('Event attendance: a leader’s manual travel skip shows on the leader but not on its followers', async ({ page }) => {
+  const server = partyServer()
+  server.eventAttendance = {
+    Leada: { crabxx: { ended: false, ignored: 'manual travel' }, goobrawl: { ended: false, ignored: 'death limit' } },
+    Folla: { franky: { ended: false, ignored: 'manual travel' } },
+  }
+  await server.install(page)
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Events (1) ▾' }).click()
+  await expect(page.getByRole('group', { name: 'Events' }).getByText('Skipped this instance: manual travel')).toBeVisible()
+
+  await page.goto('/characters/Folla')
+  await page.getByRole('button', { name: 'Events (1) ▾' }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  // attendance-limits.ts lets followers attend through the leader's manual travel skip; other leader skips still apply.
+  await expect(events.getByText('Skipped this instance: death limit')).toBeVisible()
+  // Folla's own manual travel skip on Franky still shows; the leader's on Crabxx does not.
+  await expect(events.getByText('Skipped this instance: manual travel')).toHaveCount(1)
 })

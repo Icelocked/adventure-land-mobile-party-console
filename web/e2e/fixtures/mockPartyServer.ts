@@ -89,7 +89,7 @@ const CONFIG_FIELDS = [
   'huntBlacklist', 'huntSettings',
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
   // Console 1.4 events and realms.
-  'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'dailyChase', 'realmHopBlacklist',
+  'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
   // Console 1.4 combat and party: designated tank and gear sets.
   'designatedTank', 'gearSets',
 ] as const
@@ -338,7 +338,6 @@ export class MockPartyServer {
       // Console 1.4 events and realms.
       eventAttendance: this.eventAttendance,
       bossChase: this.bossChase,
-      dailyChase: this.dailyChase,
       realmHopBlacklist: this.realmHopBlacklist,
       // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
       designatedTank: this.designatedTank,
@@ -351,10 +350,9 @@ export class MockPartyServer {
   }
 
   // Console 1.4 events and realms: initial-core.ts defaults (initialBossChase,
-  // initialDailyChase, initialRealmHopBlacklist) until a test or POST changes them.
+  // initialRealmHopBlacklist) until a test or POST changes them.
   eventAttendance: Record<string, Record<string, { ended: boolean; ignored?: string }>> = {}
   bossChase: Record<string, unknown> = { enabled: false, minEtaMinutes: 15, trip: null, returning: null, retryAt: 0, lastError: null, checkedAt: 0, sightings: [], respawns: [] }
-  dailyChase: Record<string, unknown> = { enabled: false, leadMinutes: 16, otherRegions: false, observations: {}, gameVersion: 0, trip: null, returning: null, retryAt: 0, lastError: null, upcoming: [] }
   realmHopBlacklist: string[] = []
 
   /** Any other state field a test needs (merchantForceStand, threshold,
@@ -590,10 +588,14 @@ export class MockPartyServer {
       if (!['luck', 'tank', 'gold'].includes(set)) return { status: 400, json: { error: 'invalid gear set' } }
       const sets = (this.gearSets[name] ||= {})
       if (body.action === 'clear') delete sets[set]
-      else if (body.action === 'save') {
+      else if (body.action === 'equip') {
+        // The server queues a gear-set-equip command and leaves the saved sets unchanged.
+        if (!sets[set]) return { status: 409, json: { error: 'that gear set is not saved' } }
+        return { status: 200, json: { ok: true } }
+      } else if (body.action === 'save') {
         if (!member.slots || this.staleEquipment.includes(name)) return { status: 409, json: { error: 'no fresh equipment report for ' + name } }
         const slots: Record<string, MockItem & { p?: string }> = {}
-        for (const slot of ['chest', 'pants', 'helmet', 'gloves', 'shoes', 'cape', 'belt', 'orb', 'amulet', 'ring1', 'ring2', 'earring1', 'earring2']) {
+        for (const slot of ['mainhand', 'offhand', 'chest', 'pants', 'helmet', 'gloves', 'shoes', 'cape', 'belt', 'orb', 'amulet', 'ring1', 'ring2', 'earring1', 'earring2', 'elixir']) {
           const item = member.slots[slot]?.item as (MockItem & { p?: string }) | undefined
           if (item?.name)
             slots[slot] = { name: item.name, ...(item.level !== undefined ? { level: item.level } : {}), ...(item.p ? { p: item.p } : {}), ...(item.stat_type ? { stat_type: item.stat_type } : {}) }
@@ -1066,8 +1068,8 @@ export class MockPartyServer {
       this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, currentRealm: body.realm, split: false, ...(body.setHome ? { homeRealm: body.realm } : {}) }
       return { status: 200, json: { ok: true } }
     }
-    // Console 1.4 events and realms: events/boss-chase.ts and daily-chase.ts
-    // update(), navigation/realm-hop-blacklist.ts.
+    // Console 1.4 events and realms: events/boss-chase.ts update(),
+    // navigation/realm-hop-blacklist.ts.
     if (path === 'realm/boss-chase') {
       const chase = { ...this.bossChase }
       if (body.enabled !== undefined) chase.enabled = body.enabled === true
@@ -1079,19 +1081,6 @@ export class MockPartyServer {
       if (!chase.enabled) Object.assign(chase, { trip: null, returning: null })
       this.bossChase = chase
       return { status: 200, json: { ok: true, bossChase: chase } }
-    }
-    if (path === 'realm/daily-chase') {
-      const chase = { ...this.dailyChase }
-      if (body.enabled !== undefined) chase.enabled = body.enabled === true
-      if (body.otherRegions !== undefined) chase.otherRegions = body.otherRegions === true
-      if (body.leadMinutes !== undefined) {
-        const lead = Number(body.leadMinutes)
-        if (!Number.isFinite(lead) || lead < 14 || lead > 120) return { status: 400, json: { error: 'leadMinutes must be between 14 and 120' } }
-        chase.leadMinutes = lead
-      }
-      if (!chase.enabled) Object.assign(chase, { trip: null, returning: null })
-      this.dailyChase = chase
-      return { status: 200, json: { ok: true, dailyChase: chase } }
     }
     if (path === 'realm/hop-blacklist') {
       const realms = body.realms
