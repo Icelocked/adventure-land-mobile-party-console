@@ -36,10 +36,9 @@ test('Events: sorted schedule labels, a toggle saves the selection, followers us
   await page.getByRole('button', { name: 'Events (1) ▾' }).click()
   const events = page.getByRole('group', { name: 'Events' })
   await expect(events.getByText('Anniversary — LIVE')).toBeVisible()
-  // Console 1.4 names events from eventDisplayNames over the schedule feed's
-  // names, and marks daily/nightly rotations without a prediction.
-  await expect(events.getByText(/^Goobrawl — .+ \(9m \d+s\) · not predicted yet$/)).toBeVisible()
-  await expect(events.getByText('Crabxx — Time not announced · not predicted yet · timing stale')).toBeVisible()
+  // Console 1.4 names events from eventDisplayNames over the schedule feed's names.
+  await expect(events.getByText(/^Goobrawl — .+ \(9m \d+s\)$/)).toBeVisible()
+  await expect(events.getByText('Crabxx — Time not announced · timing stale')).toBeVisible()
   await expect(events.getByText('Halloween — Unsupported')).toBeVisible()
   await expect(events.getByRole('checkbox', { name: 'Halloween' })).toBeDisabled()
   await expect(events.getByText(/^Cave of Many Dreams — /)).toBeVisible()

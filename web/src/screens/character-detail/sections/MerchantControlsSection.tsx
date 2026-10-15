@@ -210,7 +210,7 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
 
 
 /** "Join giveaway": pick a realm, then a
- *  player online there (searchable). */
+ *  player online there (searchable) or the host's typed name. */
 function GiveawayForm({
   realms,
   players,
@@ -228,6 +228,9 @@ function GiveawayForm({
   const [error, setError] = useState<string | null>(null)
   const online = players[realm] ?? []
   const matches = online.filter((name) => name.toLowerCase().includes(search.trim().toLowerCase()))
+  // Hosts who are not stand merchants on a realm without our characters never load, so an exact typed name stands in.
+  const typed = search.trim()
+  const canUseTyped = !!typed && typed.length <= 40 && !online.includes(typed)
   return (
     <div className="flex flex-col gap-2 py-1 pl-3">
       <p className="text-xs text-muted-foreground">The merchant will switch realms, travel to the main market, find this player, and enter every active giveaway they are hosting.</p>
@@ -261,7 +264,19 @@ function GiveawayForm({
               {name}
             </button>
           ))}
-          {!matches.length && <p className="px-2 text-xs text-muted-foreground">No online players loaded for this realm.</p>}
+          {!matches.length && <p className="px-2 text-xs text-muted-foreground">No loaded player matches. Type the host&apos;s exact name.</p>}
+          {canUseTyped && (
+            <button
+              type="button"
+              className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+              onClick={() => {
+                setSeller(typed)
+                setSearch('')
+              }}
+            >
+              Use “{typed}”
+            </button>
+          )}
         </div>
       )}
       <span className="font-mono text-[10px] text-muted-foreground">{online.length} online players loaded</span>

@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
 // Console 1.4 realm panel: home-change wording and confirmation, mixed homes,
-// boss chase, daily event prediction and the realm hop blacklist.
+// boss chase and the realm hop blacklist.
 
 function postBodies(page: Page, path: string): Record<string, unknown>[] {
   const bodies: Record<string, unknown>[] = []
@@ -165,50 +165,21 @@ test('Boss chase: enabling with no data waits for the first check', async ({ pag
   await expect(chase.getByText('Waiting for the first check…')).toBeVisible()
 })
 
-test('Daily chase: toggles, lead minutes 14-120, other regions, trip and upcoming predictions', async ({ page }) => {
+test('Daily chase: the scheduled event prediction setting is gone; the blacklist names only boss chase', async ({ page }) => {
   const server = realmServer()
-  const slotAt = Date.now() + 30 * 60_000
-  server.dailyChase = {
-    ...server.dailyChase,
-    enabled: true,
-    trip: { rotation: 'daily', event: 'goobrawl', realm: 'SR_EUII', slot: 4, slotAt, returnRealm: 'SR_USI', startedAt: Date.now(), arrived: false, quietChecks: 0 },
-    upcoming: [
-      { rotation: 'daily', region: 'US', slotAt, predictions: [{ realm: 'SR_USI', event: 'crabxx' }, { realm: 'SR_USIII', event: 'abtesting' }] },
-      { rotation: 'nightly', region: 'EU', slotAt, predictions: [] },
-    ],
-    lastError: 'Realm switch was refused',
-  }
   await server.install(page)
-  const bodies = postBodies(page, 'realm/daily-chase')
+  const posted: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST') posted.push(new URL(request.url()).pathname)
+  })
 
   await page.goto('/settings')
-  const chase = page.getByRole('group', { name: 'Scheduled event realm prediction' })
-  await expect(chase.getByText(new RegExp(`^Goo Brawl · moving to EU II for ${time.source} · returns to US I$`))).toBeVisible()
-  await expect(chase.getByText(new RegExp(`^US daily ${time.source}$`))).toBeVisible()
-  await expect(chase.getByText('US I: Giga Crab · US III: A/B Testing')).toBeVisible()
-  await expect(chase.getByText('no predictions yet')).toBeVisible()
-  await expect(chase.getByRole('alert')).toHaveText('Realm switch was refused')
-
-  const lead = chase.getByLabel('Arrive this many minutes before the slot (min 14)')
-  await expect(lead).toHaveValue('16')
-  await lead.fill('13')
-  await expect(chase.getByRole('button', { name: 'Save' })).toBeDisabled()
-  await lead.fill('121')
-  await expect(chase.getByRole('button', { name: 'Save' })).toBeDisabled()
-  await lead.fill('20')
-  await chase.getByRole('button', { name: 'Save' }).click()
-  await expect.poll(() => bodies[0]).toEqual({ leadMinutes: 20 })
-
-  const other = chase.getByRole('button', { name: "Also chase other regions' slots" })
-  await expect(other).toHaveAttribute('aria-pressed', 'false')
-  await other.click()
-  await expect.poll(() => bodies[1]).toEqual({ otherRegions: true })
-  await expect(other).toHaveAttribute('aria-pressed', 'true')
-
-  server.failOnce['realm/daily-chase'] = 'Realm switch in progress'
-  await chase.getByRole('button', { name: 'Predict scheduled events across realms' }).click()
-  await expect.poll(() => bodies[2]).toEqual({ enabled: false })
-  await expect(chase.getByText('Realm switch in progress')).toBeVisible()
+  // Console 6fa7b0f dropped /realm/daily-chase and the dailyChase state field.
+  await expect(page.getByRole('group', { name: 'Event boss realm chase' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Scheduled event realm prediction' })).toHaveCount(0)
+  await expect(page.getByText('Predict scheduled events across realms')).toHaveCount(0)
+  await expect(page.getByRole('group', { name: 'Realm hopping blacklist' })).toContainText('Boss chase skips checked realms')
+  expect(posted.filter((path) => path.includes('daily-chase'))).toEqual([])
 })
 
 test('Realm hop blacklist: sends the whole list on each toggle; PVP is always skipped', async ({ page }) => {

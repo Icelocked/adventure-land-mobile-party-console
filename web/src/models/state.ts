@@ -507,7 +507,7 @@ export interface RealmControl {
 // trimmed to what the event list reads.
 export interface EventAttendanceInstance {
   ended?: boolean
-  ignored?: 'death limit' | 'time limit'
+  ignored?: 'death limit' | 'time limit' | 'manual travel' | 'travel failure'
 }
 // events/boss-chase.ts BossChaseState, trimmed to what the realm panel shows.
 export interface BossChaseState {
@@ -518,15 +518,6 @@ export interface BossChaseState {
   checkedAt: number
   sightings: { boss: string; realm: string; hp: number; etaMinutes: number | null; target: string | null }[]
   respawns: { boss: string; realm: string; respawnAt: number }[]
-}
-// events/daily-chase.ts DailyChaseState, trimmed to what the realm panel and event list show.
-export interface DailyChaseState {
-  enabled: boolean
-  leadMinutes: number
-  otherRegions: boolean
-  trip: { event: string; realm: string; slotAt: number; returnRealm: string | null; arrived: boolean } | null
-  lastError: string | null
-  upcoming: { rotation: 'daily' | 'nightly'; region: string; slotAt: number; predictions: { realm: string; event: string }[] }[]
 }
 
 /** The polled slice of GET /party-api/state. `followers` maps character
@@ -695,10 +686,9 @@ export interface PartyStateDynamic {
   activeConvoy?: unknown
   // Upgrades
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
-  // Console 1.4 events and realms: per-instance event attendance, boss chase, daily event prediction, realm hop blacklist.
+  // Console 1.4 events and realms: per-instance event attendance, boss chase, realm hop blacklist.
   eventAttendance?: Record<string, Record<string, EventAttendanceInstance>>
   bossChase?: BossChaseState | null
-  dailyChase?: DailyChaseState | null
   realmHopBlacklist?: string[]
   // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
   // Set by POST /formation {tank} (http/formation.ts); its role is described in party-roles-settings.tsx.

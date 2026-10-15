@@ -51,7 +51,7 @@ export function GearSetControl({ name, state }: { name: string; state: PartyStat
   const [error, setError] = useState<string | null>(null)
   const sets = state.gearSets?.[name]
   const saved = SETS.filter(([id]) => sets?.[id]).length
-  const update = async (set: 'luck' | 'tank', action: 'save' | 'clear') => {
+  const update = async (set: 'luck' | 'tank', action: 'save' | 'clear' | 'equip') => {
     setBusy(true)
     setError(null)
     const result = await api.gearSet(name, set, action)
@@ -66,7 +66,11 @@ export function GearSetControl({ name, state }: { name: string; state: PartyStat
       </Chip>
       {open && (
         <div role="group" aria-label="Gear sets" className="basis-full space-y-2 rounded border border-border bg-card p-3 text-xs">
-          <p className="text-muted-foreground">Sets are saved from the gear {name} is wearing. Set members are never taken by automatic compound, upgrade or cleanout rules.</p>
+          <p className="text-muted-foreground">
+            Sets are saved from the gear {name} is wearing, every slot included. Equip wears a saved set from the bag (never the elixir) and pauses the tank&apos;s
+            automatic return to its tank set for 10 minutes, so you can adjust and save again. Set members are never taken by automatic compound, upgrade or
+            cleanout rules.
+          </p>
           {SETS.map(([id, label, purpose]) => {
             const set: GearSet | undefined = sets?.[id]
             const pieces = set && inventory ? completeness(inventory, set.slots) : null
@@ -88,6 +92,11 @@ export function GearSetControl({ name, state }: { name: string; state: PartyStat
                   <button type="button" disabled={busy} onClick={() => void update(id, 'save')} className="rounded border border-emerald-600 px-2 py-1 text-emerald-100 disabled:opacity-50">
                     Save current gear as {label}
                   </button>
+                  {set && (
+                    <button type="button" disabled={busy} onClick={() => void update(id, 'equip')} className="rounded border border-sky-600 px-2 py-1 text-sky-100 disabled:opacity-50">
+                      Equip {label}
+                    </button>
+                  )}
                   {set && (
                     <button type="button" disabled={busy} onClick={() => void update(id, 'clear')} className="rounded border border-rose-700 px-2 py-1 text-rose-200 disabled:opacity-50">
                       Clear

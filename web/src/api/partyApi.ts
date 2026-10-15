@@ -901,7 +901,7 @@ export class PartyApiClient {
   }
 
   // Console 1.4 events and realms: event priority order, per-event limits,
-  // boss chase, daily event prediction and the realm hop blacklist.
+  // boss chase and the realm hop blacklist.
 
   /** POST /party-api/formation {character, eventPriorities}. The server
    *  400s unless the list is a full permutation of supportedEvents, and
@@ -921,11 +921,6 @@ export class PartyApiClient {
     return this.post('realm/boss-chase', body)
   }
 
-  /** POST /party-api/realm/daily-chase. leadMinutes must be 14-120. */
-  async setDailyChase(body: { enabled?: boolean; leadMinutes?: number; otherRegions?: boolean }): Promise<ApiResult<CommandResult>> {
-    return this.post('realm/daily-chase', body)
-  }
-
   /** POST /party-api/realm/hop-blacklist {realms}: the whole list, replacing the saved one. */
   async setRealmHopBlacklist(realms: string[]): Promise<ApiResult<CommandResult>> {
     return this.post('realm/hop-blacklist', { realms })
@@ -940,8 +935,9 @@ export class PartyApiClient {
 
   /** POST /party-api/gear-sets. "save" captures the gear the character is
    *  wearing and 409s without an equipment report from the last 10s
-   *  (characters/gear-sets.ts). */
-  async gearSet(character: string, set: 'luck' | 'tank', action: 'save' | 'clear'): Promise<ApiResult<CommandResult>> {
+   *  (characters/gear-sets.ts). "equip" queues a gear-set-equip command and
+   *  409s for a set that is not saved. */
+  async gearSet(character: string, set: 'luck' | 'tank', action: 'save' | 'clear' | 'equip'): Promise<ApiResult<CommandResult>> {
     return this.post('gear-sets', { character, set, action })
   }
 
