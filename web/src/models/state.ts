@@ -421,6 +421,8 @@ export const itemFromRuleKey = (ruleKey: string): Item => {
 export interface AutoNpcSaleRule {
   item: Item
   character?: string
+  /** Console 1.4 #116: copies a merchant-wide rule keeps across the merchant's bag, bank and BankBois. */
+  keep?: number
 }
 
 /** An autoStandMarks entry (merchant-only). */
@@ -671,6 +673,8 @@ export interface PartyStateDynamic {
   nativeStand?: {
     offers: Record<string, { itemId: string; auto: boolean; phase: string; slot: string; level?: number; price?: number; quantity?: number; acknowledged?: number; problem?: string }>
     problems: Record<string, string>
+    /** Purchases a merchant job reserved, keyed `jobId:key`; one whose job ended unconfirmed pauses its item's WTB. */
+    purchases?: Record<string, { item: { name: string; q?: number; price?: number }; quantity: number; jobId: string }>
   }
   mluckSchedule?: { target: string; remainingMs: number; leadMs: number; dispatchInMs: number; marginMs: number; status: string } | null
   gatheringCooldowns?: { fishing?: number; mining?: number }

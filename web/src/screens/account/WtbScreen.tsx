@@ -11,14 +11,14 @@ import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
-import type { CatalogItem, Item, StandBid } from '@/models'
+import type { CatalogItem, Item, PartyStateDynamic, StandBid } from '@/models'
 
 const ACTIVE_OPEN_KEY = 'adventure-land-active-wtb-open'
 
 /** "Active WTB orders": filter with visible/total, each
  *  order's inspect, inline quantity/price/priority (single-field edits with
  *  the bid revision), Use stand / Accept higher levels, the Auto badge and
- *  native-stand problem, and a two-step cancel; "New WTB order" picks an
+ *  native-stand problem, an unconfirmed purchase to resolve, and a two-step cancel; "New WTB order" picks an
  *  item for the WTB dialog. */
 export function WtbScreen() {
   useDomainInterest('market')
@@ -185,6 +185,7 @@ export function WtbScreen() {
                         {problem && <p className="text-xs text-amber-500">{problem}</p>}
                       </div>
                     )}
+                    <WtbUnconfirmedPurchase itemId={itemId} name={name} purchases={state.nativeStand?.purchases} />
                     <Button size="sm" variant="outline" className="text-rose-500" disabled={!!savingBid} onClick={() => void cancelBid(itemId, bid)}>
                       {savingBid === itemId ? 'Saving…' : confirmCancel === itemId ? 'Really cancel?' : 'Cancel'}
                     </Button>
@@ -227,6 +228,51 @@ export function WtbScreen() {
         </Sheet>
       )}
     </AccountScreenScaffold>
+  )
+}
+
+type Purchases = NonNullable<NonNullable<PartyStateDynamic['nativeStand']>['purchases']>
+
+/** Console 1.4 wtb-unconfirmed-purchase.tsx: a purchase whose merchant job
+ *  ended without confirming it pauses this WTB until the player says
+ *  whether it was bought. */
+function WtbUnconfirmedPurchase({ itemId, name, purchases }: { itemId: string; name: string; purchases?: Purchases }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const entry = Object.entries(purchases || {}).find(([, purchase]) => purchase.item.name === itemId)
+  if (!entry) return null
+  const [id, purchase] = entry
+  const seller = id.split(':')[1]
+  const resolve = async (bought: boolean) => {
+    setBusy(true)
+    setError('')
+    const result = await api.resolveNativePurchase(id, bought)
+    setBusy(false)
+    if (result.kind === 'failure') setError(result.message)
+    else await refreshNow()
+  }
+  return (
+    <fieldset aria-label={`Unconfirmed purchase of ${name}`} className="order-last m-0 grid w-full min-w-0 gap-2 rounded border border-amber-700 p-2 text-xs text-amber-200">
+      <p>
+        Purchase outcome unconfirmed: {purchase.quantity.toLocaleString()} × {name} at {Number(purchase.item.price || 0).toLocaleString()}
+        {seller ? ` from ${seller}` : ''}. The merchant job ended before reporting it, so this WTB is paused.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void resolve(true)}>
+          It was bought
+        </Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void resolve(false)}>
+          It wasn&apos;t bought
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+    </fieldset>
   )
 }
 

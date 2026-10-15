@@ -219,7 +219,8 @@ export function StandScreen() {
                 }} className="flex items-center gap-3 pr-12 text-left">
                   <SpriteIcon sprite={item?.sprite || item?.meta?.sprite} size={48} />
                   <span>
-                    {name} +{level}
+                    {name}
+                    {item?.upgradeable || item?.compoundable || item?.meta?.upgradeable || item?.meta?.compoundable ? ` +${level}` : ''}
                   </span>
                 </button>
                 <div className="flex flex-wrap items-center justify-between gap-2">

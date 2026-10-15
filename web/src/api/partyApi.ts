@@ -429,11 +429,13 @@ export class PartyApiClient {
 
   /** POST /party-api/merchant/auto-npc-sale - a standing "always sell
    *  this item type to an NPC" rule. */
-  async autoNpcSale(character: string | undefined, item: Item, remove = false): Promise<ApiResult<CommandResult>> {
+  async autoNpcSale(character: string | undefined, item: Item, remove = false, keep = ''): Promise<ApiResult<CommandResult>> {
     // Omit `character` for the merchant (its rule is the account-wide
     // one); with it, the server stores a per-player rule that never fires
-    // for the merchant.
-    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set' })
+    // for the merchant. Console 1.4 sends `keep` as the trimmed text, and
+    // only for the merchant-wide rule; blank omits it so every copy sells.
+    const copies = keep.trim()
+    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set', ...(!character && copies !== '' ? { keep: copies } : {}) })
   }
 
   /** POST /party-api/merchant/auto-stand - a standing "always list this
@@ -711,6 +713,19 @@ export class PartyApiClient {
     options?: WtbOptions,
   ): Promise<ApiResult<CommandResult>> {
     return this.post('merchant/bid', { itemId, price, quantity, minimumQuality, clear, priorityOverride, ...options })
+  }
+
+  /** POST /party-api/merchant/native-stand "resolve-purchase" - settles a
+   *  purchase whose merchant job ended unconfirmed: bought counts it toward
+   *  the WTB order, not bought releases it. */
+  async resolveNativePurchase(id: string, bought: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/native-stand', { action: 'resolve-purchase', id, bought })
+  }
+
+  /** POST /party-api/prim-stack - queues a merchant job that raises a
+   *  merchant inventory item's grace to `target` without a level attempt. */
+  async primStack(character: string, slot: number, item: Item, target: number, method: 'offering' | 'stat'): Promise<ApiResult<CommandResult>> {
+    return this.post('prim-stack', { character, slot, item, target, method })
   }
 
   /** POST /party-api/upgrade-preview - polled, so a plain fetch with no

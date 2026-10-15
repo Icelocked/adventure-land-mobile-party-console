@@ -37,6 +37,7 @@ export const actionDomains = {
   '/merchant/force-stand': core,
   '/merchant/stand-location': core,
   '/merchant/gather': core,
+  '/prim-stack': core,
   '/merchant/job/cancel': commerce,
   '/merchant/job/retry': commerce,
   '/merchant/routine-priorities': core,
