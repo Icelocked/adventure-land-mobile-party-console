@@ -58,6 +58,8 @@ export interface MockCatalogEntry {
   // G.items[id].g - the item's base gold value (stand price default, NPC sale value).
   value?: number
   maxLevel?: number
+  // meta.buyable (an NPC sells it).
+  buyable?: boolean
   // Extra G.items fields (e.g. `e` for exchangeable).
   definition?: Record<string, unknown>
   // meta.world (drop sources, recipes, ...).
@@ -202,7 +204,7 @@ export class MockPartyServer {
   deconstructionCatalog: Record<string, { compound: boolean; cost?: number; rewards?: unknown[] }> = {}
 
   // Auto-mark state, mutated by POSTed commands (PartyStateDynamic shape).
-  autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
+  autoNpcSales: Record<string, { item: MockItem; character?: string; keep?: number }> = {}
   // Pending one-time inventory marks (not standing rules), keyed by
   // character (state.upgrades/compounds/statScrolls).
   upgrades: Record<string, { slot?: number | string; item: MockItem; tiers?: number; equipped?: boolean }[]> = {}
@@ -289,7 +291,7 @@ export class MockPartyServer {
         allItems: Object.values(this.catalogEntries).map((entry) => ({
           ...entry,
           sprite: testSprite(),
-          meta: { definition: { name: entry.name, ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}), ...(entry.usage ? { usage: { hands: [], ...entry.usage } } : {}) },
+          meta: { definition: { name: entry.name, ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}), ...(entry.buyable ? { buyable: true } : {}), ...(entry.usage ? { usage: { hands: [], ...entry.usage } } : {}) },
         })),
         buyable: this.buyable,
         craftable: this.craftable,
@@ -687,8 +689,11 @@ export class MockPartyServer {
       if (typeof item?.name !== 'string') return { status: 400, json: { error: 'invalid automatic NPC sale item' } }
       const ruleKey = JSON.stringify({ name: item.name, level: Math.max(0, Number(item.level) || 0), p: (item as { p?: string }).p || null, stat_type: item.stat_type || null })
       const key = character ? JSON.stringify([character, ruleKey]) : ruleKey
+      // #116: a merchant-wide rule may keep copies; blank keeps none.
+      const keep = body.keep === undefined || body.keep === null || body.keep === '' ? undefined : Number(body.keep)
+      if (keep !== undefined && (character || !Number.isSafeInteger(keep) || keep < 0)) return { status: 400, json: { error: 'enter a whole number of copies to keep, or leave it blank' } }
       if (body.action === 'remove') delete this.autoNpcSales[key]
-      else this.autoNpcSales[key] = { item, ...(character ? { character } : {}) }
+      else this.autoNpcSales[key] = { item, ...(character ? { character } : {}), ...(keep !== undefined ? { keep } : {}) }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.remove && body.id) {
@@ -1039,6 +1044,14 @@ export class MockPartyServer {
     }
     if (path === 'merchant/native-stand') {
       if (body.action === 'configure') this.extraState = { ...this.extraState, autoStandBuys: body.enabled === true }
+      // http/native-stand.ts resolvePurchase(): settles one unconfirmed purchase.
+      if (body.action === 'resolve-purchase') {
+        const nativeStand = this.extraState.nativeStand as { purchases?: Record<string, unknown> } | undefined
+        const id = String(body.id)
+        if (!nativeStand?.purchases?.[id] || typeof body.bought !== 'boolean') return { status: 409, json: { error: 'That purchase is no longer pending' } }
+        const { [id]: _resolved, ...purchases } = nativeStand.purchases
+        this.extraState = { ...this.extraState, nativeStand: { ...nativeStand, purchases } }
+      }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/bid') {

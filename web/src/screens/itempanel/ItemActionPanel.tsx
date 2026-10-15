@@ -400,7 +400,6 @@ function InventoryActions({
           )}
         </>
       )}
-      {!!merchant && !isMerchant && meta?.buyable && <TapRow label="Buy another level 0" onClick={() => command('buy-copy', undefined)} />}
 
       {!!merchant && meta?.compoundable && !compoundGroup && <TapRow label="Mark for compounding" onClick={() => command('compound-mark', slot)} />}
       {!!merchant && meta?.compoundable && level < compoundMax && (
@@ -472,7 +471,7 @@ function InventoryActions({
               name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
               character={isMerchant ? undefined : characterName}
               onCancel={() => onExpand(null)}
-              onConfirm={() => confirmWith(() => api.autoNpcSale(isMerchant ? undefined : characterName, item))}
+              onConfirm={(keep) => confirmWith(() => api.autoNpcSale(isMerchant ? undefined : characterName, item, false, keep))}
             />
           )}
         </>
