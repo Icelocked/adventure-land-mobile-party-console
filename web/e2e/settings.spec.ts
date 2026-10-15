@@ -173,3 +173,35 @@ test('Settings parity: description, stored ALData key loaded for Copy, auth wait
   await expect(page.getByText(/^Auth: CORRECT/)).toBeVisible()
   await expect(page.getByText(/^Waiting for mail delivery/)).toHaveCount(0)
 })
+
+test('Copy key falls back to the legacy copy command, and a failed copy reveals the key (copy-text.ts)', async ({ page }) => {
+  const server = settingsServer()
+  server.extraState = { ...server.extraState, aldata: { listings: [], hasKey: true, auth: 'NO' } }
+  await server.install(page)
+  await page.route('**/party-api/aldata/key', (route) => route.fulfill({ json: { key: 'secret-key' } }))
+  // Plain-HTTP LAN access: no Clipboard API, and the legacy command reports
+  // success on the first click and failure on the second.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    const copies: string[] = []
+    ;(window as unknown as { __copies: string[] }).__copies = copies
+    document.execCommand = (command: string) => {
+      const area = document.querySelector<HTMLTextAreaElement>('textarea[readonly]')
+      copies.push(`${command}:${area?.value ?? ''}`)
+      return copies.length === 1
+    }
+  })
+  await page.goto('/settings')
+  const key = page.getByPlaceholder('Stored key - reveal to view')
+  await expect(key).toHaveAttribute('type', 'password')
+  const copy = page.getByRole('button', { name: 'Copy key' })
+  await expect(copy).toBeEnabled()
+
+  await copy.click()
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __copies: string[] }).__copies)).toEqual(['copy:secret-key'])
+  await expect(key).toHaveAttribute('type', 'password')
+
+  await copy.click()
+  await expect(page.getByText('Copy failed; the key is shown so you can copy it manually.')).toBeVisible()
+  await expect(key).toHaveAttribute('type', 'text')
+})

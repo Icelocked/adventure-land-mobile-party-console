@@ -6,6 +6,13 @@ import { useVisible } from './useMapFrames'
 
 const DUNGEON_KEY = ['party', 'daily-dungeons'] as const
 
+// crypto.randomUUID exists only in secure contexts; a PWA opened over plain
+// HTTP by LAN address lacks it, while getRandomValues is always available.
+function operationId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 /** Polls GET /daily-dungeons every second while visible. Every POST
  *  carries a fresh operationId and its response replaces the cached view. */
 export function useDungeons() {
@@ -29,7 +36,7 @@ export function useDungeons() {
     setError('')
     setBusy(true)
     try {
-      const result = await api.post('daily-dungeons', { ...body, operationId: crypto.randomUUID() })
+      const result = await api.post('daily-dungeons', { ...body, operationId: operationId() })
       if (result.kind === 'failure') {
         setError(result.message)
         return false

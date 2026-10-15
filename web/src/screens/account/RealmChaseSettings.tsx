@@ -199,7 +199,7 @@ export function DailyChaseSetting({ chase }: { chase?: DailyChaseState | null })
   )
 }
 
-/** Realms boss chase and daily-event chase never hop to. Manual realm changes are unaffected. */
+/** Realms boss chase never hops to. Manual realm changes are unaffected. */
 export function RealmHopBlacklistSetting({ realms, blacklist }: { realms: RealmOption[]; blacklist?: string[] }) {
   const api = usePartyApi()
   const action = useRealmAction()
@@ -212,7 +212,7 @@ export function RealmHopBlacklistSetting({ realms, blacklist }: { realms: RealmO
       <div>
         <p className="text-sm font-medium">Never hop to these realms</p>
         <p className="text-muted-foreground">
-          Boss chase and event prediction skip checked realms, e.g. ones whose ping cripples DPS. Changing realm by hand still works. PVP realms are always skipped.
+          Boss chase skips checked realms, e.g. ones whose ping cripples DPS. Changing realm by hand still works. PVP realms are always skipped.
         </p>
       </div>
       {realms.length ? (
