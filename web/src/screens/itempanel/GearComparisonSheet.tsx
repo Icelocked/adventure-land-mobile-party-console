@@ -50,22 +50,30 @@ export function GearComparisonSheet({
   const [rightLevel, setRightLevel] = useState(Math.max(0, Number(item.level) || 0))
   const [leftStatType, setLeftStatType] = useState(equipped?.item.stat_type || 'none')
   const [rightStatType, setRightStatType] = useState(item.stat_type || 'none')
+  const [includeOffhand, setIncludeOffhand] = useState(true)
 
-  const actualOldProps = (equippedMeta?.properties || {}) as Props
+  const handsFor = (meta: ItemMeta | undefined) => meta?.usage?.classes.find((usage) => usage.id === ctype)?.hands
+  const removesOffhand = replacementSlot === 'mainhand' && handsFor(entryMeta) === 2
+  const offhand = slots.offhand ?? null
+  // Only a one-handed main hand leaves the offhand a choice: the 2H swap
+  // drops it, so the current side can be judged with or without it.
+  const offerOffhandComparison = removesOffhand && !!equipped && !!offhand && handsFor(equippedMeta) === 1
   const oldProps: Props = equipped ? propertiesAtLevel(equippedMeta, equipped.item, leftLevel, leftStatType === 'none' ? null : leftStatType) : {}
   const newProps = propertiesAtLevel(entryMeta, item, rightLevel, rightStatType === 'none' ? null : rightStatType)
   const prop = (source: Props, key: string) => Number(source[key] || 0)
   const actualEquipment = Object.entries(slots)
     .filter(([slot, value]) => !slot.startsWith('trade') && !!value)
     .map(([slot, value]) => [slot, { ...value!, meta: metaOf(value!) }] as [string, EquippedEntry])
-  const currentEquipment = actualEquipment.map(([slot, value]) =>
+  const currentEquipment = actualEquipment
+    .filter(([slot]) => slot !== 'offhand' || !offerOffhandComparison || includeOffhand)
+    .map(([slot, value]) =>
     slot === replacementSlot ? ([slot, { ...value, item: { ...value.item, level: leftLevel }, meta: { ...value.meta!, properties: oldProps } }] as [string, EquippedEntry]) : ([slot, value] as [string, EquippedEntry]),
   )
   const proposedEquipment = actualEquipment
-    .filter(([slot]) => slot !== replacementSlot)
+    .filter(([slot]) => slot !== replacementSlot && !(removesOffhand && slot === 'offhand'))
     .concat([[replacementSlot, { item: { ...item, level: rightLevel }, meta: { ...entryMeta!, properties: newProps } }]])
   const setDefinitions = new Map<string, ItemSetInfo>()
-  ;[...currentEquipment.map(([, value]) => value), { item, meta: entryMeta }].forEach((value) => {
+  ;[...actualEquipment.map(([, value]) => value), { item, meta: entryMeta }].forEach((value) => {
     const set = value.meta?.world?.set
     if (set) setDefinitions.set(set.id, set)
   })
@@ -77,7 +85,8 @@ export function GearComparisonSheet({
       const count = equipment.filter(([, value]) => allowed.has(value.item.name)).length
       counts[setId] = count
       set.bonuses
-        .filter((bonus) => count >= bonus.pieces)
+        // Native G.sets[count] is a total bonus, not cumulative tiers.
+        .filter((bonus) => count === bonus.pieces)
         .forEach((bonus) =>
           Object.entries(bonus.stats).forEach(([key, value]) => {
             if (typeof value === 'number') totals[key] = (totals[key] || 0) + value
@@ -86,8 +95,22 @@ export function GearComparisonSheet({
     })
     return { totals, counts }
   }
-  const currentSets = setState(currentEquipment),
+  const actualSets = setState(actualEquipment),
+    currentSets = setState(currentEquipment),
     proposedSets = setState(proposedEquipment)
+  const equipmentTotals = (equipment: [string, EquippedEntry][]): Props => {
+    const totals: Stats = {}
+    equipment.forEach(([, value]) =>
+      Object.entries(value.meta?.properties || {}).forEach(([key, amount]) => {
+        const numeric = Number(amount)
+        if (Number.isFinite(numeric)) totals[key] = (totals[key] || 0) + numeric
+      }),
+    )
+    return totals
+  }
+  // The diagnostics already include the actual gear and its active sets.
+  // Both previews anchor there, so dropping an offhand also drops its set share.
+  const actualTotals = equipmentTotals(actualEquipment)
 
   const character: Stats & { level: number } = {
     level: Number(vitals?.level || diagnostics.level || 0),
@@ -105,8 +128,8 @@ export function GearComparisonSheet({
   const divisor = ctype === 'paladin' && primary === 'int' ? 40 : 20
   const oldPrimary = num(primary)
   const combat = (diagnostics.combatStats || {}) as Record<string, unknown>
-  const project = (replacement: Props, setTotals: Stats): Stats => {
-    const delta = (key: string) => prop(replacement, key) - prop(actualOldProps, key) + Number(setTotals[key] || 0) - Number(currentSets.totals[key] || 0)
+  const project = (totals: Props, setTotals: Stats): Stats => {
+    const delta = (key: string) => prop(totals, key) - prop(actualTotals, key) + Number(setTotals[key] || 0) - Number(actualSets.totals[key] || 0)
     const result: Stats = {}
     result.str = num('str') + delta('str')
     result.int = num('int') + delta('int')
@@ -143,8 +166,8 @@ export function GearComparisonSheet({
     result.output = Number(combat.output || 0) + delta('output')
     return result
   }
-  const currentPreview = project(oldProps, currentSets.totals)
-  const projected = project(newProps, proposedSets.totals)
+  const currentPreview = project(equipmentTotals(currentEquipment), currentSets.totals)
+  const projected = project(equipmentTotals(proposedEquipment), proposedSets.totals)
   const rows: [string, string, (value: number) => string][] = [
     ['HP', 'max_hp', (v) => Math.round(v).toLocaleString()],
     ['MP', 'max_mp', (v) => Math.round(v).toLocaleString()],
@@ -236,6 +259,18 @@ export function GearComparisonSheet({
           </div>
         </div>
         <div className="mb-3">{statButtons(proposed)}</div>
+        {!proposed && offerOffhandComparison && offhand ? (
+          <label className="mb-3 flex items-center gap-2 rounded border border-border p-3 text-sm">
+            <input type="checkbox" aria-label="include offhand weapon in comparison" checked={includeOffhand} onChange={(event) => setIncludeOffhand(event.target.checked)} className="h-4 w-4" />
+            <span>
+              include offhand weapon in comparison
+              <span className="block text-xs text-muted-foreground">
+                {nameOf(offhand.item, metaOf(offhand))} +{offhand.item.level || 0}
+              </span>
+            </span>
+          </label>
+        ) : null}
+        {proposed && removesOffhand && offhand ? <p className="mb-3 text-sm text-cyan-400">Two-handed weapon · unequips {nameOf(offhand.item, metaOf(offhand))}</p> : null}
         {meta?.upgradeable || meta?.compoundable ? (
           <div className="mb-3 rounded border border-violet-900/70 p-3">
             <div className="mb-2 flex justify-between font-mono text-[10px] uppercase text-violet-400">
@@ -304,8 +339,8 @@ export function GearComparisonSheet({
                     <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                       {set.bonuses
                         .map((bonus) => {
-                          const was = before >= bonus.pieces,
-                            becomes = after >= bonus.pieces
+                          const was = before === bonus.pieces,
+                            becomes = after === bonus.pieces
                           const stats = Object.entries(bonus.stats)
                             .map(([key, value]) => `${key.toUpperCase()} +${value}`)
                             .join(', ')

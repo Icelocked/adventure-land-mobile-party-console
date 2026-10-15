@@ -62,8 +62,10 @@ export interface MockCatalogEntry {
   definition?: Record<string, unknown>
   // meta.world (drop sources, recipes, ...).
   world?: Record<string, unknown>
-  // meta.usage (classes that can equip it).
-  usage?: { classes: { id: string; name: string }[]; hands?: number[] }
+  // meta.usage (classes that can equip it, with per-class hands for weapons).
+  usage?: { classes: { id: string; name: string; hands?: number | null }[]; hands?: number[] }
+  // meta.properties, the server's computed stats at the item's current level.
+  properties?: Record<string, number>
 }
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
@@ -289,7 +291,7 @@ export class MockPartyServer {
         allItems: Object.values(this.catalogEntries).map((entry) => ({
           ...entry,
           sprite: testSprite(),
-          meta: { definition: { name: entry.name, ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}), ...(entry.usage ? { usage: { hands: [], ...entry.usage } } : {}) },
+          meta: { definition: { name: entry.name, ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}), ...(entry.usage ? { usage: { hands: [], ...entry.usage } } : {}), ...(entry.properties ? { properties: entry.properties } : {}) },
         })),
         buyable: this.buyable,
         craftable: this.craftable,
