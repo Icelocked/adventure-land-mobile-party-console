@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -619,9 +620,10 @@ private fun DashboardStateImport(viewModel: PartyViewModel) {
     }
 }
 
-/** The realm control: current / home realm, a confirmed switch with the Realm
- *  Fatigue and Hop Sickness warnings and "Set as home realm", and the running
- *  operation. */
+/** The realm control: current / home realm, mixed or unconfirmed homes, a
+ *  confirmed switch with the Realm Fatigue and Hop Sickness warnings and
+ *  "Set as home realm", the running operation, then the console 1.4 boss
+ *  chase and hop blacklist (RealmChaseSettings.kt). PWA: RealmSection.tsx. */
 @Composable
 private fun RealmSection(viewModel: PartyViewModel) {
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -631,7 +633,7 @@ private fun RealmSection(viewModel: PartyViewModel) {
     var setHome by remember { mutableStateOf(false) }
     var destination by remember { mutableStateOf<String?>(null) }
     var switching by remember { mutableStateOf(false) }
-    val realm = dynamicState.realmControl ?: return
+    val realm = dynamicState.realmControl ?: com.partyconsole.companion.model.RealmControl()
     val blocked = realm.operation != null && realm.operation.phase !in setOf("complete", "failed")
     fun labelFor(key: String?) = realm.realms.find { it.key == key }?.label ?: key ?: "Unknown"
     val current = realm.currentRealm ?: realm.activeRealm
@@ -643,29 +645,40 @@ private fun RealmSection(viewModel: PartyViewModel) {
             color = if (realm.split) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (realm.split) for (member in realm.characters) Text("${member.name}: ${member.realm ?: "offline"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+        if (realm.homeRealm == null && realm.homeCharacters.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth().background(Color(0x1AF59E0B), RoundedCornerShape(6.dp)).padding(8.dp)) {
+                Text("Home realms differ or are unconfirmed:", style = MaterialTheme.typography.labelSmall)
+                for (member in realm.homeCharacters) Text("${member.name}: ${member.home ?: "unconfirmed"}", style = MaterialTheme.typography.labelSmall)
+            }
+        }
         val target = destination
         if (target == null) {
             TextButton(enabled = !blocked, onClick = { showRealms = !showRealms }) { Text(if (showRealms) "Cancel" else "Change realm…") }
             if (showRealms) {
                 for (option in realm.realms) {
                     TextButton(
-                        // Nothing to do when the whole party is already there.
-                        enabled = !option.pvp && !blocked && (realm.split || option.key != current),
+                        // Nothing to do when the whole party is already there and it is already home.
+                        enabled = !option.pvp && !blocked && (realm.split || option.key != current || option.key != realm.homeRealm),
                         onClick = { realmError = null; setHome = false; destination = option.key },
                     ) { Text("${option.label} (${"%,d".format(option.players)} players)${if (option.pvp) " — disabled" else ""}") }
                 }
             }
         } else {
-            Text("Switch realm?", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+            Text(if (setHome) "Change home realm?" else "Switch realm?", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
             Text("This switches every active party character to ${labelFor(target)} and gives non-merchant characters Realm Fatigue.", style = MaterialTheme.typography.labelSmall)
+            if (setHome) Text("This will change for all characters in the account including characters not currently logged in.", color = Color(0xFFFDE68A), style = MaterialTheme.typography.labelSmall)
             Text("Realm Fatigue: approximately 30 minutes. Home-realm rewards are paused; ordinary rewards continue.", style = MaterialTheme.typography.labelSmall)
             if (target != realm.homeRealm) {
                 Text("Outside your home realm: Hop Sickness applies −80 Luck, Gold, and XP, plus −20% output, until you return home or change your home realm through Bean.", style = MaterialTheme.typography.labelSmall)
                 Row(verticalAlignment = Alignment.Top) {
-                    Checkbox(checked = setHome, onCheckedChange = { setHome = it })
+                    Checkbox(checked = setHome, onCheckedChange = { setHome = it }, modifier = Modifier.semantics { contentDescription = "Set as home realm" })
                     Column(modifier = Modifier.padding(top = 12.dp)) {
                         Text("Set as home realm", style = MaterialTheme.typography.labelMedium)
-                        Text("After switching, one non-merchant will visit Bean in Main and request the home change. Current game data exposes no separate home-change cooldown.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Every account character will request the native home change. Offline characters log in temporarily, one at a time, then log out. One headless character may briefly disconnect to make room and will reconnect afterwards. Adventure Land enforces a 36-hour home-change cooldown per character.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             } else {
@@ -684,7 +697,7 @@ private fun RealmSection(viewModel: PartyViewModel) {
                         }
                         switching = false
                     }
-                }) { Text(if (switching) "Starting…" else "Switch all characters") }
+                }) { Text(if (switching) "Starting…" else if (setHome) "Change home realm" else "Switch all characters") }
             }
         }
         realm.operation?.let { operation ->
@@ -694,7 +707,12 @@ private fun RealmSection(viewModel: PartyViewModel) {
                 color = if (operation.phase == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
             operation.error?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
-            for (member in operation.characters) Text("${member.name}: ${member.realm ?: "waiting"}", style = MaterialTheme.typography.labelSmall)
+            for (member in operation.characters) {
+                val home = if (!operation.setHome) "" else if (member.homeConfirmed) " — home confirmed" else " — waiting for home confirmation"
+                Text("${member.name}: ${member.realm ?: "waiting"}$home", style = MaterialTheme.typography.labelSmall)
+            }
         }
+        BossChaseSetting(viewModel, dynamicState.bossChase)
+        RealmHopBlacklistSetting(viewModel, realm.realms, dynamicState.realmHopBlacklist)
     }
 }

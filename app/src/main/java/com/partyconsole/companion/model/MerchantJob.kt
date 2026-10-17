@@ -372,7 +372,10 @@ data class RealmControl(
     val activeRealm: String? = null,
     // Where the party actually is (activeRealm is where the coordinator aims it).
     val currentRealm: String? = null,
+    // Console 1.4: null when the account characters' homes differ or are
+    // unconfirmed (roster-projection.ts homeRealm()).
     val homeRealm: String? = null,
+    val homeCharacters: List<RealmHome> = emptyList(),
     val split: Boolean = false,
     val characters: List<RealmCharacter> = emptyList(),
     val realms: List<RealmOption> = emptyList(),
@@ -380,9 +383,14 @@ data class RealmControl(
 )
 
 @Serializable
+data class RealmHome(val name: String, val home: String? = null)
+
+@Serializable
 data class RealmCharacter(
     val name: String,
     val realm: String? = null,
+    // Console 1.4: set on a home change's character once Adventure Land confirms the new home.
+    val homeConfirmed: Boolean = false,
 )
 
 /** A realm switch (and optional home change) in progress. */
@@ -391,8 +399,30 @@ data class RealmOperation(
     val phase: String = "",
     val realm: String? = null,
     val error: String? = null,
+    val setHome: Boolean = false,
     val characters: List<RealmCharacter> = emptyList(),
 )
+
+/** events/boss-chase.ts BossChaseState, trimmed to what the realm panel shows. */
+@Serializable
+data class BossChaseState(
+    val enabled: Boolean = false,
+    val minEtaMinutes: Double = 15.0,
+    val trip: BossChaseTrip? = null,
+    val lastError: String? = null,
+    val checkedAt: Long = 0,
+    val sightings: List<BossSighting> = emptyList(),
+    val respawns: List<BossRespawn> = emptyList(),
+)
+
+@Serializable
+data class BossChaseTrip(val boss: String, val realm: String, val respawnAt: Long? = null, val returnRealm: String? = null, val arrived: Boolean = false)
+
+@Serializable
+data class BossSighting(val boss: String, val realm: String, val hp: Double = 0.0, val etaMinutes: Double? = null, val target: String? = null)
+
+@Serializable
+data class BossRespawn(val boss: String, val realm: String, val respawnAt: Long)
 
 /** Offering item id -> display name. */
 val UPGRADE_OFFERING_LABELS: Map<String, String> = linkedMapOf(

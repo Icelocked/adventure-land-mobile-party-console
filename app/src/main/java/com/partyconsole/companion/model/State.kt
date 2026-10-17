@@ -135,6 +135,9 @@ data class PartyStateDynamic(
     // Console 1.4 gear sets per character, then by set ("luck", "tank" or
     // the server-only "gold"), saved from worn gear (characters/gear-sets.ts).
     val gearSets: Map<String, Map<String, GearSet>> = emptyMap(),
+    // Console 1.4 boss chase and the realms it never hops to.
+    val bossChase: BossChaseState? = null,
+    val realmHopBlacklist: List<String> = emptyList(),
     val anniversary: JsonElement? = null,
     // Bankbois, slots, session
     val bankbois: List<Bankboi> = emptyList(),

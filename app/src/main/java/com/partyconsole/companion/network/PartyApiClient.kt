@@ -953,6 +953,19 @@ class PartyApiClient(
         return post("realm/switch", body)
     }
 
+    /** POST /party-api/realm/boss-chase {enabled} or {minEtaMinutes}; the
+     *  server takes a minimum ETA from 0 to 600 (console 1.4). */
+    suspend fun setBossChase(enabled: Boolean? = null, minEtaMinutes: Double? = null): ApiResult<CommandResult> =
+        post("realm/boss-chase", JsonObject(buildMap {
+            enabled?.let { put("enabled", JsonPrimitive(it)) }
+            minEtaMinutes?.let { put("minEtaMinutes", jsNumber(it)) }
+        }))
+
+    /** POST /party-api/realm/hop-blacklist {realms}: the whole list,
+     *  replacing the saved one (console 1.4). */
+    suspend fun setRealmHopBlacklist(realms: List<String>): ApiResult<CommandResult> =
+        post("realm/hop-blacklist", JsonObject(mapOf("realms" to JsonArray(realms.map { JsonPrimitive(it) }))))
+
     /** POST /party-api/dashboard-preferences - the bankboi naming prefix. */
     suspend fun setBankboiPrefix(prefix: String): ApiResult<CommandResult> =
         post("dashboard-preferences", JsonObject(mapOf("bankboiPrefix" to JsonPrimitive(prefix))))
