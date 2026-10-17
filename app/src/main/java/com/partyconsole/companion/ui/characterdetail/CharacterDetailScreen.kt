@@ -206,6 +206,7 @@ fun CharacterDetailScreen(
                         actionOnLucky = lucky
                     },
                     onLuckySlotData = { luckySlotOpen = true },
+                    reservedInventory = vitals.reservedInventory,
                     localLucky = vitals.luckySlotTracking,
                 )
                 RestockSection(

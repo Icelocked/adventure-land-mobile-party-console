@@ -132,6 +132,9 @@ data class PartyStateDynamic(
     val encounterRoutines: Map<String, String> = emptyMap(),
     val encounterAutoDeathLimits: Map<String, Int> = emptyMap(),
     val encounterAutoDeaths: Map<String, Int> = emptyMap(),
+    // Console 1.4 gear sets per character, then by set ("luck", "tank" or
+    // the server-only "gold"), saved from worn gear (characters/gear-sets.ts).
+    val gearSets: Map<String, Map<String, GearSet>> = emptyMap(),
     val anniversary: JsonElement? = null,
     // Bankbois, slots, session
     val bankbois: List<Bankboi> = emptyList(),
@@ -434,6 +437,13 @@ data class EventSchedule(
     val slotAt: Double? = null,
     val slotKind: String? = null,
 )
+
+/** A saved gear set: equip slot -> the item that belongs there. */
+@Serializable
+data class GearSet(val slots: Map<String, GearSetItem> = emptyMap(), val savedAt: Long = 0)
+
+@Serializable
+data class GearSetItem(val name: String, val level: Int? = null, val p: String? = null, @kotlinx.serialization.SerialName("stat_type") val statType: String? = null)
 
 /** One event's attendance limits; null means unlimited. */
 @Serializable

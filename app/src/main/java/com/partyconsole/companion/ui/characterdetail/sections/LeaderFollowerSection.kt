@@ -65,6 +65,7 @@ import kotlinx.coroutines.launch
 fun LeaderFollowerSection(characterName: String, dynamicState: PartyStateDynamic, viewModel: PartyViewModel, onOpenAnniversary: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val loaded by viewModel.stateLoaded.collectAsState()
+    val characters by viewModel.characters.collectAsState()
     val isLeader = dynamicState.leader == characterName
     val isFollowing = dynamicState.followers[characterName] == true
     var error by remember(characterName) { mutableStateOf<String?>(null) }
@@ -100,6 +101,8 @@ fun LeaderFollowerSection(characterName: String, dynamicState: PartyStateDynamic
                 label = { Text("Follow") },
             )
             EventSelectionControl(dynamicState, characterName, viewModel, onOpenAnniversary)
+            // Merchant-class characters get no gear sets (connected-character-card.tsx).
+            if (characters[characterName]?.vitals?.ctype != "merchant") GearSetControl(characterName, dynamicState, viewModel)
         }
         ConfigLoadingNote(loaded)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }

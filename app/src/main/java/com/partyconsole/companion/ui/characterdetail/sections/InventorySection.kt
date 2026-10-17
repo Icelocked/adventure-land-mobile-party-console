@@ -80,6 +80,7 @@ fun InventorySection(
     onItemTap: (InventoryEntry, Boolean) -> Unit,
     onLuckySlotData: () -> Unit = {},
     localLucky: JsonElement? = null,
+    reservedInventory: List<com.partyconsole.companion.model.ReservedInventorySlot> = emptyList(),
 ) {
     var open by remember { mutableStateOf(true) }
     var details by remember { mutableStateOf<TileDetails?>(null) }
@@ -114,6 +115,13 @@ fun InventorySection(
     val nextUpgradeSlot = if (validLuckySlot(verifiedLucky)) verifiedLucky!! else
         luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName].orEmpty(), localLucky?.let { normalizeSlotTracking(it) })).nextSlot
     val luckySlotLabel = if (validLuckySlot(verifiedLucky)) "Verified lucky upgrade slot" else "Next upgrade will test for lucky upgrade"
+    // Console connected-inventory.tsx heldSlots: a reserved slot names the
+    // first saved set with a matching member, by name and level only.
+    val gearSets = state.gearSets[characterName].orEmpty()
+    val heldSlots = reservedInventory.associate { reserved ->
+        val set = listOf("luck", "tank", "gold").find { id -> gearSets[id]?.slots?.values.orEmpty().any { it.name == reserved.item?.name && (it.level ?: 0) == (reserved.item?.level ?: 0) } }
+        reserved.slot to (set?.let { "${it.replaceFirstChar(Char::uppercase)} set" } ?: "Swapped-out gear")
+    }
     val grid = if (isMerchant) physicalInventory(items, { it.slot }) else compactInventory(items, total)
 
     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -168,8 +176,10 @@ fun InventorySection(
                             val autoStandMarked = isMerchant && state.autoStandMarks.containsKey(saleKey)
                             val upgradeLevel = upgradeMark?.item?.level ?: 0
                             val upgradeTarget = upgradeLevel + (upgradeMark?.tiers ?: 1)
+                            val held = heldSlots[entry.slot]
                             val banner = itemActionBanner(
                                 listOf(
+                                    held?.let { BannerCandidate(BannerAction.HELD, it, title = "$it: automatic bank, merchant, compound, upgrade, sale and deconstruction rules skip this item") },
                                     deconstruction?.let { BannerCandidate(BannerAction.DECONSTRUCTION, "Deconstruction") },
                                     npcSale?.let { BannerCandidate(BannerAction.NPC, "NPC sale", automatic = it.auto, title = npcSaleDetails) },
                                     statScrollMark?.let { BannerCandidate(BannerAction.STAT, "Stat scroll") },
@@ -182,8 +192,8 @@ fun InventorySection(
                                     if (autoStandMarked) BannerCandidate(BannerAction.STAND, "Auto stand", automatic = true) else null,
                                     if (autoExchangeMarked) BannerCandidate(BannerAction.EXCHANGE, "Auto exchange", automatic = true) else null,
                                     deliveryTarget?.let { BannerCandidate(BannerAction.DELIVERY, "To $it") },
-                                    if (autoMarkMode == "bank" || markedIn(bankMarked, entry)) BannerCandidate(BannerAction.BANK, if (autoMarkMode == "bank") "Auto bank" else "Bank") else null,
-                                    if (autoMarkMode == "merchant" || markedIn(merchantMarked, entry)) BannerCandidate(BannerAction.MERCHANT, if (autoMarkMode == "merchant") "Auto merchant" else "Mark for merchant") else null,
+                                    if (autoMarkMode == "bank" || markedIn(bankMarked, entry)) BannerCandidate(BannerAction.BANK, if (autoMarkMode == "bank") "Auto bank" else "Bank", automatic = autoMarkMode == "bank") else null,
+                                    if (autoMarkMode == "merchant" || markedIn(merchantMarked, entry)) BannerCandidate(BannerAction.MERCHANT, if (autoMarkMode == "merchant") "Auto merchant" else "Mark for merchant", automatic = autoMarkMode == "merchant") else null,
                                     if (weaponMarked) BannerCandidate(BannerAction.WEAPON, "Merchant weapon") else null,
                                 ),
                                 isMerchant,
