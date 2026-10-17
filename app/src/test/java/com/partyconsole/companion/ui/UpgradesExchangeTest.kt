@@ -118,8 +118,10 @@ class UpgradesExchangeTest {
     @Test
     fun luckySlotShowsTheNextTestSlotAndItsEvidenceTable() {
         val streams = mapOf(
+            // Console 1.4 tests the square after the last roll (its cursor).
             "s-1" to com.partyconsole.companion.model.LuckySlotTracking(
                 version = 1,
+                cursor = com.partyconsole.companion.model.LuckySlotCursor(slot = 1, at = 1.0, rolls = 4),
                 slots = mapOf("0" to com.partyconsole.companion.model.SlotRollStatistics(totalRolls = 4, sumRolls = 2.0, rollsAbove96_3 = 1, perfectRolls = 0)),
             ),
         )
@@ -231,21 +233,22 @@ class UpgradesExchangeTest {
     }
 
     @Test
-    fun buyingAnUpgradedTargetSendsTheNinetyPercentBudget() {
+    fun buyingAnUpgradedTargetSendsOnlyTheLevel() {
         commerce("buy")
         compose.onNodeWithText("Gold: 0g").assertIsDisplayed()
         compose.onNodeWithContentDescription("Inspect Bow").assertExists()
         compose.onNodeWithText("600g").assertExists()
         compose.onAllNodesAdd(0)
         compose.onNodeWithContentDescription("Bow target level").performScrollTo().performTextReplacement("+2")
+        compose.waitUntil(30_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("Gold (est)", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Gold (est)", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Buy all").performClick()
         eventually { posts("merchant/order").isNotEmpty() }
         val line = (posts("merchant/order")[0]["buys"] as JsonArray)[0] as JsonObject
         assertEquals("bow", line.text("id"))
         assertEquals("2", line.text("level"))
-        assertTrue((line.text("budget")?.toDouble() ?: 0.0) >= 600.0)
-        assertTrue((line.text("maxAttempts")?.toLong() ?: 0) >= 1)
+        // Console 1.4 recomputes the budget from the level; the old budget and maxAttempts fields are gone.
+        assertEquals(setOf("id", "quantity", "level"), line.keys)
     }
 
     @Test
