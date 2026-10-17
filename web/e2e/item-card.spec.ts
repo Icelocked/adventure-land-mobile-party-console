@@ -69,8 +69,8 @@ async function openDetails(page: Page, slot = 0) {
   await page.getByTestId(`inventory-slot-${slot}`).click()
   await page.getByRole('button', { name: 'Item details' }).click()
   const card = page.getByRole('region', { name: 'Item card', exact: true })
-  // The item options sheet stays open underneath; only the details sheet has Add to WTB.
-  const sheet = page.locator('[data-slot="sheet-content"]').filter({ has: page.getByRole('button', { name: 'Add to WTB' }) })
+  // The item options sheet stays open underneath; the details sheet opens last.
+  const sheet = page.locator('[data-slot="sheet-content"]').last()
   return { sheet, card, extras: page.getByRole('region', { name: 'Item extras', exact: true }) }
 }
 
@@ -340,6 +340,7 @@ test('Item card: lock, account binding and expiry show on the card; quantity and
   await expect(line(extras, 'quantity')).toHaveText('Quantity: 2')
   await expect(line(extras, 'stat_type')).toHaveText('Stat Scroll: Dexterity')
   await card.screenshot({ path: info.outputPath('item-card-ring.png') })
-  // 8: Item details is still one entry in the item options list.
+  // 8: closing the details returns to the item options, where Item details is still one entry.
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Item details', exact: true })).toHaveCount(1)
 })
