@@ -1116,13 +1116,33 @@ class PartyApiClient(
 
     /** POST /party-api/merchant/aldata-order - the listing as received,
      *  minus client-only grouping fields. */
-    suspend fun buyAlData(listing: JsonObject, buyQuantity: Int): ApiResult<CommandResult> =
-        post("merchant/aldata-order", JsonObject(mapOf("listing" to JsonObject(listing - "origin" - "groupedListings"), "buyQuantity" to JsonPrimitive(buyQuantity))))
+    suspend fun buyAlData(listing: JsonObject, buyQuantity: Int, check: Boolean = false): ApiResult<CommandResult> =
+        post("merchant/aldata-order", JsonObject(buildMap {
+            put("listing", JsonObject(listing - "origin" - "groupedListings"))
+            put("buyQuantity", JsonPrimitive(buyQuantity))
+            // Console 1.4 "Check": the merchant verifies a stale listing in person (manual-market-orders.ts).
+            if (check) put("check", JsonPrimitive(true))
+        }))
 
     /** POST /party-api/merchant/aldata-sale - sell owned copies into a live
      *  ALData buy order. */
-    suspend fun sellAlData(order: JsonObject, sellQuantity: Int): ApiResult<CommandResult> =
-        post("merchant/aldata-sale", JsonObject(mapOf("order" to order, "sellQuantity" to JsonPrimitive(sellQuantity))))
+    suspend fun sellAlData(order: JsonObject, sellQuantity: Int, check: Boolean = false): ApiResult<CommandResult> =
+        post("merchant/aldata-sale", JsonObject(buildMap {
+            put("order", order)
+            put("sellQuantity", JsonPrimitive(sellQuantity))
+            // `check` skips the staleness refusal, as in buyAlData.
+            if (check) put("check", JsonPrimitive(true))
+        }))
+
+    /** POST /party-api/market/ignored-items {action, ...item, level}. The
+     *  dashboard spreads the listing item into the body and forces `level`,
+     *  so "clear" also carries level 0 (console 1.4 stand-sheet.tsx). */
+    suspend fun updateMarketIgnoredItems(action: String, name: String? = null, level: Int? = null): ApiResult<CommandResult> =
+        post("market/ignored-items", JsonObject(buildMap {
+            put("action", JsonPrimitive(action))
+            name?.let { put("name", JsonPrimitive(it)) }
+            put("level", JsonPrimitive(level ?: 0))
+        }))
 
     /** POST /party-api/merchant/ponty-order - every listing key of the
      *  grouped lot. */

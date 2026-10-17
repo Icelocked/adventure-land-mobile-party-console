@@ -24,9 +24,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,7 +58,7 @@ private fun minutesValue(text: String): JsonElement = when {
 /** Marketplace settings: auto-fill empty stand slots with the highest
  *  priority buy order, the merchant blacklist toggle, a manual block
  *  (minutes, -1 = forever), every strike record with Clear, and a two-step
- *  Clear all. */
+ *  Clear all. Console 1.4 adds the ignored market items list. */
 @Composable
 fun MarketplaceSettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
@@ -100,6 +102,7 @@ fun MarketplaceSettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     enabled = !saving,
                 )
             }
+            IgnoredMarketItems(viewModel, saving) { action, item -> scope.launch { save { viewModel.api.updateMarketIgnoredItems(action, item?.name, item?.level) } } }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Marketplace merchant blacklist", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 WtbPreference(
@@ -155,6 +158,57 @@ fun MarketplaceSettingsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     } else confirmClear = true
                 },
             ) { Text(if (confirmClear) "Really clear all?" else "Clear all") }
+        }
+    }
+}
+
+/** Console 1.4 market-preferences.tsx IgnoredMarketItems: the items hidden
+ *  from every market tab, collapsed by default, each with its own remove
+ *  button, and Clear all. [onChange] posts "remove" with the item or
+ *  "clear" with none. */
+@Composable
+private fun IgnoredMarketItems(viewModel: PartyViewModel, saving: Boolean, onChange: (String, com.partyconsole.companion.model.MarketIgnoredItem?) -> Unit) {
+    val state by viewModel.dynamicState.collectAsState()
+    val catalogFor = com.partyconsole.companion.ui.itemicon.rememberCatalogLookup(state.merchantCatalog)
+    val items = state.marketIgnoredItems
+    var open by remember { mutableStateOf(false) }
+    val rose = Color(0xFFFB7185)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF475569), RoundedCornerShape(4.dp)).padding(12.dp).semantics { contentDescription = "Ignored items" },
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { open = !open }, modifier = Modifier.weight(1f).semantics { contentDescription = "Ignored items" }) {
+                Text((if (open) "▾ " else "▸ ") + "Ignored items", modifier = Modifier.weight(1f, fill = false))
+                Text(" (${items.size})", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(
+                enabled = !saving && items.isNotEmpty(),
+                onClick = { onChange("clear", null) },
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE11D48)),
+                modifier = Modifier.semantics { contentDescription = "Clear all ignored items" },
+            ) {
+                // The visible label; the accessible name is the button's description, as on the dashboard.
+                Text("Clear all", color = rose, modifier = Modifier.clearAndSetSemantics { })
+            }
+        }
+        if (open) {
+            if (items.isEmpty()) Text("No ignored items.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            for (item in items) {
+                val label = com.partyconsole.companion.domain.marketItemLabel(item.name, item.level, catalogFor)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp)).padding(8.dp),
+                ) {
+                    Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.OutlinedIconButton(
+                        enabled = !saving,
+                        onClick = { onChange("remove", item) },
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBE123C)),
+                        modifier = Modifier.semantics { contentDescription = "Remove $label from ignored items" },
+                    ) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Close, contentDescription = null, tint = rose) }
+                }
+            }
         }
     }
 }

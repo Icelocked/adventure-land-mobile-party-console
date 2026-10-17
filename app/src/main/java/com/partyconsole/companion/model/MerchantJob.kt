@@ -223,6 +223,8 @@ data class AlDataState(
     // Other owners' published trade intentions (classifieds).
     val trades: List<kotlinx.serialization.json.JsonObject> = emptyList(),
     val merchantsUpdatedAt: Long? = null,
+    // The classifieds feed's last refresh; classifieds have no per-listing time.
+    val tradesUpdatedAt: Long? = null,
     // Only used when publishing the merchant's own listings to ALData.
     val hasKey: Boolean = false,
     val auth: String? = null,

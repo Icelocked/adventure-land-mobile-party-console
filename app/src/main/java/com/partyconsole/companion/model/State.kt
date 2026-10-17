@@ -141,6 +141,8 @@ data class PartyStateDynamic(
     // Console 1.4 boss chase and the realms it never hops to.
     val bossChase: BossChaseState? = null,
     val realmHopBlacklist: List<String> = emptyList(),
+    // Console 1.4 market items hidden from every market tab (http/market-ignored-items.ts).
+    val marketIgnoredItems: List<MarketIgnoredItem> = emptyList(),
     val anniversary: JsonElement? = null,
     // Bankbois, slots, session
     val bankbois: List<Bankboi> = emptyList(),
@@ -443,6 +445,10 @@ data class EventSchedule(
     val slotAt: Double? = null,
     val slotKind: String? = null,
 )
+
+/** A hidden market item; an omitted level saves as +0 (runtime/market-preferences.ts). */
+@Serializable
+data class MarketIgnoredItem(val name: String, val level: Int = 0)
 
 /** A saved gear set: equip slot -> the item that belongs there. */
 @Serializable
