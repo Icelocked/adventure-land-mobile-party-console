@@ -176,6 +176,7 @@ fun BestiaryScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                         }
                     },
                     onNavigated = { inspecting = null },
+                    onInspectMonster = { id -> state.bestiaryCatalog.find { it.id == id }?.let { inspecting = it } },
                 )
             }
         }

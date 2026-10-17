@@ -155,9 +155,9 @@ class ItemActionPanelTest {
         compose.onAllNodesWithText("Leada · slot 0").assertCountEquals(2)
         // Only the merchant's inventory (or the bank) is a stand source.
         compose.onNodeWithText("Add to stand").assertDoesNotExist()
-        compose.onNodeWithText("equip slot").performScrollTo().assertExists()
-        compose.onNodeWithText("Ring 1 or Ring 2").assertExists()
-        compose.onNodeWithText("type").assertDoesNotExist()
+        // The item extras box (app/docs/cards.md) carries the derived slot as "Equip Slot".
+        compose.onNodeWithText("Equip Slot: Ring 1 or Ring 2").performScrollTo().assertExists()
+        compose.onNode(androidx.compose.ui.test.hasText("Type: ", substring = true)).assertDoesNotExist()
     }
 
     @Test

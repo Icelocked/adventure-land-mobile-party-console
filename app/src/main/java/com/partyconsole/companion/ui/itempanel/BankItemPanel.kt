@@ -254,6 +254,7 @@ fun BankItemPanel(viewModel: PartyViewModel, pack: String, entry: InventoryEntry
                     rootStatType = item.statType,
                     rootGift = item.gift == true,
                     rootExpires = item.expires,
+                    rootItem = item,
                     context = com.partyconsole.companion.ui.itemdetail.ItemDetailContext("Bank · $pack", entry.slot),
                     onAddStand = if (merchant != null) ({ showingDetails = false; expanded = "stand" }) else null,
                     viewModel = viewModel,

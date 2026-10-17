@@ -160,6 +160,7 @@ fun ItemActionPanel(
                     rootStatType = item.statType,
                     rootGift = item.gift == true,
                     rootExpires = item.expires,
+                    rootItem = item,
                     context = ItemDetailContext(characterName, (target as? ItemActionTarget.InventorySlot)?.slot ?: -1),
                     // Only the merchant's own inventory is a stand source.
                     onAddStand = if (isMerchant && target is ItemActionTarget.InventorySlot) ({ showingDetails = false; expanded = "stand" }) else null,

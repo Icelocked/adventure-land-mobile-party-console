@@ -307,6 +307,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
                         }
                     },
                     onNavigated = { inspecting = null },
+                    onInspectMonster = { id -> dynamicState.bestiaryCatalog.find { it.id == id }?.let { inspecting = it } },
                 )
             }
         }

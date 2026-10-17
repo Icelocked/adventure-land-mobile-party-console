@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.domain.displayValue
 import com.partyconsole.companion.model.SkillEntry
 import com.partyconsole.companion.ui.PartyViewModel
-import com.partyconsole.companion.ui.components.DefinitionGrid
+import com.partyconsole.companion.ui.components.SkillCards
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
@@ -67,7 +67,7 @@ fun skillRangeLabel(skill: SkillEntry): String {
 }
 
 /** Skills: search across class and skill, a sprite grid per class, and the
- *  selected skill's full definition in a sheet. */
+ *  selected skill's game card and extras in a sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
@@ -126,7 +126,7 @@ fun SkillsScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     Text("Range: ${skillRangeLabel(skill)}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFEDE9FE), fontWeight = FontWeight.SemiBold)
                     Text("Base range in game distance units. Attack range depends on the character’s equipment. “Not specified” means the game definition does not supply a range.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 }
-                DefinitionGrid(skill.definition, omit = setOf("name", "skin", "explanation"))
+                SkillCards(skill.definition) { id -> state.skillCatalog.firstNotNullOfOrNull { entry -> entry.skills.find { it.id == id } }?.name }
             }
         }
     }
