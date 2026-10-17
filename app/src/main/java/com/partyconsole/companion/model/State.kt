@@ -105,6 +105,10 @@ data class PartyStateDynamic(
     val merchantDeliveries: Map<String, List<MerchantDelivery>> = emptyMap(),
     val luckyUpgradeSlots: Map<String, Int> = emptyMap(),
     val luckySlotTracking: Map<String, Map<String, LuckySlotTracking>> = emptyMap(),
+    // Console 1.4 lucky slot position locks (http/merchant-settings.ts) and
+    // the square an unlock resumes discovery from.
+    val luckySlotLocks: Map<String, Int?> = emptyMap(),
+    val luckySlotResume: Map<String, LuckySlotResume> = emptyMap(),
     val merchantRules: SharedRules? = null,
     // Hunting and farming
     val monsterHunt: MonsterHuntCycle? = null,
@@ -362,9 +366,24 @@ data class SlotRollStatistics(
     val perfectRolls: Long = 0,
 )
 
-/** One evidence stream's slot table (state.luckySlotTracking[character][stream]). */
+/** One evidence stream's slot table (state.luckySlotTracking[character][stream]).
+ *  Console 1.4 adds [cursor]: the square after the last observed roll, where
+ *  sequential discovery resumes. */
 @Serializable
-data class LuckySlotTracking(val version: Int = 1, val streamId: String? = null, val slots: Map<String, SlotRollStatistics> = emptyMap())
+data class LuckySlotTracking(
+    val version: Int = 1,
+    val streamId: String? = null,
+    val cursor: LuckySlotCursor? = null,
+    val slots: Map<String, SlotRollStatistics> = emptyMap(),
+)
+
+/** [rolls] is the stream's roll total when the cursor moved. */
+@Serializable
+data class LuckySlotCursor(val slot: Int, val at: Double, val rolls: Long)
+
+/** The square an unlock hands back to discovery, until that square gets a roll. */
+@Serializable
+data class LuckySlotResume(val slot: Int, val rolls: Long = 0)
 
 /** With shared rules, `owner` holds every member's rules. */
 @Serializable

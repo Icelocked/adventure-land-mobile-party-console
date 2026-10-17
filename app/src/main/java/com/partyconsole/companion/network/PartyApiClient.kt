@@ -860,6 +860,17 @@ class PartyApiClient(
         return post("merchant/bid", body)
     }
 
+    /** POST /party-api/merchant/config {character, slot, action} with
+     *  "lock-lucky-slot" or "unlock-lucky-slot". The dashboard sends the
+     *  row's slot on unlock too; the server reads it only for a lock, and an
+     *  unlock resumes discovery at the next square (console 1.4). */
+    suspend fun setLuckySlotLock(character: String, slot: Int, unlock: Boolean): ApiResult<CommandResult> =
+        post("merchant/config", JsonObject(mapOf(
+            "character" to JsonPrimitive(character),
+            "slot" to JsonPrimitive(slot),
+            "action" to JsonPrimitive(if (unlock) "unlock-lucky-slot" else "lock-lucky-slot"),
+        )))
+
     /** POST /party-api/prim-stack - queues a merchant job that raises a
      *  merchant inventory item's grace to [target] without a level attempt.
      *  [method] is "offering" (Primling only) or "stat" (Primling plus stat

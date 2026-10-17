@@ -111,10 +111,18 @@ fun InventorySection(
         free <= 10 -> Color(0xFFFB923C)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val verifiedLucky = state.luckyUpgradeSlots[characterName]
+    // Console 1.4 connected-inventory.tsx: a position lock wins, then the
+    // square an unlock resumes from, then the verified slot.
+    val lockedLucky = state.luckySlotLocks[characterName]
+    val resumingLucky = if (lockedLucky == null) state.luckySlotResume[characterName]?.slot else null
+    val verifiedLucky = lockedLucky ?: resumingLucky ?: state.luckyUpgradeSlots[characterName]
     val nextUpgradeSlot = if (validLuckySlot(verifiedLucky)) verifiedLucky!! else
         luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName].orEmpty(), localLucky?.let { normalizeSlotTracking(it) })).nextSlot
-    val luckySlotLabel = if (validLuckySlot(verifiedLucky)) "Verified lucky upgrade slot" else "Next upgrade will test for lucky upgrade"
+    val luckySlotLabel = when {
+        lockedLucky != null -> "Locked lucky upgrade position"
+        validLuckySlot(verifiedLucky) && resumingLucky == null -> "Verified lucky upgrade slot"
+        else -> "Next upgrade will test for lucky upgrade"
+    }
     // Console connected-inventory.tsx heldSlots: a reserved slot names the
     // first saved set with a matching member, by name and level only.
     val gearSets = state.gearSets[characterName].orEmpty()

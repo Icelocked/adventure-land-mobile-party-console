@@ -180,6 +180,9 @@ fun CharacterDetailScreen(
                         open = luckySlotOpen,
                         onOpenChange = { luckySlotOpen = it },
                         localLucky = vitals.luckySlotTracking,
+                        viewModel = viewModel,
+                        lockedSlot = dynamicState.luckySlotLocks[characterName],
+                        resumingSlot = dynamicState.luckySlotResume[characterName]?.slot,
                     )
                 }
             }
