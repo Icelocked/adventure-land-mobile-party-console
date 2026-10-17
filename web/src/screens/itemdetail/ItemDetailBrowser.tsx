@@ -140,7 +140,11 @@ export function ItemDetailBrowser({
       ) : (
         (() => {
           const monster = monsters.find((m) => m.id === current.id)
-          return monster ? <MonsterDetail monster={monster} onInspectDrop={(id) => pushItem(id, 0)} /> : <p className="py-4 text-sm text-muted-foreground">No bestiary data for this monster yet.</p>
+          return monster ? (
+            <MonsterDetail monster={monster} onInspectDrop={(id) => pushItem(id, 0)} onInspectMonster={pushMonster} onInspectSkill={pushSkill} />
+          ) : (
+            <p className="py-4 text-sm text-muted-foreground">No bestiary data for this monster yet.</p>
+          )
         })()
       )}
       {exchangeAdd && trail.length === 1 && (

@@ -178,6 +178,10 @@ export function BestiaryScreen() {
                 }
               }}
               onNavigated={() => setInspecting(null)}
+              onInspectMonster={(id) => {
+                const found = state.bestiaryCatalog.find((entry) => entry.id === id)
+                if (found) setInspecting(found)
+              }}
             />
           </SheetContent>
         </Sheet>

@@ -273,6 +273,10 @@ export function HuntSettingsScreen() {
                 }
               }}
               onNavigated={() => setInspecting(null)}
+              onInspectMonster={(id) => {
+                const found = dynamicState.bestiaryCatalog.find((entry) => entry.id === id)
+                if (found) setInspecting(found)
+              }}
             />
           </SheetContent>
         </Sheet>

@@ -4,7 +4,7 @@ import { MapPin } from 'lucide-react'
 import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useMonsterAchievements } from '@/data/useMonsterAchievements'
 import { formatDropRate } from '@/lib/itemFormulas'
-import { DefinitionGrid } from '@/components/DefinitionGrid'
+import { MonsterCards } from '@/components/MonsterCards'
 import { displayValue } from '@/lib/statusDuration'
 import { FarmingAreaPicker, MonsterSpawns, type SpawnRecord } from '@/components/FarmingAreaPicker'
 import { SpriteIcon } from '@/components/SpriteIcon'
@@ -14,8 +14,22 @@ import type { BestiaryDrop, BestiaryMonster, CatalogItem, ItemDropSource, Sprite
 type Achievement = { score: number; owner: string | null }
 
 /** Header with G.monsters id and Navigate,
- *  achievements, recorded spawns, the definition grid and drops. */
-export function MonsterDetail({ monster, onInspectDrop, onNavigated }: { monster: BestiaryMonster; onInspectDrop: (itemId: string) => void; onNavigated?: () => void }) {
+ *  achievements, recorded spawns, the game's monster card with its extras, and drops.
+ *  A spawn or skill line on the card opens that monster or skill where the caller
+ *  passes onInspectMonster or onInspectSkill. */
+export function MonsterDetail({
+  monster,
+  onInspectDrop,
+  onNavigated,
+  onInspectMonster,
+  onInspectSkill,
+}: {
+  monster: BestiaryMonster
+  onInspectDrop: (itemId: string) => void
+  onNavigated?: () => void
+  onInspectMonster?: (id: string) => void
+  onInspectSkill?: (id: string) => void
+}) {
   const state = useDynamicState()
   const achievements = useMonsterAchievements()
   const [navigating, setNavigating] = useState(false)
@@ -42,7 +56,13 @@ export function MonsterDetail({ monster, onInspectDrop, onNavigated }: { monster
       </div>
       <MonsterAchievementProgress monster={monster} achievement={Object.keys(achievements).length ? achievements[monster.id] || null : null} />
       <MonsterSpawns records={monster.spawnRecords as unknown as SpawnRecord[] | undefined} />
-      <DefinitionGrid value={monster.definition || {}} omit={['name', 'skin', 'achievements']} />
+      <MonsterCards
+        definition={monster.definition || {}}
+        skillName={(id) => state.skillCatalog.flatMap((entry) => entry.skills).find((skill) => skill.id === id)?.name}
+        monsterName={(id) => state.bestiaryCatalog.find((entry) => entry.id === id)?.name}
+        onMonster={onInspectMonster}
+        onSkill={onInspectSkill}
+      />
       <section className="rounded border border-amber-900/80 p-3">
         <BestiaryDrops monster={monster} catalog={state.merchantCatalog?.allItems || []} onInspectDrop={onInspectDrop} />
       </section>
