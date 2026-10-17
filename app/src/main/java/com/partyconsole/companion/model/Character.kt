@@ -40,19 +40,10 @@ data class CharacterVitals(
     val farmingMode: String? = null,
     val conditions: List<Condition> = emptyList(),
     val inventorySize: Int? = null,
-    // Console 1.4: bag slots held by a gear set or by gear swapped out for
-    // one; automatic rules skip them (inventory/swap-reservations.ts).
-    val reservedInventory: List<ReservedInventorySlot> = emptyList(),
 ) {
     val targetId: String? get() = (target as? kotlinx.serialization.json.JsonPrimitive)?.content
 }
 
-/** One vitals.reservedInventory entry. */
-@Serializable
-data class ReservedInventorySlot(val slot: Int, val item: ReservedItem? = null)
-
-@Serializable
-data class ReservedItem(val name: String? = null, val level: Int? = null)
 
 /** Carried items and equipment, kept apart from vitals. */
 @Serializable

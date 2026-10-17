@@ -62,9 +62,6 @@ data class PartyStateDynamic(
     val threshold: Long = 0,
     val itemCollectionThreshold: Int = 1,
     val bankSortMode: String? = null,
-    // Console 1.4 merchant/bank-sort.ts: "gapped" starts each item category
-    // on its own row with free slots after it; "packed" leaves no gaps.
-    val bankSortLayout: String? = null,
     // One-shot "sort on next visit" request; only relevant in "request" mode.
     val bankSortRequest: BankSortRequest? = null,
     // The leader's farming mode; see farmingContext for other characters.
@@ -139,17 +136,6 @@ data class PartyStateDynamic(
     val eventPrioritiesByCharacter: Map<String, List<String>> = emptyMap(),
     val eventLimitsByCharacter: Map<String, Map<String, EventLimits>> = emptyMap(),
     val eventAttendance: Map<String, Map<String, EventAttendanceInstance>> = emptyMap(),
-    // Console 1.4 Franky routine of the leader's scope; other scopes keep
-    // theirs in farmingProfiles (see encounterRoutine).
-    val encounterRoutines: Map<String, String> = emptyMap(),
-    val encounterAutoDeathLimits: Map<String, Int> = emptyMap(),
-    val encounterAutoDeaths: Map<String, Int> = emptyMap(),
-    // Console 1.4 gear sets per character, then by set ("luck", "tank" or
-    // the server-only "gold"), saved from worn gear (characters/gear-sets.ts).
-    val gearSets: Map<String, Map<String, GearSet>> = emptyMap(),
-    // Console 1.4 boss chase and the realms it never hops to.
-    val bossChase: BossChaseState? = null,
-    val realmHopBlacklist: List<String> = emptyList(),
     // Console 1.4 market items hidden from every market tab (http/market-ignored-items.ts).
     val marketIgnoredItems: List<MarketIgnoredItem> = emptyList(),
     val anniversary: JsonElement? = null,
@@ -233,10 +219,6 @@ data class FarmingProfile(
     val achievementHunt: AchievementHuntSettings? = null,
     val achievementBlacklist: Map<String, AchievementBlacklistEntry>? = null,
     val achievementMessage: String? = null,
-    // Console 1.4 Franky routine, per farming scope.
-    val encounterRoutines: Map<String, String>? = null,
-    val encounterAutoDeathLimits: Map<String, Int>? = null,
-    val encounterAutoDeaths: Map<String, Int>? = null,
 )
 
 /** Whose farming settings a character runs on. The leader and its
@@ -295,24 +277,6 @@ fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
         achievementSettings = effective?.achievementHunt ?: if (legacy) achievementHunt else null,
         achievementBlacklist = effective?.achievementBlacklist ?: (if (legacy) achievementBlacklist else null) ?: emptyMap(),
         achievementMessage = effective?.achievementMessage ?: (if (legacy) achievementMessage else null) ?: "",
-    )
-}
-
-/** The Franky routine of the scope a character farms in. */
-data class EncounterRoutine(val followingLeader: String?, val mode: String, val autoDeathLimit: Int, val autoDeaths: Int)
-
-/** A follower shows (and can't edit) its leader's routine. Defaults: auto,
- *  a death limit of 3. Console: farming-context.ts frankyRoutine,
- *  frankyAutoDeathLimit and frankyAutoDeaths. */
-fun PartyStateDynamic.encounterRoutine(name: String): EncounterRoutine {
-    val context = farmingContext(name)
-    val legacy = context.owner == leader
-    val effective = farmingProfiles[context.owner]
-    return EncounterRoutine(
-        followingLeader = context.followingLeader,
-        mode = effective?.encounterRoutines?.get("franky")?.ifEmpty { null } ?: (if (legacy) encounterRoutines["franky"]?.ifEmpty { null } else null) ?: "auto",
-        autoDeathLimit = effective?.encounterAutoDeathLimits?.get("franky") ?: (if (legacy) encounterAutoDeathLimits["franky"] else null) ?: 3,
-        autoDeaths = effective?.encounterAutoDeaths?.get("franky") ?: (if (legacy) encounterAutoDeaths["franky"] else null) ?: 0,
     )
 }
 
@@ -504,13 +468,6 @@ data class EventSchedule(
 @Serializable
 data class MarketIgnoredItem(val name: String, val level: Int = 0)
 
-/** A saved gear set: equip slot -> the item that belongs there. */
-@Serializable
-data class GearSet(val slots: Map<String, GearSetItem> = emptyMap(), val savedAt: Long = 0)
-
-@Serializable
-data class GearSetItem(val name: String, val level: Int? = null, val p: String? = null, @kotlinx.serialization.SerialName("stat_type") val statType: String? = null)
-
 /** One event's attendance limits; null means unlimited. */
 @Serializable
 data class EventLimits(val deathLimit: Double? = null, val timeLimitMinutes: Double? = null)
@@ -617,19 +574,7 @@ data class NativeStandOffer(
 )
 
 @Serializable
-data class NativeStand(
-    val offers: Map<String, NativeStandOffer> = emptyMap(),
-    val problems: Map<String, String> = emptyMap(),
-    // Console 1.4: purchases a merchant job reserved, keyed "jobId:seller:item";
-    // one whose job ended unconfirmed pauses its item's WTB.
-    val purchases: Map<String, NativePurchase> = emptyMap(),
-)
-
-@Serializable
-data class NativePurchase(val item: NativePurchaseItem, val quantity: Int = 0, val jobId: String = "")
-
-@Serializable
-data class NativePurchaseItem(val name: String, val q: Int? = null, val price: Long? = null)
+data class NativeStand(val offers: Map<String, NativeStandOffer> = emptyMap(), val problems: Map<String, String> = emptyMap())
 
 @Serializable
 data class MluckSchedule(
@@ -684,8 +629,6 @@ data class CharacterDiagnostics(
     val tracktrix: JsonElement? = null,
     val anniversaryVisit: JsonElement? = null,
     val anniversaryState: JsonElement? = null,
-    // Console 1.4 cosmetics panel: the character's CX jars, owned and worn cosmetics.
-    val cosmetics: CosmeticsReport? = null,
 ) {
     @kotlinx.serialization.Transient
     var raw: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap())
@@ -725,54 +668,3 @@ fun markedIn(list: List<JsonElement>, entry: InventoryEntry, json: kotlinx.seria
 }
 
 private val MARK_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
-
-// Cosmetics panel (console 1.4 dashboard char.tsx, reported by
-// characters/shared.js cosmeticsSnapshot). `label` is the game's display
-// name for emotes and the ID for appearance pieces; `sprite` previews the
-// cosmetic's layer or the emote's skill icon. Older reports leave the
-// optional fields out.
-
-@Serializable
-data class CosmeticJar(
-    val inventorySlot: Int,
-    val data: String? = null,
-    val kind: String = "unknown", // appearance | emote | unknown | empty
-    val type: String? = null,
-    val slot: String? = null,
-    val label: String? = null,
-    val sprite: Sprite? = null,
-    val locked: Boolean = false,
-    val usable: Boolean = false,
-)
-
-@Serializable
-data class OwnedCosmetic(
-    val name: String,
-    val count: Int = 1,
-    val kind: String = "unknown",
-    val type: String? = null,
-    val slot: String? = null,
-    val label: String? = null,
-    val sprite: Sprite? = null,
-    val explanation: String? = null,
-    val mp: Double? = null,
-    val cooldownMs: Long? = null,
-    val range: Double? = null,
-    val noSelf: Boolean = false,
-    val cooldownLeftMs: Long? = null,
-)
-
-@Serializable
-data class NearbyPlayer(val name: String, val distance: Double = 0.0)
-
-@Serializable
-data class LastEmote(val name: String, val target: String? = null, val at: Long = 0, val ok: Boolean = false, val reason: String? = null)
-
-@Serializable
-data class CosmeticsReport(
-    val jars: List<CosmeticJar> = emptyList(),
-    val owned: List<OwnedCosmetic> = emptyList(),
-    val worn: Map<String, String> = emptyMap(),
-    val nearbyPlayers: List<NearbyPlayer> = emptyList(),
-    val lastEmote: LastEmote? = null,
-)

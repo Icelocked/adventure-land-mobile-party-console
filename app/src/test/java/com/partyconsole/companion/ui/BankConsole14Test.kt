@@ -6,8 +6,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -17,7 +15,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.partyconsole.companion.testing.FakeConsole
 import com.partyconsole.companion.testing.eventually
-import com.partyconsole.companion.testing.field
 import com.partyconsole.companion.ui.account.BankScreen
 import com.partyconsole.companion.ui.characterdetail.sections.TravelSection
 import com.partyconsole.companion.ui.merchant.MerchantSettings
@@ -35,7 +32,7 @@ import org.robolectric.RobolectricTestRunner
 /** Console 1.4 bank features (web/e2e/bank-item-banners.spec.ts, bank.spec.ts,
  *  merchant-bank-sort-visit.spec.ts): one banner per bank item, items1's
  *  reservation only while BankBois exist, the server-side BankBoi delete
- *  check, the gapped bank sort layout and "Visit bank".
+ *  check, the bank sort mode and "Visit bank".
  *
  *  Failure modes:
  *  - A bank row lists several rule labels instead of the one banner the
@@ -49,8 +46,7 @@ import org.robolectric.RobolectricTestRunner
  *    when no BankBoi exists.
  *  - A BankBoi that still holds items can't be deleted from the app, so the
  *    server's refusal never shows.
- *  - The gaps setting posts the sort mode, or the mode radio posts the
- *    layout; a refused change stays ticked.
+ *  - The mode radio posts more than the mode.
  *  - "Visit bank" is missing when nobody else is online, or queues a visit
  *    to another character.
  */
@@ -161,35 +157,18 @@ class BankConsole14Test {
     }
 
     @Test
-    fun leaveGapsPostsOnlyTheLayoutAndTheModeRadioOnlyTheMode() {
-        console.override("core", mapOf("bankSortMode" to JsonPrimitive("automatic"), "bankSortLayout" to JsonPrimitive("packed")))
+    fun theModeRadioPostsOnlyTheModeAndNoGapsSettingIsOffered() {
+        console.override("core", mapOf("bankSortMode" to JsonPrimitive("automatic")))
         val viewModel = PartyViewModel(console.settings)
         compose.setContent { androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) { MerchantSettings(viewModel) } }
         eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.bankSortMode != null }
         compose.waitForIdle()
-        val gaps = compose.onNode(hasContentDescription("Leave gaps between item types"))
-        gaps.assertIsOff()
-        compose.onNode(hasText("Each item category starts on its own row", substring = true)).assertExists()
-        gaps.performClick()
-        eventually { posts("merchant/bank-sort").isNotEmpty() }
-        assertEquals(listOf(json("""{"layout":"gapped"}""")), posts("merchant/bank-sort"))
-        compose.waitUntil(5_000) { runCatching { gaps.assertIsOn() }.isSuccess }
-        assertEquals(JsonPrimitive("gapped"), console.field("bankSortLayout"))
-
+        // Ryan's v1.4.0 merchant/bank-sort.ts takes no {layout}.
+        compose.onNode(hasContentDescription("Leave gaps between item types")).assertDoesNotExist()
+        compose.onNode(hasText("Each item category starts on its own row", substring = true)).assertDoesNotExist()
         compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.RadioButton))[1].performClick()
-        eventually { posts("merchant/bank-sort").size == 2 }
-        assertEquals(json("""{"mode":"request"}"""), posts("merchant/bank-sort")[1])
-
-        gaps.performClick()
-        eventually { posts("merchant/bank-sort").size == 3 }
-        assertEquals(json("""{"layout":"packed"}"""), posts("merchant/bank-sort")[2])
-        compose.waitUntil(5_000) { runCatching { gaps.assertIsOff() }.isSuccess }
-
-        console.failOnce["merchant/bank-sort"] = 400 to """{"error":"invalid bank sort setting"}"""
-        gaps.performClick()
-        eventually { posts("merchant/bank-sort").size == 4 }
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText("invalid bank sort setting")).fetchSemanticsNodes().isNotEmpty() }
-        gaps.assertIsOff()
+        eventually { posts("merchant/bank-sort").isNotEmpty() }
+        assertEquals(listOf(json("""{"mode":"request"}""")), posts("merchant/bank-sort"))
     }
 
     @Test

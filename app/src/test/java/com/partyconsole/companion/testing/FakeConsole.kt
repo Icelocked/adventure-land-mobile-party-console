@@ -50,8 +50,8 @@ class FakeConsole : AutoCloseable {
     val mapFrames = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
     /** One-shot replies for a POST path (e.g. "merchant/stand"): status + body. */
     val failOnce = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, String>>()
-    /** Stateful POST routes by path ("gear-sets", or "/setup/pair" for a root
-     *  route), checked after [failOnce]. A route answers status + body, or
+    /** Stateful POST routes by path ("market/ignored-items", or "/setup/pair"
+     *  for a root route), checked after [failOnce]. A route answers status + body, or
      *  null to fall through to [postStatus]/[postBody]. Console14Routes.kt
      *  installs the console 1.4 routes of the PWA's e2e mock. */
     val routes = java.util.concurrent.ConcurrentHashMap<String, (JsonObject) -> Pair<Int, String>?>()
@@ -59,20 +59,6 @@ class FakeConsole : AutoCloseable {
     @Volatile var escape: String? = null
     /** Every escape POST path in order (the e2e mock's escapeActions). */
     val escapeActions = CopyOnWriteArrayList<String>()
-    /** GET /setup/state's body; Console14Routes.kt adds the access code expiry. */
-    @Volatile var setupState: () -> String = { """{"requirePairing":true}""" }
-    /** Characters whose equipment report is older than gear-sets.ts's 10s window. */
-    val staleEquipment = CopyOnWriteArrayList<String>()
-    /** The newest /setup/invite code: code, expiresAt, wrong guesses. Null once used or cancelled. */
-    @Volatile var accessCode: Triple<String, Long, Int>? = null
-    @Volatile var nextAccessCode = "K7MQ-2PXA"
-    @Volatile var accessCodeTtlMs = 10 * 60_000L
-    /** Every /setup/pair body. */
-    val pairRequests = CopyOnWriteArrayList<JsonObject>()
-    /** The e2e mock's `paired` and `requirePairing`: an unpaired client gets
-     *  401 from /setup/state and /setup/invite until /setup/pair succeeds. */
-    @Volatile var setupPaired = true
-    @Volatile var requirePairing = true
 
     init {
         // Poll at about the old desktop pace so tests don't wait on mobile cadences.
@@ -121,7 +107,7 @@ class FakeConsole : AutoCloseable {
                     "/party-api/daily-dungeons" -> dailyDungeon?.let { json(it) } ?: MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                     // The market's first read, before core reports a referenceRevision.
                     "/party-api/aldata/market" -> json(sections["market"]?.get("aldata")?.takeIf { it is JsonObject }?.toString() ?: """{"listings":[]}""")
-                    "/setup/state" -> if (setupPaired) json(setupState()) else json("""{"error":"not paired"}""").setResponseCode(401)
+                    "/setup/state" -> json("""{"requirePairing":true}""")
                     else -> MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                 }
             }

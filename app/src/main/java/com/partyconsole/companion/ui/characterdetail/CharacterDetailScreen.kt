@@ -209,7 +209,6 @@ fun CharacterDetailScreen(
                         actionOnLucky = lucky
                     },
                     onLuckySlotData = { luckySlotOpen = true },
-                    reservedInventory = vitals.reservedInventory,
                     localLucky = vitals.luckySlotTracking,
                 )
                 RestockSection(
@@ -217,8 +216,6 @@ fun CharacterDetailScreen(
                     dynamicState.restockPolicies[characterName] ?: com.partyconsole.companion.model.RestockPolicy(),
                     viewModel,
                 )
-                // After restock, as on the dashboard's character card.
-                com.partyconsole.companion.ui.characterdetail.sections.CosmeticsSection(characterName, viewModel)
                 if (isMerchant) GoldTargetSection(characterName, dynamicState.goldTargets[characterName] ?: 0L, vitals.gold, viewModel)
                 if (isMerchant) com.partyconsole.companion.ui.characterdetail.sections.RuleConflictsSection(viewModel)
                 AutoMarksSection(characterName, isMerchant, dynamicState, viewModel, catalogFor)

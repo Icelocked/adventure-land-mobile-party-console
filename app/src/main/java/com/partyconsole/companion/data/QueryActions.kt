@@ -67,14 +67,7 @@ val ACTION_DOMAINS: Map<String, List<Domain>> = mapOf(
     "/aldata/key" to CORE,
     "/aldata/refresh" to listOf(Domain.MARKET, Domain.CORE, Domain.CONFIG),
     "/anniversary/chat-advertise" to CORE,
-    // Console 1.4 combat and party: gear sets, Franky routine, escape resume.
-    "/gear-sets" to CORE,
-    "/encounter-mode" to CORE,
     "/escape/resume" to CORE,
-    // Console 1.4 events and realms, and prim stacking.
-    "/realm/boss-chase" to CORE,
-    "/realm/hop-blacklist" to CORE,
-    "/prim-stack" to CORE,
 )
 
 private val SLOT_ACTION = Regex("""^/slots/\d+/(spawn|logout)$""")

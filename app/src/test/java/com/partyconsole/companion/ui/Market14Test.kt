@@ -26,7 +26,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,9 +35,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** Console 1.4 market preferences and stale checks
- *  (web/e2e/console14-merchant-market.spec.ts: Market ignored items, ALData
- *  Check for stale listings) on the native market screens.
+/** Console 1.4 market preferences and stale rows
+ *  (web/e2e/console14-merchant-market.spec.ts: Market ignored items) on the
+ *  native market screens.
  *
  *  Failure modes:
  *  - The ignore post leaves out the level, so +0 and missing levels save
@@ -49,11 +48,7 @@ import org.robolectric.RobolectricTestRunner
  *    "Clear all" posts without the forced level 0.
  *  - "Hide stale listings" is shared by every tab, or forgets its value
  *    when the market opens again.
- *  - A stale listing offers no Check, or Check posts without check: true
- *    and the server refuses it as stale.
- *  - Check buys or sells a quantity other than the whole listing (WTS) or
- *    everything the merchant owns up to the order (WTB).
- *  - A refused Check closes the confirmation and hides the server's message.
+ *  - A stale listing offers Buy, Sell or Check, which v1.4.0 refuses as stale.
  */
 @RunWith(RobolectricTestRunner::class)
 class Market14Test {
@@ -170,51 +165,23 @@ class Market14Test {
     }
 
     @Test
-    fun aStaleWtsListingOffersCheckWhichBuysWithCheckTrue() {
-        aldata(listing("c", "$coat,\"price\":5000,\"seenAt\":1"))
-        showMarket()
-        val row = hasAnyAncestor(group("WTS Wolf Coat from Seller2"))
-        compose.onNode(hasText("Buy") and row).assertDoesNotExist()
-        compose.onNode(hasText("Make WTB") and row).assertExists()
-        compose.onNode(hasText("Check") and row).performScrollTo().performClick()
-        compose.onNode(hasText("Send the merchant to check whether Seller2's listing for Wolf Coat is still live, and buy up to 1 for 5,000g each if so? If the listing is gone, this fails safely and reports back in merchant activity.")).assertExists()
-        compose.onNode(hasText("Yes") and hasAnyAncestor(group("Check stale listing"))).performScrollTo().performClick()
-        eventually { posts("merchant/aldata-order").isNotEmpty() }
-        val body = posts("merchant/aldata-order")[0]
-        assertEquals(JsonPrimitive("c"), (body["listing"] as JsonObject)["key"])
-        assertEquals(JsonPrimitive(1), body["buyQuantity"])
-        assertEquals(JsonPrimitive(true), body["check"])
-        compose.waitUntil(5_000) { compose.onAllNodes(group("Check stale listing")).fetchSemanticsNodes().isEmpty() }
-    }
-
-    @Test
-    fun aRefusedCheckKeepsTheConfirmationOpenWithItsError() {
-        aldata(listing("c", "$coat,\"price\":5000,\"seenAt\":1"))
-        console.failOnce["merchant/aldata-order"] = 409 to """{"error":"ALData listing is no longer in the market snapshot"}"""
-        showMarket()
-        compose.onNode(hasText("Check") and hasAnyAncestor(group("WTS Wolf Coat from Seller2"))).performScrollTo().performClick()
-        compose.onNode(hasText("Yes") and hasAnyAncestor(group("Check stale listing"))).performScrollTo().performClick()
-        eventually { posts("merchant/aldata-order").isNotEmpty() }
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText("ALData listing is no longer in the market snapshot") and hasAnyAncestor(group("Check stale listing"))).fetchSemanticsNodes().isNotEmpty() }
-    }
-
-    @Test
-    fun aStaleWtbOfferForAnOwnedItemOffersCheckAndListAndCheckSellsWithCheckTrue() {
-        aldata(buyOrders = """{"key":"w1","buyer":"Buyer1","serverRegion":"US","serverIdentifier":"I","map":"main","seenAt":1,"price":900,"quantity":2,"item":{"name":"wcoat","level":0}}""")
+    fun aStaleWtsListingOffersMakeWtbAndAStaleOwnedWtbOfferOffersListButNeitherOffersCheck() {
+        aldata(
+            listing("c", "$coat,\"price\":5000,\"seenAt\":1"),
+            """{"key":"w1","buyer":"Buyer1","serverRegion":"US","serverIdentifier":"I","map":"main","seenAt":1,"price":900,"quantity":2,"item":{"name":"wcoat","level":0}}""",
+        )
         val viewModel = showMarket()
         eventually { viewModel.characters.value["Merchy"]?.inventory != null }
+        // Ryan's v1.4.0 manual-market-orders.ts takes no `check` and refuses every stale entry.
+        val wts = hasAnyAncestor(group("WTS Wolf Coat from Seller2"))
+        compose.onNode(hasText("Buy") and wts).assertDoesNotExist()
+        compose.onNode(hasText("Make WTB") and wts).performScrollTo().assertExists()
+        compose.onNode(hasText("Check") and wts).assertDoesNotExist()
         compose.onNode(hasText("Live WTB", substring = true)).performClick()
         compose.waitForIdle()
-        val row = hasAnyAncestor(group("WTB Wolf Coat from Buyer1"))
-        compose.onNode(hasText("Sell") and row).assertDoesNotExist()
-        compose.onNode(hasText("List") and row).performScrollTo().assertExists()
-        compose.onNode(hasText("Check") and row).performClick()
-        compose.onNode(hasText("Send the merchant to check whether Buyer1's WTB listing for Wolf Coat is still live, and sell up to 1 for 900g each if so?", substring = true)).assertExists()
-        compose.onNode(hasText("Yes") and hasAnyAncestor(group("Check stale WTB listing"))).performScrollTo().performClick()
-        eventually { posts("merchant/aldata-sale").isNotEmpty() }
-        val body = posts("merchant/aldata-sale")[0]
-        assertEquals(JsonPrimitive("w1"), (body["order"] as JsonObject)["key"])
-        assertEquals(JsonPrimitive(1), body["sellQuantity"])
-        assertEquals(JsonPrimitive(true), body["check"])
+        val wtb = hasAnyAncestor(group("WTB Wolf Coat from Buyer1"))
+        compose.onNode(hasText("Sell") and wtb).assertDoesNotExist()
+        compose.onNode(hasText("List") and wtb).performScrollTo().assertExists()
+        compose.onNode(hasText("Check") and wtb).assertDoesNotExist()
     }
 }

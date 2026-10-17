@@ -17,8 +17,8 @@ import kotlinx.serialization.json.JsonPrimitive
  *  PartyViewModel opens its live SSE connection. GET /setup/state returns 200
  *  once paired, else redirects to /setup, which this client's content-type
  *  check surfaces as "Invalid content-type: text/html"; without the gate an
- *  unpaired phone shows only that raw error. Console 1.4 adds pairing with a
- *  paired browser's access code. PWA: web/src/screens/PairingGate.tsx. */
+ *  unpaired phone shows only that raw error. PWA:
+ *  web/src/screens/PairingGate.tsx. */
 sealed interface PairingState {
     data object Checking : PairingState
     data object Paired : PairingState
@@ -56,29 +56,6 @@ class PairingViewModel(settings: ServerSettings) : ViewModel() {
         val trimmed = raw.trim()
         val hashIndex = trimmed.indexOf('#')
         return if (hashIndex >= 0) trimmed.substring(hashIndex + 1) else trimmed
-    }
-
-    /** The console's setup page sends the code as typed (trimmed); the server
-     *  ignores case, spaces and dashes (tools/hosting/setup-client.ts pairButton). */
-    fun submitCode(raw: String, onPaired: () -> Unit = {}) {
-        val code = raw.trim()
-        if (code.isEmpty()) {
-            _error.value = "Enter the access code shown on a paired browser"
-            return
-        }
-        viewModelScope.launch {
-            _submitting.value = true
-            _error.value = null
-            val result = api.pairWithAccessCode(code)
-            _submitting.value = false
-            when (result) {
-                is ApiResult.Success -> {
-                    onPaired()
-                    check()
-                }
-                is ApiResult.Failure -> _error.value = if (result.status != 0) result.message else "Couldn't reach the server to pair - check your connection and try again"
-            }
-        }
     }
 
     fun submitToken(raw: String) {
