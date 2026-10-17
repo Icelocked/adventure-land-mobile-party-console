@@ -649,6 +649,8 @@ data class CharacterDiagnostics(
     val tracktrix: JsonElement? = null,
     val anniversaryVisit: JsonElement? = null,
     val anniversaryState: JsonElement? = null,
+    // Console 1.4 cosmetics panel: the character's CX jars, owned and worn cosmetics.
+    val cosmetics: CosmeticsReport? = null,
 ) {
     @kotlinx.serialization.Transient
     var raw: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap())
@@ -688,3 +690,54 @@ fun markedIn(list: List<JsonElement>, entry: InventoryEntry, json: kotlinx.seria
 }
 
 private val MARK_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
+
+// Cosmetics panel (console 1.4 dashboard char.tsx, reported by
+// characters/shared.js cosmeticsSnapshot). `label` is the game's display
+// name for emotes and the ID for appearance pieces; `sprite` previews the
+// cosmetic's layer or the emote's skill icon. Older reports leave the
+// optional fields out.
+
+@Serializable
+data class CosmeticJar(
+    val inventorySlot: Int,
+    val data: String? = null,
+    val kind: String = "unknown", // appearance | emote | unknown | empty
+    val type: String? = null,
+    val slot: String? = null,
+    val label: String? = null,
+    val sprite: Sprite? = null,
+    val locked: Boolean = false,
+    val usable: Boolean = false,
+)
+
+@Serializable
+data class OwnedCosmetic(
+    val name: String,
+    val count: Int = 1,
+    val kind: String = "unknown",
+    val type: String? = null,
+    val slot: String? = null,
+    val label: String? = null,
+    val sprite: Sprite? = null,
+    val explanation: String? = null,
+    val mp: Double? = null,
+    val cooldownMs: Long? = null,
+    val range: Double? = null,
+    val noSelf: Boolean = false,
+    val cooldownLeftMs: Long? = null,
+)
+
+@Serializable
+data class NearbyPlayer(val name: String, val distance: Double = 0.0)
+
+@Serializable
+data class LastEmote(val name: String, val target: String? = null, val at: Long = 0, val ok: Boolean = false, val reason: String? = null)
+
+@Serializable
+data class CosmeticsReport(
+    val jars: List<CosmeticJar> = emptyList(),
+    val owned: List<OwnedCosmetic> = emptyList(),
+    val worn: Map<String, String> = emptyMap(),
+    val nearbyPlayers: List<NearbyPlayer> = emptyList(),
+    val lastEmote: LastEmote? = null,
+)
