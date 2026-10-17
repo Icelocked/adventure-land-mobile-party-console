@@ -44,7 +44,8 @@ export interface MockCharacter {
   // The game realm the character is on (vitals.server).
   server?: string
   // Equipped slots as the live stream sends them ({slot: {item}}), incl. a merchant's trade1..N.
-  slots?: Record<string, { item: MockItem; price?: number } | null>
+  // A slot may carry the item's meta (properties), as the live stream sends it.
+  slots?: Record<string, { item: MockItem; price?: number; meta?: Record<string, unknown> } | null>
   // Extra characterDetails fields (the script's stats: str, attack, combatStats, characterDollHtml, ...).
   diagnostics?: Record<string, unknown>
   // This character's Hunt quest (state.statuses[name].monsterHunt), served in
