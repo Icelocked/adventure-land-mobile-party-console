@@ -22,7 +22,6 @@ export function PairingGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('checking')
   const [error, setError] = useState('')
   const [manualInput, setManualInput] = useState('')
-  const [accessCode, setAccessCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanUnsupported, setScanUnsupported] = useState(false)
@@ -77,27 +76,6 @@ export function PairingGate({ children }: { children: ReactNode }) {
       )
       return
     }
-    stopScan()
-    await checkPaired()
-  }
-
-  // The console's setup page sends the code as typed (trimmed); the server
-  // ignores case, spaces and dashes (tools/hosting/setup-client.ts pairButton).
-  async function submitCode() {
-    const code = accessCode.trim()
-    if (!code) {
-      setError('Enter the access code shown on a paired browser')
-      return
-    }
-    setSubmitting(true)
-    setError('')
-    const result = await new PartyApiClient(loadServerSettings()).pairWithAccessCode(code)
-    setSubmitting(false)
-    if (result.kind === 'failure') {
-      setError(result.status !== undefined ? result.message : "Couldn't reach the server to pair - check your connection and try again")
-      return
-    }
-    setAccessCode('')
     stopScan()
     await checkPaired()
   }
@@ -176,30 +154,9 @@ export function PairingGate({ children }: { children: ReactNode }) {
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
       <h1 className="text-xl font-semibold">Pair this device</h1>
       <p className="text-sm text-muted-foreground">
-        On a browser that is already paired, open setup and choose "Pair another browser", then enter the access code it shows. You can
-        also scan its pairing QR code or paste its pairing link below.
+        On a browser that is already paired, open the console's setup page and choose "Pair another browser", then paste the
+        pairing link it shows below, or scan a QR code of that link.
       </p>
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="access-code">
-          Access code
-        </label>
-        <Input
-          id="access-code"
-          autoComplete="one-time-code"
-          autoCapitalize="characters"
-          spellCheck={false}
-          placeholder="ABCD-EFGH"
-          className="font-mono uppercase tracking-widest"
-          value={accessCode}
-          onChange={(event) => setAccessCode(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') void submitCode()
-          }}
-        />
-        <Button className="w-full" disabled={submitting} onClick={() => void submitCode()}>
-          {submitting ? 'Pairing…' : 'Pair with access code'}
-        </Button>
-      </div>
       {!scanning && (
         <Button className="w-full" onClick={() => void startScan()}>Scan QR code</Button>
       )}

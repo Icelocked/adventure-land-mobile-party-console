@@ -17,7 +17,6 @@ import { FarmingSection } from './sections/FarmingSection'
 import { EquipmentSection } from './sections/EquipmentSection'
 import { InventorySection } from './sections/InventorySection'
 import { RestockSection } from './sections/RestockSection'
-import { CosmeticsSection } from './sections/CosmeticsSection'
 import { GoldTargetSection } from './sections/GoldTargetSection'
 import { AutoMarksSection } from './sections/AutoMarksSection'
 import { CombatLogSection } from './sections/CombatLogSection'
@@ -191,11 +190,8 @@ export function CharacterDetailScreen() {
               }}
               onLuckySlotData={() => setLuckySlotOpen(true)}
               localLucky={vitals.luckySlotTracking}
-              reservedInventory={vitals.reservedInventory}
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
-            {/* After restock, as on the dashboard's character card. */}
-            <CosmeticsSection characterName={name} />
             {name === dynamicState.merchantCharacter && <GoldTargetSection characterName={name} serverTarget={dynamicState.goldTargets[name] ?? 0} gold={vitals.gold ?? 0} />}
             {isMerchant && <RuleConflictsSection />}
             <AutoMarksSection characterName={name} isMerchant={isMerchant} dynamicState={dynamicState} catalogFor={catalogFor} />

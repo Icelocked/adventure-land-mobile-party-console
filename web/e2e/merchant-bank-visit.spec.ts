@@ -17,36 +17,6 @@ function merchantServer() {
   return server
 }
 
-test('Merchant settings: "Leave gaps between item types" posts the bank sort layout and shows the saved one (bank-sort-control.tsx)', async ({ page }) => {
-  const server = merchantServer()
-  server.extraState = { bankSortMode: 'automatic', bankSortLayout: 'packed' }
-  await server.install(page)
-  const bodies = posts(page)
-
-  await page.goto('/characters/Patinder')
-  await page.getByRole('button', { name: 'Merchant settings' }).click()
-  const gaps = page.getByRole('checkbox', { name: 'Leave gaps between item types' })
-  await expect(gaps).not.toBeChecked()
-  await expect(page.getByText(/^Each item category starts on its own row/)).toBeVisible()
-
-  await gaps.click()
-  await expect.poll(() => bodies.filter((b) => b.path === 'merchant/bank-sort').map((b) => b.body)).toEqual([{ layout: 'gapped' }])
-  await expect(gaps).toBeChecked()
-  expect(server.extraState.bankSortLayout).toBe('gapped')
-  // The mode radio still sends only the mode.
-  await page.getByRole('radio', { name: 'Request sorting in bank window' }).click()
-  await expect.poll(() => bodies.filter((b) => b.path === 'merchant/bank-sort').at(-1)?.body).toEqual({ mode: 'request' })
-
-  await gaps.click()
-  await expect.poll(() => bodies.filter((b) => b.path === 'merchant/bank-sort').at(-1)?.body).toEqual({ layout: 'packed' })
-  await expect(gaps).not.toBeChecked()
-
-  server.failOnce['merchant/bank-sort'] = 'invalid bank sort setting'
-  await gaps.click()
-  await expect(page.getByRole('alert').filter({ hasText: 'invalid bank sort setting' })).toBeVisible()
-  await expect(gaps).not.toBeChecked()
-})
-
 test('Send merchant to… offers "Visit bank", which queues a bank command for the merchant itself (merchant-visit-control.tsx)', async ({ page }) => {
   const server = merchantServer()
   await server.install(page)

@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
-import { BossChaseSetting, RealmHopBlacklistSetting } from './RealmChaseSettings'
 
 /** Interface settings, in the console's order: state import/export, realm, characters (create, member grid,
  *  bankboi name), ALData, hosting, console updates and debugging - then
@@ -63,10 +62,7 @@ export function SettingsScreen() {
       <div className="flex flex-col gap-3 p-3 md:block md:columns-2 md:gap-3 md:*:mb-3 md:*:break-inside-avoid">
         <p className="text-xs text-muted-foreground">Manage saved dashboard state, character connections, and market access.</p>
         <DashboardStateImport />
-        <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }}>
-          <BossChaseSetting chase={dynamicState.bossChase} />
-          <RealmHopBlacklistSetting realms={dynamicState.realmControl?.realms || []} blacklist={dynamicState.realmHopBlacklist} />
-        </RealmSection>
+        <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }} />
 
         <section aria-label="Characters" className="rounded-md border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between gap-3">

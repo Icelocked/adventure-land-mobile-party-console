@@ -61,14 +61,6 @@ function BankSortSetting() {
           {label}
         </label>
       ))}
-      <label className="flex items-center gap-2 border-t border-border pt-2">
-        <input type="checkbox" checked={state.bankSortLayout === 'gapped'} onChange={(event) => void run(() => api.setBankSortLayout(event.target.checked ? 'gapped' : 'packed'))} />
-        Leave gaps between item types
-      </label>
-      <p className={help}>
-        Each item category starts on its own row with free slots after it, so new items drop into a gap instead of shifting the whole bank. Falls back to packed sorting when the bank is too
-        full.
-      </p>
       <p className={help}>Compatible stacks are always combined during bank visits. This setting controls item ordering.</p>
       {error && <p role="alert" className="text-destructive">{error}</p>}
     </fieldset>

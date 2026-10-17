@@ -503,21 +503,11 @@ export interface RealmControl {
   operation?: RealmOperation | null
 }
 
-// Console 1.4 events and realms. events/attendance-limits.ts AttendanceInstance,
+// Console 1.4 events. events/attendance-limits.ts AttendanceInstance,
 // trimmed to what the event list reads.
 export interface EventAttendanceInstance {
   ended?: boolean
   ignored?: 'death limit' | 'time limit' | 'manual travel' | 'travel failure'
-}
-// events/boss-chase.ts BossChaseState, trimmed to what the realm panel shows.
-export interface BossChaseState {
-  enabled: boolean
-  minEtaMinutes: number
-  trip: { boss: string; realm: string; respawnAt?: number; returnRealm: string | null; arrived: boolean } | null
-  lastError: string | null
-  checkedAt: number
-  sightings: { boss: string; realm: string; hp: number; etaMinutes: number | null; target: string | null }[]
-  respawns: { boss: string; realm: string; respawnAt: number }[]
 }
 
 /** The polled slice of GET /party-api/state. `followers` maps character
@@ -662,8 +652,6 @@ export interface PartyStateDynamic {
   nativeStand?: {
     offers: Record<string, { itemId: string; auto: boolean; phase: string; slot: string; level?: number; price?: number; quantity?: number; acknowledged?: number; problem?: string }>
     problems: Record<string, string>
-    /** Purchases a merchant job reserved, keyed `jobId:key`; one whose job ended unconfirmed pauses its item's WTB. */
-    purchases?: Record<string, { item: { name: string; q?: number; price?: number }; quantity: number; jobId: string }>
   }
   mluckSchedule?: { target: string; remainingMs: number; leadMs: number; dispatchInMs: number; marginMs: number; status: string } | null
   gatheringCooldowns?: { fishing?: number; mining?: number }
@@ -688,19 +676,8 @@ export interface PartyStateDynamic {
   activeConvoy?: unknown
   // Upgrades
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
-  // Console 1.4 events and realms: per-instance event attendance, boss chase, realm hop blacklist.
+  // Console 1.4 events: per-instance event attendance.
   eventAttendance?: Record<string, Record<string, EventAttendanceInstance>>
-  bossChase?: BossChaseState | null
-  realmHopBlacklist?: string[]
-  // Console 1.4 combat and party: gear sets, Franky routine.
-  // Per character, saved from worn gear (characters/gear-sets.ts).
-  gearSets?: Record<string, Partial<Record<GearSetName, GearSet>>>
-  // The leader scope's encounter settings; other scopes use farmingProfiles (see resolveEncounterRoutine).
-  encounterRoutines?: Record<string, string>
-  encounterAutoDeathLimits?: Record<string, number>
-  encounterAutoDeaths?: Record<string, number>
-  // Gapped bank sort layout (console 1.4 merchant/bank-sort.ts): "gapped" starts each item category on its own row with free slots after it.
-  bankSortLayout?: 'packed' | 'gapped'
 
   // Console 1.4 merchant and market: lucky slot position locks
   // (http/merchant-settings.ts) and market ignored items
@@ -807,10 +784,6 @@ export interface FarmingProfile {
   achievementBlacklist?: Record<string, AchievementBlacklistEntry>
   achievementMessage?: string
   monsterFocus?: string[]
-  // Console 1.4 Franky routine, per farming scope.
-  encounterRoutines?: Record<string, string>
-  encounterAutoDeathLimits?: Record<string, number>
-  encounterAutoDeaths?: Record<string, number>
 }
 
 export interface HuntBlacklistEntry {
@@ -857,31 +830,6 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
     achievementSettings: effective?.achievementHunt || (legacy ? state.achievementHunt : undefined) || undefined,
     achievementBlacklist: effective?.achievementBlacklist || (legacy ? state.achievementBlacklist : undefined) || {},
     achievementMessage: effective?.achievementMessage ?? (legacy ? state.achievementMessage : undefined) ?? '',
-  }
-}
-
-// Console 1.4 combat and party: gear sets and the Franky routine.
-/** Console characters/gear-sets.ts. "gold" exists server-side; the
- *  dashboard's Gear sets control offers only luck and tank. */
-export type GearSetName = 'luck' | 'tank' | 'gold'
-export type GearSetItem = { name: string; level?: number; p?: string; stat_type?: string }
-export interface GearSet {
-  slots: Record<string, GearSetItem>
-  savedAt: number
-}
-
-/** The Franky routine of the scope a character farms in: a follower shows
- *  (and can't edit) its leader's. Defaults: auto, a death limit of 3.
- *  Console: farming-context.ts frankyRoutine/frankyAutoDeathLimit/frankyAutoDeaths. */
-export function resolveEncounterRoutine(state: PartyStateDynamic, name: string) {
-  const { owner, followingLeader } = resolveFarmingContext(state, name)
-  const legacy = owner === state.leader
-  const effective = state.farmingProfiles[owner]
-  return {
-    followingLeader,
-    mode: effective?.encounterRoutines?.franky || (legacy ? state.encounterRoutines?.franky : undefined) || 'auto',
-    autoDeathLimit: effective?.encounterAutoDeathLimits?.franky ?? (legacy ? state.encounterAutoDeathLimits?.franky : undefined) ?? 3,
-    autoDeaths: effective?.encounterAutoDeaths?.franky ?? (legacy ? state.encounterAutoDeaths?.franky : undefined) ?? 0,
   }
 }
 
@@ -990,8 +938,6 @@ export interface CharacterDiagnostics {
   tracktrix?: unknown
   anniversaryVisit?: unknown
   anniversaryState?: unknown
-  // Cosmetics panel (console 1.4): the character's CX jars, owned and worn cosmetics.
-  cosmetics?: CosmeticsReport | null
   [field: string]: unknown
 }
 
@@ -1045,30 +991,4 @@ export interface AchievementBlacklistEntry {
   reason: string
   deaths?: number
   characters?: string[]
-}
-
-// Cosmetics panel (console 1.4 dashboard char.tsx, reported by characters/shared.js cosmeticsSnapshot).
-/** `label` is the game's display name for emotes and the ID for appearance
- *  pieces; `sprite` previews the cosmetic's layer or the emote's skill icon.
- *  Emote fields come from the skill definition. Older reports leave the
- *  optional fields out. */
-export interface CosmeticKind {
-  kind: 'appearance' | 'emote' | 'unknown' | 'empty'
-  type: string | null
-  slot: string | null
-  label?: string | null
-  sprite?: Sprite | null
-  explanation?: string | null
-  mp?: number
-  cooldownMs?: number
-  range?: number | null
-  noSelf?: boolean
-  cooldownLeftMs?: number
-}
-export interface CosmeticsReport {
-  jars: (CosmeticKind & { inventorySlot: number; data: string | null; locked: boolean; usable: boolean })[]
-  owned: (CosmeticKind & { name: string; count: number })[]
-  worn: Record<string, string>
-  nearbyPlayers?: { name: string; distance: number }[]
-  lastEmote?: { name: string; target: string | null; at: number; ok: boolean; reason: string | null } | null
 }

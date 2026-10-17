@@ -38,16 +38,7 @@ export function DestinationOffering({ name, level, tiers }: { name: string; leve
   )
 }
 const previewOptions = ['none', 'offeringp', 'offering', 'offeringx'] as const
-type PreviewResult = { preview: { chance: number; grace?: number }; observedAt: number } | { reason: string }
-
-// Console: runtime/prim-stack.ts. Grace targets run 0.5 to 15 in 0.5 steps.
-type PrimStackMethod = 'offering' | 'stat'
-const primStackTargets = Array.from({ length: 30 }, (_, index) => (index + 1) / 2)
-const statScrollName = (stat: string) => (stat === 'mp_cost' ? 'mpcostscroll' : stat + 'scroll')
-/** Stat scrolls one stat application consumes at the item's upgrade grade. */
-function statScrollsPerStack(level: number, grades: readonly number[] = [9, 10, 11, 12]) {
-  return [1, 10, 100, 1000, 9999][grades.filter((threshold) => level >= threshold).length]!
-}
+type PreviewResult = { preview: { chance: number }; observedAt: number } | { reason: string }
 
 export type OfferingSource = { slot: number | string; equipped?: boolean }
 
@@ -228,8 +219,6 @@ export function UpgradePreviewPanel({ item, source, character }: { item: Item; s
     }
   }, [api, body, key, unavailable])
   const current = state?.key === key ? state : undefined
-  // Inventories never carry grace (the server strips it); every calculated option reports it.
-  const grace = previewOptions.map((option) => current?.result?.options[option]).find((value) => value && 'preview' in value)
   const statusText =
     unavailable ||
     current?.error ||
@@ -255,11 +244,6 @@ export function UpgradePreviewPanel({ item, source, character }: { item: Item; s
       <p role="status" className="mt-2 text-xs">
         {statusText}
       </p>
-      {grace && 'preview' in grace && (
-        <p className="mt-2 font-mono text-xs tabular-nums" title="Item grace from the server preview; raise it with Prim stack">
-          Grace {grace.preview.grace}
-        </p>
-      )}
       <dl aria-live="polite" className="mt-2 space-y-2">
         {previewOptions.map((option) => {
           const value = current?.result?.options[option]
@@ -312,12 +296,8 @@ export function OfferingRows({
   source?: OfferingSource
   enabled?: boolean
 }) {
-  const state = useDynamicState()
-  const stock = state.upgradeOfferingStock ?? {}
+  const stock = useDynamicState().upgradeOfferingStock ?? {}
   const [picked, setPicked] = useState<UpgradeOffering | null>(null)
-  const [stacking, setStacking] = useState(false)
-  // The coordinator only prim stacks merchant inventory items.
-  const canStack = enabled && !!stock.offeringp && !!source && !source.equipped && character === state.merchantCharacter
   return (
     <div className="py-1 pl-4">
       <div className="mt-1 border-t border-border pt-1">
@@ -332,92 +312,9 @@ export function OfferingRows({
             Upgrade with {label}
           </button>
         ))}
-        <button type="button" disabled={!canStack} onClick={() => setStacking(true)} className="block w-full rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50">
-          Prim stack…
-        </button>
       </div>
       {picked && <OfferingDialog character={character} item={item} meta={meta} source={source} offering={picked} onClose={() => setPicked(null)} />}
-      {stacking && source && <PrimStackDialog character={character} slot={Number(source.slot)} item={item} meta={meta} onClose={() => setStacking(false)} />}
       {enabled && <UpgradePreviewPanel item={item} source={source} character={character} />}
-    </div>
-  )
-}
-
-/** Console 1.4 prim-stack-dialog.tsx (#65): Primling-only or Primling +
- *  stat-scroll operations that raise grace without a level attempt. */
-function PrimStackDialog({ character, slot, item, meta, onClose }: { character: string; slot: number; item: Item; meta?: ItemMeta | null; onClose: () => void }) {
-  const api = usePartyApi()
-  const refreshNow = useRefreshDynamicStateNow()
-  const state = useDynamicState()
-  const catalogFor = useCatalogLookup(state.merchantCatalog)
-  const definition = (meta ?? catalogFor(item.name)?.meta)?.definition
-  const level = Number(item.level) || 0
-  const [target, setTarget] = useState(Math.min(15, level + 2))
-  const [method, setMethod] = useState<PrimStackMethod>('offering')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  // A stat scroll rewrites stat_type, so only the item's current stat can be used.
-  const statType = typeof item.stat_type === 'string' && Number(definition?.stat) ? item.stat_type : null
-  const grades = Array.isArray(definition?.grades) ? (definition.grades as unknown[]).map(Number) : undefined
-  const scrolls = statScrollsPerStack(level, grades)
-  const primlings = state.upgradeOfferingStock?.offeringp || 0
-  const name = catalogFor(item.name)?.name || item.name
-  const label = (id: string) => catalogFor(id)?.name || id
-  const confirm = async () => {
-    if (busy) return
-    setBusy(true)
-    setError('')
-    const result = await api.primStack(character, slot, item, target, method)
-    setBusy(false)
-    if (result.kind === 'failure') return setError(result.message)
-    await refreshNow()
-    onClose()
-  }
-  return (
-    <div role="group" aria-label="Prim stack" className="my-1.5 flex flex-col gap-2 rounded-md border border-sky-800 p-2.5 pl-4">
-      <p className="text-sm font-medium">Prim stack</p>
-      <p className="text-xs text-muted-foreground">
-        Raise {name}&apos;s hidden grace without attempting an upgrade. Grace stays on the item until it is destroyed; during an upgrade it counts up to the next level + 1, and most when that attempt also uses an offering.
-      </p>
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        Stack until grace
-        <select aria-label="Target grace" className="rounded border border-border bg-background p-1.5 text-sm" disabled={busy} value={target} onChange={(event) => setTarget(Number(event.target.value))}>
-          {primStackTargets.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-      </label>
-      <fieldset className="space-y-1 text-sm" disabled={busy}>
-        <legend className="sr-only">Prim-stack method</legend>
-        <label className="flex items-center gap-2">
-          <input type="radio" name="prim-stack-method" checked={method === 'offering'} onChange={() => setMethod('offering')} />
-          Primling only (+0.5 grace each)
-        </label>
-        <label className={`flex items-center gap-2 ${statType ? '' : 'text-muted-foreground'}`}>
-          <input type="radio" name="prim-stack-method" disabled={!statType} checked={method === 'stat'} onChange={() => setMethod('stat')} />
-          {statType
-            ? `Primling + ${scrolls.toLocaleString()} × ${label(statScrollName(statType))} (+1 grace each, keeps ${statType.toUpperCase()})`
-            : 'Primling + stat scroll (needs an item with an applied stat)'}
-        </label>
-      </fieldset>
-      <p className="text-xs text-muted-foreground">
-        The merchant reads the current grace first and stops at the target. {primlings.toLocaleString()} Primling{primlings === 1 ? '' : 's'} in merchant inventory and storage.
-      </p>
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      <div className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={busy} onClick={onClose}>
-          Cancel
-        </Button>
-        <Button size="sm" disabled={busy} onClick={() => void confirm()}>
-          {busy ? 'Queueing…' : 'Stack grace'}
-        </Button>
-      </div>
     </div>
   )
 }

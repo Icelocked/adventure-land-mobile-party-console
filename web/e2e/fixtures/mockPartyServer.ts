@@ -51,8 +51,6 @@ export interface MockCharacter {
   // This character's Hunt quest (state.statuses[name].monsterHunt), served in
   // characterDetails by section=core&dashboard=1.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
-  // Console 1.4: live vitals.reservedInventory, the bag slots a gear set holds (inventory/swap-reservations.ts).
-  reservedInventory?: { slot: number; item: MockItem | null }[]
 }
 
 export interface MockCatalogEntry {
@@ -101,12 +99,10 @@ const CONFIG_FIELDS = [
   'farmingPolicy',
   'huntBlacklist', 'huntSettings',
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
-  // Console 1.4 events and realms.
-  'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
-  // Console 1.4 combat and party: gear sets.
-  'gearSets',
+  // Console 1.4 events.
+  'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance',
 ] as const
-// Console 1.4 events and realms: dashboard/lib/event-policy.ts supportedEvents,
+// Console 1.4 events: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
 const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin']
 const validEventLimits = (value: unknown) => {
@@ -249,25 +245,10 @@ export class MockPartyServer {
 
   paired = false
 
-  // Console 1.4 combat and party: gear sets, Franky routine, escape.
-  gearSets: Record<string, Record<string, { slots: Record<string, MockItem & { p?: string }>; savedAt: number }>> = {}
-  // Characters whose equipment report is older than gear-sets.ts's 10s freshness window.
-  staleEquipment: string[] = []
-  // The leader scope's routine; other scopes keep theirs in farmingProfiles (navigation/initial-focus.ts defaults {}).
-  encounterRoutines: Record<string, string> = {}
-  encounterAutoDeathLimits: Record<string, number> = {}
-  encounterAutoDeaths: Record<string, number> = {}
+  // Console 1.4 combat: escape.
   // GET /party-api/escape's `escape`, and every escape POST path in order.
   escape: { id: string; stage: string; error: string | null; progress: Record<string, unknown> } | null = null
   escapeActions: string[] = []
-  // Access-code pairing (tools/hosting/access.ts): the newest code from
-  // /setup/invite, its expiry and wrong guesses (the 5th cancels it), plus
-  // every /setup/pair body. Set accessCode = null to model another browser
-  // pairing with it.
-  accessCode: { code: string; expiresAt: number; failures: number } | null = null
-  nextAccessCode = 'K7MQ-2PXA'
-  accessCodeTtlMs = 10 * 60_000
-  pairRequests: Record<string, unknown>[] = []
 
   addCharacter(character: MockCharacter): this {
     this.characters.push(character)
@@ -347,24 +328,14 @@ export class MockPartyServer {
       activeSlots: this.characters.map((c, index) => ({ index, kind: 'headless', character: c.name, state: 'online' })),
       gameVersion: 830,
       merchantCharacter: this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null),
-      // Console 1.4 events and realms.
+      // Console 1.4 events.
       eventAttendance: this.eventAttendance,
-      bossChase: this.bossChase,
-      realmHopBlacklist: this.realmHopBlacklist,
-      // Console 1.4 combat and party: gear sets, Franky routine.
-      gearSets: this.gearSets,
-      encounterRoutines: this.encounterRoutines,
-      encounterAutoDeathLimits: this.encounterAutoDeathLimits,
-      encounterAutoDeaths: this.encounterAutoDeaths,
       ...this.extraState,
     }
   }
 
-  // Console 1.4 events and realms: initial-core.ts defaults (initialBossChase,
-  // initialRealmHopBlacklist) until a test or POST changes them.
+  // Console 1.4 events: per-instance attendance (events/attendance-limits.ts).
   eventAttendance: Record<string, Record<string, { ended: boolean; ignored?: string }>> = {}
-  bossChase: Record<string, unknown> = { enabled: false, minEtaMinutes: 15, trip: null, returning: null, retryAt: 0, lastError: null, checkedAt: 0, sightings: [], respawns: [] }
-  realmHopBlacklist: string[] = []
 
   /** Any other state field a test needs (merchantForceStand, threshold,
    *  goldTargets, merchantCharacter, ...). Routed to its section exactly
@@ -399,7 +370,7 @@ export class MockPartyServer {
       return {
         characters: Object.fromEntries(
           // fastCharacters: the whole status minus items/slots and other omitted fields.
-          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}) }]),
+          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}) }]),
         ),
       }
     if (section === 'inventory')
@@ -458,7 +429,6 @@ export class MockPartyServer {
           inventorySize: (c.items ?? []).length,
           ...(c.target ? { target: c.target } : {}),
           ...(c.conditions ? { conditions: c.conditions } : {}),
-          ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}),
         },
         items,
         slots: c.slots ?? {},
@@ -584,55 +554,6 @@ export class MockPartyServer {
       delete this.failOnceBody[path]
       return { status: 409, json: { ok: false, error, ...extra } }
     }
-    // Console 1.4 gear sets: characters/gear-sets.ts.
-    if (path === 'gear-sets') {
-      const name = String(body.character ?? '')
-      const set = String(body.set ?? '')
-      const member = this.characters.find((c) => c.name === name)
-      if (!member) return { status: 400, json: { error: 'invalid character' } }
-      if (!['luck', 'tank', 'gold'].includes(set)) return { status: 400, json: { error: 'invalid gear set' } }
-      const sets = (this.gearSets[name] ||= {})
-      if (body.action === 'clear') delete sets[set]
-      else if (body.action === 'save') {
-        if (!member.slots || this.staleEquipment.includes(name)) return { status: 409, json: { error: 'no fresh equipment report for ' + name } }
-        const slots: Record<string, MockItem & { p?: string }> = {}
-        for (const slot of ['mainhand', 'offhand', 'chest', 'pants', 'helmet', 'gloves', 'shoes', 'cape', 'belt', 'orb', 'amulet', 'ring1', 'ring2', 'earring1', 'earring2', 'elixir']) {
-          const item = member.slots[slot]?.item as (MockItem & { p?: string }) | undefined
-          if (item?.name)
-            slots[slot] = { name: item.name, ...(item.level !== undefined ? { level: item.level } : {}), ...(item.p ? { p: item.p } : {}), ...(item.stat_type ? { stat_type: item.stat_type } : {}) }
-        }
-        if (!Object.keys(slots).length) return { status: 409, json: { error: 'nothing is equipped in the gear set slots' } }
-        sets[set] = { slots, savedAt: Date.now() }
-      } else return { status: 400, json: { error: 'invalid gear set action' } }
-      return { status: 200, json: { ok: true, gearSets: this.gearSets[name] } }
-    }
-    // Console 1.4 Franky routine: http/encounter-mode.ts behind the
-    // farming-scope.ts wrapper, which refuses followers and merchants.
-    if (path === 'encounter-mode') {
-      const scope = this.huntScope(body.character)
-      if ('error' in scope) return { status: scope.status, json: { error: scope.error } }
-      const encounter = String(body.encounter ?? '')
-      if (encounter !== 'franky') return { status: 400, json: { error: 'invalid encounter mode' } }
-      if (body.mode === undefined && body.deathLimit === undefined) return { status: 400, json: { error: 'no encounter setting provided' } }
-      if (body.mode !== undefined && !['auto', 'offtank', 'tank'].includes(String(body.mode))) return { status: 400, json: { error: 'invalid encounter mode' } }
-      const deathLimit = Number(body.deathLimit)
-      if (body.deathLimit !== undefined && (!Number.isInteger(deathLimit) || deathLimit < 0)) return { status: 400, json: { error: 'invalid death limit' } }
-      const profile = scope.profile ? (this.farmingProfiles[scope.profile] ?? {}) : null
-      const routines = { ...((profile ? profile.encounterRoutines : this.encounterRoutines) as Record<string, string> | undefined), ...(body.mode !== undefined ? { [encounter]: String(body.mode) } : {}) }
-      const limits = { ...((profile ? profile.encounterAutoDeathLimits : this.encounterAutoDeathLimits) as Record<string, number> | undefined), ...(body.deathLimit !== undefined ? { [encounter]: deathLimit } : {}) }
-      if (scope.profile) this.updateProfile(scope.profile, { encounterRoutines: routines, encounterAutoDeathLimits: limits })
-      else {
-        this.encounterRoutines = routines
-        this.encounterAutoDeathLimits = limits
-      }
-      // farming-scope.ts resultResponse adds the scope's owner and policies when `character` was sent.
-      const owner = body.character === undefined ? null : String(body.character)
-      const policy = (name: string) => (this.farmingProfiles[name]?.farmingPolicy as string | undefined) ?? (name === this.leader ? (this.extraState.farmingPolicy as string | undefined) : undefined)
-      return {
-        status: 200,
-        json: { ok: true, encounter, mode: routines[encounter], deathLimit: limits[encounter], ...(owner ? { farmingOwner: owner, savedFarmingPolicy: policy(owner), effectiveFarmingPolicy: policy(owner) } : {}) },
-      }
-    }
     if (path === 'formation') {
       // http/formation.ts: `leader` is only touched when the key is
       // present (null clears it), `follow` only when `character` is sent.
@@ -641,7 +562,7 @@ export class MockPartyServer {
         if (typeof body.follow !== 'boolean') return { status: 400, json: { error: 'invalid follower' } }
         this.followers = { ...this.followers, [String(body.character)]: body.follow }
       }
-      // Console 1.4 events and realms: http/formation.ts limits() then
+      // Console 1.4 events: http/formation.ts limits() then
       // priorities(), each 400 on a bad value before the follower 409.
       if (body.character !== undefined && (body.eventLimits !== undefined || body.eventPriorities !== undefined)) {
         const name = String(body.character)
@@ -1040,14 +961,6 @@ export class MockPartyServer {
     }
     if (path === 'merchant/native-stand') {
       if (body.action === 'configure') this.extraState = { ...this.extraState, autoStandBuys: body.enabled === true }
-      // http/native-stand.ts resolvePurchase(): settles one unconfirmed purchase.
-      if (body.action === 'resolve-purchase') {
-        const nativeStand = this.extraState.nativeStand as { purchases?: Record<string, unknown> } | undefined
-        const id = String(body.id)
-        if (!nativeStand?.purchases?.[id] || typeof body.bought !== 'boolean') return { status: 409, json: { error: 'That purchase is no longer pending' } }
-        const { [id]: _resolved, ...purchases } = nativeStand.purchases
-        this.extraState = { ...this.extraState, nativeStand: { ...nativeStand, purchases } }
-      }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/bid') {
@@ -1076,30 +989,6 @@ export class MockPartyServer {
       // Simplified: the real switch runs as an operation; the mock completes it at once.
       this.realmControl = { ...(this.realmControl ?? {}), activeRealm: body.realm, currentRealm: body.realm, split: false, ...(body.setHome ? { homeRealm: body.realm } : {}) }
       return { status: 200, json: { ok: true } }
-    }
-    // Console 1.4 events and realms: events/boss-chase.ts update(),
-    // navigation/realm-hop-blacklist.ts.
-    if (path === 'realm/boss-chase') {
-      const chase = { ...this.bossChase }
-      if (body.enabled !== undefined) chase.enabled = body.enabled === true
-      if (body.minEtaMinutes !== undefined) {
-        const minEta = Number(body.minEtaMinutes)
-        if (!Number.isFinite(minEta) || minEta < 0 || minEta > 600) return { status: 400, json: { error: 'minEtaMinutes must be between 0 and 600' } }
-        chase.minEtaMinutes = minEta
-      }
-      if (!chase.enabled) Object.assign(chase, { trip: null, returning: null })
-      this.bossChase = chase
-      return { status: 200, json: { ok: true, bossChase: chase } }
-    }
-    if (path === 'realm/hop-blacklist') {
-      const realms = body.realms
-      if (!Array.isArray(realms) || !realms.every((realm) => typeof realm === 'string')) return { status: 400, json: { error: 'realms must be a list of realm keys' } }
-      if (new Set(realms).size !== realms.length) return { status: 400, json: { error: 'realms must not repeat' } }
-      const known = ((this.realmControl?.realms as { key: string }[] | undefined) ?? []).map((realm) => realm.key)
-      const unknown = realms.filter((realm) => !known.includes(realm))
-      if (unknown.length) return { status: 400, json: { error: 'unknown Adventure Land realm: ' + unknown.join(', ') } }
-      this.realmHopBlacklist = realms
-      return { status: 200, json: { ok: true, realmHopBlacklist: realms } }
     }
     if (path === 'command' && body.type === 'give') {
       const target = String(body.target)
@@ -1147,50 +1036,20 @@ export class MockPartyServer {
       }
       return { status: 200, json: { ok: true } }
     }
-    // Bank sort mode, layout and one-shot request (merchant/bank-sort.ts configure()).
+    // Bank sort mode and one-shot request (merchant/bank-sort.ts configure()).
     if (path === 'merchant/bank-sort') {
       const valid =
         (body.mode === undefined || body.mode === 'automatic' || body.mode === 'request') &&
-        (body.enabled === undefined || typeof body.enabled === 'boolean') &&
-        (body.layout === undefined || body.layout === 'packed' || body.layout === 'gapped')
+        (body.enabled === undefined || typeof body.enabled === 'boolean')
       if (!valid) return { status: 400, json: { error: 'invalid bank sort setting' } }
       const next = { ...this.extraState }
       if (body.mode === 'request' || body.mode === 'automatic') next.bankSortMode = body.mode
-      if (body.layout === 'packed' || body.layout === 'gapped') next.bankSortLayout = body.layout
       if (next.bankSortMode !== 'request' || body.enabled === false) next.bankSortRequest = null
       else if (body.enabled === true && !next.bankSortRequest) next.bankSortRequest = { id: 'sort-1', requestedAt: Date.now(), status: 'queued' }
       this.extraState = next
       return { status: 200, json: { ok: true } }
     }
-    // Cosmetics (characters/cosmetic-commands.ts): each command is checked
-    // against the character's latest cosmetics report, then queued.
-    if (path === 'command' && typeof body.type === 'string' && body.type.startsWith('cx-')) {
-      const report = this.characters.find((c) => c.name === body.character)?.diagnostics?.cosmetics as
-        | { jars: { inventorySlot: number; data: string | null; usable: boolean }[]; owned: { name: string; kind: string; slot: string | null }[]; worn: Record<string, string> }
-        | undefined
-      if (!report) return { status: 409, json: { error: 'No cosmetics report from this character yet' } }
-      const owned = report.owned.find((entry) => entry.name === body.name)
-      if (body.type === 'cx-open-jar') {
-        const jar = report.jars.find((entry) => entry.inventorySlot === body.inventorySlot)
-        if (!jar?.usable || !jar.data) return { status: 400, json: { error: 'That inventory slot has no usable CX jar' } }
-      } else if (body.type === 'cx-wear') {
-        if (!owned || owned.kind !== 'appearance' || !owned.slot || owned.slot !== body.slot)
-          return { status: 400, json: { error: 'Only an owned appearance cosmetic can be worn, in its own slot' } }
-      } else if (body.type === 'cx-emote') {
-        if (!owned || owned.kind !== 'emote') return { status: 400, json: { error: 'Only an owned emote can be used' } }
-        const target = body.target === undefined || body.target === null ? null : String(body.target)
-        if (target !== null && (!target || target.length > 40)) return { status: 400, json: { error: 'Invalid emote target' } }
-      } else if (body.type === 'cx-remove') {
-        if (body.slot === 'skin' || !report.worn[String(body.slot)]) return { status: 400, json: { error: 'Nothing removable is worn in that slot' } }
-      } else return { status: 400, json: { error: 'invalid command' } }
-      return { status: 200, json: { ok: true } }
-    }
     return { status: 200, json: { ok: true } }
-  }
-
-  private activeAccessCode() {
-    if (this.accessCode && Date.now() >= this.accessCode.expiresAt) this.accessCode = null
-    return this.accessCode
   }
 
   // Console 1.4 merchant and market. Returns null for anything it doesn't
@@ -1241,14 +1100,14 @@ export class MockPartyServer {
     }
     if (path === 'merchant/aldata-order' || path === 'merchant/aldata-sale') {
       // http/manual-market-orders.ts: a snapshot entry older than two
-      // minutes is refused unless `check` is true. The mock only judges
-      // entries it can find in its own snapshot.
+      // minutes is refused. The mock only judges entries it can find in its
+      // own snapshot.
       const sale = path === 'merchant/aldata-sale'
       const requested = (sale ? body.order : body.listing) as { key?: string } | undefined
       const aldata = (this.extraState.aldata as { listings?: Record<string, unknown>[]; buyOrders?: Record<string, unknown>[] } | undefined) ?? { listings: this.aldataListings }
       const listing = ((sale ? aldata.buyOrders : aldata.listings) ?? []).find((entry) => entry.key === requested?.key)
       if (listing?.serverIdentifier === 'PVP') return { status: 409, json: { error: 'automatic PVP realm travel is disabled' } }
-      if (listing && body.check !== true && Number(listing.seenAt) < Date.now() - 120000)
+      if (listing && Number(listing.seenAt) < Date.now() - 120000)
         return { status: 409, json: { error: sale ? 'buy order is stale; refresh the market first' : 'listing is stale; refresh the market first' } }
       return null
     }
@@ -1311,34 +1170,12 @@ export class MockPartyServer {
     })
 
     await page.route('**/setup/state', (route) => {
-      // setup-routes.ts setupState(): accessCodeExpiresAt only while pairing is required, null once the code is used, expired or cancelled.
-      const accessCode = this.requirePairing ? { accessCodeExpiresAt: this.activeAccessCode()?.expiresAt ?? null } : {}
-      if (this.paired) return route.fulfill({ status: 200, json: { ok: true, requirePairing: this.requirePairing, ...accessCode } })
+      if (this.paired) return route.fulfill({ status: 200, json: { ok: true, requirePairing: this.requirePairing } })
       return route.fulfill({ status: 401, json: { error: 'not paired' } })
     })
     await page.route('**/setup/pair', (route) => {
-      const body = (route.request().postDataJSON() as Record<string, unknown>) ?? {}
-      this.pairRequests.push(body)
-      // setup-routes.ts pair(): a code takes precedence over a token; access.ts
-      // pairCode() ignores case, spaces and dashes, and a failure answers 400.
-      if (typeof body.code === 'string' && body.code) {
-        const code = this.activeAccessCode()
-        const typed = body.code.toUpperCase().replace(/[\s-]/g, '')
-        if (!code) return route.fulfill({ status: 400, json: { error: 'Access code is invalid or expired' } })
-        if (typed !== code.code.replace(/-/g, '')) {
-          if (++code.failures >= 5) this.accessCode = null
-          return route.fulfill({ status: 400, json: { error: 'Access code is invalid or expired' } })
-        }
-        this.accessCode = null
-      }
       this.paired = true
       return route.fulfill({ status: 200, json: { ok: true } })
-    })
-    await page.route('**/setup/invite', (route) => {
-      if (this.requirePairing && !this.paired) return route.fulfill({ status: 401, json: { error: 'Pair this browser before changing setup' } })
-      // access.ts accessCode(): each invitation replaces the previous code.
-      this.accessCode = { code: this.nextAccessCode, expiresAt: Date.now() + this.accessCodeTtlMs, failures: 0 }
-      return route.fulfill({ json: { token: 'c0ffee'.repeat(10) + 'c0de', code: this.accessCode.code, expiresAt: this.accessCode.expiresAt, expiresIn: this.accessCodeTtlMs } })
     })
     await page.route('**/setup/pairing', async (route) => {
       const body = (route.request().postDataJSON() as { requirePairing?: boolean }) ?? {}

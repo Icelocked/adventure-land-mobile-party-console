@@ -51,105 +51,12 @@ export function HostingSettings() {
       <Button variant="outline" onClick={() => window.location.assign(`${settings.baseUrl.replace(/\/+$/, '')}/setup`)}>
         Load setup
       </Button>
-      {required && <PairAnotherBrowser setupAddress={`${(settings.baseUrl || window.location.origin).replace(/\/+$/, '')}/setup`} />}
       {error && (
         <p role="alert" className="text-rose-300">
           {error}
         </p>
       )}
     </section>
-  )
-}
-
-type Invitation = { token: string; code: string; expiresAt: number; expiresIn: number }
-
-/** "Pair another browser": a one-use access code with its countdown, the
- *  setup address to enter it at, and a one-use pairing link. Every third
- *  second it rereads /setup/state, because the server clears the code once a
- *  browser pairs with it and a newer invitation replaces it.
- *  Console: tools/hosting/setup-client.ts invite. */
-function PairAnotherBrowser({ setupAddress }: { setupAddress: string }) {
-  const api = usePartyApi()
-  const [invitation, setInvitation] = useState<Invitation | null>(null)
-  const [secondsLeft, setSecondsLeft] = useState(0)
-  const [status, setStatus] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    if (!invitation) return
-    const deadline = Date.now() + invitation.expiresIn
-    let checks = 0
-    let stopped = false
-    const end = (message: string) => {
-      stopped = true
-      clearInterval(timer)
-      setInvitation(null)
-      setStatus(message)
-    }
-    const tick = async () => {
-      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
-      setSecondsLeft(left)
-      if (left === 0) return end('The access code expired. Choose Pair another browser for a new one.')
-      if (++checks % 3 !== 0) return
-      const result = await api.getRoot('setup/state')
-      if (stopped || result.kind === 'failure') return
-      try {
-        const state = JSON.parse(result.value) as { accessCodeExpiresAt?: number | null }
-        if (state.accessCodeExpiresAt !== invitation.expiresAt) end('The access code was used or replaced. Choose Pair another browser for a new one.')
-      } catch {
-        // An unreadable state leaves the code showing; the next check retries.
-      }
-    }
-    const timer = setInterval(() => void tick(), 1000)
-    void tick()
-    return () => {
-      stopped = true
-      clearInterval(timer)
-    }
-  }, [api, invitation])
-  async function invite() {
-    setBusy(true)
-    setError('')
-    const result = await api.invitePairing()
-    setBusy(false)
-    if (result.kind === 'failure') return setError(result.message)
-    try {
-      setStatus('')
-      setInvitation(JSON.parse(result.value) as Invitation)
-    } catch {
-      setError('Setup request failed')
-    }
-  }
-  return (
-    <div className="space-y-2">
-      <Button variant="outline" disabled={busy} onClick={() => void invite()}>
-        Pair another browser
-      </Button>
-      {invitation && (
-        <div aria-label="Pairing invitation" role="group" className="space-y-2 rounded-md border border-border p-3">
-          <p>
-            Access code: <strong className="font-mono text-lg tracking-widest">{invitation.code}</strong>{' '}
-            <span className="text-xs text-muted-foreground">
-              (expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')})
-            </span>
-          </p>
-          <p className="text-xs">
-            On the other device, open <code className="break-all">{setupAddress}</code> and enter this code. It works once.
-          </p>
-          <details className="text-xs">
-            <summary className="cursor-pointer">Use a pairing link instead</summary>
-            <p className="mt-1">Open this link on the other device. It also works once.</p>
-            <code className="break-all">{`${setupAddress}#${invitation.token}`}</code>
-          </details>
-        </div>
-      )}
-      {status && <p role="status" className="text-xs">{status}</p>}
-      {error && (
-        <p role="alert" className="text-rose-300">
-          {error}
-        </p>
-      )}
-    </div>
   )
 }
 

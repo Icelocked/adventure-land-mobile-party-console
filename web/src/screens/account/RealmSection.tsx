@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { Button } from '@/components/ui/button'
@@ -10,9 +10,8 @@ const labelFor = (control: RealmControl, key?: string | null) => control.realms.
 /** Realm panel: where the party actually is
  *  (or "Mixed realms" with each character's realm), home realm, every realm
  *  with its population (PVP shown but disabled), the "Switch realm?"
- *  confirmation, and a running switch's progress. `children` (the
- *  console 1.4 chase settings) render at the bottom of the panel. */
-export function RealmSection({ control, children }: { control: RealmControl; children?: ReactNode }) {
+ *  confirmation, and a running switch's progress. */
+export function RealmSection({ control }: { control: RealmControl }) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const [choosing, setChoosing] = useState(false)
@@ -159,7 +158,6 @@ export function RealmSection({ control, children }: { control: RealmControl; chi
           ))}
         </div>
       )}
-      {children}
     </div>
   )
 }
