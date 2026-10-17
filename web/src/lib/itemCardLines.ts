@@ -309,21 +309,26 @@ export function monsterCardLines(definition: Values, skillName: (id: string) => 
 
 // A monster's stats at a level: level_monster adds half the base HP and one base XP per
 // level, and calculate_monster_stats (both in the game's node/server.js) raises attack
-// 12.5%, speed 0.24 and frequency 0.034 per level up to level 12. The game adds each
-// step in turn; one multiplication instead leaves float error that the card's
-// truncation shows (6 + 12 * 0.24 is 8.8799...), so the sums round to 4 decimals.
+// 12.5%, speed 0.24 and frequency 0.034 per level up to level 12. Speed and frequency
+// add one step per level, as the game does: one multiplication lands on the other side
+// of the card's truncation (6 + 12 * 0.24 is 8.8799..., which prints as 8.87).
 export function monsterAtLevel(definition: Values, level: number): Values {
   if (level <= 1) return definition
   const base = (key: string) => Number(definition[key]) || 0
   const combat = Math.min(level, 12)
-  const round = (value: number) => Math.round(value * 1e4) / 1e4
+  let speed = base('speed'),
+    frequency = base('frequency') || 1
+  for (let step = 0; step < combat; step++) {
+    speed += 0.24
+    frequency += 0.034
+  }
   return {
     ...definition,
     hp: base('hp') + (level - 1) * Math.floor(base('hp') / 2),
     xp: base('xp') * level,
     attack: Math.floor(base('attack') * (1 + combat * 0.125)),
-    speed: round(base('speed') + combat * 0.24),
-    frequency: round((base('frequency') || 1) + combat * 0.034),
+    speed,
+    frequency,
   }
 }
 
