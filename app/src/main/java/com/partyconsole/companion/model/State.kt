@@ -62,6 +62,9 @@ data class PartyStateDynamic(
     val threshold: Long = 0,
     val itemCollectionThreshold: Int = 1,
     val bankSortMode: String? = null,
+    // Console 1.4 merchant/bank-sort.ts: "gapped" starts each item category
+    // on its own row with free slots after it; "packed" leaves no gaps.
+    val bankSortLayout: String? = null,
     // One-shot "sort on next visit" request; only relevant in "request" mode.
     val bankSortRequest: BankSortRequest? = null,
     // The leader's farming mode; see farmingContext for other characters.

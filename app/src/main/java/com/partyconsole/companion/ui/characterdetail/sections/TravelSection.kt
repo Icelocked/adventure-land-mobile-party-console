@@ -39,7 +39,8 @@ import com.partyconsole.companion.ui.components.rememberClock
 import kotlinx.coroutines.launch
 
 /** The "Send to..." / "Return to leader" (every character) and "Travel to
- *  place..." / "Go home" / "Send merchant to..." (merchant) controls. "Send
+ *  place..." / "Go home" / "Send merchant to..." (merchant: "Visit bank" or an
+ *  online character) controls. "Send
  *  to..." opens the travel form inline: a known area or exact coordinates. */
 @Composable
 fun TravelSection(
@@ -63,6 +64,28 @@ fun TravelSection(
     // A different leader, seen recently.
     val leader = state.leader
     val leaderOnline = leader != null && leader != characterName && now - (diagnostics[leader]?.seenAt ?: 0) < 10_000
+    val merchant = state.merchantCharacter
+    // A "bank" command for another character queues a merchant visit to it;
+    // for the merchant itself it queues a bank visit (merchant-visit-control.tsx).
+    fun visit(name: String) {
+        if (queuingVisit) return
+        queuingVisit = true
+        error = null
+        visitMessage = null
+        scope.launch {
+            try {
+                when (val result = viewModel.api.sendCommand(name, mapOf("type" to "bank"))) {
+                    is ApiResult.Failure -> error = result.message
+                    is ApiResult.Success -> {
+                        visitMessage = if (name == merchant) "Bank visit queued" else "Merchant visit queued for $name"
+                        showVisits = false
+                    }
+                }
+            } finally {
+                queuingVisit = false
+            }
+        }
+    }
     fun report(action: suspend () -> ApiResult<*>) = scope.launch {
         error = null
         (action() as? ApiResult.Failure)?.let { error = it.message.ifEmpty { "Command failed" } }
@@ -84,31 +107,11 @@ fun TravelSection(
             visitMessage?.let { Text(it, color = Color(0xFFF59E0B), style = MaterialTheme.typography.labelSmall) }
             if (showVisits) {
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (merchant != null) {
+                        OutlinedButton(enabled = !queuingVisit, modifier = Modifier.fillMaxWidth(), onClick = { visit(merchant) }) { Text("Visit bank", modifier = Modifier.fillMaxWidth()) }
+                    }
                     for (name in eligible) {
-                        OutlinedButton(
-                            enabled = !queuingVisit,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                if (queuingVisit) return@OutlinedButton
-                                queuingVisit = true
-                                error = null
-                                visitMessage = null
-                                scope.launch {
-                                    try {
-                                        // Queue a merchant visit to that character.
-                                        when (val result = viewModel.api.sendCommand(name, mapOf("type" to "bank"))) {
-                                            is ApiResult.Failure -> error = result.message
-                                            is ApiResult.Success -> {
-                                                visitMessage = "Merchant visit queued for $name"
-                                                showVisits = false
-                                            }
-                                        }
-                                    } finally {
-                                        queuingVisit = false
-                                    }
-                                }
-                            },
-                        ) { Text(name, modifier = Modifier.fillMaxWidth()) }
+                        OutlinedButton(enabled = !queuingVisit, modifier = Modifier.fillMaxWidth(), onClick = { visit(name) }) { Text(name, modifier = Modifier.fillMaxWidth()) }
                     }
                     if (queuingVisit) Text("Queuing visit…", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (eligible.isEmpty()) Text("No other characters are online.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

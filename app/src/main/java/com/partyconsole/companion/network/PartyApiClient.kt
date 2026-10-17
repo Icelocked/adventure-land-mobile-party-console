@@ -694,6 +694,12 @@ class PartyApiClient(
     suspend fun setBankSortMode(mode: String): ApiResult<CommandResult> =
         post("merchant/bank-sort", JsonObject(mapOf("mode" to JsonPrimitive(mode))))
 
+    /** POST /party-api/merchant/bank-sort {layout}: "gapped" or "packed".
+     *  The server falls back to packed sorting when the bank is too full
+     *  (console 1.4). */
+    suspend fun setBankSortLayout(layout: String): ApiResult<CommandResult> =
+        post("merchant/bank-sort", JsonObject(mapOf("layout" to JsonPrimitive(layout))))
+
     suspend fun requestBankSort(enabled: Boolean): ApiResult<CommandResult> =
         post("merchant/bank-sort", JsonObject(mapOf("enabled" to JsonPrimitive(enabled))))
 
