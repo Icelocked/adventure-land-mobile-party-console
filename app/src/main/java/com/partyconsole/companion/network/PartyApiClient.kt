@@ -821,6 +821,15 @@ class PartyApiClient(
         return post("hunt-blacklist", body)
     }
 
+    /** POST /party-api/achievement-hunt - one character's settings patch
+     *  and/or blacklist change (console branch achievement-hunt). */
+    suspend fun achievementHunt(character: String, settings: Map<String, JsonElement>? = null, blacklist: JsonObject? = null): ApiResult<CommandResult> =
+        post("achievement-hunt", JsonObject(buildMap {
+            settings?.let { put("settings", JsonObject(it)) }
+            blacklist?.let { put("blacklist", it) }
+            put("character", JsonPrimitive(character))
+        }))
+
     /** POST /party-api/rare-hunting - passive hunting rules and/or the
      *  party-wide field-generator toggle. */
     suspend fun setRareHunting(patch: JsonObject): ApiResult<CommandResult> = post("rare-hunting", patch)

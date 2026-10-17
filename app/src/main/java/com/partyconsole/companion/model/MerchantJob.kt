@@ -101,6 +101,8 @@ data class MonsterSpawnRecord(
     val count: Int? = null,
     val boundary: List<Double>? = null,
     val restrictions: List<String> = emptyList(),
+    // G.maps spawn type; "randomrespawn" moves between places (Dracul, Phoenix).
+    val stype: String? = null,
 )
 
 /** A bestiary monster entry. */

@@ -51,7 +51,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Hunt settings and the Hunt blacklist for one character. Every control
+/** Farming settings for one character: Hunt settings and the Hunt
+ *  blacklist, then Achievement Hunt when the console has it. Every control
  *  saves its own field as soon as it changes (thresholds when the field loses
  *  focus), always scoped with `character`; a character following the leader
  *  sees the leader's settings read-only. */
@@ -147,7 +148,7 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
         }
     }
 
-    AccountScreenScaffold("Hunt settings · ${context.owner}", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
+    AccountScreenScaffold("Farming settings · ${context.owner}", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
@@ -286,6 +287,9 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
                         }
                     }
                 }
+            }
+            context.achievementSettings?.let { achievements ->
+                AchievementHuntSettingsBlock(viewModel, name, achievements, context.achievementBlacklist, editable, onInspect = ::inspectMonster)
             }
             inspectError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)) }
         }

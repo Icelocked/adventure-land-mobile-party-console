@@ -149,7 +149,7 @@ class CharacterScreenTest {
     @Test
     fun aFollowerCannotRouteAndTravelSendsTypedCoordinates() {
         show("Folla")
-        scrollTo("Hunt settings...")
+        scrollTo("Farming settings...")
         compose.onNodeWithContentDescription("only leader can route to monster").performClick()
         compose.onAllNodesWithText("only leader can route to monster").fetchSemanticsNodes().let { assertTrue(it.isNotEmpty()) }
 

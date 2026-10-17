@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.partyconsole.companion.model.farmingContext
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -84,10 +85,14 @@ private val MODES = listOf(
     Mode("hunt", "Hunt", "One quest at a time: leader first, then the next member if its monster is blacklisted"),
 )
 
+// Achievement Hunt: only on a console that has it (branch achievement-hunt).
+private val ACHIEVEMENTS = Mode("achievements", "Achievements", "Farm the selected monsters for their kill achievements, weakest first")
+
 /** Farming: the live combat target, the mode selector with the saved / live
  *  mode badge, the active farming zone, Hunt status, the Hunt backup setup,
  *  and this character's monster focus (with priorities and radius), the
- *  route-to- monster farming-area picker, and Hunt settings. */
+ *  route-to- monster farming-area picker, and Farming settings (Hunt and
+ *  Achievement Hunt). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FarmingSection(
@@ -174,7 +179,7 @@ fun FarmingSection(
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("FARMING SETTINGS", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    ((if (inherited) "Copy leader" else farmingPolicy) + if (!inherited && (farmingPolicy == "auto" || farmingPolicy == "hunt")) " · $liveMode" else "").uppercase(),
+                    ((if (inherited) "Copy leader" else farmingPolicy) + if (!inherited && farmingPolicy in setOf("auto", "hunt", "achievements")) " · $liveMode" else "").uppercase(),
                     color = Cyan,
                     fontFamily = FontFamily.Monospace,
                     style = MaterialTheme.typography.labelSmall,
@@ -182,8 +187,9 @@ fun FarmingSection(
                 )
             }
             if (inherited) Text("Used when Follow is off.", color = Color(0xFF06B6D4), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 6.dp))
+            val achievement = state.farmingContext(characterName)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (mode in MODES) {
+                for (mode in if (achievement.achievementSettings != null) MODES + ACHIEVEMENTS else MODES) {
                     FilterChip(
                         selected = farmingPolicy == mode.id,
                         enabled = configLoaded && !pickingBackup && !pickingArea,
@@ -205,6 +211,12 @@ fun FarmingSection(
                 )
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
+            if (effectiveMode == "achievements") {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp).semantics { contentDescription = "Achievement Hunt status" }) {
+                    Text("Achievement Hunt status", color = Color(0xFFFB7185), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
+                    Text(achievement.achievementMessage.ifEmpty { "Choosing the next monster" }, color = Color(0xFFFB7185), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
+                }
+            }
             HuntStatusBlock(effectiveMode, monsterHunt, characterHunt, huntBlacklist)
         }
 
@@ -297,7 +309,7 @@ fun FarmingSection(
                     modifier = Modifier.alpha(if (canRoute) 1f else 0.6f).semantics { contentDescription = routeDescription },
                 ) { Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(16.dp)) }
             }
-            OutlinedButton(onClick = onOpenHuntSettings, modifier = Modifier.padding(top = 6.dp)) { Text("Hunt settings...") }
+            OutlinedButton(onClick = onOpenHuntSettings, modifier = Modifier.padding(top = 6.dp)) { Text("Farming settings...") }
             if (focusOpen) {
                 MonsterFocusForm(
                     characterName = characterName,

@@ -73,6 +73,11 @@ data class PartyStateDynamic(
     val monsterSearchRadiusByCharacter: Map<String, Int> = emptyMap(),
     val huntBlacklist: Map<String, HuntBlacklistEntry> = emptyMap(),
     val huntSettings: HuntSettings? = null,
+    // Achievement Hunt of the leader's scope (console branch achievement-hunt;
+    // absent on stock consoles). Other scopes keep theirs in farmingProfiles.
+    val achievementHunt: AchievementHuntSettings? = null,
+    val achievementBlacklist: Map<String, AchievementBlacklistEntry>? = null,
+    val achievementMessage: String? = null,
     // WTB orders: one standing buy order per item id, filled up to `price`.
     val standBids: Map<String, StandBid> = emptyMap(),
     // Use an offering instead of scrolls for automatic upgrades within a
@@ -225,6 +230,9 @@ data class FarmingProfile(
     val location: MapLocation? = null,
     val monsterHunt: MonsterHuntCycle? = null,
     val farmAreaState: FarmAreaState? = null,
+    val achievementHunt: AchievementHuntSettings? = null,
+    val achievementBlacklist: Map<String, AchievementBlacklistEntry>? = null,
+    val achievementMessage: String? = null,
     // Console 1.4 Franky routine, per farming scope.
     val encounterRoutines: Map<String, String>? = null,
     val encounterAutoDeathLimits: Map<String, Int>? = null,
@@ -243,6 +251,30 @@ data class FarmingContext(
     val settings: HuntSettings?,
     val farmArea: FarmAreaState? = null,
     val hunt: MonsterHuntCycle? = null,
+    // Null on a console without Achievement Hunt.
+    val achievementSettings: AchievementHuntSettings? = null,
+    val achievementBlacklist: Map<String, AchievementBlacklistEntry> = emptyMap(),
+    val achievementMessage: String = "",
+)
+
+/** Console runtime/coordinator/hunt/achievement-settings.ts. */
+@Serializable
+data class AchievementHuntSettings(
+    val monsters: List<String> = emptyList(),
+    val blacklistDeaths: Boolean = true,
+    val deathThreshold: Int = 6,
+    val fillIdle: Boolean? = null,
+    val fillSelectedOnly: Boolean? = null,
+    val bossRecheckMinutes: Int? = null,
+)
+
+@Serializable
+data class AchievementBlacklistEntry(
+    val monsterId: String,
+    val at: Long = 0,
+    val reason: String = "",
+    val deaths: Int? = null,
+    val characters: List<String> = emptyList(),
 )
 
 fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
@@ -260,6 +292,9 @@ fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
         settings = effective?.huntSettings ?: if (legacy) huntSettings else null,
         farmArea = effective?.farmAreaState ?: if (legacy) farmAreaState else null,
         hunt = effective?.monsterHunt ?: if (legacy) monsterHunt else null,
+        achievementSettings = effective?.achievementHunt ?: if (legacy) achievementHunt else null,
+        achievementBlacklist = effective?.achievementBlacklist ?: (if (legacy) achievementBlacklist else null) ?: emptyMap(),
+        achievementMessage = effective?.achievementMessage ?: (if (legacy) achievementMessage else null) ?: "",
     )
 }
 
