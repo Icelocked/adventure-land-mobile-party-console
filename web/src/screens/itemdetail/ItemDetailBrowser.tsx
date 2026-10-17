@@ -12,6 +12,9 @@ import { ExchangeRewardTile } from '@/components/ExchangeReward'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { ItemCard, ItemExtraStats } from '@/components/ItemCard'
+import { SkillCards } from '@/components/SkillCards'
+import { itemSlotExtras, onItemCard } from '@/lib/itemCardLines'
 import {
   buildStatRows,
   comparisonSlotLabel,
@@ -28,6 +31,7 @@ import {
   formatStatValue,
   itemMaximumLevel,
   npcSaleValue,
+  previewProperties,
   rewardPercentage,
   type ExchangeSections,
 } from '@/lib/itemFormulas'
@@ -35,20 +39,22 @@ import { cn } from '@/lib/utils'
 import type {
   BestiaryMonster,
   CatalogItem,
+  Item,
   ItemCraftUse,
   ItemMeta,
   ItemRecipe,
   ItemSetInfo,
   ItemDropSource,
   MerchantCatalog,
+  SkillEntry,
   Sprite,
 } from '@/models'
 
 /** Item details: a header plus chips for only the sections that apply to
  *  this item (ItemMeta via the merchant catalog). Tapping a related
- *  item/material/set-piece/exchange result or a drop's monster drills into
- *  its details with a back button. */
-type DetailTarget = { kind: 'item'; id: string; level: number } | { kind: 'monster'; id: string }
+ *  item/material/set-piece/exchange result, a drop's monster or a granted
+ *  skill drills into its details with a back button. */
+type DetailTarget = { kind: 'item'; id: string; level: number } | { kind: 'monster'; id: string } | { kind: 'skill'; id: string }
 
 export function ItemDetailBrowser({
   rootItemId,
@@ -59,6 +65,7 @@ export function ItemDetailBrowser({
   rootGift = false,
   rootExpires,
   rootMeta,
+  rootItem,
   context,
   onAddStand,
   exchangeAdd,
@@ -73,6 +80,9 @@ export function ItemDetailBrowser({
   rootExpires?: unknown
   // The live instance's meta, merged over the catalog's.
   rootMeta?: ItemMeta | null
+  // The inspected copy, for the per-copy state the item card shows (lock, account
+  // binding, quantity).
+  rootItem?: Item
   // Header: whose item and where ("Ranger1 · slot 3").
   context?: { character: string; slot: number }
   // "Add to stand": only for the merchant's inventory or the bank.
@@ -86,6 +96,16 @@ export function ItemDetailBrowser({
 
   const pushItem = (id: string, level: number) => setTrail((t) => [...t, { kind: 'item', id, level }])
   const pushMonster = (id: string) => setTrail((t) => [...t, { kind: 'monster', id }])
+  const skills = useDynamicState().skillCatalog
+  const skillById = (id: string): SkillEntry | undefined => skills.flatMap((entry) => entry.skills).find((skill) => skill.id === id)
+  const skillName = (id: string) => skillById(id)?.name
+  const skillHint = (id: string) => {
+    const explanation = skillById(id)?.definition?.explanation
+    return typeof explanation === 'string' && explanation ? explanation : undefined
+  }
+  const pushSkill = (id: string) => {
+    if (skillById(id)) setTrail((t) => [...t, { kind: 'skill', id }])
+  }
 
   return (
     <div className={className}>
@@ -103,11 +123,20 @@ export function ItemDetailBrowser({
           rootGift={rootGift}
           rootExpires={rootExpires}
           rootMeta={rootMeta}
+          rootItem={rootItem}
           context={trail.length === 1 ? context : undefined}
           onAddStand={trail.length === 1 ? onAddStand : undefined}
           onNavigateItem={pushItem}
           onNavigateMonster={pushMonster}
+          onNavigateSkill={pushSkill}
+          skillName={skillName}
+          skillHint={skillHint}
         />
+      ) : current.kind === 'skill' ? (
+        (() => {
+          const skill = skillById(current.id)
+          return skill ? <SkillDetail skill={skill} skillName={skillName} /> : <p className="py-4 text-sm text-muted-foreground">No skill data for this skill yet.</p>
+        })()
       ) : (
         (() => {
           const monster = monsters.find((m) => m.id === current.id)
@@ -123,6 +152,24 @@ export function ItemDetailBrowser({
   )
 }
 
+/** A granted skill's details: the header the Skills screen shows, then the skill card. */
+function SkillDetail({ skill, skillName }: { skill: SkillEntry; skillName: (id: string) => string | undefined }) {
+  const explanation = typeof skill.definition?.explanation === 'string' ? skill.definition.explanation : ''
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <SpriteIcon sprite={skill.sprite} size={48} />
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold">{skill.name}</h3>
+          <p className="font-mono text-xs text-muted-foreground">G.skills.{skill.id}</p>
+        </div>
+      </div>
+      {explanation && <p className="text-sm text-muted-foreground">{explanation}</p>}
+      <SkillCards skill={skill} skillName={skillName} />
+    </div>
+  )
+}
+
 const TABS = ['Overview', 'Set bonus', 'Craftable', 'Ingredient in', 'Exchange', 'Drops'] as const
 type Tab = (typeof TABS)[number]
 
@@ -134,12 +181,17 @@ function ItemDetailContent({
   rootGift,
   rootExpires,
   rootMeta,
+  rootItem,
   context,
   onAddStand,
   onNavigateItem,
   onNavigateMonster,
+  onNavigateSkill,
+  skillName,
+  skillHint,
 }: {
   rootMeta?: ItemMeta | null
+  rootItem?: Item
   context?: { character: string; slot: number }
   onAddStand?: () => void
   target: { id: string; level: number }
@@ -150,6 +202,9 @@ function ItemDetailContent({
   rootExpires: unknown
   onNavigateItem: (id: string, level: number) => void
   onNavigateMonster: (id: string) => void
+  onNavigateSkill: (id: string) => void
+  skillName: (id: string) => string | undefined
+  skillHint: (id: string) => string | undefined
 }) {
   const catalogItem = useMemo(() => catalog?.allItems.find((item) => item.id === target.id), [catalog, target.id])
   const [previewLevel, setPreviewLevel] = useState(target.level)
@@ -304,12 +359,17 @@ function ItemDetailContent({
       {activeTab === 'Overview' && (
         <OverviewSection
           meta={meta}
+          item={isRoot ? { ...rootItem, name: target.id, level: target.level, stat_type: rootStatType, gift: rootGift || undefined, expires: rootExpires } : { name: target.id, level: target.level }}
           actualLevel={target.level}
           previewLevel={previewLevel}
           onPreviewLevelChange={setPreviewLevel}
           statType={isRoot ? rootStatType : undefined}
           gift={isRoot ? rootGift : false}
           expires={isRoot ? rootExpires : undefined}
+          usable={!!meta?.usage?.classes.some((entry) => Object.values(characters).some((character) => character?.vitals?.ctype === entry.id))}
+          skillName={skillName}
+          skillHint={skillHint}
+          onSkill={onNavigateSkill}
         />
       )}
       {activeTab === 'Set bonus' && world?.set && <SetBonusSection set={world.set} currentId={target.id} onNavigateItem={onNavigateItem} />}
@@ -358,26 +418,44 @@ function PriceCard({ label, value, className }: { label: string; value: string; 
 
 function OverviewSection({
   meta,
+  item,
   actualLevel,
   previewLevel,
   onPreviewLevelChange,
   statType,
   gift,
   expires,
+  usable,
+  skillName,
+  skillHint,
+  onSkill,
 }: {
   meta: ItemMeta | undefined
+  item: Item
   actualLevel: number
   previewLevel: number
   onPreviewLevelChange: (level: number) => void
   statType?: string
   gift: boolean
   expires: unknown
+  usable: boolean
+  skillName: (id: string) => string | undefined
+  skillHint: (id: string) => string | undefined
+  onSkill: (id: string) => void
 }) {
   const buyPrice = definitionNumber(meta, 'g')
   const maxLevel = itemMaximumLevel(meta)
   const defType = definitionString(meta, 'type')
   const rows = buildStatRows(meta, actualLevel, previewLevel, statType)
   const classes = meta?.usage?.classes ?? []
+  // Stats the level calculation doesn't cover, such as a fixed lifesteal, keep their live value.
+  const cardProperties = { ...meta?.properties, ...previewProperties(meta, actualLevel, previewLevel, statType) }
+  const extras: [string, string][] = [
+    ...itemSlotExtras(item),
+    ...rows
+      .filter((row) => !onItemCard(row.key, meta?.definition ?? {}))
+      .map((row): [string, string] => [row.key, typeof row.value === 'boolean' ? (row.value ? 'Yes' : 'No') : formatStatValue(row.key, row.value, defType)]),
+  ]
 
   return (
     <div>
@@ -419,18 +497,21 @@ function OverviewSection({
       )}
 
       <SectionLabel>Item stats</SectionLabel>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No stat data.</p>
-      ) : (
-        <div>
-          {rows.map((row) => (
-            <div key={row.key} className="flex justify-between border-b border-border/60 py-0.5 text-sm last:border-0">
-              <span className="text-muted-foreground">{row.key.replace(/_/g, ' ')}</span>
-              <span>{formatStatValue(row.key, row.value, defType)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* The game's item card beside the fields it has no line for; the extras box wraps below on a phone. */}
+      <div className="flex min-w-0 flex-wrap items-start gap-3">
+        <ItemCard
+          meta={meta}
+          item={{ ...item, level: previewLevel }}
+          level={previewLevel}
+          properties={cardProperties}
+          setName={meta?.world?.set?.name}
+          usable={usable}
+          skillName={skillName}
+          skillHint={skillHint}
+          onSkill={onSkill}
+        />
+        {extras.length > 0 && <ItemExtraStats entries={extras} />}
+      </div>
     </div>
   )
 }

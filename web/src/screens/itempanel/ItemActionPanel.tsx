@@ -136,6 +136,7 @@ export function ItemActionPanel({
             rootStatType={item.stat_type}
             rootGift={item.gift === true}
             rootExpires={item.expires}
+            rootItem={item}
             context={{ character: characterName, slot: target.kind === 'inventory' ? target.slot : -1 }}
             // Only the merchant's own inventory is a stand source.
             onAddStand={

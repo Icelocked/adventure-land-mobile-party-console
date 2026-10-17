@@ -271,6 +271,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               rootStatType={item.stat_type}
               rootGift={item.gift === true}
               rootExpires={item.expires}
+              rootItem={item}
               catalog={state.merchantCatalog}
               monsters={state.bestiaryCatalog}
             />
