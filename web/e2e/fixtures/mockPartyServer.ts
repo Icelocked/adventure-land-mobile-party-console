@@ -18,6 +18,10 @@ export interface MockItem {
   level?: number
   q?: number
   stat_type?: string
+  // Per-copy state the game's item card shows: l (lock: "s" sealed, "u" unsealing, else locked), acl (account bound), expires.
+  l?: string
+  acl?: number
+  expires?: string
 }
 
 export interface MockCharacter {
@@ -68,6 +72,10 @@ export interface MockCatalogEntry {
   usage?: { classes: { id: string; name: string; hands?: number | null }[]; hands?: number[] }
   // meta.properties, the server's computed stats at the item's current level.
   properties?: Record<string, number>
+  // meta.scaling, the per-level stat steps (upgrade or compound).
+  scaling?: Record<string, number>
+  // meta.bonuses: class-only and map-only bonuses (characters/shared.js itemBonuses).
+  bonuses?: { kind: 'class' | 'map'; id: string; name: string; stats: Record<string, number> }[]
 }
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
@@ -292,7 +300,7 @@ export class MockPartyServer {
         allItems: Object.values(this.catalogEntries).map((entry) => ({
           ...entry,
           sprite: testSprite(),
-          meta: { definition: { name: entry.name, ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}), ...(entry.buyable ? { buyable: true } : {}), ...(entry.usage ? { usage: { hands: [], ...entry.usage } } : {}), ...(entry.properties ? { properties: entry.properties } : {}) },
+          meta: { definition: { name: entry.name, ...(entry.value ? { g: entry.value } : {}), ...entry.definition }, upgradeable: entry.upgradeable, compoundable: entry.compoundable, maxLevel: entry.maxLevel ?? (entry.upgradeable ? 13 : entry.compoundable ? 7 : 0), ...(entry.world ? { world: entry.world } : {}), ...(entry.buyable ? { buyable: true } : {}), ...(entry.usage ? { usage: { hands: [], ...entry.usage } } : {}), ...(entry.properties ? { properties: entry.properties } : {}), ...(entry.scaling ? { scaling: entry.scaling } : {}), ...(entry.bonuses ? { bonuses: entry.bonuses } : {}) },
         })),
         buyable: this.buyable,
         craftable: this.craftable,
