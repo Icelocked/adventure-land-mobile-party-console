@@ -143,8 +143,8 @@ class ItemActionPanelTest {
         compose.onNodeWithText("Ring A +0").assertExists()
         compose.onNodeWithText("Replaces ring1 · Ring A").assertExists()
         // project(): DEX moves with the ring.
-        compose.onNodeWithText("105").assertExists()
-        compose.onNodeWithText("110 (+5 · +4.8%)").performScrollTo().assertExists()
+        compose.onNodeWithText("DEX: 105").assertExists()
+        compose.onNodeWithText("DEX: 110 (+5 · +4.8%)").performScrollTo().assertExists()
     }
 
     @Test

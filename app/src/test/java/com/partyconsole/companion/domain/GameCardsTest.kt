@@ -347,4 +347,29 @@ class GameCardsTest {
         assertEquals("61", jsText(JsonPrimitive(61.0)))
         assertEquals("0.25", jsText(JsonPrimitive(0.25)))
     }
+
+    @Test
+    fun aStatReadsTheSameColorOnEveryCard() {
+        // stat-colors.spec.ts: Attack, MP, Armor, Resistance, Lifesteal and Range on the item
+        // card, the monster card, the character card and extras, the comparison and the skill card.
+        val stats = """{"attack":30,"mp":50,"armor":20,"resistance":10,"lifesteal":2,"range":5,"evasion":3,"frequency":1,"speed":4}"""
+        val item = card(meta("""{"definition":{"type":"chest"},"properties":$stats}"""), Item(name = "testgear")).associate { it.key to it.color }
+        val monster = monsterCardLines(obj(stats), { null }, { null }).associate { it.key to it.color }
+        val vitals = com.partyconsole.companion.model.CharacterVitals(name = "Mage1", ctype = "mage", level = 50, hp = 1, maxHp = 1, mp = 1, maxMp = 1, gold = 0, map = "main", x = 0.0, y = 0.0, rip = false)
+        val raw = obj("""{"primaryStat":"int","attack":30,"frequency":1,"range":5,"speed":4,"armor":20,"resistance":10,"combatStats":{"lifesteal":2,"manasteal":1}}""")
+        val character = characterCardLines("Mage1", vitals, raw).associate { it.key to it.color }
+        val extras = characterExtras(vitals, raw, emptyMap()).associate { it.line.key to it.line.color }
+        val comparison = com.partyconsole.companion.ui.itempanel.COMPARISON_ROW_COLORS
+        val skill = skillCardLines(obj("""{"explanation":"x","mp":10,"range":5,"cooldown":1000}"""), { null }).associate { it.key to it.color }
+        val expected = mapOf("attack" to "#DB2900", "mp" to "#3A62CE", "armor" to "#A3A9B0", "resistance" to "#8B74C9", "lifesteal" to "#C8323E", "range" to "#93A6A2")
+        assertEquals(expected.getValue("attack"), item["attack"]); assertEquals(expected.getValue("attack"), monster["attack"]); assertEquals(expected.getValue("attack"), character["attack"]); assertEquals(expected.getValue("attack"), comparison["attack"])
+        assertEquals(expected.getValue("mp"), item["mp"]); assertEquals(expected.getValue("mp"), monster["mp"]); assertEquals(expected.getValue("mp"), character["mp"]); assertEquals(expected.getValue("mp"), comparison["max_mp"]); assertEquals(expected.getValue("mp"), skill["mp"])
+        assertEquals(expected.getValue("armor"), item["armor"]); assertEquals(expected.getValue("armor"), character["armor"]); assertEquals(expected.getValue("armor"), extras["armor"]); assertEquals(expected.getValue("armor"), comparison["armor"])
+        assertEquals(expected.getValue("resistance"), item["resistance"]); assertEquals(expected.getValue("resistance"), character["resistance"]); assertEquals(expected.getValue("resistance"), extras["resistance"]); assertEquals(expected.getValue("resistance"), comparison["resistance"])
+        assertEquals(expected.getValue("lifesteal"), item["lifesteal"]); assertEquals(expected.getValue("lifesteal"), extras["lifesteal"]); assertEquals(expected.getValue("lifesteal"), comparison["lifesteal"])
+        assertEquals(expected.getValue("range"), item["range"]); assertEquals(expected.getValue("range"), monster["range"]); assertEquals(expected.getValue("range"), character["range"]); assertEquals(expected.getValue("range"), comparison["range"]); assertEquals(expected.getValue("range"), skill["range"])
+        // A dark game color stays readable: the brighter Fortitude and Manasteal shades.
+        assertEquals("#9A6BC9", extras["for"])
+        assertEquals("#5C66D9", extras["manasteal"])
+    }
 }
