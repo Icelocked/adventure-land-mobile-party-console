@@ -505,3 +505,26 @@ fun propertiesAtLevel(meta: ItemMeta?, item: com.partyconsole.companion.model.It
     }
     return out
 }
+
+/** The stats the item card shows at [previewLevel]: the live properties, with the level
+ *  preview over them. Stats the level calculation doesn't cover, such as a fixed
+ *  lifesteal, keep their live value. */
+fun itemCardProperties(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?): Map<String, JsonElement> =
+    meta?.properties.orEmpty() + previewProperties(meta, actualLevel, previewLevel, statType?.ifEmpty { null }).mapValues { JsonPrimitive(it.value) }
+
+/** The item extras box: quantity and stat scroll, then every stats-table row the card
+ *  has no line for, booleans as Yes and No. */
+fun itemExtras(meta: ItemMeta?, item: com.partyconsole.companion.model.Item, actualLevel: Int, previewLevel: Int): List<com.partyconsole.companion.domain.CardExtra> {
+    val definition = meta?.definition.orEmpty()
+    val definitionType = definitionString(meta, "type")
+    val rows = buildStatRows(meta, actualLevel, previewLevel, item.statType?.ifEmpty { null })
+        .filter { !com.partyconsole.companion.domain.onItemCard(it.key, definition) }
+        .map { row ->
+            val value = row.value
+            val shown = if (value is JsonPrimitive && !value.isString && (value.content == "true" || value.content == "false")) {
+                if (value.content == "true") "Yes" else "No"
+            } else formatStatValue(row.key, value, definitionType)
+            row.key to shown
+        }
+    return (com.partyconsole.companion.domain.itemSlotExtras(item) + rows).map { (key, value) -> com.partyconsole.companion.domain.itemExtra(key, value) }
+}

@@ -17,8 +17,19 @@ data class ItemMeta(
     val scaling: Map<String, JsonElement> = emptyMap(),
     val maxLevel: Int? = null,
     val usage: ItemUsage? = null,
+    // Class-only and map-only bonuses from the definition's nested class and map
+    // fields (characters/shared.js itemBonuses).
+    val bonuses: List<ItemBonus> = emptyList(),
     val world: ItemWorldInfo? = null,
     val sprite: Sprite? = null,
+)
+
+@Serializable
+data class ItemBonus(
+    val kind: String = "",
+    val id: String,
+    val name: String,
+    val stats: Map<String, JsonElement> = emptyMap(),
 )
 
 @Serializable
@@ -128,6 +139,8 @@ data class ItemCraftUse(
     val quantity: Int = 1,
     val level: Int = 0,
     val cost: Long = 0,
+    // The recipe's quest; "mcollector" makes the item Collectable on the game's card.
+    val quest: String? = null,
     val sprite: Sprite? = null,
 )
 

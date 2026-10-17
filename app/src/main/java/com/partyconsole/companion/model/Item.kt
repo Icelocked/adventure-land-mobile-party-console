@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class Item(
     val l: JsonElement? = null, // string | boolean - locked, or a lock reason
+    val acl: JsonElement? = null, // number | boolean - account bound; the game's card prints "Account Bound"
     val gift: Boolean? = null,
     val expires: JsonElement? = null, // string | number
     val name: String,
