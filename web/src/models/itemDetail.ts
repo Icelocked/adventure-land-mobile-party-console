@@ -14,8 +14,18 @@ export interface ItemMeta {
   scaling?: Record<string, unknown>
   maxLevel?: number
   usage?: ItemUsage
+  // Class-only and map-only bonuses from the definition's nested class and map fields
+  // (characters/shared.js itemBonuses).
+  bonuses?: ItemBonus[]
   world?: ItemWorldInfo
   sprite?: Sprite | null
+}
+
+export interface ItemBonus {
+  kind: 'class' | 'map'
+  id: string
+  name: string
+  stats: Record<string, number>
 }
 
 export interface ItemUsage {
@@ -91,6 +101,8 @@ export interface ItemCraftUse {
   quantity: number
   level: number
   cost: number
+  // The recipe's quest; "mcollector" makes the item Collectable on the game's card.
+  quest?: string | null
   sprite?: Sprite | null
 }
 

@@ -5,6 +5,7 @@ import type { Sprite } from './sprite'
  *  shapes (string|boolean|number) are `unknown`; callers narrow them. */
 export interface Item {
   l?: unknown // string | boolean - locked, or a lock reason
+  acl?: number | boolean // account bound; the game's card prints "Account Bound"
   gift?: boolean
   expires?: unknown // string | number
   name: string
