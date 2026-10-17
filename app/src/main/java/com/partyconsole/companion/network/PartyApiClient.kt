@@ -916,6 +916,11 @@ class PartyApiClient(
      *  Poll GET /party-api/escape for stage/error. */
     suspend fun triggerEscape(): ApiResult<CommandResult> = post("escape", JsonObject(emptyMap()))
 
+    /** POST /party-api/escape/resume - releases the automation hold an
+     *  escape leaves at "complete" or "failed-hold"; answers {escape}
+     *  (console 1.4). */
+    suspend fun resumeEscape(): ApiResult<CommandResult> = post("escape/resume", JsonObject(emptyMap()))
+
     /** `/party-api/command` type "remove-auto-item-mark" - removes one
      *  auto-bank/auto-merchant rule by key. No `item` field; this command
      *  doesn't need one. */
