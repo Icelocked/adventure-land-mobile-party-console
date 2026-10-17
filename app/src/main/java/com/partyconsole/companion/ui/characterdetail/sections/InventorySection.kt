@@ -162,7 +162,8 @@ fun InventorySection(
                             val compoundGroup = compoundGroups.find { group -> group.items.any { it.slot.slotInt() == entry.slot && sameMarkedItem(it.item, entry.item) } }
                             val autoCompound = autoCompoundMarks.find { it.name == entry.item.name }
                             val autoCompoundPending = autoCompound != null && level < autoCompound.targetTier && autoCompound.quantity != 0
-                            val autoExchangeMarked = isMerchant && state.autoExchanges.containsKey("${entry.item.name}@$level")
+                            // Console 1.4: auto exchange rules cover every party member's bag once a merchant is configured.
+                            val autoExchangeMarked = merchant != null && state.autoExchanges.containsKey("${entry.item.name}@$level")
                             val saleKey = automaticCommerceRuleKey(entry.item)
                             val autoNpcSaleMarked = state.autoNpcSales.containsKey(if (sharedRules || isMerchant) saleKey else kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive(characterName), JsonPrimitive(saleKey))).toString())
                             val npcSale = state.npcSaleMarks.find {
@@ -181,14 +182,14 @@ fun InventorySection(
                                 listOf(
                                     held?.let { BannerCandidate(BannerAction.HELD, it, title = "$it: automatic bank, merchant, compound, upgrade, sale and deconstruction rules skip this item") },
                                     deconstruction?.let { BannerCandidate(BannerAction.DECONSTRUCTION, "Deconstruction") },
-                                    npcSale?.let { BannerCandidate(BannerAction.NPC, "NPC sale", automatic = it.auto, title = npcSaleDetails) },
+                                    npcSale?.let { BannerCandidate(BannerAction.NPC, if (it.auto) "Auto NPC" else "NPC sale", automatic = it.auto, title = npcSaleDetails) },
                                     statScrollMark?.let { BannerCandidate(BannerAction.STAT, "Stat scroll") },
                                     upgradeMark?.let { BannerCandidate(BannerAction.UPGRADE, if (it.auto) "Auto → +$upgradeTarget" else "+$upgradeLevel → +$upgradeTarget", automatic = it.auto) },
                                     compoundGroup?.let { BannerCandidate(BannerAction.COMPOUND, "+$level → +${level + 1}") },
                                     if (standMarked) BannerCandidate(BannerAction.STAND, "Stand sale") else null,
                                     if (autoCompoundPending) BannerCandidate(BannerAction.COMPOUND, "Auto compound → +${autoCompound!!.targetTier}", automatic = true) else null,
                                     if (autoDeconstruct) BannerCandidate(BannerAction.DECONSTRUCTION, "Auto deconstruction", automatic = true) else null,
-                                    if (autoNpcSaleMarked) BannerCandidate(BannerAction.NPC, "NPC sale", automatic = true, title = npcSaleDetails ?: "Auto NPC sale") else null,
+                                    if (autoNpcSaleMarked) BannerCandidate(BannerAction.NPC, "Auto NPC", automatic = true, title = npcSaleDetails ?: "Auto NPC sale") else null,
                                     if (autoStandMarked) BannerCandidate(BannerAction.STAND, "Auto stand", automatic = true) else null,
                                     if (autoExchangeMarked) BannerCandidate(BannerAction.EXCHANGE, "Auto exchange", automatic = true) else null,
                                     deliveryTarget?.let { BannerCandidate(BannerAction.DELIVERY, "To $it") },
