@@ -7,6 +7,7 @@
 > **Requires [Adventureland Party Console](https://github.com/Ryan-Haines/adventureland-party-console)**
 > by Ryan Haines and contributors. This is a companion to it: install and run
 > party-console first; these apps connect to it and do nothing on their own.
+> Version 1.1.0 and later need party-console v1.4.0 or newer.
 
 A phone companion for
 [Adventureland Party Console](https://github.com/Ryan-Haines/adventureland-party-console):

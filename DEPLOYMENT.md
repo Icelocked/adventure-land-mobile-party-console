@@ -166,7 +166,7 @@ volumes:
 docker compose up -d party-console-pwa party-console-pwa-updater
 ```
 
-To stay on one version with Docker, add `PWA_VERSION=1.0.1` to the `.env`
+To stay on one version with Docker, add `PWA_VERSION=1.1.0` to the `.env`
 next to the compose file and leave out the updater service.
 
 ### 4b. Reach it from your phone
@@ -262,7 +262,7 @@ Without the updater, Settings still tells you when a release is out. (The
 packages' updater is part of the PWA's own process and needs no extra access.)
 
 **Building from source instead:** replace the `image:` line with
-`build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#v1.0.1:web`.
+`build: https://github.com/Icelocked/adventure-land-mobile-party-console.git#v1.1.0:web`.
 A local build has no version, so Settings only shows update notices; update
 it the way you built it (`docker compose build --pull party-console-pwa`).
 
