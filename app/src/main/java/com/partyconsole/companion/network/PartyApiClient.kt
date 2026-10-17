@@ -83,6 +83,13 @@ data class CommandResult(
         internal set
 }
 
+/** A number as JSON.stringify writes it: whole values without ".0", null as null. */
+internal fun jsNumber(value: Double?): JsonElement = when {
+    value == null -> JsonNull
+    value.isFinite() && value == Math.floor(value) && kotlin.math.abs(value) < 9.007199254740992E15 -> JsonPrimitive(value.toLong())
+    else -> JsonPrimitive(value)
+}
+
 @kotlinx.serialization.Serializable
 private data class AlDataKeyResponse(val key: String? = null, val error: String? = null)
 
@@ -948,6 +955,19 @@ class PartyApiClient(
     /** POST /party-api/formation {character, eventSelections}. */
     suspend fun setEventSelections(character: String, eventSelections: List<String>): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventSelections" to kotlinx.serialization.json.JsonArray(eventSelections.map { JsonPrimitive(it) }))))
+
+    /** POST /party-api/formation {character, eventPriorities}. The server
+     *  400s unless the list is a full permutation of supportedEvents, and
+     *  409s "using leader events" for followers (console 1.4). */
+    suspend fun setEventPriorities(character: String, eventPriorities: List<String>): ApiResult<CommandResult> =
+        post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventPriorities" to JsonArray(eventPriorities.map { JsonPrimitive(it) }))))
+
+    /** POST /party-api/formation {character, eventLimits: {event, limits}}.
+     *  A null limit means unlimited (console 1.4). */
+    suspend fun setEventLimits(character: String, event: String, limits: com.partyconsole.companion.model.EventLimits): ApiResult<CommandResult> {
+        val values = JsonObject(mapOf("deathLimit" to jsNumber(limits.deathLimit), "timeLimitMinutes" to jsNumber(limits.timeLimitMinutes)))
+        return post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventLimits" to JsonObject(mapOf("event" to JsonPrimitive(event), "limits" to values)))))
+    }
 
     /** POST /party-api/dashboard-preferences - whether to send the
      *  anniversary chat message when receiving cake from a kiss. */

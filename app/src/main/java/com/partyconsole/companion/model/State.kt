@@ -122,6 +122,11 @@ data class PartyStateDynamic(
     val eventSchedules: List<EventSchedule> = emptyList(),
     val eventSelectionsByCharacter: Map<String, List<String>> = emptyMap(),
     val eventsByCharacter: Map<String, Boolean> = emptyMap(),
+    // Console 1.4: each character's event priority order, per-event limits
+    // and per-instance attendance (events/attendance-limits.ts).
+    val eventPrioritiesByCharacter: Map<String, List<String>> = emptyMap(),
+    val eventLimitsByCharacter: Map<String, Map<String, EventLimits>> = emptyMap(),
+    val eventAttendance: Map<String, Map<String, EventAttendanceInstance>> = emptyMap(),
     val anniversary: JsonElement? = null,
     // Bankbois, slots, session
     val bankbois: List<Bankboi> = emptyList(),
@@ -403,6 +408,16 @@ data class EventSchedule(
     val slotAt: Double? = null,
     val slotKind: String? = null,
 )
+
+/** One event's attendance limits; null means unlimited. */
+@Serializable
+data class EventLimits(val deathLimit: Double? = null, val timeLimitMinutes: Double? = null)
+
+/** events/attendance-limits.ts AttendanceInstance, trimmed to what the
+ *  events list reads. `ignored` is "death limit", "time limit", "manual
+ *  travel" or "travel failure". */
+@Serializable
+data class EventAttendanceInstance(val ended: Boolean = false, val ignored: String? = null)
 
 @Serializable
 data class BankboiTransactionState(val phase: String = "", val mode: String = "")
