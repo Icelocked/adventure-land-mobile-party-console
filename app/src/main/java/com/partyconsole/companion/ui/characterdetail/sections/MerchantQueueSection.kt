@@ -34,7 +34,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.data.Domain
 import com.partyconsole.companion.domain.durationLabel
+import com.partyconsole.companion.domain.dueGatheringModes
+import com.partyconsole.companion.domain.merchantAtCapacity
 import com.partyconsole.companion.domain.merchantJobLabel
+import com.partyconsole.companion.domain.queuedJobStatus
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.partyconsole.companion.model.MerchantJob
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.DomainInterest
@@ -80,7 +85,21 @@ fun MerchantQueueSection(viewModel: PartyViewModel) {
         current?.reason == "marked items" && current.phase == "processing" -> "finishing collection"
         else -> current?.phase ?: "in progress"
     }
-    val jobs = (if (current != null) listOf(current to currentStatus) else emptyList()) + state.merchantQueue.map { it to "queued" }
+    val characters by viewModel.characters.collectAsState()
+    val diagnostics by viewModel.characterDetails.collectAsState()
+    val merchant = state.merchantCharacter
+    val merchantItems = merchant?.let { characters[it]?.inventory?.items }
+    val atCapacity = merchantAtCapacity(merchantItems)
+    val capacityReason = "Merchant capacity blocked (${merchantItems?.count { it != null }}/${merchantItems?.size} slots occupied; three slots reserved)"
+    val ownCooldowns = (merchant?.let { diagnostics[it]?.raw?.get("gatheringCooldowns") } as? JsonObject)
+        ?.mapNotNull { (mode, value) -> (value as? JsonPrimitive)?.content?.toDoubleOrNull()?.let { mode to it.toLong() } }?.toMap().orEmpty()
+    val partyCooldowns = listOfNotNull(state.gatheringCooldowns?.fishing?.let { "fishing" to it }, state.gatheringCooldowns?.mining?.let { "mining" to it }).toMap()
+    // Console 1.4: jobs waiting on merchant bag space show as blocked, and due
+    // fishing and mining modes get a row of their own.
+    val jobs = (if (current != null) listOf(current to currentStatus) else emptyList()) +
+        state.merchantQueue.map { it to queuedJobStatus(it, merchant, atCapacity) } +
+        dueGatheringModes(state.gatheringModes, ownCooldowns, partyCooldowns, listOf(current) + state.merchantQueue, now)
+            .map { MerchantJob(reason = it, target = merchant.orEmpty()) to if (atCapacity) "BLOCKED" else "queued" }
     val mluck = state.mluckSchedule
 
     SectionCard(title = "Merchant logistics · ${state.merchantQueue.size} queued") {
@@ -96,11 +115,12 @@ fun MerchantQueueSection(viewModel: PartyViewModel) {
         if (jobs.isEmpty()) Text("No queued work", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         jobs.forEachIndexed { index, (job, status) ->
             val target = if (job.target.isNotEmpty() && job.reason != "join giveaway") " · ${job.target}" else ""
-            val side = job.realmBlockedReason
+            val blocked = status.lowercase() == "blocked"
+            val side = if (blocked) status else job.realmBlockedReason
                 ?: job.retryAt?.takeIf { it > now }?.let { "Retry at ${DateFormat.getTimeInstance().format(Date(it))}" }
                 ?: job.pauseReason ?: status
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (status == "queued" && job.reason != "fishing" && job.reason != "mining") CancelJobControl(job, viewModel)
+                if ((status == "queued" || status == "blocked") && job.reason != "fishing" && job.reason != "mining") CancelJobControl(job, viewModel)
                 Text(
                     "P${job.priority ?: state.merchantRoutinePriorities[routineFor(job)] ?: 50} ${merchantJobLabel(job, catalog)}$target",
                     fontFamily = FontFamily.Monospace,
@@ -110,7 +130,16 @@ fun MerchantQueueSection(viewModel: PartyViewModel) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Text(side, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 128.dp))
+                Text(
+                    side,
+                    color = if (blocked) Color(0xFFF87171) else Color.Unspecified,
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    // The dashboard's tooltip: why the job waits.
+                    modifier = Modifier.widthIn(max = 128.dp).then(if (blocked) Modifier.semantics { contentDescription = capacityReason } else Modifier),
+                )
                 if (job.realmRetryExhausted) RetryJobButton(job.id, viewModel)
             }
         }

@@ -83,6 +83,13 @@ data class CommandResult(
         internal set
 }
 
+/** A number as JSON.stringify writes it: whole values without ".0", null as null. */
+internal fun jsNumber(value: Double?): JsonElement = when {
+    value == null -> JsonNull
+    value.isFinite() && value == Math.floor(value) && kotlin.math.abs(value) < 9.007199254740992E15 -> JsonPrimitive(value.toLong())
+    else -> JsonPrimitive(value)
+}
+
 @kotlinx.serialization.Serializable
 private data class AlDataKeyResponse(val key: String? = null, val error: String? = null)
 
@@ -259,13 +266,28 @@ class PartyApiClient(
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (sessionLost(response.code)) ApiResult.Failure(SESSION_EXPIRED, "session_expired")
-                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}") else ApiResult.Success(text)
+                if (response.isSuccessful) return@withContext ApiResult.Success(text)
+                // Many rejections carry an {error} body (pairing failures among
+                // them); it wins over the bare status, as in the PWA's postJson.
+                val message = runCatching { ((json.parseToJsonElement(text) as? JsonObject)?.get("error") as? JsonPrimitive)?.content }.getOrNull()?.ifEmpty { null }
+                if (sessionLost(response.code)) return@withContext ApiResult.Failure(message ?: SESSION_EXPIRED, "session_expired", response.code)
+                ApiResult.Failure(message ?: "HTTP ${response.code}", status = response.code)
             }
         } catch (e: java.io.IOException) {
             ApiResult.Failure(e.message ?: "network error")
         }
     }
+
+    /** POST /setup/pair {code} - pairs this device with the access code a
+     *  paired browser shows. The server ignores case, spaces and dashes, and
+     *  answers 400 "Access code is invalid or expired" (console 1.4
+     *  tools/hosting/access.ts). */
+    suspend fun pairWithAccessCode(code: String): ApiResult<String> = postRoot("setup/pair", JsonObject(mapOf("code" to JsonPrimitive(code))))
+
+    /** POST /setup/invite - a one-use pairing link token plus a one-use access
+     *  code: {token, code, expiresAt, expiresIn}. Issuing one replaces the
+     *  previous code (console 1.4 tools/hosting/setup-routes.ts). */
+    suspend fun invitePairing(): ApiResult<String> = postRoot("setup/invite", JsonObject(emptyMap()))
 
     suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> {
         // Every mutating action funnels through here, so this is where a tap
@@ -586,8 +608,8 @@ class PartyApiClient(
         sendCommand(character, mapOf("type" to "clear-auto-item-marks", "mode" to mode))
 
     /** POST /party-api/merchant/order - queues an NPC buy and/or crafting
-     *  job. The server recomputes each buy line's upgrade budget, so `level`
-     *  is what matters; client-side cost estimates are display-only. */
+     *  job. The server recomputes each buy line's upgrade budget from
+     *  `level` (console 1.4 runtime/upgrade-estimate.ts). */
     suspend fun submitMerchantOrder(
         buys: List<com.partyconsole.companion.model.MerchantOrderBuyLine>,
         crafts: List<com.partyconsole.companion.model.MerchantOrderCraftLine>,
@@ -686,6 +708,12 @@ class PartyApiClient(
      *  is queued via `enabled: true`. */
     suspend fun setBankSortMode(mode: String): ApiResult<CommandResult> =
         post("merchant/bank-sort", JsonObject(mapOf("mode" to JsonPrimitive(mode))))
+
+    /** POST /party-api/merchant/bank-sort {layout}: "gapped" or "packed".
+     *  The server falls back to packed sorting when the bank is too full
+     *  (console 1.4). */
+    suspend fun setBankSortLayout(layout: String): ApiResult<CommandResult> =
+        post("merchant/bank-sort", JsonObject(mapOf("layout" to JsonPrimitive(layout))))
 
     suspend fun requestBankSort(enabled: Boolean): ApiResult<CommandResult> =
         post("merchant/bank-sort", JsonObject(mapOf("enabled" to JsonPrimitive(enabled))))
@@ -793,6 +821,15 @@ class PartyApiClient(
         return post("hunt-blacklist", body)
     }
 
+    /** POST /party-api/achievement-hunt - one character's settings patch
+     *  and/or blacklist change (console branch achievement-hunt). */
+    suspend fun achievementHunt(character: String, settings: Map<String, JsonElement>? = null, blacklist: JsonObject? = null): ApiResult<CommandResult> =
+        post("achievement-hunt", JsonObject(buildMap {
+            settings?.let { put("settings", JsonObject(it)) }
+            blacklist?.let { put("blacklist", it) }
+            put("character", JsonPrimitive(character))
+        }))
+
     /** POST /party-api/rare-hunting - passive hunting rules and/or the
      *  party-wide field-generator toggle. */
     suspend fun setRareHunting(patch: JsonObject): ApiResult<CommandResult> = post("rare-hunting", patch)
@@ -846,6 +883,36 @@ class PartyApiClient(
         )
         return post("merchant/bid", body)
     }
+
+    /** POST /party-api/merchant/config {character, slot, action} with
+     *  "lock-lucky-slot" or "unlock-lucky-slot". The dashboard sends the
+     *  row's slot on unlock too; the server reads it only for a lock, and an
+     *  unlock resumes discovery at the next square (console 1.4). */
+    suspend fun setLuckySlotLock(character: String, slot: Int, unlock: Boolean): ApiResult<CommandResult> =
+        post("merchant/config", JsonObject(mapOf(
+            "character" to JsonPrimitive(character),
+            "slot" to JsonPrimitive(slot),
+            "action" to JsonPrimitive(if (unlock) "unlock-lucky-slot" else "lock-lucky-slot"),
+        )))
+
+    /** POST /party-api/prim-stack - queues a merchant job that raises a
+     *  merchant inventory item's grace to [target] without a level attempt.
+     *  [method] is "offering" (Primling only) or "stat" (Primling plus stat
+     *  scrolls) (console 1.4 runtime/prim-stack.ts). */
+    suspend fun primStack(character: String, slot: Int, item: Item, target: Double, method: String): ApiResult<CommandResult> =
+        post("prim-stack", JsonObject(mapOf(
+            "character" to JsonPrimitive(character),
+            "slot" to JsonPrimitive(slot),
+            "item" to json.encodeToJsonElement(Item.serializer(), item),
+            "target" to jsNumber(target),
+            "method" to JsonPrimitive(method),
+        )))
+
+    /** POST /party-api/merchant/native-stand "resolve-purchase" - settles a
+     *  purchase whose merchant job ended unconfirmed: bought counts it toward
+     *  the WTB order, not bought releases it (console 1.4). */
+    suspend fun resolveNativePurchase(id: String, bought: Boolean): ApiResult<CommandResult> =
+        post("merchant/native-stand", JsonObject(mapOf("action" to JsonPrimitive("resolve-purchase"), "id" to JsonPrimitive(id), "bought" to JsonPrimitive(bought))))
 
     /** POST /party-api/upgrade-preview - polled, so no action toast and no
      *  domain refresh. `refresh` queues a new server preview; otherwise the
@@ -909,6 +976,11 @@ class PartyApiClient(
      *  Poll GET /party-api/escape for stage/error. */
     suspend fun triggerEscape(): ApiResult<CommandResult> = post("escape", JsonObject(emptyMap()))
 
+    /** POST /party-api/escape/resume - releases the automation hold an
+     *  escape leaves at "complete" or "failed-hold"; answers {escape}
+     *  (console 1.4). */
+    suspend fun resumeEscape(): ApiResult<CommandResult> = post("escape/resume", JsonObject(emptyMap()))
+
     /** `/party-api/command` type "remove-auto-item-mark" - removes one
      *  auto-bank/auto-merchant rule by key. No `item` field; this command
      *  doesn't need one. */
@@ -941,6 +1013,19 @@ class PartyApiClient(
         return post("realm/switch", body)
     }
 
+    /** POST /party-api/realm/boss-chase {enabled} or {minEtaMinutes}; the
+     *  server takes a minimum ETA from 0 to 600 (console 1.4). */
+    suspend fun setBossChase(enabled: Boolean? = null, minEtaMinutes: Double? = null): ApiResult<CommandResult> =
+        post("realm/boss-chase", JsonObject(buildMap {
+            enabled?.let { put("enabled", JsonPrimitive(it)) }
+            minEtaMinutes?.let { put("minEtaMinutes", jsNumber(it)) }
+        }))
+
+    /** POST /party-api/realm/hop-blacklist {realms}: the whole list,
+     *  replacing the saved one (console 1.4). */
+    suspend fun setRealmHopBlacklist(realms: List<String>): ApiResult<CommandResult> =
+        post("realm/hop-blacklist", JsonObject(mapOf("realms" to JsonArray(realms.map { JsonPrimitive(it) }))))
+
     /** POST /party-api/dashboard-preferences - the bankboi naming prefix. */
     suspend fun setBankboiPrefix(prefix: String): ApiResult<CommandResult> =
         post("dashboard-preferences", JsonObject(mapOf("bankboiPrefix" to JsonPrimitive(prefix))))
@@ -948,6 +1033,35 @@ class PartyApiClient(
     /** POST /party-api/formation {character, eventSelections}. */
     suspend fun setEventSelections(character: String, eventSelections: List<String>): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventSelections" to kotlinx.serialization.json.JsonArray(eventSelections.map { JsonPrimitive(it) }))))
+
+    /** POST /party-api/formation {character, eventPriorities}. The server
+     *  400s unless the list is a full permutation of supportedEvents, and
+     *  409s "using leader events" for followers (console 1.4). */
+    suspend fun setEventPriorities(character: String, eventPriorities: List<String>): ApiResult<CommandResult> =
+        post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventPriorities" to JsonArray(eventPriorities.map { JsonPrimitive(it) }))))
+
+    /** POST /party-api/formation {character, eventLimits: {event, limits}}.
+     *  A null limit means unlimited (console 1.4). */
+    suspend fun setEventLimits(character: String, event: String, limits: com.partyconsole.companion.model.EventLimits): ApiResult<CommandResult> {
+        val values = JsonObject(mapOf("deathLimit" to jsNumber(limits.deathLimit), "timeLimitMinutes" to jsNumber(limits.timeLimitMinutes)))
+        return post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventLimits" to JsonObject(mapOf("event" to JsonPrimitive(event), "limits" to values)))))
+    }
+
+    /** POST /party-api/gear-sets {character, set, action}. "save" captures
+     *  the gear the character is wearing and 409s without an equipment
+     *  report from the last 10s; "clear" drops the set
+     *  (characters/gear-sets.ts). */
+    suspend fun gearSet(character: String, set: String, action: String): ApiResult<CommandResult> =
+        post("gear-sets", JsonObject(mapOf("character" to JsonPrimitive(character), "set" to JsonPrimitive(set), "action" to JsonPrimitive(action))))
+
+    /** POST /party-api/encounter-mode {character, encounter, mode}: "auto",
+     *  "offtank" or "tank" (console 1.4 Franky routine). */
+    suspend fun setEncounterMode(character: String, encounter: String, mode: String): ApiResult<CommandResult> =
+        post("encounter-mode", JsonObject(mapOf("character" to JsonPrimitive(character), "encounter" to JsonPrimitive(encounter), "mode" to JsonPrimitive(mode))))
+
+    /** POST /party-api/encounter-mode {character, encounter, deathLimit}. */
+    suspend fun setEncounterAutoLimit(character: String, encounter: String, deathLimit: Long): ApiResult<CommandResult> =
+        post("encounter-mode", JsonObject(mapOf("character" to JsonPrimitive(character), "encounter" to JsonPrimitive(encounter), "deathLimit" to JsonPrimitive(deathLimit))))
 
     /** POST /party-api/dashboard-preferences - whether to send the
      *  anniversary chat message when receiving cake from a kiss. */
@@ -1037,13 +1151,33 @@ class PartyApiClient(
 
     /** POST /party-api/merchant/aldata-order - the listing as received,
      *  minus client-only grouping fields. */
-    suspend fun buyAlData(listing: JsonObject, buyQuantity: Int): ApiResult<CommandResult> =
-        post("merchant/aldata-order", JsonObject(mapOf("listing" to JsonObject(listing - "origin" - "groupedListings"), "buyQuantity" to JsonPrimitive(buyQuantity))))
+    suspend fun buyAlData(listing: JsonObject, buyQuantity: Int, check: Boolean = false): ApiResult<CommandResult> =
+        post("merchant/aldata-order", JsonObject(buildMap {
+            put("listing", JsonObject(listing - "origin" - "groupedListings"))
+            put("buyQuantity", JsonPrimitive(buyQuantity))
+            // Console 1.4 "Check": the merchant verifies a stale listing in person (manual-market-orders.ts).
+            if (check) put("check", JsonPrimitive(true))
+        }))
 
     /** POST /party-api/merchant/aldata-sale - sell owned copies into a live
      *  ALData buy order. */
-    suspend fun sellAlData(order: JsonObject, sellQuantity: Int): ApiResult<CommandResult> =
-        post("merchant/aldata-sale", JsonObject(mapOf("order" to order, "sellQuantity" to JsonPrimitive(sellQuantity))))
+    suspend fun sellAlData(order: JsonObject, sellQuantity: Int, check: Boolean = false): ApiResult<CommandResult> =
+        post("merchant/aldata-sale", JsonObject(buildMap {
+            put("order", order)
+            put("sellQuantity", JsonPrimitive(sellQuantity))
+            // `check` skips the staleness refusal, as in buyAlData.
+            if (check) put("check", JsonPrimitive(true))
+        }))
+
+    /** POST /party-api/market/ignored-items {action, ...item, level}. The
+     *  dashboard spreads the listing item into the body and forces `level`,
+     *  so "clear" also carries level 0 (console 1.4 stand-sheet.tsx). */
+    suspend fun updateMarketIgnoredItems(action: String, name: String? = null, level: Int? = null): ApiResult<CommandResult> =
+        post("market/ignored-items", JsonObject(buildMap {
+            put("action", JsonPrimitive(action))
+            name?.let { put("name", JsonPrimitive(it)) }
+            put("level", JsonPrimitive(level ?: 0))
+        }))
 
     /** POST /party-api/merchant/ponty-order - every listing key of the
      *  grouped lot. */

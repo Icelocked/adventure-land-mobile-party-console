@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.partyconsole.companion.network.ServerConfigStore
@@ -79,6 +80,31 @@ fun AppNavigation(store: ServerConfigStore) {
         }
     }
 
+    // Console 1.4 DungeonNavigator: once the party view exists, a dungeon
+    // start brings the user to its controls and other screens show a bar
+    // that leads back.
+    val currentEntry by navController.currentBackStackEntryAsState()
+    val partyEntry = remember(currentEntry) { runCatching { navController.getBackStackEntry(Routes.CHARACTER_LIST) }.getOrNull() }
+    val active = settings
+    if (active != null && partyEntry != null) {
+        val partyViewModel: PartyViewModel = viewModel(partyEntry, factory = PartyViewModelFactory(active))
+        com.partyconsole.companion.ui.dungeon.DungeonNavigator(
+            partyViewModel,
+            onPartyScreen = currentEntry?.destination?.route == Routes.CHARACTER_LIST,
+            onOpenParty = {
+                navController.navigate(Routes.CHARACTER_LIST) {
+                    popUpTo(Routes.CHARACTER_LIST)
+                    launchSingleTop = true
+                }
+            },
+        ) { Screens(navController, store, settings) }
+    } else {
+        Screens(navController, store, settings)
+    }
+}
+
+@Composable
+private fun Screens(navController: androidx.navigation.NavHostController, store: ServerConfigStore, settings: com.partyconsole.companion.network.ServerSettings?) {
     NavHost(
         navController = navController,
         startDestination = Routes.CONNECTION,

@@ -50,18 +50,43 @@ class FakeConsole : AutoCloseable {
     val mapFrames = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
     /** One-shot replies for a POST path (e.g. "merchant/stand"): status + body. */
     val failOnce = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, String>>()
+    /** Stateful POST routes by path ("gear-sets", or "/setup/pair" for a root
+     *  route), checked after [failOnce]. A route answers status + body, or
+     *  null to fall through to [postStatus]/[postBody]. Console14Routes.kt
+     *  installs the console 1.4 routes of the PWA's e2e mock. */
+    val routes = java.util.concurrent.ConcurrentHashMap<String, (JsonObject) -> Pair<Int, String>?>()
+    /** GET /party-api/escape's `escape` (JSON), as the e2e mock's `escape`. */
+    @Volatile var escape: String? = null
+    /** Every escape POST path in order (the e2e mock's escapeActions). */
+    val escapeActions = CopyOnWriteArrayList<String>()
+    /** GET /setup/state's body; Console14Routes.kt adds the access code expiry. */
+    @Volatile var setupState: () -> String = { """{"requirePairing":true}""" }
+    /** Characters whose equipment report is older than gear-sets.ts's 10s window. */
+    val staleEquipment = CopyOnWriteArrayList<String>()
+    /** The newest /setup/invite code: code, expiresAt, wrong guesses. Null once used or cancelled. */
+    @Volatile var accessCode: Triple<String, Long, Int>? = null
+    @Volatile var nextAccessCode = "K7MQ-2PXA"
+    @Volatile var accessCodeTtlMs = 10 * 60_000L
+    /** Every /setup/pair body. */
+    val pairRequests = CopyOnWriteArrayList<JsonObject>()
+    /** The e2e mock's `paired` and `requirePairing`: an unpaired client gets
+     *  401 from /setup/state and /setup/invite until /setup/pair succeeds. */
+    @Volatile var setupPaired = true
+    @Volatile var requirePairing = true
 
     init {
         // Poll at about the old desktop pace so tests don't wait on mobile cadences.
         com.partyconsole.companion.data.PartyRepository.pollingScale = 0.2
         actionBaseline = com.partyconsole.companion.ui.components.ActionToasts.entries.value.maxOfOrNull { it.id } ?: actionBaseline
+        installConsole14Routes()
     }
 
     private val server = MockWebServer().apply {
         dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path.orEmpty()
-                requests += Request(request.method.orEmpty(), path, request.body.readUtf8())
+                val text = request.body.readUtf8()
+                requests += Request(request.method.orEmpty(), path, text)
                 if (unpaired) return MockResponse().setResponseCode(302).setHeader("Location", "/setup")
                 // party-console's tools/hosting/authorize.ts rejects every non-GET/HEAD request whose
                 // Origin is not the console's own address (scheme + Host header), before pairing.
@@ -69,7 +94,11 @@ class FakeConsole : AutoCloseable {
                     return json("""{"error":"Dashboard origin required"}""").setResponseCode(403)
                 }
                 if (request.method == "POST") {
-                    failOnce.remove(path.removePrefix("/party-api/"))?.let { (status, body) -> return json(body).setResponseCode(status) }
+                    val route = path.removePrefix("/party-api/")
+                    if (route.startsWith("escape")) escapeActions += route
+                    failOnce.remove(route)?.let { (status, body) -> return json(body).setResponseCode(status) }
+                    val body = runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull() ?: JsonObject(emptyMap())
+                    routes[route]?.invoke(body)?.let { (status, reply) -> return json(reply).setResponseCode(status) }
                     return json(postBody).setResponseCode(postStatus)
                 }
                 val url = request.requestUrl!!
@@ -88,11 +117,11 @@ class FakeConsole : AutoCloseable {
                         sections[name]?.let { json(it.toString()) } ?: json(fixture("state-full").toString())
                     }
                     "/party-api/mail" -> json("""{"messages":[],"count":0}""")
-                    "/party-api/escape" -> json("""{"escape":null}""")
+                    "/party-api/escape" -> json("""{"escape":${escape ?: "null"}}""")
                     "/party-api/daily-dungeons" -> dailyDungeon?.let { json(it) } ?: MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                     // The market's first read, before core reports a referenceRevision.
                     "/party-api/aldata/market" -> json(sections["market"]?.get("aldata")?.takeIf { it is JsonObject }?.toString() ?: """{"listings":[]}""")
-                    "/setup/state" -> json("""{"requirePairing":true}""")
+                    "/setup/state" -> if (setupPaired) json(setupState()) else json("""{"error":"not paired"}""").setResponseCode(401)
                     else -> MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                 }
             }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -56,6 +58,9 @@ import com.partyconsole.companion.domain.filterAlData
 import com.partyconsole.companion.domain.filterBuyOrders
 import com.partyconsole.companion.domain.groupAlData
 import com.partyconsole.companion.domain.groupPonty
+import com.partyconsole.companion.domain.marketItemKey
+import com.partyconsole.companion.domain.marketItemLabel
+import com.partyconsole.companion.domain.marketListingFresh
 import com.partyconsole.companion.domain.ownedCounts
 import com.partyconsole.companion.domain.ownedKey
 import com.partyconsole.companion.domain.ownedSource
@@ -107,7 +112,10 @@ private fun Confirm(title: String, text: String, busy: Boolean, error: String?, 
  *  colouring and stale dimming, confirmed buys split across grouped listings,
  *  "Make WTB" for stale rows, selling into live WTB offers (or "List" at the
  *  WTB price when stale), classifieds' Add to WTB / Add to stand, and Ponty's
- *  grouped lots. Every row inspects its item. */
+ *  grouped lots. Every row inspects its item. Console 1.4 adds a per-row
+ *  ignore button, "Hide stale listings" (per tab, remembered on this
+ *  device), and "Check" on stale WTS rows and stale WTB offers the merchant
+ *  can fill. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () -> Unit, onOpenSettings: () -> Unit, onOpenSetup: () -> Unit) {
@@ -126,6 +134,18 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     var hideUnaffordable by remember { mutableStateOf(false) }
     var hideBlacklisted by remember { mutableStateOf(true) }
     var hideUnowned by remember { mutableStateOf(false) }
+    // stand-sheet.tsx keeps "Hide stale listings" per tab (party-market-hide-stale-<tab>).
+    val prefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE)
+    val hideStaleByTab = remember { mutableStateMapOf<String, Boolean>() }
+    val hideStale = hideStaleByTab[tab] ?: prefs.getBoolean("party-market-hide-stale-$tab", false)
+    fun setHideStale(value: Boolean) {
+        hideStaleByTab[tab] = value
+        prefs.edit().putBoolean("party-market-hide-stale-$tab", value).apply()
+    }
+    var ignoring by remember { mutableStateOf(false) }
+    var ignoreError by remember { mutableStateOf("") }
+    // Set with `confirming`: true when the confirmation is a stale-listing Check.
+    var checking by remember { mutableStateOf(false) }
     val quantities = remember { mutableStateMapOf<String, String>() }
     var confirming by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
@@ -149,22 +169,28 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     val bankGold = state.bank?.gold ?: state.bankGold ?: 0L
     val values = remember(catalog, state.merchantCatalog?.buyable) { dealValuesByItem(catalog, state.merchantCatalog?.buyable.orEmpty()) }
     fun listingValue(entry: AlDataListing) = values[entry.item.name]?.takeIf { it != 0.0 } ?: 1.0
-    val grouped = remember(allAlData) { groupAlData(allAlData) }
+    val ignoredKeys = state.marketIgnoredItems.map { marketItemKey(it.name, it.level) }.toSet()
+    fun shown(item: Item, seenAt: Long?) = marketItemKey(item.name, item.level) !in ignoredKeys && (!hideStale || marketListingFresh(seenAt, now))
+    // stand-sheet.tsx drops stale rows before grouping; ignored items go after.
+    val grouped = groupAlData(allAlData.filter { !hideStale || marketListingFresh(it.seenAt, now) })
     val wts = filterAlData(grouped, query, now, nameFor).filter { entry ->
+        shown(entry.item, entry.seenAt) &&
         (!showDealsOnly || entry.price < listingValue(entry) * 0.5) &&
             (!hideBadDeals || entry.price <= listingValue(entry) * 2) &&
             (!hideUnaffordable || entry.price <= bankGold) &&
             (!hideBlacklisted || blacklistRecord(blacklist, state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier) == null)
     }
     val owned = ownedCounts(merchantItems, bankPacks)
-    val buyOrders = filterBuyOrders(allBuyOrders, query, now, hideUnowned, owned, nameFor)
+    val buyOrders = filterBuyOrders(allBuyOrders.filter { shown(it.item, it.seenAt) }, query, now, hideUnowned, owned, nameFor)
     val bankWtb = buyOrders.filter { owned.containsKey(ownedKey(it.item)) }
     val ownOwner = merchantName?.let { diagnostics[it]?.owner }?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.toString() }.orEmpty()
     val publicTrades = aldata?.trades.orEmpty().map(::alDataPublicTrade).filter { it.owner != ownOwner }.flatMap { owner -> owner.listings.map { owner to it } }
+    // Classifieds have no per-listing time, so their freshness is the feed's last refresh.
     val classifieds = publicTrades.filter { (owner, entry) ->
+        shown(Item(name = entry.name, level = entry.level), aldata?.tradesUpdatedAt) &&
         "${nameFor(entry.name).orEmpty()} ${entry.name} ${owner.label.orEmpty()} ${owner.characters.joinToString(" ")}".lowercase().contains(query.trim().lowercase())
     }
-    val pontyRows = groupPonty(ponty?.listings.orEmpty().map(::pontyListing), query, now, nameFor)
+    val pontyRows = groupPonty(ponty?.listings.orEmpty().map(::pontyListing).filter { shown(it.item, it.seenAt) }, query, now, nameFor)
 
     fun run(key: String, action: suspend () -> String?) = scope.launch {
         busy = key
@@ -177,12 +203,13 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     }
     fun ApiResult<CommandResult>.message() = (this as? ApiResult.Failure)?.message
     // Purchase confirmation: split the quantity across the grouped listings.
-    suspend fun buyGrouped(entry: AlDataListing, quantity: Int): String? {
+    // `check` asks the merchant to verify a stale listing in person (console 1.4).
+    suspend fun buyGrouped(entry: AlDataListing, quantity: Int, check: Boolean = false): String? {
         var remaining = quantity
         for (physical in entry.groupedListings ?: listOf(entry)) {
             if (remaining <= 0) break
             val purchasing = minOf(remaining, max(1, physical.quantity))
-            api.buyAlData(physical.raw, purchasing).message()?.let { return it }
+            api.buyAlData(physical.raw, purchasing, check).message()?.let { return it }
             remaining -= purchasing
         }
         return if (remaining > 0) "Only ${quantity - remaining} of $quantity listings could be queued" else null
@@ -210,6 +237,24 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     fun itemLabel(item: Item): String {
         val entry = catalogFor(item.name)
         return (entry?.name ?: item.name) + if (entry != null && (entry.upgradeable || entry.compoundable)) " +${item.level ?: 0}" else ""
+    }
+    // Marketplace settings manages the list; rows only add to it.
+    fun ignore(item: Item) = scope.launch {
+        ignoreError = ""
+        ignoring = true
+        val result = api.updateMarketIgnoredItems("add", item.name, item.level ?: 0)
+        ignoring = false
+        if (result is ApiResult.Failure) ignoreError = result.message.ifEmpty { "Could not save ignored items" } else viewModel.refreshDynamicStateNow()
+    }
+    @Composable
+    fun IgnoreButton(item: Item) {
+        val label = marketItemLabel(item.name, item.level, catalogFor)
+        androidx.compose.material3.OutlinedIconButton(
+            enabled = !ignoring,
+            onClick = { ignore(item) },
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF991B1B)),
+            modifier = Modifier.size(32.dp).semantics { contentDescription = "Ignore listings of $label" },
+        ) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Close, contentDescription = null, tint = Color(0xFFF87171), modifier = Modifier.size(16.dp)) }
     }
     @Composable
     fun Check(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
@@ -278,6 +323,9 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search market" },
             )
+            // Hides observations older than two minutes; classifieds use the last successful feed refresh.
+            Check("Hide stale listings", hideStale) { setHideStale(it) }
+            if (ignoreError.isNotEmpty()) Text(ignoreError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             if (tab == "wts") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Check("Show deals only", showDealsOnly) { showDealsOnly = it }
@@ -306,7 +354,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                     val stackable = ((item?.meta?.definition?.get("s") as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: 1.0) > 1
                     val multiple = entry.quantity > 1
                     val age = max(0L, (now - entry.seenAt) / 1000)
-                    val fresh = age <= 120 && entry.serverIdentifier != "PVP"
+                    val fresh = marketListingFresh(entry.seenAt, now) && entry.serverIdentifier != "PVP"
                     val suggested = listingValue(entry)
                     val (deal, badDeal, comparison) = priceComparison(entry.price.toDouble(), suggested)
                     val quantity = (quantities[key] ?: "1").toIntOrNull() ?: 0
@@ -316,6 +364,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        IgnoreButton(entry.item)
                         ItemButton(entry.item, itemLabel(entry.item), "${entry.seller}'s ALData listing", {
                             Text(
                                 "${entry.seller} · ${entry.serverRegion} ${entry.serverIdentifier} · ${entry.map} · seen ${ageLabel(age)} ago" +
@@ -341,20 +390,33 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                             Button(enabled = busy != key, onClick = {
                                 if (quantity < 1 || quantity > entry.quantity) return@Button
                                 rowError = null
+                                checking = false
                                 confirming = key
                             }) { Text(if (busy == key) "Queuing…" else "Buy") }
                         } else {
+                            OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
                             OutlinedButton(onClick = { wtbItem = Item(name = entry.item.name, level = entry.item.level ?: 0) }) { Text("Make WTB") }
                         }
                         if (confirming == key) {
-                            Confirm(
-                                "Confirm marketplace purchase",
-                                "Really buy ${"%,d".format(quantity)} ${nameFor(entry.item.name) ?: entry.item.name} for ${gold(quantity * entry.price)}g?",
-                                busy == key,
-                                rowError?.takeIf { it.first == key }?.second,
-                                onYes = { run(key) { buyGrouped(entry, quantity) } },
-                                onCancel = { confirming = null },
-                            )
+                            if (checking) {
+                                Confirm(
+                                    "Check stale listing",
+                                    "Send the merchant to check whether ${entry.seller}'s listing for ${nameFor(entry.item.name) ?: entry.item.name} is still live, and buy up to ${"%,d".format(entry.quantity)} for ${gold(entry.price)}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.",
+                                    busy == key,
+                                    rowError?.takeIf { it.first == key }?.second,
+                                    onYes = { run(key) { buyGrouped(entry, entry.quantity, check = true) } },
+                                    onCancel = { confirming = null },
+                                )
+                            } else {
+                                Confirm(
+                                    "Confirm marketplace purchase",
+                                    "Really buy ${"%,d".format(quantity)} ${nameFor(entry.item.name) ?: entry.item.name} for ${gold(quantity * entry.price)}g?",
+                                    busy == key,
+                                    rowError?.takeIf { it.first == key }?.second,
+                                    onYes = { run(key) { buyGrouped(entry, quantity) } },
+                                    onCancel = { confirming = null },
+                                )
+                            }
                         }
                     }
                 }
@@ -373,7 +435,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                         val have = owned[ownedKey(order.item)] ?: 0
                         val source = ownedSource(order.item, merchantItems, bankPacks)
                         val age = max(0L, (now - order.seenAt) / 1000)
-                        val fresh = age <= 120 && order.serverIdentifier != "PVP"
+                        val fresh = marketListingFresh(order.seenAt, now) && order.serverIdentifier != "PVP"
                         val maximum = minOf(have, order.quantity)
                         val quantity = (quantities[key] ?: "1").toIntOrNull() ?: 0
                         val title = (item?.name ?: order.item.name) + if (item?.meta?.upgradeable == true || item?.meta?.compoundable == true) " +${order.item.level ?: 0}" else ""
@@ -383,6 +445,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
+                            IgnoreButton(order.item)
                             ItemButton(order.item, title, "${order.buyer}'s live WTB", {
                                 Text("${order.buyer} · ${order.serverRegion} ${order.serverIdentifier} · seen ${ageLabel(age)} ago · wants ${order.quantity}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }, Modifier.fillMaxWidth())
@@ -394,22 +457,37 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                                 Button(enabled = busy != key, onClick = {
                                     if (quantity < 1 || quantity > maximum) return@Button
                                     rowError = null
+                                    checking = false
                                     confirming = key
                                 }) { Text("Sell") }
+                            } else if (!fresh && maximum > 0) {
+                                OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
+                                if (source != null) OutlinedButton(onClick = { listFor(key, order.item, order.price, maximum) }) { Text("List") }
                             } else if (!fresh && source != null) {
                                 OutlinedButton(onClick = { listFor(key, order.item, order.price, maximum) }) { Text("List") }
                             } else {
                                 Text(if (!fresh) "STALE · NO MATCH OWNED" else "NO MATCH OWNED", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterVertically))
                             }
                             if (confirming == key) {
-                                Confirm(
-                                    "Confirm marketplace sale",
-                                    "Really sell ${"%,d".format(quantity)} ${nameFor(order.item.name) ?: order.item.name} to ${order.buyer} for ${gold(quantity * order.price)}g?",
-                                    busy == key,
-                                    rowError?.takeIf { it.first == key }?.second,
-                                    onYes = { run(key) { api.sellAlData(order.raw, quantity).message() } },
-                                    onCancel = { confirming = null },
-                                )
+                                if (checking) {
+                                    Confirm(
+                                        "Check stale WTB listing",
+                                        "Send the merchant to check whether ${order.buyer}'s WTB listing for ${nameFor(order.item.name) ?: order.item.name} is still live, and sell up to ${"%,d".format(maximum)} for ${gold(order.price)}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.",
+                                        busy == key,
+                                        rowError?.takeIf { it.first == key }?.second,
+                                        onYes = { run(key) { api.sellAlData(order.raw, maximum, check = true).message() } },
+                                        onCancel = { confirming = null },
+                                    )
+                                } else {
+                                    Confirm(
+                                        "Confirm marketplace sale",
+                                        "Really sell ${"%,d".format(quantity)} ${nameFor(order.item.name) ?: order.item.name} to ${order.buyer} for ${gold(quantity * order.price)}g?",
+                                        busy == key,
+                                        rowError?.takeIf { it.first == key }?.second,
+                                        onYes = { run(key) { api.sellAlData(order.raw, quantity).message() } },
+                                        onCancel = { confirming = null },
+                                    )
+                                }
                             }
                             ListingForm(key)
                         }
@@ -428,6 +506,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        IgnoreButton(requested)
                         ItemButton(requested, (item?.name ?: entry.name) + if (entry.level != 0) " +${entry.level}" else "", "Published trade intention", {
                             Text("${owner.label ?: owner.characters.firstOrNull() ?: owner.owner} · ${entry.note ?: "Published intention"}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }, Modifier.fillMaxWidth())
@@ -445,7 +524,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                 "ponty" -> {
                     ponty?.error?.let { Text("Last refresh failed: $it", style = MaterialTheme.typography.bodySmall, modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF701A75), RoundedCornerShape(4.dp)).padding(8.dp)) }
                     if (pontyRows.isEmpty()) Text("Ponty currently has no matching items.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    for (group in pontyRows) PontyRow(group, viewModel, catalogFor, now, quantities, busy, confirming, rowError, merchantName,
+                    for (group in pontyRows) PontyRow(group, viewModel, catalogFor, now, quantities, busy, confirming, rowError, merchantName, { IgnoreButton(group.item) },
                         onInspect = { inspectSource = "Ponty's inventory"; inspecting = it },
                         onConfirm = { rowError = null; confirming = group.key },
                         onCancel = { confirming = null },
@@ -480,6 +559,7 @@ private fun PontyRow(
     confirming: String?,
     rowError: Pair<String, String>?,
     merchantName: String?,
+    ignoreButton: @Composable () -> Unit,
     onInspect: (Item) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
@@ -499,6 +579,7 @@ private fun PontyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        ignoreButton()
         Row(modifier = Modifier.fillMaxWidth().clickable { onInspect(group.item) }, verticalAlignment = Alignment.CenterVertically) {
             SpriteIcon(item?.sprite, size = 40.dp)
             Column(modifier = Modifier.padding(start = 12.dp)) {

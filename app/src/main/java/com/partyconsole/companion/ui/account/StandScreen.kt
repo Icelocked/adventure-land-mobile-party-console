@@ -282,7 +282,9 @@ fun StandScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(modifier = Modifier.clickable { inspectSource = "Your stand buy order"; inspecting = Item(name = row.id, level = row.level) }.padding(end = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                                 SpriteIcon(item?.sprite ?: item?.meta?.sprite, size = 48.dp)
-                                Text("$name +${row.level}", modifier = Modifier.padding(start = 12.dp))
+                                // "+level" only for items that have levels.
+                                val leveled = item?.upgradeable == true || item?.compoundable == true || item?.meta?.upgradeable == true || item?.meta?.compoundable == true
+                                Text(name + if (leveled) " +${row.level}" else "", modifier = Modifier.padding(start = 12.dp))
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text("${"%,d".format(bid?.quantity ?: row.quantity)} wanted", style = MaterialTheme.typography.bodySmall)

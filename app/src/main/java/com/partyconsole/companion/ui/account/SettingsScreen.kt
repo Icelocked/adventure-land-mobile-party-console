@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -345,8 +346,90 @@ private fun HostingSettings(viewModel: PartyViewModel) {
         OutlinedButton(onClick = {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(viewModel.api.baseUrl.trimEnd('/') + "/setup"))) }
         }) { Text("Load setup") }
+        if (required == true) PairAnotherBrowser(viewModel, viewModel.api.baseUrl.trimEnd('/') + "/setup")
         if (error.isNotEmpty()) Text(error, color = Color(0xFFFDA4AF), style = MaterialTheme.typography.bodySmall)
     }
+}
+
+@kotlinx.serialization.Serializable
+private data class Invitation(val token: String, val code: String, val expiresAt: Long, val expiresIn: Long)
+
+@kotlinx.serialization.Serializable
+private data class AccessCodeState(val accessCodeExpiresAt: Long? = null)
+
+/** "Pair another browser": a one-use access code with its countdown, the
+ *  setup address to enter it at, and a one-use pairing link. Every third
+ *  second it rereads /setup/state, because the server clears the code once
+ *  a browser pairs with it and a newer invitation replaces it (console 1.4
+ *  tools/hosting/setup-client.ts invite). PWA: ConsoleSettings.tsx. */
+@Composable
+private fun PairAnotherBrowser(viewModel: PartyViewModel, setupAddress: String) {
+    val scope = rememberCoroutineScope()
+    var invitation by remember { mutableStateOf<Invitation?>(null) }
+    var secondsLeft by remember { mutableStateOf(0L) }
+    var status by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var showLink by remember { mutableStateOf(false) }
+    LaunchedEffect(invitation) {
+        val current = invitation ?: return@LaunchedEffect
+        val deadline = System.currentTimeMillis() + current.expiresIn
+        var checks = 0
+        while (true) {
+            val left = maxOf(0L, Math.ceil((deadline - System.currentTimeMillis()) / 1000.0).toLong())
+            secondsLeft = left
+            if (left == 0L) {
+                invitation = null
+                status = "The access code expired. Choose Pair another browser for a new one."
+                return@LaunchedEffect
+            }
+            if (++checks % 3 == 0) {
+                val result = viewModel.api.getRoot("setup/state")
+                // An unreadable state leaves the code showing; the next check retries.
+                val state = (result as? ApiResult.Success)?.let { runCatching { settingsJson.decodeFromString(AccessCodeState.serializer(), it.value) }.getOrNull() }
+                if (state != null && state.accessCodeExpiresAt != current.expiresAt) {
+                    invitation = null
+                    status = "The access code was used or replaced. Choose Pair another browser for a new one."
+                    return@LaunchedEffect
+                }
+            }
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+    fun invite() = scope.launch {
+        busy = true
+        error = ""
+        val result = viewModel.api.invitePairing()
+        busy = false
+        when (result) {
+            is ApiResult.Failure -> error = result.message
+            is ApiResult.Success -> runCatching { settingsJson.decodeFromString(Invitation.serializer(), result.value) }
+                .onSuccess { status = ""; showLink = false; invitation = it }
+                .onFailure { error = "Setup request failed" }
+        }
+    }
+    OutlinedButton(enabled = !busy, onClick = { invite() }) { Text("Pair another browser") }
+    invitation?.let { current ->
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)).padding(12.dp)
+                .semantics { contentDescription = "Pairing invitation" },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Access code:", style = MaterialTheme.typography.bodySmall)
+                Text(current.code, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text("(expires in ${secondsLeft / 60}:${(secondsLeft % 60).toString().padStart(2, '0')})", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            }
+            Text("On the other device, open $setupAddress and enter this code. It works once.", style = MaterialTheme.typography.labelSmall)
+            TextButton(onClick = { showLink = !showLink }) { Text("Use a pairing link instead") }
+            if (showLink) {
+                Text("Open this link on the other device. It also works once.", style = MaterialTheme.typography.labelSmall)
+                Text("$setupAddress#${current.token}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+    if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.labelSmall)
+    if (error.isNotEmpty()) Text(error, color = Color(0xFFFDA4AF), style = MaterialTheme.typography.bodySmall)
 }
 
 /** Console update settings, with the debug instance controls. */
@@ -619,9 +702,10 @@ private fun DashboardStateImport(viewModel: PartyViewModel) {
     }
 }
 
-/** The realm control: current / home realm, a confirmed switch with the Realm
- *  Fatigue and Hop Sickness warnings and "Set as home realm", and the running
- *  operation. */
+/** The realm control: current / home realm, mixed or unconfirmed homes, a
+ *  confirmed switch with the Realm Fatigue and Hop Sickness warnings and
+ *  "Set as home realm", the running operation, then the console 1.4 boss
+ *  chase and hop blacklist (RealmChaseSettings.kt). PWA: RealmSection.tsx. */
 @Composable
 private fun RealmSection(viewModel: PartyViewModel) {
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -631,7 +715,7 @@ private fun RealmSection(viewModel: PartyViewModel) {
     var setHome by remember { mutableStateOf(false) }
     var destination by remember { mutableStateOf<String?>(null) }
     var switching by remember { mutableStateOf(false) }
-    val realm = dynamicState.realmControl ?: return
+    val realm = dynamicState.realmControl ?: com.partyconsole.companion.model.RealmControl()
     val blocked = realm.operation != null && realm.operation.phase !in setOf("complete", "failed")
     fun labelFor(key: String?) = realm.realms.find { it.key == key }?.label ?: key ?: "Unknown"
     val current = realm.currentRealm ?: realm.activeRealm
@@ -643,29 +727,40 @@ private fun RealmSection(viewModel: PartyViewModel) {
             color = if (realm.split) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (realm.split) for (member in realm.characters) Text("${member.name}: ${member.realm ?: "offline"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+        if (realm.homeRealm == null && realm.homeCharacters.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth().background(Color(0x1AF59E0B), RoundedCornerShape(6.dp)).padding(8.dp)) {
+                Text("Home realms differ or are unconfirmed:", style = MaterialTheme.typography.labelSmall)
+                for (member in realm.homeCharacters) Text("${member.name}: ${member.home ?: "unconfirmed"}", style = MaterialTheme.typography.labelSmall)
+            }
+        }
         val target = destination
         if (target == null) {
             TextButton(enabled = !blocked, onClick = { showRealms = !showRealms }) { Text(if (showRealms) "Cancel" else "Change realm…") }
             if (showRealms) {
                 for (option in realm.realms) {
                     TextButton(
-                        // Nothing to do when the whole party is already there.
-                        enabled = !option.pvp && !blocked && (realm.split || option.key != current),
+                        // Nothing to do when the whole party is already there and it is already home.
+                        enabled = !option.pvp && !blocked && (realm.split || option.key != current || option.key != realm.homeRealm),
                         onClick = { realmError = null; setHome = false; destination = option.key },
                     ) { Text("${option.label} (${"%,d".format(option.players)} players)${if (option.pvp) " — disabled" else ""}") }
                 }
             }
         } else {
-            Text("Switch realm?", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+            Text(if (setHome) "Change home realm?" else "Switch realm?", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
             Text("This switches every active party character to ${labelFor(target)} and gives non-merchant characters Realm Fatigue.", style = MaterialTheme.typography.labelSmall)
+            if (setHome) Text("This will change for all characters in the account including characters not currently logged in.", color = Color(0xFFFDE68A), style = MaterialTheme.typography.labelSmall)
             Text("Realm Fatigue: approximately 30 minutes. Home-realm rewards are paused; ordinary rewards continue.", style = MaterialTheme.typography.labelSmall)
             if (target != realm.homeRealm) {
                 Text("Outside your home realm: Hop Sickness applies −80 Luck, Gold, and XP, plus −20% output, until you return home or change your home realm through Bean.", style = MaterialTheme.typography.labelSmall)
                 Row(verticalAlignment = Alignment.Top) {
-                    Checkbox(checked = setHome, onCheckedChange = { setHome = it })
+                    Checkbox(checked = setHome, onCheckedChange = { setHome = it }, modifier = Modifier.semantics { contentDescription = "Set as home realm" })
                     Column(modifier = Modifier.padding(top = 12.dp)) {
                         Text("Set as home realm", style = MaterialTheme.typography.labelMedium)
-                        Text("After switching, one non-merchant will visit Bean in Main and request the home change. Current game data exposes no separate home-change cooldown.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Every account character will request the native home change. Offline characters log in temporarily, one at a time, then log out. One headless character may briefly disconnect to make room and will reconnect afterwards. Adventure Land enforces a 36-hour home-change cooldown per character.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             } else {
@@ -684,7 +779,7 @@ private fun RealmSection(viewModel: PartyViewModel) {
                         }
                         switching = false
                     }
-                }) { Text(if (switching) "Starting…" else "Switch all characters") }
+                }) { Text(if (switching) "Starting…" else if (setHome) "Change home realm" else "Switch all characters") }
             }
         }
         realm.operation?.let { operation ->
@@ -694,7 +789,12 @@ private fun RealmSection(viewModel: PartyViewModel) {
                 color = if (operation.phase == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
             operation.error?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
-            for (member in operation.characters) Text("${member.name}: ${member.realm ?: "waiting"}", style = MaterialTheme.typography.labelSmall)
+            for (member in operation.characters) {
+                val home = if (!operation.setHome) "" else if (member.homeConfirmed) " — home confirmed" else " — waiting for home confirmation"
+                Text("${member.name}: ${member.realm ?: "waiting"}$home", style = MaterialTheme.typography.labelSmall)
+            }
         }
+        BossChaseSetting(viewModel, dynamicState.bossChase)
+        RealmHopBlacklistSetting(viewModel, realm.realms, dynamicState.realmHopBlacklist)
     }
 }

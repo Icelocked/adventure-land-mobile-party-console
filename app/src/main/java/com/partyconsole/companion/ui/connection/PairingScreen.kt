@@ -30,6 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -51,6 +54,7 @@ fun PairingScreen(viewModel: PairingViewModel, onPaired: () -> Unit) {
     val submitting by viewModel.submitting.collectAsState()
     val error by viewModel.error.collectAsState()
     var manualInput by remember { mutableStateOf("") }
+    var accessCode by remember { mutableStateOf("") }
     var scanning by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
@@ -62,6 +66,8 @@ fun PairingScreen(viewModel: PairingViewModel, onPaired: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // The access code, scanner and link fields outgrow small screens.
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -71,11 +77,33 @@ fun PairingScreen(viewModel: PairingViewModel, onPaired: () -> Unit) {
                 is PairingState.Unpaired -> {
                     Text("Pair this device", style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "On your computer, open the party-console dashboard's Setup page, then under " +
-                            "\"Connection settings\" click \"Pair another browser\". Scan the code it shows, " +
-                            "or paste the link it gives you below.",
+                        "On a browser that is already paired, open setup and choose \"Pair another browser\", " +
+                            "then enter the access code it shows. You can also scan its pairing QR code or paste " +
+                            "its pairing link below.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    OutlinedTextField(
+                        value = accessCode,
+                        onValueChange = { accessCode = it },
+                        label = { Text("Access code") },
+                        placeholder = { Text("ABCD-EFGH") },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+                            autoCorrectEnabled = false,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { viewModel.submitCode(accessCode) { accessCode = ""; scanning = false } }),
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Access code" },
+                    )
+                    Button(
+                        onClick = { viewModel.submitCode(accessCode) { accessCode = ""; scanning = false } },
+                        enabled = !submitting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (submitting) "Pairing…" else "Pair with access code")
+                    }
                     if (scanning) {
                         QrScanner(
                             modifier = Modifier.fillMaxWidth().aspectRatio(1f),

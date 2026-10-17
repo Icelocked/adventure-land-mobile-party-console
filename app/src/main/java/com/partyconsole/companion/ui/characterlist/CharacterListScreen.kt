@@ -264,6 +264,9 @@ private fun PartyControls(viewModel: PartyViewModel) {
     val current = escape
     val running = current != null && current.stage !in listOf("complete", "failed-hold", "released")
     val failed = error != null || escapeReadError != null || (current != null && current.stage != "released" && (current.error != null || current.stage == "failed-hold"))
+    // Console 1.4 escape-control.tsx: a finished or failed escape holds automation until resumed.
+    val held = current != null && current.stage in listOf("complete", "failed-hold")
+    val holdError = current?.takeIf { it.stage != "released" }?.error
     // Escape stage labels.
     val label = if (failed) "Escape - failed" else if (current?.stage == "complete") "Escape - success" else "Escape"
 
@@ -301,6 +304,24 @@ private fun PartyControls(viewModel: PartyViewModel) {
             }
         }
         (townError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        if (!inDungeon && error == null) holdError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
+        if (!inDungeon && held) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+                Text("Automation is held until you resume it.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                OutlinedButton(
+                    enabled = !busy,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            error = null
+                            (viewModel.api.resumeEscape() as? ApiResult.Failure)?.let { error = it.message }
+                            viewModel.refreshDynamicStateNow()
+                            busy = false
+                        }
+                    },
+                ) { Text("Resume automation") }
+            }
+        }
         if (inDungeon && dungeonError.isNotEmpty()) Text(dungeonError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     }
 }

@@ -177,10 +177,11 @@ class EventsDungeonTest {
         eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.eventSchedules.isNotEmpty() }
         compose.waitForIdle()
         compose.onAllNodes(hasText("Events (1) ▾"))[0].performClick()
-        compose.onNodeWithText("Goo Brawl — LIVE").assertExists()
-        compose.onNodeWithText("Giant Crab — Time not announced · timing stale").assertExists()
+        // Console 1.4 names events from eventDisplayNames over the schedule feed's names.
+        compose.onNodeWithText("Goobrawl — LIVE").assertExists()
+        compose.onNodeWithText("Crabxx — Time not announced · timing stale").assertExists()
         compose.onNodeWithText("Mystery — Unsupported").assertExists()
-        compose.onNodeWithContentDescription("Goo Brawl").performClick()
+        compose.onNodeWithContentDescription("Goobrawl").performClick()
         eventually { posts("formation").isNotEmpty() }
         posts("formation")[0].let {
             assertEquals("Leada", it.text("character"))
@@ -190,7 +191,7 @@ class EventsDungeonTest {
         compose.onAllNodes(hasText("Events (1) ▾"))[0].performClick()
         compose.onAllNodes(hasText("Events (1) ▾"))[1].performClick()
         compose.onNodeWithText("Using Leada’s events").assertExists()
-        compose.onNodeWithContentDescription("Goo Brawl").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Goobrawl").assertIsNotEnabled()
     }
 
     @Test

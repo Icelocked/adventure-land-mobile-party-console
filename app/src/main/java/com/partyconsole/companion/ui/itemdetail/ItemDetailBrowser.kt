@@ -58,11 +58,12 @@ import kotlin.math.roundToInt
 
 /** Item details (ItemMeta via the merchant catalog) as a header plus chips
  *  for only the sections that apply to this item. Tapping a related
- *  item/material/set-piece/exchange result or a drop's monster drills into
- *  its details with a back button. */
+ *  item/material/set-piece/exchange result, a drop's monster or a granted
+ *  skill drills into its details with a back button. */
 private sealed interface DetailTarget {
     data class ItemTarget(val id: String, val level: Int = 0) : DetailTarget
     data class MonsterTarget(val id: String) : DetailTarget
+    data class SkillTarget(val id: String) : DetailTarget
 }
 
 /** The exchange "Add" (enabled when the merchant has enough). */
@@ -83,6 +84,9 @@ fun ItemDetailBrowser(
     rootExpires: JsonElement? = null,
     // The live instance's meta, merged over the catalog's.
     rootMeta: ItemMeta? = null,
+    // The inspected copy, for the per-copy state the item card shows (lock, account
+    // binding, quantity).
+    rootItem: com.partyconsole.companion.model.Item? = null,
     context: ItemDetailContext? = null,
     // "Add to stand": only for the merchant's inventory or the bank.
     onAddStand: (() -> Unit)? = null,
@@ -95,6 +99,11 @@ fun ItemDetailBrowser(
         mutableStateOf(listOf<DetailTarget>(DetailTarget.ItemTarget(rootItemId, rootLevel)))
     }
     val current = trail.last()
+    val emptyState = remember { kotlinx.coroutines.flow.MutableStateFlow(com.partyconsole.companion.model.PartyStateDynamic()) }
+    val skillCatalog = (viewModel?.dynamicState ?: emptyState).collectAsState().value.skillCatalog
+    val skillById = { id: String -> skillCatalog.firstNotNullOfOrNull { entry -> entry.skills.find { it.id == id } } }
+    val skillName = { id: String -> skillById(id)?.name }
+    val pushSkill = { id: String -> if (skillById(id) != null) trail = trail + DetailTarget.SkillTarget(id) }
     Column(modifier = modifier) {
         if (trail.size > 1) {
             TextButton(onClick = { trail = trail.dropLast(1) }, contentPadding = PaddingValues(vertical = 4.dp)) {
@@ -112,17 +121,30 @@ fun ItemDetailBrowser(
                 rootGift = rootGift,
                 rootExpires = rootExpires,
                 rootMeta = rootMeta,
+                rootItem = rootItem,
                 context = if (trail.size == 1) context else null,
                 onAddStand = if (trail.size == 1) onAddStand else null,
                 viewModel = viewModel,
                 onNavigateItem = { id, level -> trail = trail + DetailTarget.ItemTarget(id, level) },
                 onNavigateMonster = { id -> trail = trail + DetailTarget.MonsterTarget(id) },
+                onNavigateSkill = pushSkill,
+                skillName = skillName,
             )
             is DetailTarget.MonsterTarget -> {
                 val monster = monsters.find { it.id == target.id }
                 if (monster != null && viewModel != null) {
-                    com.partyconsole.companion.ui.components.MonsterDetail(viewModel, monster, onInspectDrop = { id -> trail = trail + DetailTarget.ItemTarget(id, 0) })
+                    com.partyconsole.companion.ui.components.MonsterDetail(
+                        viewModel, monster,
+                        onInspectDrop = { id -> trail = trail + DetailTarget.ItemTarget(id, 0) },
+                        onInspectMonster = { id -> trail = trail + DetailTarget.MonsterTarget(id) },
+                        onInspectSkill = pushSkill,
+                    )
                 } else MonsterDetailContent(monster = monster, onNavigateItem = { id, level -> trail = trail + DetailTarget.ItemTarget(id, level) })
+            }
+            is DetailTarget.SkillTarget -> {
+                val skill = skillById(target.id)
+                if (skill != null) SkillDetail(skill, skillName)
+                else Text("No skill data for this skill yet.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 16.dp))
             }
         }
         if (exchangeAdd != null && trail.size == 1) {
@@ -135,6 +157,24 @@ fun ItemDetailBrowser(
     }
 }
 
+/** A granted skill's details: the header the Class skills screen shows, then the skill card. */
+@Composable
+private fun SkillDetail(skill: com.partyconsole.companion.model.SkillEntry, skillName: (String) -> String?) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SpriteIcon(skill.sprite, size = 48.dp)
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(skill.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                Text("G.skills.${skill.id}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = Color(0xFFC4B5FD))
+            }
+        }
+        (skill.definition?.get("explanation") as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotEmpty() }?.let {
+            Text(it.content, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        com.partyconsole.companion.ui.components.SkillCards(skill.definition, skillName)
+    }
+}
+
 @Composable
 private fun ItemDetailContent(
     target: DetailTarget.ItemTarget,
@@ -144,11 +184,14 @@ private fun ItemDetailContent(
     rootGift: Boolean,
     rootExpires: JsonElement?,
     rootMeta: ItemMeta?,
+    rootItem: com.partyconsole.companion.model.Item?,
     context: ItemDetailContext?,
     onAddStand: (() -> Unit)?,
     viewModel: PartyViewModel?,
     onNavigateItem: (String, Int) -> Unit,
     onNavigateMonster: (String) -> Unit,
+    onNavigateSkill: (String) -> Unit,
+    skillName: (String) -> String?,
 ) {
     val catalogItem = remember(catalog, target.id) { catalog?.allItems?.find { it.id == target.id } }
     // Reset per navigated item (the content isn't remounted on navigation).
@@ -278,6 +321,18 @@ private fun ItemDetailContent(
     when (activeTab) {
         "Overview" -> OverviewSection(
             meta = meta,
+            // The inspected copy for the root item; a related item is a bare +level.
+            item = if (isRoot) (rootItem ?: com.partyconsole.companion.model.Item(name = target.id)).copy(
+                name = target.id,
+                level = target.level,
+                statType = rootStatType,
+                gift = if (rootGift) true else rootItem?.gift,
+                expires = rootExpires ?: rootItem?.expires,
+            ) else com.partyconsole.companion.model.Item(name = target.id, level = target.level),
+            // The game colors a weapon's type green when a party class can wield it.
+            usable = meta?.usage?.classes.orEmpty().any { entry -> characters.values.any { it.vitals?.ctype == entry.id } },
+            skillName = skillName,
+            onSkill = onNavigateSkill,
             actualLevel = target.level,
             previewLevel = previewLevel,
             onPreviewLevelChange = { previewLevel = it },
@@ -346,6 +401,10 @@ private fun PriceCard(label: String, value: String, modifier: Modifier = Modifie
 @Composable
 private fun OverviewSection(
     meta: ItemMeta?,
+    item: com.partyconsole.companion.model.Item,
+    usable: Boolean,
+    skillName: (String) -> String?,
+    onSkill: (String) -> Unit,
     actualLevel: Int,
     previewLevel: Int,
     onPreviewLevelChange: (Int) -> Unit,
@@ -412,22 +471,18 @@ private fun OverviewSection(
         }
 
         SectionLabel("Item stats")
-        val defType = definitionString(meta, "type")
-        val rows = buildStatRows(meta, actualLevel, previewLevel, statType)
-        if (rows.isEmpty()) {
-            Text("No stat data.", style = MaterialTheme.typography.bodySmall)
-        } else {
-            for (row in rows) {
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        row.key.replace('_', ' '),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(formatStatValue(row.key, row.value, defType), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
+        // The game's item card beside the fields it has no line for; the extras box moves below on a phone.
+        val shown = item.copy(level = previewLevel, statType = statType)
+        val lines = com.partyconsole.companion.domain.itemCardLines(
+            meta = meta,
+            item = shown,
+            level = previewLevel,
+            properties = itemCardProperties(meta, actualLevel, previewLevel, statType),
+            setName = meta?.world?.set?.name,
+            usable = usable,
+            skillName = skillName,
+        )
+        com.partyconsole.companion.ui.components.ItemCards(lines, itemExtras(meta, shown, actualLevel, previewLevel), onSkill)
     }
 }
 

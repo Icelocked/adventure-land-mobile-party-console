@@ -56,6 +56,7 @@ fun bannerColors(action: BannerAction): BannerColors = when (action) {
     BannerAction.BANK -> BannerColors(Color(0xFF422006), Color(0xFFFEF08A), Color(0xFFFACC15))
     BannerAction.MERCHANT -> BannerColors(Color(0xFF3B0764), Color(0xFFE9D5FF), Color(0xFFC084FC))
     BannerAction.WEAPON -> BannerColors(Color(0xFF022C22), Color(0xFFA7F3D0), Color(0xFF34D399))
+    BannerAction.HELD -> BannerColors(Color(0xFF042F2E), Color(0xFFCCFBF1), Color(0xFF5EEAD4))
 }
 
 /** Stat badge background and text per stat. */

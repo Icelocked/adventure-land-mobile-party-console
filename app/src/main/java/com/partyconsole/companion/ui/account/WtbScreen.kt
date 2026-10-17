@@ -80,6 +80,7 @@ private val VioletBorder = Color(0xFF4C1D95)
 /** "Active WTB orders": filter with visible/total, each order's inspect,
  *  inline quantity/price/priority (single-field edits with the bid revision),
  *  Use stand / Accept higher levels, the Auto badge and native-stand problem,
+ *  an unconfirmed purchase to resolve (console 1.4),
  *  and a two-step cancel; "New WTB order" picks an item for the WTB dialog. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -215,6 +216,7 @@ fun WtbScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                                 problem?.let { Text(it, color = Color(0xFFF59E0B), style = MaterialTheme.typography.labelSmall) }
                             }
                         }
+                        WtbUnconfirmedPurchase(viewModel, itemId, name, state.nativeStand?.purchases.orEmpty())
                         OutlinedButton(enabled = savingBid == null, onClick = { cancelBid(itemId, bid) }) {
                             Text(
                                 when {

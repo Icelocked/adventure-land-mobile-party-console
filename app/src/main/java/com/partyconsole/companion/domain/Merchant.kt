@@ -25,7 +25,10 @@ private fun JsonElement?.num(): Double? = (this as? JsonPrimitive)?.content?.toD
 /** One label per job for queue rows, tooltips and cancellation controls.
  *  PWA: web/src/lib/merchantJobLabel.ts. */
 private val JOB_LABELS = mapOf(
+    "fishing" to "Fishing",
+    "mining" to "Mining",
     "party collection" to "Item collection",
+    "bank collection" to "Bank item collection",
     "manual visit" to "Manual visit",
     "deliveries" to "Marked deliveries",
     "withdrawals" to "Marked withdrawals",

@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,27 +57,53 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
+import com.partyconsole.companion.domain.GAIN_COLOR
+import com.partyconsole.companion.domain.LOSS_COLOR
+import com.partyconsole.companion.domain.STAT_COLORS
+import com.partyconsole.companion.ui.components.GameBox
+import com.partyconsole.companion.ui.components.cardColor
+import com.partyconsole.companion.ui.components.gameLineText
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private val Lime = Color(0xFFA3E635)
-private val Rose = Color(0xFFFB7185)
 private val Violet = Color(0xFFA78BFA)
+
+// Stat labels in their palette colors (app/docs/cards.md); changes in the game's success
+// and failure colors. Console: gear-comparison-dialog.tsx and docs/comparison-card.md.
+internal val COMPARISON_ROW_COLORS = mapOf(
+    "max_hp" to "hp", "max_mp" to "mp", "attack" to "attack", "frequency" to "frequency", "range" to "range", "speed" to "speed",
+    "armor" to "armor", "resistance" to "resistance", "str" to "str", "int" to "int", "dex" to "dex", "vit" to "vit", "fortitude" to "for",
+    "luck" to "luck", "goldBonus" to "gold", "xpBonus" to "xp", "evasion" to "evasion", "reflection" to "reflection", "lifesteal" to "lifesteal",
+    "manasteal" to "manasteal", "apiercing" to "armor", "rpiercing" to "resistance", "crit" to "crit", "dreturn" to "dreturn", "mp_cost" to "mp",
+    "output" to "output",
+).mapValues { (_, stat) -> STAT_COLORS.getValue(stat) }
+private val SetGold = "#f1c054"
 
 /** One comparison row: label, the projected stat it reads and its format. */
 private class StatRow(val label: String, val key: String, val format: (Double) -> String)
 
-private fun fixed(digits: Int, suffix: String = ""): (Double) -> String = { "%.${digits}f".format(it) + suffix }
+private fun fixed(digits: Int, suffix: String = ""): (Double) -> String = { "%.${digits}f".format(Locale.US, it) + suffix }
 
 private val ROWS = listOf(
-    StatRow("HP", "max_hp") { "%,d".format(it.roundToInt()) },
-    StatRow("MP", "max_mp") { "%,d".format(it.roundToInt()) },
+    StatRow("HP", "max_hp") { "%,d".format(Locale.US, it.roundToInt()) },
+    StatRow("MP", "max_mp") { "%,d".format(Locale.US, it.roundToInt()) },
     StatRow("Attack", "attack", fixed(1)),
     StatRow("Attack speed", "frequency", fixed(3)),
     StatRow("Range", "range", fixed(1)),
-    StatRow("Run speed", "speed") { if (it.isFinite()) "%.2f".format(it) else "Unavailable" },
+    StatRow("Run speed", "speed") { if (it.isFinite()) "%.2f".format(Locale.US, it) else "Unavailable" },
     StatRow("Armor", "armor", fixed(1)),
     StatRow("Resistance", "resistance", fixed(1)),
     StatRow("STR", "str", fixed(0)),
@@ -138,18 +166,29 @@ fun GearComparisonSheet(
     var rightLevel by remember { mutableStateOf(max(0, item.level ?: 0)) }
     var leftStatType by remember { mutableStateOf(equipped?.item?.statType ?: "none") }
     var rightStatType by remember { mutableStateOf(item.statType ?: "none") }
+    var includeOffhand by remember { mutableStateOf(true) }
 
-    val actualOldProps = equippedMeta?.properties.orEmpty().mapValues { (it.value as? JsonPrimitive)?.doubleOrNull ?: 0.0 }
+    fun handsFor(m: ItemMeta?) = m?.usage?.classes?.find { it.id == ctype }?.hands
+    val removesOffhand = replacementSlot == "mainhand" && handsFor(entryMeta) == 2
+    val offhand = slots["offhand"]
+    // Only a one-handed main hand leaves the offhand a choice: the two-handed
+    // swap drops it, so the current side can be judged with or without it.
+    val offerOffhandComparison = removesOffhand && equipped != null && offhand != null && handsFor(equippedMeta) == 1
     val oldProps = if (equipped != null) propertiesAtLevel(equippedMeta, equipped.item, leftLevel, leftStatType.takeIf { it != "none" }) else emptyMap()
     val newProps = propertiesAtLevel(entryMeta, item, rightLevel, rightStatType.takeIf { it != "none" })
 
     // The equipped gear (not the stand) with resolved meta; each side swaps
     // the replacement slot for its preview.
     val actualEquipment = slots.filter { (name, value) -> !name.startsWith("trade") && value != null }.map { (name, value) -> name to value!!.copy(meta = metaOf(value)) }
-    val currentEquipment = actualEquipment.map { (name, value) -> if (name == replacementSlot) name to value.copy(item = value.item.copy(level = leftLevel)) else name to value }
-    val proposedEquipment = actualEquipment.filter { it.first != replacementSlot } + (replacementSlot to EquippedEntry(item = item.copy(level = rightLevel), meta = entryMeta))
+    fun withProperties(value: EquippedEntry, properties: Map<String, Double>) =
+        value.copy(meta = (value.meta ?: ItemMeta()).copy(properties = properties.mapValues { JsonPrimitive(it.value) }))
+    val currentEquipment = actualEquipment
+        .filter { it.first != "offhand" || !offerOffhandComparison || includeOffhand }
+        .map { (name, value) -> if (name == replacementSlot) name to withProperties(value.copy(item = value.item.copy(level = leftLevel)), oldProps) else name to value }
+    val proposedEquipment = actualEquipment.filter { it.first != replacementSlot && !(removesOffhand && it.first == "offhand") } +
+        (replacementSlot to withProperties(EquippedEntry(item = item.copy(level = rightLevel), meta = entryMeta), newProps))
     val setDefinitions = linkedMapOf<String, ItemSetInfo>()
-    (currentEquipment.map { it.second.meta } + entryMeta).forEach { m -> m?.world?.set?.let { setDefinitions[it.id] = it } }
+    (actualEquipment.map { it.second.meta } + entryMeta).forEach { m -> m?.world?.set?.let { setDefinitions[it.id] = it } }
     fun setState(equipment: List<Pair<String, EquippedEntry>>): SetState {
         val totals = mutableMapOf<String, Double>()
         val counts = mutableMapOf<String, Int>()
@@ -157,14 +196,28 @@ fun GearComparisonSheet(
             val allowed = set.items.map { it.id }.toSet()
             val count = equipment.count { it.second.item.name in allowed }
             counts[setId] = count
-            set.bonuses.filter { count >= it.pieces }.forEach { bonus ->
+            // Native G.sets[count] is a total bonus, not cumulative tiers.
+            set.bonuses.filter { count == it.pieces }.forEach { bonus ->
                 bonus.stats.forEach { (key, value) -> (value as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull?.let { totals[key] = (totals[key] ?: 0.0) + it } }
             }
         }
         return SetState(totals, counts)
     }
+    val actualSets = setState(actualEquipment)
     val currentSets = setState(currentEquipment)
     val proposedSets = setState(proposedEquipment)
+    fun equipmentTotals(equipment: List<Pair<String, EquippedEntry>>): Map<String, Double> {
+        val totals = mutableMapOf<String, Double>()
+        for ((_, value) in equipment) {
+            for ((key, amount) in value.meta?.properties.orEmpty()) {
+                (amount as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { totals[key] = (totals[key] ?: 0.0) + it }
+            }
+        }
+        return totals
+    }
+    // The diagnostics already include the actual gear and its active sets.
+    // Both previews anchor there, so dropping an offhand also drops its set share.
+    val actualTotals = equipmentTotals(actualEquipment)
 
     val characterLevel = (vitals?.level?.takeIf { it > 0 } ?: diagnostics?.level ?: 0).toDouble()
     val maxHp = (vitals?.maxHp ?: 0).toDouble()
@@ -181,8 +234,8 @@ fun GearComparisonSheet(
     val oldPrimary = num(primary)
     val combat = (base["combatStats"] as? JsonObject) ?: JsonObject(emptyMap())
     fun combatNum(key: String) = numberOf(combat, key)
-    fun project(replacement: Map<String, Double>, setTotals: Map<String, Double>): Map<String, Double> {
-        fun delta(key: String) = (replacement[key] ?: 0.0) - (actualOldProps[key] ?: 0.0) + (setTotals[key] ?: 0.0) - (currentSets.totals[key] ?: 0.0)
+    fun project(totals: Map<String, Double>, setTotals: Map<String, Double>): Map<String, Double> {
+        fun delta(key: String) = (totals[key] ?: 0.0) - (actualTotals[key] ?: 0.0) + (setTotals[key] ?: 0.0) - (actualSets.totals[key] ?: 0.0)
         val result = mutableMapOf<String, Double>()
         result["str"] = num("str") + delta("str")
         result["int"] = num("int") + delta("int")
@@ -218,8 +271,8 @@ fun GearComparisonSheet(
         result["output"] = combatNum("output") + delta("output")
         return result
     }
-    val currentPreview = project(oldProps, currentSets.totals)
-    val projected = project(newProps, proposedSets.totals)
+    val currentPreview = project(equipmentTotals(currentEquipment), currentSets.totals)
+    val projected = project(equipmentTotals(proposedEquipment), proposedSets.totals)
     val changedSets = setDefinitions.values.filter { currentSets.counts[it.id] != proposedSets.counts[it.id] }
     fun nameOf(value: Item, m: ItemMeta?) = (m?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(value.name)?.name ?: value.name
 
@@ -231,7 +284,16 @@ fun GearComparisonSheet(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            ComparisonPanel(
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val wide = maxWidth >= 560.dp
+            // Each panel's header, stat scroll buttons, notice, level slider and stat rows share
+            // their heights with the other side, so a notice on one side only never pushes its
+            // stats out of line (docs/comparison-card.md, failure 7).
+            val bands = remember { mutableStateMapOf<String, Int>() }
+            val left: @Composable (Modifier) -> Unit = { modifier -> ComparisonPanel(
+                modifier = modifier,
+                bands = if (wide) bands else null,
+                side = 0,
                 sectionLabel = "Currently equipped",
                 title = if (equipped != null) "${nameOf(equipped.item, equippedMeta)} +$leftLevel" else "Empty slot",
                 detail = characterName,
@@ -244,8 +306,27 @@ fun GearComparisonSheet(
                 candidate = currentPreview,
                 original = currentPreview,
                 proposed = false,
-            )
-            ComparisonPanel(
+            ) {
+                if (offerOffhandComparison && offhand != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
+                            .toggleable(value = includeOffhand, role = androidx.compose.ui.semantics.Role.Checkbox) { includeOffhand = it }
+                            .semantics(mergeDescendants = true) { contentDescription = "include offhand weapon in comparison" }
+                            .padding(8.dp),
+                    ) {
+                        Checkbox(checked = includeOffhand, onCheckedChange = null)
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text("include offhand weapon in comparison", style = MaterialTheme.typography.bodySmall)
+                            Text("${nameOf(offhand.item, metaOf(offhand))} +${offhand.item.level ?: 0}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            } }
+            val right: @Composable (Modifier) -> Unit = { modifier -> ComparisonPanel(
+                modifier = modifier,
+                bands = if (wide) bands else null,
+                side = 1,
                 sectionLabel = "With this item",
                 title = "${nameOf(item, entryMeta)} +$rightLevel",
                 detail = "Replaces $replacementSlot" + if (equipped != null) " · ${nameOf(equipped.item, equippedMeta)}" else " · empty slot",
@@ -258,37 +339,56 @@ fun GearComparisonSheet(
                 candidate = projected,
                 original = currentPreview,
                 proposed = true,
-            )
+            ) {
+                if (removesOffhand && offhand != null) {
+                    Text("Two-handed weapon · unequips ${nameOf(offhand.item, metaOf(offhand))}", color = Color(0xFF22D3EE), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                }
+            } }
+            if (wide) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                    left(Modifier.weight(1f))
+                    right(Modifier.weight(1f))
+                }
+            } else {
+                Column {
+                    left(Modifier.fillMaxWidth())
+                    right(Modifier.fillMaxWidth())
+                }
+            }
+            }
             if (changedSets.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).border(1.dp, Color(0xFF5B21B6), RoundedCornerShape(6.dp)).padding(12.dp)
-                        .semantics { contentDescription = "Set changes" },
-                ) {
-                    Text("SET CHANGES", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = Violet)
+                GameBox("Set changes", Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Text("Set changes", color = cardColor(SetGold), fontWeight = FontWeight.SemiBold)
                     for (set in changedSets) {
                         val before = currentSets.counts[set.id] ?: 0
                         val after = proposedSets.counts[set.id] ?: 0
-                        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp)).padding(8.dp)) {
-                            Row {
-                                Text("${set.name}: $before/${set.items.size} → ", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                                Text("$after/${set.items.size}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = if (after > before) Color(0xFF34D399) else Rose)
-                            }
-                            Text(
-                                set.bonuses.joinToString(" · ") { bonus ->
-                                    val was = before >= bonus.pieces
-                                    val becomes = after >= bonus.pieces
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = cardColor(SetGold))) { append(set.name) }
+                                append(": $before/${set.items.size} → ")
+                                withStyle(SpanStyle(color = cardColor(if (after > before) GAIN_COLOR else LOSS_COLOR))) { append("$after/${set.items.size}") }
+                            },
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        Text(
+                            buildAnnotatedString {
+                                set.bonuses.forEachIndexed { index, bonus ->
+                                    val was = before == bonus.pieces
+                                    val becomes = after == bonus.pieces
                                     val stats = bonus.stats.entries.joinToString(", ") { (key, value) -> "${key.uppercase()} +${(value as? JsonPrimitive)?.content ?: value}" }
-                                    "${bonus.pieces} pieces: $stats" + when {
-                                        !was && becomes -> " · GAINED"
-                                        was && !becomes -> " · LOST"
-                                        else -> ""
+                                    if (index > 0) append(" · ")
+                                    append("${bonus.pieces} pieces: $stats")
+                                    val outcome = if (!was && becomes) "GAINED" else if (was && !becomes) "LOST" else null
+                                    if (outcome != null) {
+                                        append(" · ")
+                                        withStyle(SpanStyle(color = cardColor(if (outcome == "GAINED") GAIN_COLOR else LOSS_COLOR))) { append(outcome) }
                                     }
-                                },
-                                fontFamily = FontFamily.Monospace,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                                }
+                            },
+                            fontSize = 12.sp,
+                            color = cardColor("#C3C3C3"),
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
                     }
                 }
             }
@@ -296,9 +396,27 @@ fun GearComparisonSheet(
     }
 }
 
+/** One of the bands both panels share on a wide sheet: it reports its natural height and
+ *  grows to the taller side's, so the two columns stay row for row. [bands] is null when
+ *  the panels stack. */
+@Composable
+private fun AlignedBand(band: String, side: Int, bands: SnapshotStateMap<String, Int>?, content: @Composable () -> Unit) {
+    if (bands == null) {
+        content()
+        return
+    }
+    val target = maxOf(bands["$band:0"] ?: 0, bands["$band:1"] ?: 0)
+    Box(modifier = Modifier.fillMaxWidth().heightIn(min = with(LocalDensity.current) { target.toDp() })) {
+        Box(modifier = Modifier.fillMaxWidth().onSizeChanged { bands["$band:$side"] = it.height }) { content() }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComparisonPanel(
+    modifier: Modifier,
+    bands: SnapshotStateMap<String, Int>?,
+    side: Int,
     sectionLabel: String,
     title: String,
     detail: String,
@@ -311,23 +429,31 @@ private fun ComparisonPanel(
     candidate: Map<String, Double>,
     original: Map<String, Double>,
     proposed: Boolean,
+    // Below the stat-scroll preview: the offhand choice or the two-handed note.
+    extra: @Composable () -> Unit = {},
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+        modifier = modifier.padding(top = 12.dp)
             .border(1.dp, if (proposed) Color(0xFF155E75) else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-            .padding(12.dp),
+            .padding(12.dp)
+            .semantics { contentDescription = sectionLabel },
     ) {
-        Text(sectionLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // The game's own character doll markup.
-            if (dollHtml != null) CharacterPortrait(dollHtml, null, null, modifier = Modifier.size(width = 64.dp, height = 80.dp))
-            Column(modifier = Modifier.padding(start = if (dollHtml != null) 12.dp else 0.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(detail, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AlignedBand("header", side, bands) {
+            Column {
+                Text(sectionLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // The game's own character doll markup.
+                    if (dollHtml != null) CharacterPortrait(dollHtml, null, null, modifier = Modifier.size(width = 64.dp, height = 80.dp))
+                    Column(modifier = Modifier.padding(start = if (dollHtml != null) 12.dp else 0.dp)) {
+                        Text(title, fontWeight = FontWeight.SemiBold)
+                        Text(detail, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
-        if (meta?.definition?.get("stat") != null) StatPreviewButtons(statType, onStatType)
-        if (meta?.upgradeable == true || meta?.compoundable == true) {
+        AlignedBand("buttons", side, bands) { if (meta?.definition?.get("stat") != null) StatPreviewButtons(statType, onStatType) }
+        AlignedBand("notice", side, bands) { Column { extra() } }
+        AlignedBand("slider", side, bands) { if (meta?.upgradeable == true || meta?.compoundable == true) {
             val maxLevel = itemMaximumLevel(meta)
             Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp).border(1.dp, Color(0xB34C1D95), RoundedCornerShape(4.dp)).padding(12.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -342,26 +468,23 @@ private fun ComparisonPanel(
                     modifier = Modifier.semantics { contentDescription = "$sectionLabel preview level" },
                 )
             }
-        }
-        FlowRow(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), maxItemsInEachRow = 2, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        } }
+        // Each side's stat tiles as one game box: labels in their stat colors, and in the
+        // proposed panel the change after the value in the gain or loss color.
+        GameBox(if (proposed) "Proposed stats" else "Equipped stats", Modifier.fillMaxWidth().padding(top = 12.dp)) {
             for (row in ROWS) {
                 val value = candidate[row.key] ?: 0.0
                 val before = original[row.key] ?: 0.0
                 val change = value - before
                 val changed = proposed && abs(change) > 0.0001
                 val percentChange = if (before == 0.0) null else change / abs(before) * 100
-                Column(modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp)).padding(8.dp)) {
-                    Text(row.label.uppercase(), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AlignedBand("row:${row.key}", side, bands) {
                     Text(
-                        row.format(value) + if (changed) " (${if (change > 0) "+" else "-"}${row.format(abs(change))} · ${percentChange?.let { "${if (it > 0) "+" else ""}${"%.1f".format(it)}%" } ?: "new"})" else "",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = if (changed && change > 0) FontWeight.Bold else FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = when {
-                            changed && change > 0 -> Lime
-                            changed && change < 0 -> Rose
-                            else -> Color.Unspecified
-                        },
+                        gameLineText(
+                            row.label, row.format(value), COMPARISON_ROW_COLORS.getValue(row.key),
+                            suffix = if (changed) " (${if (change > 0) "+" else "-"}${row.format(abs(change))} · ${percentChange?.let { "${if (it > 0) "+" else ""}${"%.1f".format(Locale.US, it)}%" } ?: "new"})" else null,
+                            suffixColor = if (change > 0) GAIN_COLOR else LOSS_COLOR,
+                        ),
                     )
                 }
             }

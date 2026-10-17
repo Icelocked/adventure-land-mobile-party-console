@@ -59,6 +59,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -71,7 +73,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.partyconsole.companion.data.Domain
 import com.partyconsole.companion.domain.automaticCommerceRuleKey
-import com.partyconsole.companion.domain.upgradeEstimate
+import com.partyconsole.companion.domain.BuyEstimate
+import com.partyconsole.companion.domain.EstimateLine
+import com.partyconsole.companion.domain.estimateUpgradeBatch
+import com.partyconsole.companion.domain.highestUpgradeLevel
 import com.partyconsole.companion.model.CraftMaterial
 import com.partyconsole.companion.model.Item
 import com.partyconsole.companion.model.MerchantBuyItem
@@ -131,6 +136,11 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
 
     var search by remember { mutableStateOf("") }
     var buyCart by remember { mutableStateOf<Map<String, BuyLine>>(emptyMap()) }
+    // Console 1.4: a line the console can't estimate needs a maximum gold and a confirmation.
+    var goldCaps by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var confirmedUnavailable by remember { mutableStateOf(false) }
+    val buySelected = catalog?.buyable.orEmpty().filter { (buyCart[it.id]?.quantity ?: 0) > 0 }
+    val buyEstimates = rememberBatchEstimates(buySelected, buyCart)
     var craftCart by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var exchangeCart by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var submitting by remember { mutableStateOf(false) }
@@ -163,7 +173,10 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
     // Each mode draws its list in the scrolling area and its cart pinned below.
     @Composable
     fun Content(part: CommercePart) = when (mode) {
-        "buy" -> BuyContent(part, catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }) { inspecting = Inspecting(it, 0, source = "Merchant catalog") }
+        "buy" -> BuyContent(
+            part, catalog?.buyable.orEmpty(), search, buyCart, { buyCart = it }, buyEstimates,
+            goldCaps, { goldCaps = it }, confirmedUnavailable, { confirmedUnavailable = it },
+        ) { inspecting = Inspecting(it, 0, source = "Merchant catalog") }
         "craft" -> CraftContent(part, catalog?.craftable.orEmpty(), buyableById, owned, search, craftCart, { craftCart = it }) { inspecting = Inspecting(it, 0, source = "Crafting catalog") }
         else -> ExchangeContent(part, viewModel, catalog?.exchangeable.orEmpty(), search, exchangeCart, { exchangeCart = it }) { inspecting = it }
     }
@@ -191,18 +204,21 @@ fun MerchantCommerceScreen(viewModel: PartyViewModel, initialMode: String, onBac
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
                 when (mode) {
                     "buy" -> {
-                        val selected = catalog?.buyable.orEmpty().filter { (buyCart[it.id]?.quantity ?: 0) > 0 }
-                        val unlikely = selected.any { upgradeEstimate(it, buyCart.getValue(it.id).quantity, buyCart.getValue(it.id).level).unlikely }
-                        Button(enabled = selected.isNotEmpty() && !unlikely && !submitting, modifier = Modifier.fillMaxWidth(), onClick = {
+                        val selected = buySelected
+                        val pending = buyEstimates == null
+                        val unavailable = selected.filter { buyEstimates?.get(it.id) is BuyEstimate.Unavailable }
+                        val validCaps = unavailable.all { (goldCaps[it.id]?.toLongOrNull() ?: 0) > 0 }
+                        val blocked = pending || (unavailable.isNotEmpty() && (!confirmedUnavailable || !validCaps))
+                        Button(enabled = selected.isNotEmpty() && !blocked && !submitting, modifier = Modifier.fillMaxWidth(), onClick = {
                             val lines = selected.map { item ->
                                 val line = buyCart.getValue(item.id)
-                                val estimate = upgradeEstimate(item, line.quantity, line.level)
+                                val acknowledged = item in unavailable
                                 MerchantOrderBuyLine(
                                     id = item.id,
                                     quantity = line.quantity,
                                     level = line.level.takeIf { it != 0 },
-                                    budget = if (item.upgradeable) estimate.gold else null,
-                                    maxAttempts = if (item.upgradeable) estimate.attempts else null,
+                                    goldCap = if (acknowledged) goldCaps[item.id]?.toLongOrNull() else null,
+                                    acknowledgeUnavailable = if (acknowledged) true else null,
                                 )
                             }
                             submit({ viewModel.api.submitMerchantOrder(lines, emptyList()) }) { buyCart = emptyMap() }
@@ -388,12 +404,31 @@ private fun Modifier.cartLine(key: String): Modifier {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, search: String, cart: Map<String, BuyLine>, setCart: (Map<String, BuyLine>) -> Unit, onInspect: (String) -> Unit) {
+private fun BuyContent(
+    part: CommercePart,
+    catalog: List<MerchantBuyItem>,
+    search: String,
+    cart: Map<String, BuyLine>,
+    setCart: (Map<String, BuyLine>) -> Unit,
+    // Null while the cart's batch is still being estimated.
+    estimates: Map<String, BuyEstimate>?,
+    goldCaps: Map<String, String>,
+    setGoldCaps: (Map<String, String>) -> Unit,
+    confirmed: Boolean,
+    setConfirmed: (Boolean) -> Unit,
+    onInspect: (String) -> Unit,
+) {
     val filtered = catalog.filter { "${it.name} ${it.id}".lowercase().contains(search.lowercase()) }
     val selected = catalog.filter { (cart[it.id]?.quantity ?: 0) > 0 }
-    val estimates = selected.associate { it.id to upgradeEstimate(it, cart.getValue(it.id).quantity, cart.getValue(it.id).level) }
     val hasEstimatedGold = selected.any { cart.getValue(it.id).level > 0 && it.upgradeable }
-    val goldTotal = selected.sumOf { estimates.getValue(it.id).gold }
+    val available = { id: String -> estimates?.get(id) as? BuyEstimate.Available }
+    val unavailable = selected.filter { estimates?.get(it.id) is BuyEstimate.Unavailable }
+    val goldTotal = selected.sumOf { available(it.id)?.gold ?: 0.0 }
+    val summary = when {
+        estimates == null -> "Gold: estimating…"
+        unavailable.isNotEmpty() -> "Gold total unavailable"
+        else -> "Gold${if (hasEstimatedGold) " (est)" else ""}: ${"%,d".format(Math.round(goldTotal))}g"
+    }
     if (part == CommercePart.LIST) {
     if (filtered.isEmpty()) EmptyState("No buyable items found.")
     for (item in filtered) {
@@ -402,7 +437,7 @@ private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, searc
             setCart(cart + (item.id to BuyLine((old?.quantity ?: 0) + 1, old?.level ?: 0)))
         }
     }
-    } else CartDock("Cart", cart.mapValues { it.value.quantity }, "Gold${if (hasEstimatedGold) " (est)" else ""}: ${"%,d".format(Math.round(goldTotal))}g") {
+    } else CartDock("Cart", cart.mapValues { it.value.quantity }, summary) {
         if (selected.isEmpty()) Text("Nothing selected.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (item in selected) {
             val line = cart.getValue(item.id)
@@ -414,20 +449,27 @@ private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, searc
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("TARGET", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 4.dp))
                         LevelField("${item.name} target level", "+${line.level}") { text ->
-                            setCart(cart + (item.id to line.copy(level = (text.filter(Char::isDigit).take(3).toIntOrNull() ?: 0).coerceIn(0, 13))))
+                            setCart(cart + (item.id to line.copy(level = (text.filter(Char::isDigit).take(3).toIntOrNull() ?: 0).coerceIn(0, highestUpgradeLevel(item)))))
                         }
                     }
                 }
                 TextButton(onClick = { setCart(cart + (item.id to BuyLine(0, 0))) }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
-                if (line.level > 0 && item.upgradeable && estimates.getValue(item.id).unlikely) {
-                    Text(
-                        "+${line.level} is too unlikely to estimate a budget for. Choose a lower target level.",
-                        color = Color(0xFFFBBF24),
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.fillMaxWidth().padding(start = 36.dp),
-                    )
-                } else if (line.level > 0 && item.upgradeable) {
-                    val estimate = estimates.getValue(item.id)
+                val estimate = available(item.id)
+                if (line.level > 0 && item.upgradeable && estimates == null) {
+                    Text("Estimating…", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(start = 36.dp))
+                } else if (item in unavailable) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(start = 36.dp)) {
+                        Text("Can't estimate +${line.level}. Maximum gold:", color = Color(0xFFFBBF24), style = MaterialTheme.typography.labelSmall)
+                        OutlinedTextField(
+                            goldCaps[item.id].orEmpty(),
+                            { text -> setGoldCaps(goldCaps + (item.id to text.filter(Char::isDigit))) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            textStyle = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.width(120.dp).semantics { contentDescription = "${item.name} maximum gold" },
+                        )
+                    }
+                } else if (line.level > 0 && item.upgradeable && estimate != null) {
                     Text(
                         "90% budget: ${estimate.attempts} base items · " + estimate.scrolls.withIndex().filter { it.value != 0L }.joinToString(" · ") { "${it.value} scroll${it.index}" },
                         color = Color(0xFFC4B5FD),
@@ -438,7 +480,37 @@ private fun BuyContent(part: CommercePart, catalog: List<MerchantBuyItem>, searc
                 }
             }
         }
+        if (unavailable.isNotEmpty()) {
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp).border(1.dp, Color(0xFFB45309), RoundedCornerShape(4.dp))
+                    .toggleable(value = confirmed, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = setConfirmed).padding(8.dp),
+            ) {
+                Checkbox(checked = confirmed, onCheckedChange = null)
+                Text(
+                    "The console can't estimate how many operations ${if (unavailable.size == 1) "that line needs" else "those lines need"}. Buy anyway, spending at most each line's maximum gold on base items and scrolls? The cap stays in force after a restart.",
+                    color = Color(0xFFFDE68A),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
     }
+}
+
+/** Every cart line estimated together, sharing one 60M-roll budget: the check
+ *  the console runs on the order (console 1.4 runtime/upgrade-estimate.ts).
+ *  Null until the current cart's batch is done; a cart edit cancels the
+ *  running batch. */
+@Composable
+private fun rememberBatchEstimates(selected: List<MerchantBuyItem>, cart: Map<String, BuyLine>): Map<String, BuyEstimate>? {
+    val lines = selected.map { EstimateLine(it, cart.getValue(it.id).quantity, cart.getValue(it.id).level) }
+    var result by remember { mutableStateOf<Pair<List<EstimateLine>, Map<String, BuyEstimate>>?>(null) }
+    LaunchedEffect(lines) {
+        val estimates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { estimateUpgradeBatch(lines) }
+        result = lines to lines.zip(estimates).associate { (line, estimate) -> line.choice.id to estimate }
+    }
+    return result?.takeIf { it.first == lines }?.second
 }
 
 // Craft

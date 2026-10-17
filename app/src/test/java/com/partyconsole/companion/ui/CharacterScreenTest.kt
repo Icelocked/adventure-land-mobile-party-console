@@ -19,7 +19,7 @@ import com.partyconsole.companion.domain.statusRemaining
 import com.partyconsole.companion.testing.FakeConsole
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.ui.characterdetail.CharacterDetailScreen
-import com.partyconsole.companion.ui.characterdetail.damageMultiplier
+import com.partyconsole.companion.domain.damageMultiplier
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -125,7 +125,7 @@ class CharacterScreenTest {
         compose.onNodeWithContentDescription("View Leada stats").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Leada stats").assertExists()
-        compose.onNodeWithText("ARMOR PIERCING").performScrollTo().assertExists()
+        compose.onNode(hasText("A.Piercing: ", substring = true)).performScrollTo().assertExists()
     }
 
     @Test
@@ -149,7 +149,7 @@ class CharacterScreenTest {
     @Test
     fun aFollowerCannotRouteAndTravelSendsTypedCoordinates() {
         show("Folla")
-        scrollTo("Hunt settings...")
+        scrollTo("Farming settings...")
         compose.onNodeWithContentDescription("only leader can route to monster").performClick()
         compose.onAllNodesWithText("only leader can route to monster").fetchSemanticsNodes().let { assertTrue(it.isNotEmpty()) }
 

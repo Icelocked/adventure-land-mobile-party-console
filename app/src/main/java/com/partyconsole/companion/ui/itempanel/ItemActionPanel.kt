@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -159,6 +160,7 @@ fun ItemActionPanel(
                     rootStatType = item.statType,
                     rootGift = item.gift == true,
                     rootExpires = item.expires,
+                    rootItem = item,
                     context = ItemDetailContext(characterName, (target as? ItemActionTarget.InventorySlot)?.slot ?: -1),
                     // Only the merchant's own inventory is a stand source.
                     onAddStand = if (isMerchant && target is ItemActionTarget.InventorySlot) ({ showingDetails = false; expanded = "stand" }) else null,
@@ -234,8 +236,11 @@ private fun InventoryActions(
     val statScrollMark = if (isMerchant) state.statScrolls[characterName].orEmpty().find { !it.equipped && it.slot.slotInt() == slot && sameMarkedItem(it.item, item) } else null
     val compoundGroup = state.compounds[characterName].orEmpty().find { group -> group.items.any { it.slot.slotInt() == slot && sameMarkedItem(it.item, item) } }
     val autoCompoundMark = state.autoCompounds[ruleName].orEmpty().find { it.name == item.name }
-    val autoExchangeMarked = isMerchant && state.autoExchanges.containsKey("${item.name}@$level")
-    val exchangeable = isMerchant && ((meta?.definition?.get("e") as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0) > 0
+    // Console 1.4: exchanges, one-off and automatic, apply to every party
+    // member's items once a merchant is configured; the merchant collects
+    // them first (merchant-item-commands.ts).
+    val autoExchangeMarked = merchant != null && state.autoExchanges.containsKey("${item.name}@$level")
+    val exchangeable = merchant != null && ((meta?.definition?.get("e") as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0) > 0
     val saleKey = automaticCommerceRuleKey(item)
     val autoNpcSaleMarked = state.autoNpcSales.containsKey(if (sharedRules || isMerchant) saleKey else JsonArray(listOf(JsonPrimitive(characterName), JsonPrimitive(saleKey))).toString())
     val npcSale = state.npcSaleMarks.find { (if (isMerchant) it.source == "merchant" else it.source == "character" && it.character == characterName) && it.slot == slot && automaticCommerceRuleKey(it.item) == saleKey }
@@ -303,8 +308,10 @@ private fun InventoryActions(
             if (expanded == "statscroll") StatScrollPicker(meta, item, statScrollInventory) { statType -> command("stat-scroll-mark", slot, mapOf("statType" to JsonPrimitive(statType))) }
         }
 
+        // Queues one manual exchange of this stack (console 1.4).
+        if (exchangeable) TapRow("Exchange") { command("exchange", slot) }
         // The server toggles this rule.
-        if (merchant != null && exchangeable) TapRow("Auto exchange", enabled = loaded && !autoExchangeMarked) { command("auto-exchange", slot) }
+        if (exchangeable) TapRow("Auto exchange", enabled = loaded && !autoExchangeMarked) { command("auto-exchange", slot) }
 
         TapRow("Mark for bank", enabled = !bankMarked) { command("mark", slot) }
         if (merchant != null) TapRow("Auto mark for bank", enabled = autoMarkMode != "bank") { command("auto-item-mark", null, mapOf("mode" to JsonPrimitive("bank"))) }
@@ -334,16 +341,15 @@ private fun InventoryActions(
         if (merchant != null && meta?.upgradeable == true && upgradeMax > 0) {
             TapRow("Mark for upgrade" + (upgradeMark?.let { " · ${tiers(it.tiers ?: 1)}" } ?: "")) { toggle("upgrade") }
             if (expanded == "upgrade") {
-                UpgradeTierPicker(meta, level) { t -> command("upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
+                UpgradeTierPicker(meta, level, viewModel = viewModel, name = item.name) { t -> command("upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
                 OfferingRows(viewModel, characterName, item, meta, OfferingSource(JsonPrimitive(slot)))
             }
             TapRow("Auto mark for upgrade" + (if (autoUpgradeTiers > 0) " · ${tiers(autoUpgradeTiers)}" else "")) { toggle("autoupgrade") }
             if (expanded == "autoupgrade") {
-                UpgradeTierPicker(meta, level, current = autoUpgradeTiers) { t -> command("auto-upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
+                UpgradeTierPicker(meta, level, current = autoUpgradeTiers, viewModel = viewModel, name = item.name) { t -> command("auto-upgrade-mark", slot, mapOf("tiers" to JsonPrimitive(t))) }
                 AddUpgradeRule(viewModel, characterName, item, meta)
             }
         }
-        if (merchant != null && !isMerchant && meta?.buyable == true) TapRow("Buy another level 0") { command("buy-copy", null) }
 
         if (merchant != null && meta?.compoundable == true && compoundGroup == null) TapRow("Mark for compounding") { command("compound-mark", slot) }
         if (merchant != null && meta?.compoundable == true && level < compoundMax) {
@@ -424,7 +430,8 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
     val hasAutomaticMarks = autoItemMarks[key] != null || (level == 0 && autoItemMarks[item.name] != null) || autoUpgradeRule != null ||
         state.autoCompounds[ruleName].orEmpty().any { it.name == item.name } || state.autoDeconstruction[ruleName]?.containsKey(commerceKey) == true ||
         state.autoNpcSales.containsKey(if (sharedRules || isMerchant) commerceKey else JsonArray(listOf(JsonPrimitive(characterName), JsonPrimitive(commerceKey))).toString()) ||
-        (isMerchant && (state.autoStandMarks.containsKey(commerceKey) || state.autoExchanges.containsKey("${item.name}@$level") || state.merchantWeapon?.item?.let { sameMarkedItem(item, it) } == true))
+        (state.merchantCharacter != null && state.autoExchanges.containsKey("${item.name}@$level")) ||
+        (isMerchant && (state.autoStandMarks.containsKey(commerceKey) || state.merchantWeapon?.item?.let { sameMarkedItem(item, it) } == true))
     fun tiers(n: Int) = "$n tier${if (n == 1) "" else "s"}"
 
     Column {
@@ -434,12 +441,12 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
         if (meta?.upgradeable == true && upgradeMax > 0) {
             TapRow("Mark for upgrade" + (mark?.let { " · ${tiers(it.tiers ?: 1)}" } ?: "")) { toggle("upgrade") }
             if (expanded == "upgrade") {
-                UpgradeTierPicker(meta, level) { t -> run { api.itemCommand("upgrade-mark", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(t))) } }
+                UpgradeTierPicker(meta, level, viewModel = viewModel, name = item.name) { t -> run { api.itemCommand("upgrade-mark", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(t))) } }
                 OfferingRows(viewModel, characterName, item, meta, OfferingSource(slotArg, equipped = true))
             }
             TapRow("Auto mark for upgrade" + (if (autoTiers > 0) " · ${tiers(autoTiers)}" else "")) { toggle("autoupgrade") }
             if (expanded == "autoupgrade") {
-                UpgradeTierPicker(meta, level, current = autoTiers) { t -> run { api.itemCommand("auto-upgrade-mark", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(t))) } }
+                UpgradeTierPicker(meta, level, current = autoTiers, viewModel = viewModel, name = item.name) { t -> run { api.itemCommand("auto-upgrade-mark", characterName, item, slotArg, mapOf("equipped" to JsonPrimitive(true), "tiers" to JsonPrimitive(t))) } }
                 AddUpgradeRule(viewModel, characterName, item, meta)
             }
         }
@@ -451,9 +458,10 @@ private fun EquipmentActions(viewModel: PartyViewModel, target: ItemActionTarget
 }
 
 /** Upgrade tier submenu: one row per achievable target tier, "+N → +N+tiers"
- *  with the scroll gold cost. */
+ *  with the scroll gold cost. With [name], each row also shows the offering
+ *  rule that covers its last step (console 1.4). */
 @Composable
-internal fun UpgradeTierPicker(meta: ItemMeta?, level: Int, current: Int? = null, onPick: (Int) -> Unit) {
+internal fun UpgradeTierPicker(meta: ItemMeta?, level: Int, current: Int? = null, viewModel: PartyViewModel? = null, name: String? = null, onPick: (Int) -> Unit) {
     val max = maxOf(0, itemMaximumLevel(meta) - level)
     if (max <= 0) return
     Column(modifier = Modifier.padding(start = 16.dp)) {
@@ -462,7 +470,10 @@ internal fun UpgradeTierPicker(meta: ItemMeta?, level: Int, current: Int? = null
                 modifier = Modifier.fillMaxWidth().clickable(enabled = current != tiers) { onPick(tiers) }.padding(vertical = 8.dp, horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("+$level → +${level + tiers}", style = MaterialTheme.typography.bodySmall, color = if (current == tiers) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("+$level → +${level + tiers}", style = MaterialTheme.typography.bodySmall, color = if (current == tiers) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified)
+                    if (viewModel != null && name != null) com.partyconsole.companion.ui.components.DestinationOffering(viewModel, name, level, tiers)
+                }
                 Text("${"%,d".format(upgradeScrollCost(meta, level, tiers))}g", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

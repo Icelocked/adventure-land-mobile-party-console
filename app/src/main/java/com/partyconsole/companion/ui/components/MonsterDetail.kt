@@ -32,7 +32,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -46,47 +45,26 @@ import com.partyconsole.companion.model.MapLocation
 import com.partyconsole.companion.model.Sprite
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.PartyViewModel
-import com.partyconsole.companion.ui.itemdetail.durationStat
 import com.partyconsole.companion.ui.itemdetail.formatDropRate
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** A raw definition as label / value rows (durations formatted). */
-@Composable
-fun DefinitionGrid(value: JsonObject?, omit: Set<String> = emptySet()) {
-    val entries = value.orEmpty().filter { (key, field) -> key !in omit && field !is JsonNull && !(field is JsonPrimitive && field.isString && field.content.isEmpty()) }
-    val definitionType = (value?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
-    fun display(field: JsonElement): String = when {
-        field is JsonPrimitive && !field.isString && field.content in setOf("true", "false") -> if (field.content == "true") "Yes" else "No"
-        field is JsonObject || field is JsonArray -> field.toString()
-        else -> displayValue(field)
-    }
-    Column {
-        for ((key, field) in entries) {
-            val number = (field as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toDoubleOrNull()
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(key.replace('_', ' ').replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    number?.let { durationStat(key, it, definitionType) } ?: display(field),
-                    fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFA7F3D0),
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
 /** Monster details: header with the G.monsters id and Navigate, achievements,
- *  recorded spawns, the definition grid and drops. */
+ *  recorded spawns, the game's monster card with its extras, and drops. A spawn or
+ *  skill line on the card opens that monster or skill where the caller passes
+ *  [onInspectMonster] or [onInspectSkill]. */
 @Composable
-fun MonsterDetail(viewModel: PartyViewModel, monster: BestiaryMonster, onInspectDrop: (String) -> Unit, onNavigated: (() -> Unit)? = null) {
+fun MonsterDetail(
+    viewModel: PartyViewModel,
+    monster: BestiaryMonster,
+    onInspectDrop: (String) -> Unit,
+    onNavigated: (() -> Unit)? = null,
+    onInspectMonster: ((String) -> Unit)? = null,
+    onInspectSkill: ((String) -> Unit)? = null,
+) {
     val state by viewModel.dynamicState.collectAsState()
     val diagnostics by viewModel.characterDetails.collectAsState()
     val achievements = remember(diagnostics) { aggregateMonsterAchievements(diagnostics) }
@@ -106,7 +84,13 @@ fun MonsterDetail(viewModel: PartyViewModel, monster: BestiaryMonster, onInspect
         }
         MonsterAchievementProgress(monster, if (achievements.isNotEmpty()) achievements[monster.id] else null)
         MonsterSpawns(monster.spawnRecords)
-        DefinitionGrid(monster.definition, omit = setOf("name", "skin", "achievements"))
+        MonsterCards(
+            definition = monster.definition.orEmpty(),
+            skillName = { id -> state.skillCatalog.firstNotNullOfOrNull { entry -> entry.skills.find { it.id == id } }?.name },
+            monsterName = { id -> state.bestiaryCatalog.find { it.id == id }?.name },
+            onMonster = onInspectMonster,
+            onSkill = onInspectSkill,
+        )
         Column(modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xCC78350F), RoundedCornerShape(4.dp)).padding(12.dp)) {
             BestiaryDrops(monster, state.merchantCatalog?.allItems.orEmpty(), onInspectDrop)
         }

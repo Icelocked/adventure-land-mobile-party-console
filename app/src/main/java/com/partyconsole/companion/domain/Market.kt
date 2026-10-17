@@ -221,10 +221,9 @@ fun groupPonty(listings: List<PontyListing>, query: String, now: Long, nameFor: 
     val filtered = listings
         .filter { it.serverIdentifier != "PVP" && "${nameFor(it.item.name).orEmpty()} ${it.item.name}".lowercase().contains(text) }
         .sortedWith(compareBy<PontyListing> { it.unitPrice }.thenBy { it.item.name })
-    val freshCutoff = now - 120000
     val groups = linkedMapOf<String, PontyGroup>()
     for (listing in filtered) {
-        val stale = listing.seenAt == null || listing.seenAt == 0L || listing.seenAt <= freshCutoff
+        val stale = !marketListingFresh(listing.seenAt, now)
         val key = "${listing.groupKey ?: listing.key}|${if (stale) "stale" else "fresh"}"
         val realm = "${listing.serverRegion ?: "?"} ${listing.serverIdentifier ?: "?"}"
         val existing = groups[key]
@@ -242,6 +241,23 @@ fun groupPonty(listings: List<PontyListing>, query: String, now: Long, nameFor: 
         }
     }
     return groups.values.toList()
+}
+
+// Console 1.4 runtime/market-preferences.ts: ignored items and the shared
+// two-minute freshness rule.
+
+/** One ignored-item identity per name and level; a missing level is +0. */
+fun marketItemKey(name: String, level: Int?) = "$name|${level ?: 0}"
+
+/** Seen within the last two minutes. An unknown observation time is stale. */
+fun marketListingFresh(seenAt: Long?, now: Long): Boolean = seenAt != null && seenAt >= now - 120000
+
+/** stand-sheet.tsx marketItemLabel: "+level" only for upgradeable or
+ *  compoundable items, or any item listed above +0. */
+fun marketItemLabel(name: String, level: Int?, catalogFor: (String) -> CatalogItem?): String {
+    val known = catalogFor(name)
+    val leveled = known?.upgradeable == true || known?.compoundable == true || known?.meta?.upgradeable == true || known?.meta?.compoundable == true || (level ?: 0) != 0
+    return (known?.name ?: name) + if (leveled) " +${level ?: 0}" else ""
 }
 
 data class PriceComparison(val deal: Boolean, val badDeal: Boolean, val comparison: String)

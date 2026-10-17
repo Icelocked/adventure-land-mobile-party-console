@@ -1,9 +1,9 @@
 package com.partyconsole.companion.domain
 
 /** The one banner an item tile shows: a rule conflict first, then manual
- *  marks, automatic rules, delivery, bank, merchant and merchant weapon.
- *  PWA: web/src/lib/itemActionBanner.ts. */
-enum class BannerAction { CONFLICT, UPGRADE, COMPOUND, NPC, STAND, EXCHANGE, DECONSTRUCTION, DELIVERY, BANK, MERCHANT, WEAPON, STAT }
+ *  marks, automatic rules, delivery, bank, merchant, merchant weapon and a
+ *  gear-set hold. PWA: web/src/lib/itemActionBanner.ts. */
+enum class BannerAction { CONFLICT, UPGRADE, COMPOUND, NPC, STAND, EXCHANGE, DECONSTRUCTION, DELIVERY, BANK, MERCHANT, WEAPON, STAT, HELD }
 
 data class BannerCandidate(val action: BannerAction, val label: String, val automatic: Boolean = false, val title: String? = null)
 data class ItemActionBanner(val action: BannerAction, val label: String, val title: String?)
@@ -14,12 +14,16 @@ private fun priority(candidate: BannerCandidate): Int = when (candidate.action) 
     BannerAction.BANK -> 4
     BannerAction.MERCHANT -> 5
     BannerAction.WEAPON -> 6
+    BannerAction.HELD -> 7
     else -> if (candidate.automatic) 2 else 1
 }
 
 /** Collection/storage are supporting intents, never additional banners. */
 fun itemActionBanner(candidates: List<BannerCandidate?>, merchant: Boolean): ItemActionBanner? {
-    val actions = candidates.filterNotNull().filter { !(merchant && it.action == BannerAction.MERCHANT) }.toMutableList()
+    val present = candidates.filterNotNull().filter { !(merchant && it.action == BannerAction.MERCHANT) }
+    // Every automatic rule skips a gear-set item, so only manual marks still compete with the hold.
+    val held = present.any { it.action == BannerAction.HELD }
+    val actions = (if (held) present.filter { !it.automatic } else present).toMutableList()
     val automatic = actions.filter { it.automatic }
         .map { if (it.action == BannerAction.UPGRADE || it.action == BannerAction.COMPOUND) "processing" else it.action.name.lowercase() }
         .filter { it in setOf("processing", "npc", "stand", "deconstruction") }

@@ -68,7 +68,8 @@ class ItemPortsTest {
             ),
         )
         val result = luckySlotSearch(tracking)
-        assertEquals(LuckySlotSearchResult(slot = 7, confidence = result.confidence, samples = 300, total = 320, inferred = true, nextSlot = 7), result)
+        // Console 1.4 adds the per-square posterior; the summary fields are unchanged.
+        assertEquals(LuckySlotSearchResult(slot = 7, confidence = result.confidence, samples = 300, total = 320, inferred = true, nextSlot = 7), result.copy(slots = emptyMap(), ruledOutCount = 0))
         assertEquals(1.0, result.confidence, 1e-9)
     }
 

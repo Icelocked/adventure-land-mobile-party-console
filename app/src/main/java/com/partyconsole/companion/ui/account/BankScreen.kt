@@ -1,6 +1,7 @@
 package com.partyconsole.companion.ui.account
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -110,8 +111,10 @@ fun BankScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
             } else {
                 for ((packName, entries) in bank.packs) {
                     val filled = entries.filterNotNull()
-                    // items1's last 7 slots are reserved and never usable.
-                    val usable = if (packName == "items1") entries.take(35) else entries
+                    // With BankBois, the console reserves items1's last 7 slots for
+                    // their logistics, so they don't count as free deposit room.
+                    // Without any, every slot is ordinary storage (console 1.4).
+                    val usable = if (state.bankbois.isNotEmpty() && packName == "items1") entries.take(35) else entries
                     val free = usable.size - usable.count { it != null }
                     val expanded = packName !in collapsed
                     item(key = "pack-$packName") {
@@ -291,7 +294,8 @@ private fun AdditionalStorageSection(viewModel: PartyViewModel) {
 /** Bankbois, the overflow storage workers: create one (the first reserves 7
  *  slots of bank pane 1, so it asks), each one's state, load and error, its
  *  items (the same options as a bank item, on pack bankboi:NAME), and a
- *  two-step delete once it's empty. */
+ *  two-step delete. The server refuses to delete a BankBoi that still holds
+ *  anything (console 1.4 http/bankboi-delete.ts). */
 private fun LazyListScope.bankbois(viewModel: PartyViewModel, catalogFor: (String) -> CatalogItem?, matches: (InventoryEntry) -> Boolean, onOpen: (String, InventoryEntry) -> Unit) {
     item(key = "bankbois") { BankboisHeader(viewModel) }
     item(key = "bankbois-list") {
@@ -302,11 +306,10 @@ private fun LazyListScope.bankbois(viewModel: PartyViewModel, catalogFor: (Strin
         Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
             if (state.bankbois.isEmpty()) {
-                Text("No bankbois yet. Reserved overflow cargo will wait safely until one is created.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(vertical = 8.dp))
+                Text("No BankBois yet. All bank slots are available for ordinary storage.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(vertical = 8.dp))
             }
             for (bankboi in state.bankbois) {
                 val occupied = bankboi.items.count { it != null }
-                val empty = occupied == 0 && bankboi.slots.isEmpty() && (bankboi.gold ?: 0L) == 0L
                 val pack = "bankboi:${bankboi.name}"
                 Column(modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(6.dp)).padding(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -320,7 +323,6 @@ private fun LazyListScope.bankbois(viewModel: PartyViewModel, catalogFor: (Strin
                         Text("$occupied/42", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
                         val confirming = deleting == bankboi.name
                         OutlinedButton(
-                            enabled = empty,
                             colors = if (confirming) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonColors(),
                             onClick = {
                                 if (!confirming) {
@@ -382,7 +384,7 @@ private fun BankboisHeader(viewModel: PartyViewModel) {
         if (confirmFirst) {
             Column(modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(6.dp)).padding(10.dp)) {
                 Text("Create first BankBoi?", style = MaterialTheme.typography.titleSmall)
-                Text("This will reserve 7 slots from bank pane 1 for BankBoi logistics.", style = MaterialTheme.typography.labelSmall)
+                Text("This will reserve the final 7 slots of bank pane 1 for BankBoi logistics. Items already in those slots will be moved into BankBoi storage.", style = MaterialTheme.typography.labelSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(enabled = !busy, onClick = { confirmFirst = false }) { Text("Cancel") }
                     Button(enabled = !busy, onClick = { create() }) { Text(if (busy) "Creating…" else "Create BankBoi") }
@@ -396,8 +398,10 @@ private fun BankboisHeader(viewModel: PartyViewModel) {
 }
 
 /** Bank tile markers as a list row: every pending mark at once (withdrawal
- *  border + Withdraw / Stand / NPC / Deconstruct labels), the stat-scroll
- *  badge, Auto stand, and RESERVED on items1's last seven slots. */
+ *  border + Withdraw / Stand / Deconstruct labels), the stat-scroll badge,
+ *  RESERVED on items1's last seven slots while BankBois exist, and one
+ *  banner for the manual NPC sale mark or the automatic rules that match
+ *  the item (domain/BankItemBanner.kt). */
 @Composable
 private fun BankRow(viewModel: PartyViewModel, entry: InventoryEntry, pack: String, catalogFor: (String) -> CatalogItem?, dimmed: Boolean, onOpen: () -> Unit) {
     val state by viewModel.dynamicState.collectAsState()
@@ -405,17 +409,15 @@ private fun BankRow(viewModel: PartyViewModel, entry: InventoryEntry, pack: Stri
     val item = entry.item
     val withdrawMarked = merchant != null && state.withdrawals[merchant].orEmpty().any { it.pack == pack && it.slot == entry.slot && sameMarkedItem(it.item, item) }
     val standMarked = state.standListings.any { it.bankPack == pack && it.bankSlot == entry.slot && sameMarkedItem(it.item, item) }
-    val npcMarked = state.npcSaleMarks.any { it.pack == pack && it.slot == entry.slot && sameMarkedItem(it.item, item) }
+    // A manual mark only; the auto NPC rule's own marks show through the banner as "Auto NPC".
+    val npcMarked = state.npcSaleMarks.any { !it.auto && it.pack == pack && it.slot == entry.slot && sameMarkedItem(it.item, item) }
     val deconstructionMarked = state.deconstructionMarks.any { it.state != "complete" && it.storage?.pack == pack && it.storage.slot == entry.slot && sameMarkedItem(it.item, item) }
-    val reserved = pack == "items1" && entry.slot >= 35
+    val reserved = state.bankbois.isNotEmpty() && pack == "items1" && entry.slot >= 35
     val autoStand = state.autoStandMarks[automaticCommerceRuleKey(item)]
-    // The merchant's account-wide auto sale rule. The dashboard's bank doesn't
-    // show it, so marking looked like it did nothing; its inventory does.
-    val autoNpc = state.autoNpcSales.containsKey(automaticCommerceRuleKey(item))
+    val banner = com.partyconsole.companion.domain.bankItemBanner(item, state, npcMarked)
     val marks = listOfNotNull(
         "WITHDRAW".takeIf { withdrawMarked },
         "STAND".takeIf { standMarked && autoStand == null },
-        "NPC".takeIf { npcMarked },
         "DECONSTRUCT".takeIf { deconstructionMarked },
     )
     val border = when {
@@ -441,8 +443,15 @@ private fun BankRow(viewModel: PartyViewModel, entry: InventoryEntry, pack: Stri
             item.statType?.let { Text(" ${it.uppercase()}", color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall) }
         }
         if (reserved) Text("RESERVED", color = Fuchsia, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-        if (autoStand != null) Text("Auto stand", color = Color(0xFFFDE68A), style = MaterialTheme.typography.labelSmall)
-        if (autoNpc) Text("Auto NPC", color = Color(0xFFFECDD3), style = MaterialTheme.typography.labelSmall)
+        banner?.let {
+            val colors = com.partyconsole.companion.ui.components.bannerColors(it.action)
+            Text(
+                it.label,
+                color = colors.text,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.background(colors.background, RoundedCornerShape(3.dp)).border(1.dp, colors.border, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp),
+            )
+        }
         for (label in marks) Text(label, color = Amber, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
     }
 }

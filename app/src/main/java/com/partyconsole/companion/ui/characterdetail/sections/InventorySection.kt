@@ -80,6 +80,7 @@ fun InventorySection(
     onItemTap: (InventoryEntry, Boolean) -> Unit,
     onLuckySlotData: () -> Unit = {},
     localLucky: JsonElement? = null,
+    reservedInventory: List<com.partyconsole.companion.model.ReservedInventorySlot> = emptyList(),
 ) {
     var open by remember { mutableStateOf(true) }
     var details by remember { mutableStateOf<TileDetails?>(null) }
@@ -110,10 +111,25 @@ fun InventorySection(
         free <= 10 -> Color(0xFFFB923C)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val verifiedLucky = state.luckyUpgradeSlots[characterName]
+    // Console 1.4 connected-inventory.tsx: a position lock wins, then the
+    // square an unlock resumes from, then the verified slot.
+    val lockedLucky = state.luckySlotLocks[characterName]
+    val resumingLucky = if (lockedLucky == null) state.luckySlotResume[characterName]?.slot else null
+    val verifiedLucky = lockedLucky ?: resumingLucky ?: state.luckyUpgradeSlots[characterName]
     val nextUpgradeSlot = if (validLuckySlot(verifiedLucky)) verifiedLucky!! else
         luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName].orEmpty(), localLucky?.let { normalizeSlotTracking(it) })).nextSlot
-    val luckySlotLabel = if (validLuckySlot(verifiedLucky)) "Verified lucky upgrade slot" else "Next upgrade will test for lucky upgrade"
+    val luckySlotLabel = when {
+        lockedLucky != null -> "Locked lucky upgrade position"
+        validLuckySlot(verifiedLucky) && resumingLucky == null -> "Verified lucky upgrade slot"
+        else -> "Next upgrade will test for lucky upgrade"
+    }
+    // Console connected-inventory.tsx heldSlots: a reserved slot names the
+    // first saved set with a matching member, by name and level only.
+    val gearSets = state.gearSets[characterName].orEmpty()
+    val heldSlots = reservedInventory.associate { reserved ->
+        val set = listOf("luck", "tank", "gold").find { id -> gearSets[id]?.slots?.values.orEmpty().any { it.name == reserved.item?.name && (it.level ?: 0) == (reserved.item?.level ?: 0) } }
+        reserved.slot to (set?.let { "${it.replaceFirstChar(Char::uppercase)} set" } ?: "Swapped-out gear")
+    }
     val grid = if (isMerchant) physicalInventory(items, { it.slot }) else compactInventory(items, total)
 
     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -154,7 +170,8 @@ fun InventorySection(
                             val compoundGroup = compoundGroups.find { group -> group.items.any { it.slot.slotInt() == entry.slot && sameMarkedItem(it.item, entry.item) } }
                             val autoCompound = autoCompoundMarks.find { it.name == entry.item.name }
                             val autoCompoundPending = autoCompound != null && level < autoCompound.targetTier && autoCompound.quantity != 0
-                            val autoExchangeMarked = isMerchant && state.autoExchanges.containsKey("${entry.item.name}@$level")
+                            // Console 1.4: auto exchange rules cover every party member's bag once a merchant is configured.
+                            val autoExchangeMarked = merchant != null && state.autoExchanges.containsKey("${entry.item.name}@$level")
                             val saleKey = automaticCommerceRuleKey(entry.item)
                             val autoNpcSaleMarked = state.autoNpcSales.containsKey(if (sharedRules || isMerchant) saleKey else kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive(characterName), JsonPrimitive(saleKey))).toString())
                             val npcSale = state.npcSaleMarks.find {
@@ -168,22 +185,24 @@ fun InventorySection(
                             val autoStandMarked = isMerchant && state.autoStandMarks.containsKey(saleKey)
                             val upgradeLevel = upgradeMark?.item?.level ?: 0
                             val upgradeTarget = upgradeLevel + (upgradeMark?.tiers ?: 1)
+                            val held = heldSlots[entry.slot]
                             val banner = itemActionBanner(
                                 listOf(
+                                    held?.let { BannerCandidate(BannerAction.HELD, it, title = "$it: automatic bank, merchant, compound, upgrade, sale and deconstruction rules skip this item") },
                                     deconstruction?.let { BannerCandidate(BannerAction.DECONSTRUCTION, "Deconstruction") },
-                                    npcSale?.let { BannerCandidate(BannerAction.NPC, "NPC sale", automatic = it.auto, title = npcSaleDetails) },
+                                    npcSale?.let { BannerCandidate(BannerAction.NPC, if (it.auto) "Auto NPC" else "NPC sale", automatic = it.auto, title = npcSaleDetails) },
                                     statScrollMark?.let { BannerCandidate(BannerAction.STAT, "Stat scroll") },
                                     upgradeMark?.let { BannerCandidate(BannerAction.UPGRADE, if (it.auto) "Auto → +$upgradeTarget" else "+$upgradeLevel → +$upgradeTarget", automatic = it.auto) },
                                     compoundGroup?.let { BannerCandidate(BannerAction.COMPOUND, "+$level → +${level + 1}") },
                                     if (standMarked) BannerCandidate(BannerAction.STAND, "Stand sale") else null,
                                     if (autoCompoundPending) BannerCandidate(BannerAction.COMPOUND, "Auto compound → +${autoCompound!!.targetTier}", automatic = true) else null,
                                     if (autoDeconstruct) BannerCandidate(BannerAction.DECONSTRUCTION, "Auto deconstruction", automatic = true) else null,
-                                    if (autoNpcSaleMarked) BannerCandidate(BannerAction.NPC, "NPC sale", automatic = true, title = npcSaleDetails ?: "Auto NPC sale") else null,
+                                    if (autoNpcSaleMarked) BannerCandidate(BannerAction.NPC, "Auto NPC", automatic = true, title = npcSaleDetails ?: "Auto NPC sale") else null,
                                     if (autoStandMarked) BannerCandidate(BannerAction.STAND, "Auto stand", automatic = true) else null,
                                     if (autoExchangeMarked) BannerCandidate(BannerAction.EXCHANGE, "Auto exchange", automatic = true) else null,
                                     deliveryTarget?.let { BannerCandidate(BannerAction.DELIVERY, "To $it") },
-                                    if (autoMarkMode == "bank" || markedIn(bankMarked, entry)) BannerCandidate(BannerAction.BANK, if (autoMarkMode == "bank") "Auto bank" else "Bank") else null,
-                                    if (autoMarkMode == "merchant" || markedIn(merchantMarked, entry)) BannerCandidate(BannerAction.MERCHANT, if (autoMarkMode == "merchant") "Auto merchant" else "Mark for merchant") else null,
+                                    if (autoMarkMode == "bank" || markedIn(bankMarked, entry)) BannerCandidate(BannerAction.BANK, if (autoMarkMode == "bank") "Auto bank" else "Bank", automatic = autoMarkMode == "bank") else null,
+                                    if (autoMarkMode == "merchant" || markedIn(merchantMarked, entry)) BannerCandidate(BannerAction.MERCHANT, if (autoMarkMode == "merchant") "Auto merchant" else "Mark for merchant", automatic = autoMarkMode == "merchant") else null,
                                     if (weaponMarked) BannerCandidate(BannerAction.WEAPON, "Merchant weapon") else null,
                                 ),
                                 isMerchant,
