@@ -36,11 +36,12 @@ test('Character header: doll portrait opens the stats, presence and ping, cave m
 
   await page.getByRole('button', { name: 'View Ranger1 stats' }).click()
   const stats = page.getByRole('dialog', { name: 'Ranger1 stats' })
-  await expect(stats.getByRole('group', { name: 'Dexterity', exact: true })).toContainText('100 · PRIMARY')
-  await expect(stats.getByRole('group', { name: 'Strength', exact: true })).toContainText('+4,200 max HP · +21 per point')
+  const extras = stats.getByRole('region', { name: 'Character extras', exact: true })
+  await expect(extras.getByRole('button', { name: 'Dexterity: 100 Primary' })).toBeVisible()
+  await expect(extras.locator('[data-line="str"] [data-effect="max_hp"]')).toHaveText('+4,200 Max HP +21 per point')
   // 300 armor: 1 - (0.1 + 0.1 + 0.095) = 70.5% of a hit.
-  await expect(stats.getByRole('group', { name: 'Armor', exact: true })).toContainText('29.50% physical damage reduction · a 100-damage physical hit becomes 70.5')
-  await expect(stats.getByRole('group', { name: 'Critical damage', exact: true })).toContainText('250%')
+  await expect(extras.locator('[data-line="armor"] [data-effect="reduction"]')).toHaveText('29.50% physical damage reduction a 100-damage physical hit becomes 70.5')
+  await expect(extras.locator('[data-line="critdamage"]')).toHaveText('Crit Damage: 250%')
 })
 
 test('Active status: shown for merchants too, counts, stacks, and the condition details', async ({ page }) => {
