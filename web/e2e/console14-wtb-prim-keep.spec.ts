@@ -53,48 +53,22 @@ test('WTB unconfirmed purchase: "It wasn\'t bought" sends bought false and a ref
   expect(bodies[0]).toEqual({ action: 'resolve-purchase', id, bought: false })
 })
 
-test('Auto NPC sale on the merchant: Keep in storage prefills from the rule and is sent as text; blank omits it', async ({ page }) => {
+test('Auto NPC sale on the merchant sends only the item and action; console v1.4.0 has no Keep in storage', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
-  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58, items: [{ name: 'ironore', q: 5 }, { name: 'hpot0', q: 9 }] })
-  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58, items: [{ name: 'hpot0', q: 9 }] })
   server.addCatalogEntry({ id: 'hpot0', name: 'Health Potion' })
-  server.autoNpcSales = { [JSON.stringify({ name: 'ironore', level: 0, p: null, stat_type: null })]: { item: { name: 'ironore' }, keep: 3 } }
   await server.install(page)
   const bodies = postBodies(page, 'merchant/auto-npc-sale')
 
   await page.goto('/characters/Patinder')
   await page.getByTestId('inventory-slot-0').click()
-  await page.getByRole('button', { name: 'Update auto sell to NPC…' }).click()
-  const keep = page.getByLabel('Keep in storage')
-  await expect(keep).toHaveValue('3')
-  await keep.fill('12')
-  await page.getByRole('button', { name: 'Enable auto sale' }).click()
-  await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ item: { name: 'ironore', q: 5 }, action: 'set', keep: '12' })
-  expect(Object.values(server.autoNpcSales)[0]).toMatchObject({ keep: 12 })
-
-  await page.getByTestId('inventory-slot-1').click()
-  await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
-  await expect(page.getByLabel('Keep in storage')).toHaveValue('')
-  await page.getByRole('button', { name: 'Enable auto sale' }).click()
-  await expect.poll(() => bodies.length).toBe(2)
-  expect(bodies[1]).toEqual({ item: { name: 'hpot0', q: 9 }, action: 'set' })
-})
-
-test('Auto NPC sale on another character: no Keep in storage field, since only merchant-wide rules keep copies', async ({ page }) => {
-  const server = new MockPartyServer()
-  server.paired = true
-  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
-  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, items: [{ name: 'ironore', q: 5 }] })
-  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
-  await server.install(page)
-
-  await page.goto('/characters/Ranger1')
-  await page.getByTestId('inventory-slot-0').click()
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await expect(page.getByRole('group', { name: 'Automatically sell to NPC?' })).toBeVisible()
   await expect(page.getByLabel('Keep in storage')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Enable auto sale' }).click()
+  await expect.poll(() => bodies.length).toBe(1)
+  expect(bodies[0]).toEqual({ item: { name: 'hpot0', q: 9 }, action: 'set' })
 })
 
 test('Prim stack: offered under Mark for upgrade on a merchant item, posts target and method, shows grace from the preview', async ({ page }) => {

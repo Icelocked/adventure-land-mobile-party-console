@@ -421,8 +421,6 @@ export const itemFromRuleKey = (ruleKey: string): Item => {
 export interface AutoNpcSaleRule {
   item: Item
   character?: string
-  /** Console 1.4 #116: copies a merchant-wide rule keeps across the merchant's bag, bank and BankBois. */
-  keep?: number
 }
 
 /** An autoStandMarks entry (merchant-only). */
@@ -694,9 +692,7 @@ export interface PartyStateDynamic {
   eventAttendance?: Record<string, Record<string, EventAttendanceInstance>>
   bossChase?: BossChaseState | null
   realmHopBlacklist?: string[]
-  // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
-  // Set by POST /formation {tank} (http/formation.ts); its role is described in party-roles-settings.tsx.
-  designatedTank?: string | null
+  // Console 1.4 combat and party: gear sets, Franky routine.
   // Per character, saved from worn gear (characters/gear-sets.ts).
   gearSets?: Record<string, Partial<Record<GearSetName, GearSet>>>
   // The leader scope's encounter settings; other scopes use farmingProfiles (see resolveEncounterRoutine).

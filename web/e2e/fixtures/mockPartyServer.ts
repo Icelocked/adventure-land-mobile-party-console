@@ -94,8 +94,8 @@ const CONFIG_FIELDS = [
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
   // Console 1.4 events and realms.
   'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
-  // Console 1.4 combat and party: designated tank and gear sets.
-  'designatedTank', 'gearSets',
+  // Console 1.4 combat and party: gear sets.
+  'gearSets',
 ] as const
 // Console 1.4 events and realms: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
@@ -206,7 +206,7 @@ export class MockPartyServer {
   deconstructionCatalog: Record<string, { compound: boolean; cost?: number; rewards?: unknown[] }> = {}
 
   // Auto-mark state, mutated by POSTed commands (PartyStateDynamic shape).
-  autoNpcSales: Record<string, { item: MockItem; character?: string; keep?: number }> = {}
+  autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
   // Pending one-time inventory marks (not standing rules), keyed by
   // character (state.upgrades/compounds/statScrolls).
   upgrades: Record<string, { slot?: number | string; item: MockItem; tiers?: number; equipped?: boolean }[]> = {}
@@ -240,8 +240,7 @@ export class MockPartyServer {
 
   paired = false
 
-  // Console 1.4 combat and party: designated tank, gear sets, Franky routine, escape.
-  designatedTank: string | null = null
+  // Console 1.4 combat and party: gear sets, Franky routine, escape.
   gearSets: Record<string, Record<string, { slots: Record<string, MockItem & { p?: string }>; savedAt: number }>> = {}
   // Characters whose equipment report is older than gear-sets.ts's 10s freshness window.
   staleEquipment: string[] = []
@@ -343,8 +342,7 @@ export class MockPartyServer {
       eventAttendance: this.eventAttendance,
       bossChase: this.bossChase,
       realmHopBlacklist: this.realmHopBlacklist,
-      // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
-      designatedTank: this.designatedTank,
+      // Console 1.4 combat and party: gear sets, Franky routine.
       gearSets: this.gearSets,
       encounterRoutines: this.encounterRoutines,
       encounterAutoDeathLimits: this.encounterAutoDeathLimits,
@@ -577,12 +575,6 @@ export class MockPartyServer {
       delete this.failOnceBody[path]
       return { status: 409, json: { ok: false, error, ...extra } }
     }
-    // Console 1.4 designated tank: http/formation.ts assigns `tank` after
-    // `leader` and before the character fields; null clears it.
-    if (path === 'formation' && body.tank !== undefined) {
-      if (body.tank !== null && !this.characters.some((c) => c.name === body.tank)) return { status: 400, json: { error: 'unknown tank' } }
-      this.designatedTank = body.tank === null ? null : String(body.tank)
-    }
     // Console 1.4 gear sets: characters/gear-sets.ts.
     if (path === 'gear-sets') {
       const name = String(body.character ?? '')
@@ -592,11 +584,7 @@ export class MockPartyServer {
       if (!['luck', 'tank', 'gold'].includes(set)) return { status: 400, json: { error: 'invalid gear set' } }
       const sets = (this.gearSets[name] ||= {})
       if (body.action === 'clear') delete sets[set]
-      else if (body.action === 'equip') {
-        // The server queues a gear-set-equip command and leaves the saved sets unchanged.
-        if (!sets[set]) return { status: 409, json: { error: 'that gear set is not saved' } }
-        return { status: 200, json: { ok: true } }
-      } else if (body.action === 'save') {
+      else if (body.action === 'save') {
         if (!member.slots || this.staleEquipment.includes(name)) return { status: 409, json: { error: 'no fresh equipment report for ' + name } }
         const slots: Record<string, MockItem & { p?: string }> = {}
         for (const slot of ['mainhand', 'offhand', 'chest', 'pants', 'helmet', 'gloves', 'shoes', 'cape', 'belt', 'orb', 'amulet', 'ring1', 'ring2', 'earring1', 'earring2', 'elixir']) {
@@ -675,7 +663,7 @@ export class MockPartyServer {
         const current = (this.extraState.eventSelectionsByCharacter as Record<string, string[]> | undefined) ?? {}
         this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
       }
-      return { status: 200, json: { ok: true, leader: this.leader, tank: this.designatedTank, followers: this.followers } }
+      return { status: 200, json: { ok: true, leader: this.leader, followers: this.followers } }
     }
     if (path === 'merchant/auto-npc-sale') {
       // http/automatic-sales.ts npc(): with `character` the rule is per-player
@@ -691,11 +679,8 @@ export class MockPartyServer {
       if (typeof item?.name !== 'string') return { status: 400, json: { error: 'invalid automatic NPC sale item' } }
       const ruleKey = JSON.stringify({ name: item.name, level: Math.max(0, Number(item.level) || 0), p: (item as { p?: string }).p || null, stat_type: item.stat_type || null })
       const key = character ? JSON.stringify([character, ruleKey]) : ruleKey
-      // #116: a merchant-wide rule may keep copies; blank keeps none.
-      const keep = body.keep === undefined || body.keep === null || body.keep === '' ? undefined : Number(body.keep)
-      if (keep !== undefined && (character || !Number.isSafeInteger(keep) || keep < 0)) return { status: 400, json: { error: 'enter a whole number of copies to keep, or leave it blank' } }
       if (body.action === 'remove') delete this.autoNpcSales[key]
-      else this.autoNpcSales[key] = { item, ...(character ? { character } : {}), ...(keep !== undefined ? { keep } : {}) }
+      else this.autoNpcSales[key] = { item, ...(character ? { character } : {}) }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.remove && body.id) {

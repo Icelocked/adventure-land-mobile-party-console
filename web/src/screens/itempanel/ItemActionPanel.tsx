@@ -471,7 +471,7 @@ function InventoryActions({
               name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
               character={isMerchant ? undefined : characterName}
               onCancel={() => onExpand(null)}
-              onConfirm={(keep) => confirmWith(() => api.autoNpcSale(isMerchant ? undefined : characterName, item, false, keep))}
+              onConfirm={() => confirmWith(() => api.autoNpcSale(isMerchant ? undefined : characterName, item))}
             />
           )}
         </>

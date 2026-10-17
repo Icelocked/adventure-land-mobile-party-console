@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
-// Console 1.4 combat and party features: designated tank, gear sets, the
-// Franky routine and the escape hold's Resume automation.
+// Console 1.4 combat and party features: gear sets, the Franky routine and the
+// escape hold's Resume automation.
 
 function postBodies(page: Page, path: string): Record<string, unknown>[] {
   const bodies: Record<string, unknown>[] = []
@@ -28,38 +28,14 @@ function partyServer() {
   return server
 }
 
-test('Designated tank: the party list picks a tank, None clears it, and a refusal shows the server’s reason', async ({ page }) => {
+test('The party list has no designated tank control; console v1.4.0 has none', async ({ page }) => {
   const server = partyServer()
   await server.install(page)
-  const bodies = postBodies(page, 'formation')
 
   await page.goto('/')
-  await expect(page.getByText('Holds melee range for the party regardless of class')).toBeVisible()
-  const choices = page.getByRole('group', { name: 'Tank' })
-  await page.getByRole('button', { name: 'Tank: None ▾' }).click()
-  // Every connected character is a choice, the merchant included (party-workspace.tsx chars).
-  await expect(choices.getByRole('button')).toHaveText(['None', 'Leada', 'Folla', 'Merchy'])
-  await choices.getByRole('button', { name: 'Folla' }).click()
-  await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ tank: 'Folla' })
-  expect(server.designatedTank).toBe('Folla')
-  await expect(page.getByRole('button', { name: 'Tank: Folla ▾' })).toBeVisible()
-
-  // Choosing the current tank sends nothing.
-  await page.getByRole('button', { name: 'Tank: Folla ▾' }).click()
-  await expect(choices.getByRole('button', { name: 'Folla' })).toHaveAttribute('aria-pressed', 'true')
-  await choices.getByRole('button', { name: 'Folla' }).click()
-  await page.getByRole('button', { name: 'Tank: Folla ▾' }).click()
-  await choices.getByRole('button', { name: 'None' }).click()
-  await expect.poll(() => bodies.length).toBe(2)
-  expect(bodies[1]).toEqual({ tank: null })
-  expect(server.designatedTank).toBeNull()
-  await expect(page.getByRole('button', { name: 'Tank: None ▾' })).toBeVisible()
-
-  server.failOnce['formation'] = 'unknown tank'
-  await page.getByRole('button', { name: 'Tank: None ▾' }).click()
-  await choices.getByRole('button', { name: 'Leada' }).click()
-  await expect(page.getByRole('alert').filter({ hasText: 'unknown tank' })).toBeVisible()
+  await expect(page.getByText('Folla').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Tank:/ })).toHaveCount(0)
+  await expect(page.getByText('Holds melee range for the party regardless of class')).toHaveCount(0)
 })
 
 test('Gear sets: saving captures the worn gear, shows worn/bag/missing pieces, clears, and shows a 409', async ({ page }) => {
@@ -108,27 +84,18 @@ test('Gear sets: saving captures the worn gear, shows worn/bag/missing pieces, c
   await expect(page.getByRole('button', { name: /^Gear sets/ })).toHaveCount(0)
 })
 
-test('Gear sets: Equip shows only for a saved set, posts action equip, and shows a 409', async ({ page }) => {
+test('Gear sets offer Save and Clear only; console v1.4.0 has no Equip action', async ({ page }) => {
   const server = partyServer()
   server.gearSets = { Leada: { tank: { slots: { chest: { name: 'coat', level: 7 } }, savedAt: 1 } } }
   await server.install(page)
-  const bodies = postBodies(page, 'gear-sets')
 
   await page.goto('/characters/Leada')
   await page.getByRole('button', { name: 'Gear sets (1) ▾' }).click()
-  await expect(page.getByRole('group', { name: 'Gear sets' })).toContainText('Equip wears a saved set from the bag (never the elixir)')
-  await expect(page.getByRole('region', { name: 'Luck gear set' }).getByRole('button', { name: 'Equip Luck' })).toHaveCount(0)
   const tank = page.getByRole('region', { name: 'Tank gear set' })
-  await tank.getByRole('button', { name: 'Equip Tank' }).click()
-  await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ character: 'Leada', set: 'tank', action: 'equip' })
-  // Equipping leaves the saved set in place.
-  expect(server.gearSets.Leada.tank.slots).toEqual({ chest: { name: 'coat', level: 7 } })
-  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveCount(0)
-
-  server.failOnce['gear-sets'] = 'that gear set is not saved'
-  await tank.getByRole('button', { name: 'Equip Tank' }).click()
-  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveText('that gear set is not saved')
+  await expect(tank.getByRole('button', { name: 'Save current gear as Tank' })).toBeVisible()
+  await expect(tank.getByRole('button', { name: 'Clear' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('button', { name: /^Equip/ })).toHaveCount(0)
+  await expect(page.getByRole('group', { name: 'Gear sets' })).not.toContainText('Equip wears a saved set')
 })
 
 test('Gear sets: reserved bag slots read "Luck set" or "Swapped-out gear" over automatic rules', async ({ page }) => {
