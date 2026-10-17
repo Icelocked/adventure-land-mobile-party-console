@@ -1,5 +1,5 @@
 import { sanitizeDollHtml } from '@/lib/safeHtml'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
@@ -7,10 +7,45 @@ import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/da
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { statBadgeClass } from '@/lib/itemActionBanner'
 import { comparisonSlotsFor, detailMeta, itemMaximumLevel, propertiesAtLevel, STAT_SCROLLS } from '@/lib/itemFormulas'
+import { GameBox } from '@/components/GameBox'
+import { STAT_COLORS as S } from '@/lib/statColors'
 import type { EquippedEntry, Item, ItemMeta, ItemSetInfo } from '@/models'
 
 type Props = Record<string, string | number | boolean>
 type Stats = Record<string, number>
+
+// Stat labels in their palette colors, and changes in the game's success and failure
+// colors. Console: gear-comparison-dialog.tsx and docs/comparison-card.md.
+const STAT_COLORS: Record<string, string> = {
+  max_hp: S.hp,
+  max_mp: S.mp,
+  attack: S.attack,
+  frequency: S.frequency,
+  range: S.range,
+  speed: S.speed,
+  armor: S.armor,
+  resistance: S.resistance,
+  str: S.str,
+  int: S.int,
+  dex: S.dex,
+  vit: S.vit,
+  fortitude: S.for,
+  luck: S.luck,
+  goldBonus: S.gold,
+  xpBonus: S.xp,
+  evasion: S.evasion,
+  reflection: S.reflection,
+  lifesteal: S.lifesteal,
+  manasteal: S.manasteal,
+  apiercing: S.armor,
+  rpiercing: S.resistance,
+  crit: S.crit,
+  dreturn: S.dreturn,
+  mp_cost: S.mp,
+  output: S.output,
+}
+const GAIN = '#85C76B',
+  LOSS = '#E13758'
 
 /** The character's projected totals (HP, MP,
  *  attack, speeds, armor, resistance, attributes, combat stats) with the
@@ -243,12 +278,46 @@ export function GearComparisonSheet({
     )
   }
 
+  // Each panel spans the same five shared rows (header, stat scroll buttons, notice, level
+  // slider, stats), so a notice or slider on one side only never pushes its stats out of
+  // line with the other. A row with content pads its own bottom, so an empty row adds no gap.
   const panel = (candidate: Stats, proposed: boolean) => {
     const meta = proposed ? entryMeta : equippedMeta
     const level = proposed ? rightLevel : leftLevel
+    const buttons = statButtons(proposed)
+    const notice =
+      !proposed && offerOffhandComparison && offhand ? (
+        <label className="flex items-center gap-2 rounded border border-border p-3 text-sm">
+          <input type="checkbox" aria-label="include offhand weapon in comparison" checked={includeOffhand} onChange={(event) => setIncludeOffhand(event.target.checked)} className="h-4 w-4" />
+          <span>
+            include offhand weapon in comparison
+            <span className="block text-xs text-muted-foreground">
+              {nameOf(offhand.item, metaOf(offhand))} +{offhand.item.level || 0}
+            </span>
+          </span>
+        </label>
+      ) : proposed && removesOffhand && offhand ? (
+        <p className="text-sm text-cyan-400">Two-handed weapon · unequips {nameOf(offhand.item, metaOf(offhand))}</p>
+      ) : null
+    const slider =
+      meta?.upgradeable || meta?.compoundable ? (
+        <div className="rounded border border-violet-900/70 p-3">
+          <div className="mb-2 flex justify-between font-mono text-[10px] uppercase text-violet-400">
+            <span>Preview level</span>
+            <span>+{level}</span>
+          </div>
+          <Slider
+            min={0}
+            max={itemMaximumLevel(meta)}
+            step={1}
+            value={[level]}
+            onValueChange={(value) => (proposed ? setRightLevel : setLeftLevel)(Array.isArray(value) ? value[0] || 0 : Number(value) || 0)}
+          />
+        </div>
+      ) : null
     return (
-      <section aria-label={proposed ? 'With this item' : 'Currently equipped'} className={`rounded-lg border p-3 ${proposed ? 'border-cyan-800' : 'border-border'}`}>
-        <div className="mb-3 flex items-center gap-3">
+      <section aria-label={proposed ? 'With this item' : 'Currently equipped'} className={`row-span-5 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-lg border p-3 ${proposed ? 'border-cyan-800' : 'border-border'}`}>
+        <div className="flex items-center gap-3 pb-3">
           {/* The game's own character doll markup. */}
           <div className="h-20 w-16 shrink-0 overflow-hidden" dangerouslySetInnerHTML={diagnostics.characterDollHtml ? { __html: sanitizeDollHtml(diagnostics.characterDollHtml) } : undefined} />
           <div className="min-w-0">
@@ -258,35 +327,10 @@ export function GearComparisonSheet({
             </p>
           </div>
         </div>
-        <div className="mb-3">{statButtons(proposed)}</div>
-        {!proposed && offerOffhandComparison && offhand ? (
-          <label className="mb-3 flex items-center gap-2 rounded border border-border p-3 text-sm">
-            <input type="checkbox" aria-label="include offhand weapon in comparison" checked={includeOffhand} onChange={(event) => setIncludeOffhand(event.target.checked)} className="h-4 w-4" />
-            <span>
-              include offhand weapon in comparison
-              <span className="block text-xs text-muted-foreground">
-                {nameOf(offhand.item, metaOf(offhand))} +{offhand.item.level || 0}
-              </span>
-            </span>
-          </label>
-        ) : null}
-        {proposed && removesOffhand && offhand ? <p className="mb-3 text-sm text-cyan-400">Two-handed weapon · unequips {nameOf(offhand.item, metaOf(offhand))}</p> : null}
-        {meta?.upgradeable || meta?.compoundable ? (
-          <div className="mb-3 rounded border border-violet-900/70 p-3">
-            <div className="mb-2 flex justify-between font-mono text-[10px] uppercase text-violet-400">
-              <span>Preview level</span>
-              <span>+{level}</span>
-            </div>
-            <Slider
-              min={0}
-              max={itemMaximumLevel(meta)}
-              step={1}
-              value={[level]}
-              onValueChange={(value) => (proposed ? setRightLevel : setLeftLevel)(Array.isArray(value) ? value[0] || 0 : Number(value) || 0)}
-            />
-          </div>
-        ) : null}
-        <div className="grid grid-cols-2 gap-2">
+        <div className={buttons ? 'pb-3' : undefined}>{buttons}</div>
+        <div className={notice ? 'pb-3' : undefined}>{notice}</div>
+        <div className={slider ? 'pb-3' : undefined}>{slider}</div>
+        <GameBox group label={proposed ? 'Proposed stats' : 'Equipped stats'}>
           {rows.map(([label, key, format]) => {
             const value = Number(candidate[key] || 0)
             const original = Number(currentPreview[key] || 0)
@@ -294,21 +338,21 @@ export function GearComparisonSheet({
             const changed = proposed && Math.abs(change) > 0.0001
             const percentChange = original === 0 ? null : (change / Math.abs(original)) * 100
             return (
-              <div key={label} className="rounded border border-border p-2">
-                <div className="font-mono text-[9px] uppercase text-muted-foreground">{label}</div>
-                <div className={`font-mono font-semibold ${changed && change > 0 ? 'font-bold text-lime-400' : changed && change < 0 ? 'text-rose-400' : ''}`}>
-                  {format(value)}
-                  {changed ? (
-                    <span className="ml-1 whitespace-nowrap text-[10px]">
-                      ({change > 0 ? '+' : '-'}
-                      {format(Math.abs(change))} · {percentChange === null ? 'new' : `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`})
-                    </span>
-                  ) : null}
-                </div>
+              <div key={label} data-line={key} className="md:whitespace-nowrap">
+                <span data-label style={{ color: STAT_COLORS[key] }}>
+                  {label}
+                </span>
+                : {format(value)}
+                {changed ? (
+                  <span data-change className="ml-1 whitespace-nowrap" style={{ color: change > 0 ? GAIN : LOSS }}>
+                    ({change > 0 ? '+' : '-'}
+                    {format(Math.abs(change))} · {percentChange === null ? 'new' : `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`})
+                  </span>
+                ) : null}
               </div>
             )
           })}
-        </div>
+        </GameBox>
       </section>
     )
   }
@@ -325,34 +369,47 @@ export function GearComparisonSheet({
           {panel(projected, true)}
         </div>
         {changedSets.length ? (
-          <section aria-label="Set changes" className="mt-3 rounded border border-violet-800 p-3">
-            <h3 className="font-mono text-xs uppercase tracking-wider text-violet-400">Set changes</h3>
+          <GameBox label="Set changes" className="mt-3">
+            <h3 className="inline-block border-b-2 border-dashed border-[#808080] font-semibold text-[#f1c054]">Set changes</h3>
             <div className="mt-2 space-y-2">
               {changedSets.map((set) => {
                 const before = currentSets.counts[set.id] || 0,
                   after = proposedSets.counts[set.id] || 0
                 return (
-                  <div key={set.id} className="rounded border border-border p-2">
-                    <p className="text-sm font-semibold">
-                      {set.name}: {before}/{set.items.length} → <span className={after > before ? 'text-emerald-400' : 'text-rose-400'}>{after}/{set.items.length}</span>
+                  <div key={set.id}>
+                    <p>
+                      <span className="text-[#f1c054]">{set.name}</span>: {before}/{set.items.length} →{' '}
+                      <span style={{ color: after > before ? GAIN : LOSS }}>
+                        {after}/{set.items.length}
+                      </span>
                     </p>
-                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                      {set.bonuses
-                        .map((bonus) => {
-                          const was = before === bonus.pieces,
-                            becomes = after === bonus.pieces
-                          const stats = Object.entries(bonus.stats)
-                            .map(([key, value]) => `${key.toUpperCase()} +${value}`)
-                            .join(', ')
-                          return `${bonus.pieces} pieces: ${stats}${!was && becomes ? ' · GAINED' : was && !becomes ? ' · LOST' : ''}`
-                        })
-                        .join(' · ')}
+                    <p className="pl-3 text-[12px] text-[#C3C3C3]">
+                      {set.bonuses.map((bonus, index) => {
+                        const was = before === bonus.pieces,
+                          becomes = after === bonus.pieces
+                        const stats = Object.entries(bonus.stats)
+                          .map(([key, value]) => `${key.toUpperCase()} +${value}`)
+                          .join(', ')
+                        const outcome = !was && becomes ? 'GAINED' : was && !becomes ? 'LOST' : null
+                        return (
+                          <Fragment key={bonus.pieces}>
+                            {index ? ' · ' : ''}
+                            {bonus.pieces} pieces: {stats}
+                            {outcome ? (
+                              <>
+                                {' · '}
+                                <span style={{ color: outcome === 'GAINED' ? GAIN : LOSS }}>{outcome}</span>
+                              </>
+                            ) : null}
+                          </Fragment>
+                        )
+                      })}
                     </p>
                   </div>
                 )
               })}
             </div>
-          </section>
+          </GameBox>
         ) : null}
       </SheetContent>
     </Sheet>
