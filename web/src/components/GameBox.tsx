@@ -7,8 +7,10 @@ import { cn } from '@/lib/utils'
 export function GameBox({ label, className, group = false, children }: { label: string; className?: string; group?: boolean; children: ReactNode }) {
   const props = {
     'aria-label': label,
-    className: cn('min-w-0 break-words border-[length:5px] border-[color:#808080] bg-black px-4 py-3 text-[13px] leading-5 text-[#E4E4E4]', className),
-    style: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
+    className: cn('min-w-0 break-words border-[5px] bg-black px-4 py-3 text-[13px] leading-5 text-[#E4E4E4]', className),
+    // index.css sets every element's border color outside a cascade layer, which beats
+    // Tailwind's border color utilities, so the gray goes inline.
+    style: { borderColor: '#808080', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
   }
   return group ? <fieldset {...props}>{children}</fieldset> : <section {...props}>{children}</section>
 }
