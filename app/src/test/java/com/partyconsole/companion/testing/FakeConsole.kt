@@ -69,6 +69,10 @@ class FakeConsole : AutoCloseable {
     @Volatile var accessCodeTtlMs = 10 * 60_000L
     /** Every /setup/pair body. */
     val pairRequests = CopyOnWriteArrayList<JsonObject>()
+    /** The e2e mock's `paired` and `requirePairing`: an unpaired client gets
+     *  401 from /setup/state and /setup/invite until /setup/pair succeeds. */
+    @Volatile var setupPaired = true
+    @Volatile var requirePairing = true
 
     init {
         // Poll at about the old desktop pace so tests don't wait on mobile cadences.
@@ -117,7 +121,7 @@ class FakeConsole : AutoCloseable {
                     "/party-api/daily-dungeons" -> dailyDungeon?.let { json(it) } ?: MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                     // The market's first read, before core reports a referenceRevision.
                     "/party-api/aldata/market" -> json(sections["market"]?.get("aldata")?.takeIf { it is JsonObject }?.toString() ?: """{"listings":[]}""")
-                    "/setup/state" -> json(setupState())
+                    "/setup/state" -> if (setupPaired) json(setupState()) else json("""{"error":"not paired"}""").setResponseCode(401)
                     else -> MockResponse().setResponseCode(404).setBody("""{"error":"not found"}""")
                 }
             }

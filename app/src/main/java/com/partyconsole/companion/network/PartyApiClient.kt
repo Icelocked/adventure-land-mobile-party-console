@@ -266,13 +266,28 @@ class PartyApiClient(
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
-                if (sessionLost(response.code)) ApiResult.Failure(SESSION_EXPIRED, "session_expired")
-                else if (!response.isSuccessful) ApiResult.Failure("HTTP ${response.code}") else ApiResult.Success(text)
+                if (response.isSuccessful) return@withContext ApiResult.Success(text)
+                // Many rejections carry an {error} body (pairing failures among
+                // them); it wins over the bare status, as in the PWA's postJson.
+                val message = runCatching { ((json.parseToJsonElement(text) as? JsonObject)?.get("error") as? JsonPrimitive)?.content }.getOrNull()?.ifEmpty { null }
+                if (sessionLost(response.code)) return@withContext ApiResult.Failure(message ?: SESSION_EXPIRED, "session_expired", response.code)
+                ApiResult.Failure(message ?: "HTTP ${response.code}", status = response.code)
             }
         } catch (e: java.io.IOException) {
             ApiResult.Failure(e.message ?: "network error")
         }
     }
+
+    /** POST /setup/pair {code} - pairs this device with the access code a
+     *  paired browser shows. The server ignores case, spaces and dashes, and
+     *  answers 400 "Access code is invalid or expired" (console 1.4
+     *  tools/hosting/access.ts). */
+    suspend fun pairWithAccessCode(code: String): ApiResult<String> = postRoot("setup/pair", JsonObject(mapOf("code" to JsonPrimitive(code))))
+
+    /** POST /setup/invite - a one-use pairing link token plus a one-use access
+     *  code: {token, code, expiresAt, expiresIn}. Issuing one replaces the
+     *  previous code (console 1.4 tools/hosting/setup-routes.ts). */
+    suspend fun invitePairing(): ApiResult<String> = postRoot("setup/invite", JsonObject(emptyMap()))
 
     suspend fun post(path: String, body: JsonObject): ApiResult<CommandResult> {
         // Every mutating action funnels through here, so this is where a tap

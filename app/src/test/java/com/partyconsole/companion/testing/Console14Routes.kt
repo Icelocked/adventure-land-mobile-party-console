@@ -256,20 +256,23 @@ internal fun FakeConsole.installConsole14Routes() {
     // Access-code pairing (tools/hosting/access.ts, setup-routes.ts): /setup/invite
     // issues a code that replaces the previous one; /setup/pair ignores case,
     // spaces and dashes, and the fifth wrong guess cancels the code.
-    setupState = { """{"ok":true,"requirePairing":true,"accessCodeExpiresAt":${activeAccessCode()?.second ?: "null"}}""" }
-    routes["/setup/invite"] = { _ ->
+    // setup-routes.ts setupState(): accessCodeExpiresAt only while pairing is required.
+    setupState = { if (requirePairing) """{"ok":true,"requirePairing":true,"accessCodeExpiresAt":${activeAccessCode()?.second ?: "null"}}""" else """{"ok":true,"requirePairing":false}""" }
+    routes["/setup/invite"] = route@{ _ ->
+        if (requirePairing && !setupPaired) return@route error(401, "Pair this browser before changing setup")
         accessCode = Triple(nextAccessCode, System.currentTimeMillis() + accessCodeTtlMs, 0)
         200 to """{"token":"${"c0ffee".repeat(10)}c0de","code":"$nextAccessCode","expiresAt":${accessCode!!.second},"expiresIn":$accessCodeTtlMs}"""
     }
     routes["/setup/pair"] = route@{ body ->
         pairRequests += body
-        val typed = body["code"].str()?.takeIf { it.isNotEmpty() } ?: return@route ok()
+        val typed = body["code"].str()?.takeIf { it.isNotEmpty() } ?: return@route ok().also { setupPaired = true }
         val code = activeAccessCode() ?: return@route error(400, "Access code is invalid or expired")
         if (typed.uppercase().replace(Regex("[\\s-]"), "") != code.first.replace("-", "")) {
             accessCode = if (code.third + 1 >= 5) null else code.copy(third = code.third + 1)
             return@route error(400, "Access code is invalid or expired")
         }
         accessCode = null
+        setupPaired = true
         ok()
     }
 }
