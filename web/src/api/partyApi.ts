@@ -672,7 +672,8 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/achievement-hunt - one character's settings patch and/or
-   *  blacklist change (console branch achievement-hunt). */
+   *  blacklist change. Only a console with Achievement Hunt (upstream PR #131)
+   *  has the route; Ryan's v1.4.0 has none. */
   async achievementHunt(
     character: string,
     body: {

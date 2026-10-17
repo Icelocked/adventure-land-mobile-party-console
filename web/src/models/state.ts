@@ -595,7 +595,8 @@ export interface PartyStateDynamic {
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
   huntSettings?: HuntSettings | null
-  // Achievement Hunt (console branch achievement-hunt; absent on stock consoles).
+  // Achievement Hunt (upstream console PR #131; Ryan's v1.4.0 has none).
+  // See consoleHasAchievementHunt.
   achievementHunt?: AchievementHuntSettings | null
   achievementBlacklist?: Record<string, AchievementBlacklistEntry> | null
   achievementTarget?: { id: string; step: number; milestone: number; startedAt: number; deaths: number } | null
@@ -808,6 +809,14 @@ export interface HuntSettings {
   expirationThreshold: number
 }
 
+/** Whether the console runs Achievement Hunt (upstream PR #131). A console
+ *  with it always sends a top-level `achievementHunt` settings object in the
+ *  config section (telemetry/public-state.ts configFields, filled from
+ *  defaultAchievementHuntSettings); Ryan's v1.4.0 never sends the field. */
+export function consoleHasAchievementHunt(state: Pick<PartyStateDynamic, 'achievementHunt'>): boolean {
+  return typeof state.achievementHunt === 'object' && state.achievementHunt !== null
+}
+
 /** A character's effective farming setup. The leader and its followers
  *  use the top-level fields; everyone else uses their farmingProfiles
  *  entry. `savedMode` is what this character selected; `effectiveMode` is
@@ -818,6 +827,9 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
   const legacy = owner === state.leader
   const personal = state.farmingProfiles[name]
   const effective = state.farmingProfiles[owner]
+  // Achievement settings stay undefined without the console capability, so
+  // every Achievement Hunt control and status gates on it.
+  const achievementHunt = consoleHasAchievementHunt(state)
   return {
     owner,
     followingLeader,
@@ -827,7 +839,7 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
     blacklist: effective?.huntBlacklist || (legacy ? state.huntBlacklist : undefined) || {},
     settings: effective?.huntSettings || (legacy ? state.huntSettings ?? undefined : undefined),
     hunt: effective?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
-    achievementSettings: effective?.achievementHunt || (legacy ? state.achievementHunt : undefined) || undefined,
+    achievementSettings: achievementHunt ? effective?.achievementHunt || (legacy ? state.achievementHunt : undefined) || undefined : undefined,
     achievementBlacklist: effective?.achievementBlacklist || (legacy ? state.achievementBlacklist : undefined) || {},
     achievementMessage: effective?.achievementMessage ?? (legacy ? state.achievementMessage : undefined) ?? '',
   }

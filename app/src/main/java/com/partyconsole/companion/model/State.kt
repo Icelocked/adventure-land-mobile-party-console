@@ -70,8 +70,9 @@ data class PartyStateDynamic(
     val monsterSearchRadiusByCharacter: Map<String, Int> = emptyMap(),
     val huntBlacklist: Map<String, HuntBlacklistEntry> = emptyMap(),
     val huntSettings: HuntSettings? = null,
-    // Achievement Hunt of the leader's scope (console branch achievement-hunt;
-    // absent on stock consoles). Other scopes keep theirs in farmingProfiles.
+    // Achievement Hunt of the leader's scope (upstream console PR #131; Ryan's
+    // v1.4.0 has none). Other scopes keep theirs in farmingProfiles. See
+    // consoleHasAchievementHunt.
     val achievementHunt: AchievementHuntSettings? = null,
     val achievementBlacklist: Map<String, AchievementBlacklistEntry>? = null,
     val achievementMessage: String? = null,
@@ -233,7 +234,7 @@ data class FarmingContext(
     val settings: HuntSettings?,
     val farmArea: FarmAreaState? = null,
     val hunt: MonsterHuntCycle? = null,
-    // Null on a console without Achievement Hunt.
+    // Null unless consoleHasAchievementHunt.
     val achievementSettings: AchievementHuntSettings? = null,
     val achievementBlacklist: Map<String, AchievementBlacklistEntry> = emptyMap(),
     val achievementMessage: String = "",
@@ -259,12 +260,22 @@ data class AchievementBlacklistEntry(
     val characters: List<String> = emptyList(),
 )
 
+/** Whether the console runs Achievement Hunt (upstream PR #131). A console
+ *  with it always sends a top-level `achievementHunt` settings object in the
+ *  config section (telemetry/public-state.ts configFields, filled from
+ *  defaultAchievementHuntSettings); Ryan's v1.4.0 never sends the field.
+ *  PWA: web/src/models/state.ts consoleHasAchievementHunt. */
+val PartyStateDynamic.consoleHasAchievementHunt: Boolean get() = achievementHunt != null
+
 fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
     val followingLeader = leader?.takeIf { it != name && followers[name] == true }
     val owner = followingLeader ?: name
     val legacy = owner == leader
     val personal = farmingProfiles[name]
     val effective = farmingProfiles[owner]
+    // Achievement settings stay null without the console capability, so
+    // every Achievement Hunt control and status gates on it.
+    val hasAchievementHunt = consoleHasAchievementHunt
     return FarmingContext(
         owner = owner,
         followingLeader = followingLeader,
@@ -274,7 +285,7 @@ fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
         settings = effective?.huntSettings ?: if (legacy) huntSettings else null,
         farmArea = effective?.farmAreaState ?: if (legacy) farmAreaState else null,
         hunt = effective?.monsterHunt ?: if (legacy) monsterHunt else null,
-        achievementSettings = effective?.achievementHunt ?: if (legacy) achievementHunt else null,
+        achievementSettings = if (!hasAchievementHunt) null else effective?.achievementHunt ?: if (legacy) achievementHunt else null,
         achievementBlacklist = effective?.achievementBlacklist ?: (if (legacy) achievementBlacklist else null) ?: emptyMap(),
         achievementMessage = effective?.achievementMessage ?: (if (legacy) achievementMessage else null) ?: "",
     )

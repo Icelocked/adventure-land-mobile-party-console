@@ -16,9 +16,10 @@ function progress(monster: AchievementMonster, kills: number): string {
   return step < 0 ? `${Math.floor(kills).toLocaleString()} kills · complete` : `${Math.floor(kills).toLocaleString()} / ${monster.ladder[step].toLocaleString()} · step ${step + 1}`
 }
 
-/** Achievement Hunt settings for one farming scope (console branch achievement-hunt,
- *  docs/achievement-hunt.md), on the Farming settings screen below Hunt. Every
- *  request carries `character`; a follower sees the leader's settings read-only. */
+/** Achievement Hunt settings for one farming scope, on the Farming settings
+ *  screen below Hunt. The console needs Achievement Hunt (upstream PR #131,
+ *  docs/achievement-hunt.md); Ryan's v1.4.0 has none. Every request carries
+ *  `character`; a follower sees the leader's settings read-only. */
 export function AchievementHuntSettingsBlock({
   character,
   value,

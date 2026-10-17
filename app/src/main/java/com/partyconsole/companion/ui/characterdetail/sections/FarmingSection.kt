@@ -85,7 +85,8 @@ private val MODES = listOf(
     Mode("hunt", "Hunt", "One quest at a time: leader first, then the next member if its monster is blacklisted"),
 )
 
-// Achievement Hunt: only on a console that has it (branch achievement-hunt).
+// Achievement Hunt needs a console that has it (upstream PR #131; Ryan's
+// v1.4.0 has none). farmingContext returns achievementSettings only then.
 private val ACHIEVEMENTS = Mode("achievements", "Achievements", "Farm the selected monsters for their kill achievements, weakest first")
 
 /** Farming: the live combat target, the mode selector with the saved / live
@@ -211,7 +212,7 @@ fun FarmingSection(
                 )
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
-            if (effectiveMode == "achievements") {
+            if (effectiveMode == "achievements" && achievement.achievementSettings != null) {
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp).semantics { contentDescription = "Achievement Hunt status" }) {
                     Text("Achievement Hunt status", color = Color(0xFFFB7185), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
                     Text(achievement.achievementMessage.ifEmpty { "Choosing the next monster" }, color = Color(0xFFFB7185), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)

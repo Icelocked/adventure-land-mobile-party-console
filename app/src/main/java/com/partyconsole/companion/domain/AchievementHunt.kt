@@ -4,8 +4,9 @@ import com.partyconsole.companion.model.BestiaryMonster
 import com.partyconsole.companion.model.MonsterChoice
 import kotlinx.serialization.json.JsonPrimitive
 
-// Console branch achievement-hunt: runtime/hunt/achievement-policy.ts
-// (achievementMonsters, nextStep). PWA: web/src/lib/achievementHunt.ts.
+// Console Achievement Hunt (upstream PR #131; Ryan's v1.4.0 has none):
+// runtime/hunt/achievement-policy.ts (achievementMonsters, nextStep).
+// PWA: web/src/lib/achievementHunt.ts.
 
 data class AchievementMonster(
     val id: String,

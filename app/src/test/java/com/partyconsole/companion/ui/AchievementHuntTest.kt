@@ -31,8 +31,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** Achievement Hunt (web/e2e/achievement-hunt.spec.ts; console branch
- *  achievement-hunt) on the native farming screens.
+/** Achievement Hunt (web/e2e/achievement-hunt.spec.ts) on the native
+ *  farming screens. The console needs Achievement Hunt (upstream PR #131;
+ *  Ryan's v1.4.0 has none).
  *
  *  Failure modes:
  *  - Monsters list in catalog order instead of weakest first, or bosses,
@@ -43,8 +44,8 @@ import org.robolectric.RobolectricTestRunner
  *  - A follower can edit the leader's settings, or sees its own.
  *  - An invalid death threshold reaches the server.
  *  - "Fill respawn waits" reads off when the console never saved it.
- *  - The Achievements mode or the settings block shows on a console
- *    without Achievement Hunt.
+ *  - The Achievements mode, the status line or the settings block shows on
+ *    a v1.4.0 console, even when a farming profile carries achievementHunt.
  *  - The status line is missing while the mode runs.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -175,6 +176,48 @@ class AchievementHuntTest {
         setUp(false)
         settings("Leada")
         compose.onNodeWithText("Farming settings · Leada").assertExists()
+        compose.onNode(hasContentDescription("Achievement Hunt settings")).assertDoesNotExist()
+    }
+
+    /** v1.4.0 never sends the top-level achievementHunt, so a profile's own
+     *  copy and a saved "achievements" mode unlock nothing. */
+    @Test
+    fun aV140ConsoleShowsNoAchievementsModeStatusOrSettings() {
+        setUp(false)
+        val profiles = console.sections.getValue("config")["farmingProfiles"]!!.jsonObject
+        console.override("config", mapOf(
+            "farmingPolicy" to json("\"achievements\""),
+            "achievementMessage" to json("\"Farming goo: 4 / 10 kills (step 1)\""),
+            "farmingProfiles" to JsonObject(profiles + ("Rangy" to JsonObject(profiles.getValue("Rangy").jsonObject + mapOf(
+                "achievementHunt" to json("""{"monsters":["goo"],"blacklistDeaths":false,"deathThreshold":5}"""),
+            )))),
+        ))
+        val viewModel = PartyViewModel(console.settings)
+        val name = androidx.compose.runtime.mutableStateOf("Leada")
+        compose.setContent { CharacterDetailScreen(viewModel, name.value, onBack = {}, onSwitchCharacter = {}, onNavigate = {}, onOpenMerchantCommerce = {}, onOpenRoutines = {}, onOpenHuntSettings = {}) }
+        eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.bestiaryCatalog.size == 5 && viewModel.characters.value["Leada"]?.vitals != null }
+        compose.waitForIdle()
+        compose.onAllNodes(scroller)[0].performScrollToNode(hasContentDescription("Scatter: ", substring = true))
+        compose.onNode(hasContentDescription("Achievements: ", substring = true)).assertDoesNotExist()
+        compose.onNode(hasContentDescription("Achievement Hunt status")).assertDoesNotExist()
+
+        name.value = "Rangy"
+        compose.waitForIdle()
+        compose.onAllNodes(scroller)[0].performScrollToNode(hasContentDescription("Scatter: ", substring = true))
+        compose.onNode(hasContentDescription("Achievements: ", substring = true)).assertDoesNotExist()
+    }
+
+    @Test
+    fun aV140ConsoleShowsNoSettingsForAProfileThatCarriesAchievementHunt() {
+        setUp(false)
+        val profiles = console.sections.getValue("config")["farmingProfiles"]!!.jsonObject
+        console.override("config", mapOf(
+            "farmingProfiles" to JsonObject(profiles + ("Rangy" to JsonObject(profiles.getValue("Rangy").jsonObject + mapOf(
+                "achievementHunt" to json("""{"monsters":["goo"],"blacklistDeaths":false,"deathThreshold":5}"""),
+            )))),
+        ))
+        settings("Rangy")
+        compose.onNodeWithText("Farming settings · Rangy").assertExists()
         compose.onNode(hasContentDescription("Achievement Hunt settings")).assertDoesNotExist()
     }
 }

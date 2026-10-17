@@ -30,7 +30,8 @@ const MODES: { id: FarmingMode; label: string; description: string }[] = [
   { id: 'scatter', label: 'Scatter', description: 'Force one-shot scatter farming' },
   { id: 'hunt', label: 'Hunt', description: 'One quest at a time: leader first, then the next member if its monster is blacklisted' },
 ]
-// Achievement Hunt: only on a console that has it (branch achievement-hunt).
+// Achievement Hunt needs a console that has it (upstream PR #131; Ryan's
+// v1.4.0 has none). resolveFarmingContext returns achievementSettings only then.
 const ACHIEVEMENTS = { id: 'achievements' as const, label: 'Achievements', description: 'Farm the selected monsters for their kill achievements, weakest first' }
 
 /** The mode selector with effective-mode/follow indicator, hunt status, and
@@ -189,7 +190,7 @@ export function FarmingSection({
         </p>
       )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
-      {effectiveMode === 'achievements' && (
+      {effectiveMode === 'achievements' && achievement.achievementSettings && (
         <section aria-label="Achievement Hunt status" className="mt-2 border-t border-rose-900/70 pt-2 font-mono text-[10px] text-rose-400">
           <p className="font-semibold">Achievement Hunt status</p>
           <p>{achievement.achievementMessage || 'Choosing the next monster'}</p>

@@ -103,13 +103,31 @@ test("An independent character edits its own Achievement Hunt; a follower sees t
   await expect(section.getByRole('textbox', { name: 'Achievement Hunt deaths before blacklisting' })).toBeDisabled()
 })
 
+// Ryan's v1.4.0 (no upstream PR #131) sends no achievementHunt field at all.
 test('Achievement Hunt is absent on a console without it', async ({ page }) => {
   const server = setup(false)
   await server.install(page)
   await page.goto('/characters/Leada')
   await expect(page.getByRole('region', { name: 'Formation' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Farming' }).getByRole('button', { name: 'Hunt', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Farming' }).getByRole('button', { name: 'Achievements' })).toHaveCount(0)
   await page.goto('/characters/Leada/hunt-settings')
   await expect(page.getByText('Farming settings · Leada')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Achievement Hunt settings' })).toHaveCount(0)
+})
+
+// consoleHasAchievementHunt reads only the top-level achievementHunt object,
+// so profile data without it shows nothing.
+test('A farming profile with Achievement Hunt data but no top-level achievementHunt shows no Achievement Hunt', async ({ page }) => {
+  const server = setup(false)
+  server.farmingProfiles = { Solo: { farmingPolicy: 'achievements', achievementHunt: selection, achievementBlacklist: {}, achievementMessage: 'Farming goo: 4 / 10 kills (step 1)' } }
+  await server.install(page)
+  await page.goto('/characters/Solo')
+  const farming = page.getByRole('region', { name: 'Farming' })
+  await expect(farming.getByRole('button', { name: 'Hunt', exact: true })).toBeVisible()
+  await expect(farming.getByRole('button', { name: 'Achievements' })).toHaveCount(0)
+  await expect(farming.getByRole('region', { name: 'Achievement Hunt status' })).toHaveCount(0)
+  await page.goto('/characters/Solo/hunt-settings')
+  await expect(page.getByText('Farming settings · Solo')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Achievement Hunt settings' })).toHaveCount(0)
 })

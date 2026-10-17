@@ -61,11 +61,11 @@ private fun progress(monster: AchievementMonster, kills: Double): String {
     return if (step < 0) "$count kills · complete" else "$count / ${"%,d".format(monster.ladder[step].toLong())} · step ${step + 1}"
 }
 
-/** Achievement Hunt settings for one farming scope (console branch
- *  achievement-hunt, docs/achievement-hunt.md), on the Farming settings
- *  screen below Hunt. Every request carries `character`; a follower sees the
- *  leader's settings read-only. The monster chooser opens inline. PWA:
- *  AchievementHuntSettings.tsx. */
+/** Achievement Hunt settings for one farming scope (upstream console PR
+ *  #131, docs/achievement-hunt.md; Ryan's v1.4.0 has none), on the Farming
+ *  settings screen below Hunt. Every request carries `character`; a
+ *  follower sees the leader's settings read-only. The monster chooser opens
+ *  inline. PWA: AchievementHuntSettings.tsx. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AchievementHuntSettingsBlock(
