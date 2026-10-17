@@ -608,8 +608,8 @@ class PartyApiClient(
         sendCommand(character, mapOf("type" to "clear-auto-item-marks", "mode" to mode))
 
     /** POST /party-api/merchant/order - queues an NPC buy and/or crafting
-     *  job. The server recomputes each buy line's upgrade budget, so `level`
-     *  is what matters; client-side cost estimates are display-only. */
+     *  job. The server recomputes each buy line's upgrade budget from
+     *  `level` (console 1.4 runtime/upgrade-estimate.ts). */
     suspend fun submitMerchantOrder(
         buys: List<com.partyconsole.companion.model.MerchantOrderBuyLine>,
         crafts: List<com.partyconsole.companion.model.MerchantOrderCraftLine>,
