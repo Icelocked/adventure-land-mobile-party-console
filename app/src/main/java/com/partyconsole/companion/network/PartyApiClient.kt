@@ -969,6 +969,15 @@ class PartyApiClient(
         return post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventLimits" to JsonObject(mapOf("event" to JsonPrimitive(event), "limits" to values)))))
     }
 
+    /** POST /party-api/encounter-mode {character, encounter, mode}: "auto",
+     *  "offtank" or "tank" (console 1.4 Franky routine). */
+    suspend fun setEncounterMode(character: String, encounter: String, mode: String): ApiResult<CommandResult> =
+        post("encounter-mode", JsonObject(mapOf("character" to JsonPrimitive(character), "encounter" to JsonPrimitive(encounter), "mode" to JsonPrimitive(mode))))
+
+    /** POST /party-api/encounter-mode {character, encounter, deathLimit}. */
+    suspend fun setEncounterAutoLimit(character: String, encounter: String, deathLimit: Long): ApiResult<CommandResult> =
+        post("encounter-mode", JsonObject(mapOf("character" to JsonPrimitive(character), "encounter" to JsonPrimitive(encounter), "deathLimit" to JsonPrimitive(deathLimit))))
+
     /** POST /party-api/dashboard-preferences - whether to send the
      *  anniversary chat message when receiving cake from a kiss. */
     suspend fun setAnniversaryAutoChat(enabled: Boolean): ApiResult<CommandResult> =

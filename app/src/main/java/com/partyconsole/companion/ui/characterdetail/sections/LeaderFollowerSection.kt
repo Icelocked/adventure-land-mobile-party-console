@@ -126,6 +126,10 @@ private fun EventSelectionControl(state: PartyStateDynamic, name: String, viewMo
     var open by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var settings by remember { mutableStateOf<String?>(null) }
+    var franky by remember { mutableStateOf(false) }
+    // Merchant-class characters get no Franky routine (connected-character-card.tsx).
+    val characters by viewModel.characters.collectAsState()
+    val combat = characters[name]?.vitals?.ctype != "merchant"
     val policy = eventPolicy(state, name)
     val selected = selectedEvents(state, name)
     val order = eventPriorityOrder(state, name)
@@ -232,6 +236,14 @@ private fun EventSelectionControl(state: PartyStateDynamic, name: String, viewMo
                         },
                         onAnniversary = onOpenAnniversary,
                     )
+                }
+                // Console 1.4 reaches the Franky routine from inside Franky's
+                // event settings (event-limits-dialog.tsx).
+                if (settings == event.id && event.id == "franky" && combat) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        OutlinedButton(onClick = { franky = !franky }, modifier = Modifier.fillMaxWidth()) { Text("Franky routine settings") }
+                        if (franky) FrankyRoutineControl(name, state, viewModel)
+                    }
                 }
             }
         }

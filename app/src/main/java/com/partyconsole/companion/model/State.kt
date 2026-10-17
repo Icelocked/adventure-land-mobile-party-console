@@ -127,6 +127,11 @@ data class PartyStateDynamic(
     val eventPrioritiesByCharacter: Map<String, List<String>> = emptyMap(),
     val eventLimitsByCharacter: Map<String, Map<String, EventLimits>> = emptyMap(),
     val eventAttendance: Map<String, Map<String, EventAttendanceInstance>> = emptyMap(),
+    // Console 1.4 Franky routine of the leader's scope; other scopes keep
+    // theirs in farmingProfiles (see encounterRoutine).
+    val encounterRoutines: Map<String, String> = emptyMap(),
+    val encounterAutoDeathLimits: Map<String, Int> = emptyMap(),
+    val encounterAutoDeaths: Map<String, Int> = emptyMap(),
     val anniversary: JsonElement? = null,
     // Bankbois, slots, session
     val bankbois: List<Bankboi> = emptyList(),
@@ -205,6 +210,10 @@ data class FarmingProfile(
     val location: MapLocation? = null,
     val monsterHunt: MonsterHuntCycle? = null,
     val farmAreaState: FarmAreaState? = null,
+    // Console 1.4 Franky routine, per farming scope.
+    val encounterRoutines: Map<String, String>? = null,
+    val encounterAutoDeathLimits: Map<String, Int>? = null,
+    val encounterAutoDeaths: Map<String, Int>? = null,
 )
 
 /** Whose farming settings a character runs on. The leader and its
@@ -239,6 +248,23 @@ fun PartyStateDynamic.farmingContext(name: String): FarmingContext {
     )
 }
 
+/** The Franky routine of the scope a character farms in. */
+data class EncounterRoutine(val followingLeader: String?, val mode: String, val autoDeathLimit: Int, val autoDeaths: Int)
+
+/** A follower shows (and can't edit) its leader's routine. Defaults: auto,
+ *  a death limit of 3. Console: farming-context.ts frankyRoutine,
+ *  frankyAutoDeathLimit and frankyAutoDeaths. */
+fun PartyStateDynamic.encounterRoutine(name: String): EncounterRoutine {
+    val context = farmingContext(name)
+    val legacy = context.owner == leader
+    val effective = farmingProfiles[context.owner]
+    return EncounterRoutine(
+        followingLeader = context.followingLeader,
+        mode = effective?.encounterRoutines?.get("franky")?.ifEmpty { null } ?: (if (legacy) encounterRoutines["franky"]?.ifEmpty { null } else null) ?: "auto",
+        autoDeathLimit = effective?.encounterAutoDeathLimits?.get("franky") ?: (if (legacy) encounterAutoDeathLimits["franky"] else null) ?: 3,
+        autoDeaths = effective?.encounterAutoDeaths?.get("franky") ?: (if (legacy) encounterAutoDeaths["franky"] else null) ?: 0,
+    )
+}
 
 /** Whether an item can be scrapped, and for what. */
 @Serializable
