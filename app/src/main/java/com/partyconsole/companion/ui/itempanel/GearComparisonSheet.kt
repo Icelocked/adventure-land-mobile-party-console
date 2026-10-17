@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -138,18 +140,29 @@ fun GearComparisonSheet(
     var rightLevel by remember { mutableStateOf(max(0, item.level ?: 0)) }
     var leftStatType by remember { mutableStateOf(equipped?.item?.statType ?: "none") }
     var rightStatType by remember { mutableStateOf(item.statType ?: "none") }
+    var includeOffhand by remember { mutableStateOf(true) }
 
-    val actualOldProps = equippedMeta?.properties.orEmpty().mapValues { (it.value as? JsonPrimitive)?.doubleOrNull ?: 0.0 }
+    fun handsFor(m: ItemMeta?) = m?.usage?.classes?.find { it.id == ctype }?.hands
+    val removesOffhand = replacementSlot == "mainhand" && handsFor(entryMeta) == 2
+    val offhand = slots["offhand"]
+    // Only a one-handed main hand leaves the offhand a choice: the two-handed
+    // swap drops it, so the current side can be judged with or without it.
+    val offerOffhandComparison = removesOffhand && equipped != null && offhand != null && handsFor(equippedMeta) == 1
     val oldProps = if (equipped != null) propertiesAtLevel(equippedMeta, equipped.item, leftLevel, leftStatType.takeIf { it != "none" }) else emptyMap()
     val newProps = propertiesAtLevel(entryMeta, item, rightLevel, rightStatType.takeIf { it != "none" })
 
     // The equipped gear (not the stand) with resolved meta; each side swaps
     // the replacement slot for its preview.
     val actualEquipment = slots.filter { (name, value) -> !name.startsWith("trade") && value != null }.map { (name, value) -> name to value!!.copy(meta = metaOf(value)) }
-    val currentEquipment = actualEquipment.map { (name, value) -> if (name == replacementSlot) name to value.copy(item = value.item.copy(level = leftLevel)) else name to value }
-    val proposedEquipment = actualEquipment.filter { it.first != replacementSlot } + (replacementSlot to EquippedEntry(item = item.copy(level = rightLevel), meta = entryMeta))
+    fun withProperties(value: EquippedEntry, properties: Map<String, Double>) =
+        value.copy(meta = (value.meta ?: ItemMeta()).copy(properties = properties.mapValues { JsonPrimitive(it.value) }))
+    val currentEquipment = actualEquipment
+        .filter { it.first != "offhand" || !offerOffhandComparison || includeOffhand }
+        .map { (name, value) -> if (name == replacementSlot) name to withProperties(value.copy(item = value.item.copy(level = leftLevel)), oldProps) else name to value }
+    val proposedEquipment = actualEquipment.filter { it.first != replacementSlot && !(removesOffhand && it.first == "offhand") } +
+        (replacementSlot to withProperties(EquippedEntry(item = item.copy(level = rightLevel), meta = entryMeta), newProps))
     val setDefinitions = linkedMapOf<String, ItemSetInfo>()
-    (currentEquipment.map { it.second.meta } + entryMeta).forEach { m -> m?.world?.set?.let { setDefinitions[it.id] = it } }
+    (actualEquipment.map { it.second.meta } + entryMeta).forEach { m -> m?.world?.set?.let { setDefinitions[it.id] = it } }
     fun setState(equipment: List<Pair<String, EquippedEntry>>): SetState {
         val totals = mutableMapOf<String, Double>()
         val counts = mutableMapOf<String, Int>()
@@ -157,14 +170,28 @@ fun GearComparisonSheet(
             val allowed = set.items.map { it.id }.toSet()
             val count = equipment.count { it.second.item.name in allowed }
             counts[setId] = count
-            set.bonuses.filter { count >= it.pieces }.forEach { bonus ->
+            // Native G.sets[count] is a total bonus, not cumulative tiers.
+            set.bonuses.filter { count == it.pieces }.forEach { bonus ->
                 bonus.stats.forEach { (key, value) -> (value as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull?.let { totals[key] = (totals[key] ?: 0.0) + it } }
             }
         }
         return SetState(totals, counts)
     }
+    val actualSets = setState(actualEquipment)
     val currentSets = setState(currentEquipment)
     val proposedSets = setState(proposedEquipment)
+    fun equipmentTotals(equipment: List<Pair<String, EquippedEntry>>): Map<String, Double> {
+        val totals = mutableMapOf<String, Double>()
+        for ((_, value) in equipment) {
+            for ((key, amount) in value.meta?.properties.orEmpty()) {
+                (amount as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { totals[key] = (totals[key] ?: 0.0) + it }
+            }
+        }
+        return totals
+    }
+    // The diagnostics already include the actual gear and its active sets.
+    // Both previews anchor there, so dropping an offhand also drops its set share.
+    val actualTotals = equipmentTotals(actualEquipment)
 
     val characterLevel = (vitals?.level?.takeIf { it > 0 } ?: diagnostics?.level ?: 0).toDouble()
     val maxHp = (vitals?.maxHp ?: 0).toDouble()
@@ -181,8 +208,8 @@ fun GearComparisonSheet(
     val oldPrimary = num(primary)
     val combat = (base["combatStats"] as? JsonObject) ?: JsonObject(emptyMap())
     fun combatNum(key: String) = numberOf(combat, key)
-    fun project(replacement: Map<String, Double>, setTotals: Map<String, Double>): Map<String, Double> {
-        fun delta(key: String) = (replacement[key] ?: 0.0) - (actualOldProps[key] ?: 0.0) + (setTotals[key] ?: 0.0) - (currentSets.totals[key] ?: 0.0)
+    fun project(totals: Map<String, Double>, setTotals: Map<String, Double>): Map<String, Double> {
+        fun delta(key: String) = (totals[key] ?: 0.0) - (actualTotals[key] ?: 0.0) + (setTotals[key] ?: 0.0) - (actualSets.totals[key] ?: 0.0)
         val result = mutableMapOf<String, Double>()
         result["str"] = num("str") + delta("str")
         result["int"] = num("int") + delta("int")
@@ -218,8 +245,8 @@ fun GearComparisonSheet(
         result["output"] = combatNum("output") + delta("output")
         return result
     }
-    val currentPreview = project(oldProps, currentSets.totals)
-    val projected = project(newProps, proposedSets.totals)
+    val currentPreview = project(equipmentTotals(currentEquipment), currentSets.totals)
+    val projected = project(equipmentTotals(proposedEquipment), proposedSets.totals)
     val changedSets = setDefinitions.values.filter { currentSets.counts[it.id] != proposedSets.counts[it.id] }
     fun nameOf(value: Item, m: ItemMeta?) = (m?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(value.name)?.name ?: value.name
 
@@ -244,7 +271,23 @@ fun GearComparisonSheet(
                 candidate = currentPreview,
                 original = currentPreview,
                 proposed = false,
-            )
+            ) {
+                if (offerOffhandComparison && offhand != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
+                            .toggleable(value = includeOffhand, role = androidx.compose.ui.semantics.Role.Checkbox) { includeOffhand = it }
+                            .semantics(mergeDescendants = true) { contentDescription = "include offhand weapon in comparison" }
+                            .padding(8.dp),
+                    ) {
+                        Checkbox(checked = includeOffhand, onCheckedChange = null)
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text("include offhand weapon in comparison", style = MaterialTheme.typography.bodySmall)
+                            Text("${nameOf(offhand.item, metaOf(offhand))} +${offhand.item.level ?: 0}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
             ComparisonPanel(
                 sectionLabel = "With this item",
                 title = "${nameOf(item, entryMeta)} +$rightLevel",
@@ -258,7 +301,11 @@ fun GearComparisonSheet(
                 candidate = projected,
                 original = currentPreview,
                 proposed = true,
-            )
+            ) {
+                if (removesOffhand && offhand != null) {
+                    Text("Two-handed weapon · unequips ${nameOf(offhand.item, metaOf(offhand))}", color = Color(0xFF22D3EE), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                }
+            }
             if (changedSets.isNotEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp).border(1.dp, Color(0xFF5B21B6), RoundedCornerShape(6.dp)).padding(12.dp)
@@ -275,8 +322,8 @@ fun GearComparisonSheet(
                             }
                             Text(
                                 set.bonuses.joinToString(" · ") { bonus ->
-                                    val was = before >= bonus.pieces
-                                    val becomes = after >= bonus.pieces
+                                    val was = before == bonus.pieces
+                                    val becomes = after == bonus.pieces
                                     val stats = bonus.stats.entries.joinToString(", ") { (key, value) -> "${key.uppercase()} +${(value as? JsonPrimitive)?.content ?: value}" }
                                     "${bonus.pieces} pieces: $stats" + when {
                                         !was && becomes -> " · GAINED"
@@ -311,11 +358,14 @@ private fun ComparisonPanel(
     candidate: Map<String, Double>,
     original: Map<String, Double>,
     proposed: Boolean,
+    // Below the stat-scroll preview: the offhand choice or the two-handed note.
+    extra: @Composable () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
             .border(1.dp, if (proposed) Color(0xFF155E75) else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-            .padding(12.dp),
+            .padding(12.dp)
+            .semantics { contentDescription = sectionLabel },
     ) {
         Text(sectionLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -327,6 +377,7 @@ private fun ComparisonPanel(
             }
         }
         if (meta?.definition?.get("stat") != null) StatPreviewButtons(statType, onStatType)
+        extra()
         if (meta?.upgradeable == true || meta?.compoundable == true) {
             val maxLevel = itemMaximumLevel(meta)
             Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp).border(1.dp, Color(0xB34C1D95), RoundedCornerShape(4.dp)).padding(12.dp)) {
