@@ -1,5 +1,6 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -118,15 +119,19 @@ class AchievementHuntTest {
         // The list folds away again.
         compose.onNode(hasText("Monsters (", substring = true) and inSection).performScrollTo().performClick()
 
+        // Each control stays disabled until the previous save and its refresh end.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Clear") and inSection and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasText("Clear") and inSection).performScrollTo().performClick()
         eventually { posts("achievement-hunt").size == 2 }
         assertEquals(json("""{"blacklist":{"action":"remove","monsterId":"bee"},"character":"Leada"}"""), posts("achievement-hunt").last())
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Achievement Hunt deaths before blacklisting") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         val deaths = compose.onNodeWithContentDescription("Achievement Hunt deaths before blacklisting")
         deaths.performScrollTo().performTextReplacement("5")
         deaths.performImeAction()
         eventually { posts("achievement-hunt").size == 3 }
         assertEquals(json("""{"settings":{"deathThreshold":5},"character":"Leada"}"""), posts("achievement-hunt").last())
         // Fill respawn waits is on unless a console saved it off.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Fill respawn waits with nearby monsters") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         val fill = compose.onNodeWithContentDescription("Fill respawn waits with nearby monsters")
         fill.performScrollTo().assertIsOn().performClick()
         eventually { posts("achievement-hunt").size == 4 }

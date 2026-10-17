@@ -63,7 +63,11 @@ class LuckySlotLockTest {
         compose.waitForIdle()
     }
 
-    private fun scrollTo(text: String) = compose.onAllNodes(scroller)[0].performScrollToNode(hasText(text, substring = true))
+    // The detail screen draws its scroll container a frame after the state loads.
+    private fun scrollTo(text: String) {
+        compose.waitUntil(5_000) { compose.onAllNodes(scroller).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(scroller)[0].performScrollToNode(hasText(text, substring = true))
+    }
 
     private fun openData() {
         scrollTo("Show lucky slot data")

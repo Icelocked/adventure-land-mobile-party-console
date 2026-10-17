@@ -1,5 +1,6 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -58,6 +59,8 @@ class EscapeResumeTest {
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("dungeon participants are still inside", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Automation is held until you resume it.").assertExists()
 
+        // The button stays disabled until the refresh after the failed resume ends.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Resume automation") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Resume automation").performClick()
         eventually { posts("escape/resume").size == 2 }
         assertEquals("{}", posts("escape/resume")[1].body)
