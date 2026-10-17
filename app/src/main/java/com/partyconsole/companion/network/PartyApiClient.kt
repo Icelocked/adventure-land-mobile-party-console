@@ -860,6 +860,19 @@ class PartyApiClient(
         return post("merchant/bid", body)
     }
 
+    /** POST /party-api/prim-stack - queues a merchant job that raises a
+     *  merchant inventory item's grace to [target] without a level attempt.
+     *  [method] is "offering" (Primling only) or "stat" (Primling plus stat
+     *  scrolls) (console 1.4 runtime/prim-stack.ts). */
+    suspend fun primStack(character: String, slot: Int, item: Item, target: Double, method: String): ApiResult<CommandResult> =
+        post("prim-stack", JsonObject(mapOf(
+            "character" to JsonPrimitive(character),
+            "slot" to JsonPrimitive(slot),
+            "item" to json.encodeToJsonElement(Item.serializer(), item),
+            "target" to jsNumber(target),
+            "method" to JsonPrimitive(method),
+        )))
+
     /** POST /party-api/upgrade-preview - polled, so no action toast and no
      *  domain refresh. `refresh` queues a new server preview; otherwise the
      *  stored one is returned. */

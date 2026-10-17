@@ -254,7 +254,7 @@ private fun AutomaticItemActions(
         if (meta?.upgradeable == true && itemMaximumLevel(meta) - level > 0) {
             TapRow("Auto mark for upgrade" + if (upgradeTiers != 0) " · $upgradeTiers tier${if (upgradeTiers == 1) "" else "s"}" else "") { toggle("upgrade") }
             if (expanded == "upgrade") {
-                UpgradeTierPicker(meta, level, current = upgradeTiers) { tiers -> command("auto-upgrade-mark", null, mapOf("slot" to JsonPrimitive(-1), "tiers" to JsonPrimitive(tiers))) }
+                UpgradeTierPicker(meta, level, current = upgradeTiers, viewModel = viewModel, name = item.name) { tiers -> command("auto-upgrade-mark", null, mapOf("slot" to JsonPrimitive(-1), "tiers" to JsonPrimitive(tiers))) }
                 // Rewards use the merchant's upgrade offerings.
                 AddUpgradeRule(viewModel, merchant, item, meta)
             }

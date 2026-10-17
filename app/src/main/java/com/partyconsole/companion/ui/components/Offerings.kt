@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -63,6 +64,41 @@ import java.util.Locale
 /** A different rule for the same item whose level range overlaps [next]'s. */
 fun offeringOverlap(rules: List<UpgradeOfferingRule>, next: UpgradeOfferingRule): UpgradeOfferingRule? =
     rules.find { it.id != next.id && it.name == next.name && it.floor < next.ceiling && next.floor < it.ceiling }
+
+/** The rule covering one upgrade step from [level] to level + 1. */
+fun offeringRule(rules: List<UpgradeOfferingRule>, name: String, level: Int): UpgradeOfferingRule? =
+    rules.find { it.name == name && it.floor <= level && level < it.ceiling }
+
+/** Console 1.4 upgrade-actions.tsx destinationOffering: the offering rule
+ *  covering the last step of an upgrade to +level+tiers, shown next to that
+ *  tier, with an optional rule in parentheses. Display only. */
+@Composable
+fun DestinationOffering(viewModel: PartyViewModel, name: String, level: Int, tiers: Int) {
+    val state by viewModel.dynamicState.collectAsState()
+    val catalogFor = rememberCatalogLookup(state.merchantCatalog)
+    val step = level + tiers - 1
+    val rule = offeringRule(state.upgradeOfferingRules, name, step) ?: return
+    val label = UPGRADE_OFFERING_LABELS[rule.offering] ?: rule.offering
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(start = 4.dp).semantics { contentDescription = "+$step → +${step + 1}: $label (${if (rule.required) "required" else "optional"})" },
+    ) {
+        if (!rule.required) Text("(", style = MaterialTheme.typography.bodySmall)
+        Box(modifier = Modifier.size(20.dp)) { catalogFor(rule.offering)?.sprite?.let { SpriteIcon(it, size = 20.dp) } }
+        if (!rule.required) Text(")", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+// Console runtime/prim-stack.ts: grace targets run from 0.5 to 15 in 0.5 steps.
+private val PRIM_STACK_TARGETS = (1..30).map { it / 2.0 }
+private fun statScrollName(stat: String) = if (stat == "mp_cost") "mpcostscroll" else stat + "scroll"
+
+/** Stat scrolls one stat application consumes at the item's upgrade grade. */
+private fun statScrollsPerStack(level: Int, grades: List<Int> = listOf(9, 10, 11, 12)) =
+    listOf(1, 10, 100, 1000, 9999)[grades.count { level >= it }.coerceAtMost(4)]
+
+/** A grace value as JavaScript prints it: whole values without ".0". */
+private fun graceText(value: Double) = if (value == Math.floor(value)) value.toLong().toString() else value.toString()
 
 // Preview variants: no offering, then each offering.
 private val PREVIEW_OPTIONS = listOf("none", "offeringp", "offering", "offeringx")
@@ -157,7 +193,7 @@ fun OfferingDialog(
     ) {
         Text(title, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
         Text(
-            if (manual) "Use ${UPGRADE_OFFERING_LABELS[draft.offering]} to upgrade $name from +$level to +${level + 1}?" else "Use an offering during automatic upgrades within this level range.",
+            if (manual) "Use ${UPGRADE_OFFERING_LABELS[draft.offering]} to upgrade $name from +$level to +${level + 1}?" else "Use an offering during manual and automatic upgrades within this level range.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -261,6 +297,9 @@ fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingS
     }
     val time = remember { SimpleDateFormat("h:mm:ss a", Locale.getDefault()) }
     val options = result?.get("options") as? JsonObject
+    // Inventories never carry grace (the server strips it); every calculated option reports it.
+    val grace = PREVIEW_OPTIONS.firstNotNullOfOrNull { option -> ((options?.get(option) as? JsonObject)?.get("preview") as? JsonObject)?.get("grace") as? JsonPrimitive }
+        ?.content?.toDoubleOrNull()
     val level = item.level ?: 0
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)).padding(10.dp)
@@ -269,6 +308,7 @@ fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingS
         Text("Next attempt: +$level → +${level + 1}", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
         Text("Server preview" + (executor?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(statusText, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
+        grace?.let { Text("Grace ${graceText(it)}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp)) }
         for (option in PREVIEW_OPTIONS) {
             val value = options?.get(option) as? JsonObject
             val chance = ((value?.get("preview") as? JsonObject)?.get("chance") as? JsonPrimitive)?.content?.toDoubleOrNull()
@@ -298,11 +338,15 @@ fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingS
 }
 
 /** Offering rows under Mark for upgrade: "Upgrade with X" (needs stock and a
- *  source) and, beside them, the server preview. */
+ *  source), "Prim stack…" (console 1.4, merchant inventory items only) and,
+ *  beside them, the server preview. */
 @Composable
 fun OfferingRows(viewModel: PartyViewModel, character: String, item: Item, meta: ItemMeta?, source: OfferingSource? = null, enabled: Boolean = true) {
     val state by viewModel.dynamicState.collectAsState()
     var picked by remember(item) { mutableStateOf<String?>(null) }
+    var stacking by remember(item) { mutableStateOf(false) }
+    // The coordinator only prim stacks merchant inventory items.
+    val canStack = enabled && (state.upgradeOfferingStock["offeringp"] ?: 0) > 0 && source != null && !source.equipped && character == state.merchantCharacter
     Column(modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)) {
         HorizontalDivider()
         for ((id, label) in UPGRADE_OFFERING_LABELS) {
@@ -312,8 +356,104 @@ fun OfferingRows(viewModel: PartyViewModel, character: String, item: Item, meta:
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Upgrade with $label", modifier = Modifier.fillMaxWidth()) }
         }
+        TextButton(enabled = canStack, onClick = { stacking = true }, modifier = Modifier.fillMaxWidth()) { Text("Prim stack…", modifier = Modifier.fillMaxWidth()) }
         picked?.let { OfferingDialog(viewModel, character, item, meta, source, it, onClose = { picked = null }) }
+        val slot = (source?.slot as? JsonPrimitive)?.content?.toIntOrNull()
+        if (stacking && slot != null) PrimStackDialog(viewModel, character, slot, item, meta, onClose = { stacking = false })
         if (enabled) UpgradePreviewPanel(viewModel, item, source, character)
+    }
+}
+
+/** Console 1.4 prim-stack-dialog.tsx (#65): Primling-only or Primling +
+ *  stat-scroll operations that raise grace without a level attempt. */
+@Composable
+private fun PrimStackDialog(viewModel: PartyViewModel, character: String, slot: Int, item: Item, meta: ItemMeta?, onClose: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val state by viewModel.dynamicState.collectAsState()
+    val catalogFor = rememberCatalogLookup(state.merchantCatalog)
+    val definition = (meta ?: catalogFor(item.name)?.meta)?.definition.orEmpty()
+    val level = item.level ?: 0
+    var target by remember { mutableStateOf(minOf(15.0, level + 2.0)) }
+    var method by remember { mutableStateOf("offering") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    var choosing by remember { mutableStateOf(false) }
+    // A stat scroll rewrites stat_type, so only the item's current stat can be used.
+    val stat = (definition["stat"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
+    val statType = item.statType?.takeIf { stat != 0.0 }
+    val grades = (definition["grades"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt() }
+    val scrolls = if (grades != null) statScrollsPerStack(level, grades) else statScrollsPerStack(level)
+    val primlings = state.upgradeOfferingStock["offeringp"] ?: 0
+    val name = catalogFor(item.name)?.name ?: item.name
+    fun label(id: String) = catalogFor(id)?.name ?: id
+    fun confirm() {
+        if (busy) return
+        busy = true
+        error = ""
+        scope.launch {
+            when (val result = viewModel.api.primStack(character, slot, item, target, method)) {
+                is ApiResult.Failure -> {
+                    busy = false
+                    error = result.message
+                }
+                is ApiResult.Success -> {
+                    viewModel.refreshDynamicStateNow()
+                    busy = false
+                    onClose()
+                }
+            }
+        }
+    }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).border(1.dp, Sky, RoundedCornerShape(6.dp)).padding(start = 16.dp, top = 10.dp, end = 10.dp, bottom = 10.dp)
+            .semantics { contentDescription = "Prim stack" },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Prim stack", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
+        Text(
+            "Raise $name's hidden grace without attempting an upgrade. Grace stays on the item until it is destroyed; during an upgrade it counts up to the next level + 1, and most when that attempt also uses an offering.",
+            style = MaterialTheme.typography.labelSmall,
+            color = muted,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Stack until grace", style = MaterialTheme.typography.bodySmall)
+            Box {
+                OutlinedButton(enabled = !busy, onClick = { choosing = true }, modifier = Modifier.semantics { contentDescription = "Target grace" }) { Text(graceText(target)) }
+                DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+                    for (value in PRIM_STACK_TARGETS) DropdownMenuItem(text = { Text(graceText(value)) }, onClick = { choosing = false; target = value })
+                }
+            }
+        }
+        val methods = listOf(
+            Triple("offering", "Primling only (+0.5 grace each)", true),
+            Triple(
+                "stat",
+                if (statType != null) "Primling + ${"%,d".format(scrolls)} × ${label(statScrollName(statType))} (+1 grace each, keeps ${statType.uppercase()})" else "Primling + stat scroll (needs an item with an applied stat)",
+                statType != null,
+            ),
+        )
+        for ((id, text, available) in methods) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+                    .selectable(selected = method == id, enabled = available && !busy, role = androidx.compose.ui.semantics.Role.RadioButton) { method = id }
+                    .semantics(mergeDescendants = true) { contentDescription = text },
+            ) {
+                RadioButton(selected = method == id, onClick = null, enabled = available && !busy)
+                Text(text, style = MaterialTheme.typography.bodySmall, color = if (available) Color.Unspecified else muted)
+            }
+        }
+        Text(
+            "The merchant reads the current grace first and stops at the target. ${"%,d".format(primlings)} Primling${if (primlings == 1) "" else "s"} in merchant inventory and storage.",
+            style = MaterialTheme.typography.labelSmall,
+            color = muted,
+        )
+        if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(enabled = !busy, onClick = onClose) { Text("Cancel") }
+            Button(enabled = !busy, onClick = { confirm() }) { Text(if (busy) "Queueing…" else "Stack grace") }
+        }
     }
 }
 
