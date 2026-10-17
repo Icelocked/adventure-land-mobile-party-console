@@ -557,7 +557,19 @@ data class NativeStandOffer(
 )
 
 @Serializable
-data class NativeStand(val offers: Map<String, NativeStandOffer> = emptyMap(), val problems: Map<String, String> = emptyMap())
+data class NativeStand(
+    val offers: Map<String, NativeStandOffer> = emptyMap(),
+    val problems: Map<String, String> = emptyMap(),
+    // Console 1.4: purchases a merchant job reserved, keyed "jobId:seller:item";
+    // one whose job ended unconfirmed pauses its item's WTB.
+    val purchases: Map<String, NativePurchase> = emptyMap(),
+)
+
+@Serializable
+data class NativePurchase(val item: NativePurchaseItem, val quantity: Int = 0, val jobId: String = "")
+
+@Serializable
+data class NativePurchaseItem(val name: String, val q: Int? = null, val price: Long? = null)
 
 @Serializable
 data class MluckSchedule(

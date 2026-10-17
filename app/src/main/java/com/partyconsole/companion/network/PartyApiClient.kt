@@ -873,6 +873,12 @@ class PartyApiClient(
             "method" to JsonPrimitive(method),
         )))
 
+    /** POST /party-api/merchant/native-stand "resolve-purchase" - settles a
+     *  purchase whose merchant job ended unconfirmed: bought counts it toward
+     *  the WTB order, not bought releases it (console 1.4). */
+    suspend fun resolveNativePurchase(id: String, bought: Boolean): ApiResult<CommandResult> =
+        post("merchant/native-stand", JsonObject(mapOf("action" to JsonPrimitive("resolve-purchase"), "id" to JsonPrimitive(id), "bought" to JsonPrimitive(bought))))
+
     /** POST /party-api/upgrade-preview - polled, so no action toast and no
      *  domain refresh. `refresh` queues a new server preview; otherwise the
      *  stored one is returned. */
