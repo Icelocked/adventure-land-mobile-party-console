@@ -140,7 +140,7 @@ test('Skills: search, range labels, and the full definition of a skill', async (
   await expect(details.getByText('G.skills.cleave')).toBeVisible()
   await expect(details.getByText('Hits everything nearby')).toBeVisible()
   await expect(details.getByText('210', { exact: true })).toBeVisible()
-  await expect(details.getByText('4s', { exact: true })).toBeVisible()
+  await expect(details.locator('[data-line="cooldown"]')).toHaveText('Cooldown: 4 seconds')
 })
 
 test('Routines: moving a routine up changes its saved priority order', async ({ page }) => {

@@ -3,19 +3,20 @@ import { useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProv
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { DefinitionGrid } from '@/components/DefinitionGrid'
+import { SkillCards } from '@/components/SkillCards'
 import { displayValue } from '@/lib/statusDuration'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { SkillEntry } from '@/models'
 import { skillRangeLabel } from '@/lib/skillRange'
 
 /** Skills: search across class and skill, a sprite
- *  grid per class, and the selected skill's full definition in a sheet. */
+ *  grid per class, and the selected skill's game card and extras in a sheet. */
 export function SkillsScreen() {
   const dynamicState = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<SkillEntry | null>(null)
+  const skillName = (id: string) => dynamicState.skillCatalog.flatMap((entry) => entry.skills).find((skill) => skill.id === id)?.name
   const filteredClasses = dynamicState.skillCatalog
     .map((entry) => ({ ...entry, skills: entry.skills.filter((skill) => `${skill.name} ${skill.id} ${entry.name}`.toLowerCase().includes(search.toLowerCase())) }))
     .filter((entry) => entry.skills.length)
@@ -65,7 +66,7 @@ export function SkillsScreen() {
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">Base range in game distance units. Attack range depends on the character’s equipment. “Not specified” means the game definition does not supply a range.</p>
               </div>
-              <DefinitionGrid value={selected.definition || {}} omit={['name', 'skin', 'explanation']} />
+              <SkillCards skill={selected} skillName={skillName} />
             </div>
           </SheetContent>
         </Sheet>
