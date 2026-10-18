@@ -59,6 +59,8 @@ class FakeConsole : AutoCloseable {
     @Volatile var escape: String? = null
     /** Every escape POST path in order (the e2e mock's escapeActions). */
     val escapeActions = CopyOnWriteArrayList<String>()
+    /** Characters whose equipment report is older than gear-sets.ts's 10s window. */
+    val staleEquipment = CopyOnWriteArrayList<String>()
 
     init {
         // Poll at about the old desktop pace so tests don't wait on mobile cadences.

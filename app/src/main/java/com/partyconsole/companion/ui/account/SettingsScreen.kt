@@ -622,7 +622,8 @@ private fun DashboardStateImport(viewModel: PartyViewModel) {
 
 /** The realm control: current / home realm, mixed or unconfirmed homes, a
  *  confirmed switch with the Realm Fatigue and Hop Sickness warnings and
- *  "Set as home realm", and the running operation. PWA: RealmSection.tsx. */
+ *  "Set as home realm", the running operation, then the console 1.4 boss
+ *  chase and hop blacklist (RealmChaseSettings.kt). PWA: RealmSection.tsx. */
 @Composable
 private fun RealmSection(viewModel: PartyViewModel) {
     val dynamicState by viewModel.dynamicState.collectAsState()
@@ -632,7 +633,7 @@ private fun RealmSection(viewModel: PartyViewModel) {
     var setHome by remember { mutableStateOf(false) }
     var destination by remember { mutableStateOf<String?>(null) }
     var switching by remember { mutableStateOf(false) }
-    val realm = dynamicState.realmControl ?: return
+    val realm = dynamicState.realmControl ?: com.partyconsole.companion.model.RealmControl()
     val blocked = realm.operation != null && realm.operation.phase !in setOf("complete", "failed")
     fun labelFor(key: String?) = realm.realms.find { it.key == key }?.label ?: key ?: "Unknown"
     val current = realm.currentRealm ?: realm.activeRealm
@@ -711,5 +712,7 @@ private fun RealmSection(viewModel: PartyViewModel) {
                 Text("${member.name}: ${member.realm ?: "waiting"}$home", style = MaterialTheme.typography.labelSmall)
             }
         }
+        BossChaseSetting(viewModel, dynamicState.bossChase)
+        RealmHopBlacklistSetting(viewModel, realm.realms, dynamicState.realmHopBlacklist)
     }
 }

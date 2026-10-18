@@ -113,8 +113,9 @@ private fun Confirm(title: String, text: String, busy: Boolean, error: String?, 
  *  "Make WTB" for stale rows, selling into live WTB offers (or "List" at the
  *  WTB price when stale), classifieds' Add to WTB / Add to stand, and Ponty's
  *  grouped lots. Every row inspects its item. Console 1.4 adds a per-row
- *  ignore button and "Hide stale listings" (per tab, remembered on this
- *  device). */
+ *  ignore button, "Hide stale listings" (per tab, remembered on this
+ *  device), and "Check" on stale WTS rows and stale WTB offers the merchant
+ *  can fill. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () -> Unit, onOpenSettings: () -> Unit, onOpenSetup: () -> Unit) {
@@ -143,6 +144,8 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     }
     var ignoring by remember { mutableStateOf(false) }
     var ignoreError by remember { mutableStateOf("") }
+    // Set with `confirming`: true when the confirmation is a stale-listing Check.
+    var checking by remember { mutableStateOf(false) }
     val quantities = remember { mutableStateMapOf<String, String>() }
     var confirming by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
@@ -200,12 +203,13 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     }
     fun ApiResult<CommandResult>.message() = (this as? ApiResult.Failure)?.message
     // Purchase confirmation: split the quantity across the grouped listings.
-    suspend fun buyGrouped(entry: AlDataListing, quantity: Int): String? {
+    // `check` asks the merchant to verify a stale listing in person (console 1.4).
+    suspend fun buyGrouped(entry: AlDataListing, quantity: Int, check: Boolean = false): String? {
         var remaining = quantity
         for (physical in entry.groupedListings ?: listOf(entry)) {
             if (remaining <= 0) break
             val purchasing = minOf(remaining, max(1, physical.quantity))
-            api.buyAlData(physical.raw, purchasing).message()?.let { return it }
+            api.buyAlData(physical.raw, purchasing, check).message()?.let { return it }
             remaining -= purchasing
         }
         return if (remaining > 0) "Only ${quantity - remaining} of $quantity listings could be queued" else null
@@ -386,20 +390,33 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                             Button(enabled = busy != key, onClick = {
                                 if (quantity < 1 || quantity > entry.quantity) return@Button
                                 rowError = null
+                                checking = false
                                 confirming = key
                             }) { Text(if (busy == key) "Queuing…" else "Buy") }
                         } else {
+                            OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
                             OutlinedButton(onClick = { wtbItem = Item(name = entry.item.name, level = entry.item.level ?: 0) }) { Text("Make WTB") }
                         }
                         if (confirming == key) {
-                            Confirm(
-                                "Confirm marketplace purchase",
-                                "Really buy ${"%,d".format(quantity)} ${nameFor(entry.item.name) ?: entry.item.name} for ${gold(quantity * entry.price)}g?",
-                                busy == key,
-                                rowError?.takeIf { it.first == key }?.second,
-                                onYes = { run(key) { buyGrouped(entry, quantity) } },
-                                onCancel = { confirming = null },
-                            )
+                            if (checking) {
+                                Confirm(
+                                    "Check stale listing",
+                                    "Send the merchant to check whether ${entry.seller}'s listing for ${nameFor(entry.item.name) ?: entry.item.name} is still live, and buy up to ${"%,d".format(entry.quantity)} for ${gold(entry.price)}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.",
+                                    busy == key,
+                                    rowError?.takeIf { it.first == key }?.second,
+                                    onYes = { run(key) { buyGrouped(entry, entry.quantity, check = true) } },
+                                    onCancel = { confirming = null },
+                                )
+                            } else {
+                                Confirm(
+                                    "Confirm marketplace purchase",
+                                    "Really buy ${"%,d".format(quantity)} ${nameFor(entry.item.name) ?: entry.item.name} for ${gold(quantity * entry.price)}g?",
+                                    busy == key,
+                                    rowError?.takeIf { it.first == key }?.second,
+                                    onYes = { run(key) { buyGrouped(entry, quantity) } },
+                                    onCancel = { confirming = null },
+                                )
+                            }
                         }
                     }
                 }
@@ -440,22 +457,37 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                                 Button(enabled = busy != key, onClick = {
                                     if (quantity < 1 || quantity > maximum) return@Button
                                     rowError = null
+                                    checking = false
                                     confirming = key
                                 }) { Text("Sell") }
+                            } else if (!fresh && maximum > 0) {
+                                OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
+                                if (source != null) OutlinedButton(onClick = { listFor(key, order.item, order.price, maximum) }) { Text("List") }
                             } else if (!fresh && source != null) {
                                 OutlinedButton(onClick = { listFor(key, order.item, order.price, maximum) }) { Text("List") }
                             } else {
                                 Text(if (!fresh) "STALE · NO MATCH OWNED" else "NO MATCH OWNED", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterVertically))
                             }
                             if (confirming == key) {
-                                Confirm(
-                                    "Confirm marketplace sale",
-                                    "Really sell ${"%,d".format(quantity)} ${nameFor(order.item.name) ?: order.item.name} to ${order.buyer} for ${gold(quantity * order.price)}g?",
-                                    busy == key,
-                                    rowError?.takeIf { it.first == key }?.second,
-                                    onYes = { run(key) { api.sellAlData(order.raw, quantity).message() } },
-                                    onCancel = { confirming = null },
-                                )
+                                if (checking) {
+                                    Confirm(
+                                        "Check stale WTB listing",
+                                        "Send the merchant to check whether ${order.buyer}'s WTB listing for ${nameFor(order.item.name) ?: order.item.name} is still live, and sell up to ${"%,d".format(maximum)} for ${gold(order.price)}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.",
+                                        busy == key,
+                                        rowError?.takeIf { it.first == key }?.second,
+                                        onYes = { run(key) { api.sellAlData(order.raw, maximum, check = true).message() } },
+                                        onCancel = { confirming = null },
+                                    )
+                                } else {
+                                    Confirm(
+                                        "Confirm marketplace sale",
+                                        "Really sell ${"%,d".format(quantity)} ${nameFor(order.item.name) ?: order.item.name} to ${order.buyer} for ${gold(quantity * order.price)}g?",
+                                        busy == key,
+                                        rowError?.takeIf { it.first == key }?.second,
+                                        onYes = { run(key) { api.sellAlData(order.raw, quantity).message() } },
+                                        onCancel = { confirming = null },
+                                    )
+                                }
                             }
                             ListingForm(key)
                         }

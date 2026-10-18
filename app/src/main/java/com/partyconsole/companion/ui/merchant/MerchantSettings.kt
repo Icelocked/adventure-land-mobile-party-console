@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -101,6 +103,17 @@ private fun BankSortSetting(viewModel: PartyViewModel) {
                 Text(label, style = MaterialTheme.typography.bodySmall)
             }
         }
+        val gapped = state.bankSortLayout == "gapped"
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().toggleable(value = gapped, enabled = !setting.busy, role = Role.Checkbox) {
+                run({ viewModel.api.setBankSortLayout(if (it) "gapped" else "packed") }, {})
+            }.semantics(mergeDescendants = true) { contentDescription = "Leave gaps between item types" },
+        ) {
+            Checkbox(checked = gapped, onCheckedChange = null, enabled = !setting.busy)
+            Text("Leave gaps between item types", style = MaterialTheme.typography.bodySmall)
+        }
+        Help("Each item category starts on its own row with free slots after it, so new items drop into a gap instead of shifting the whole bank. Falls back to packed sorting when the bank is too full.")
         Help("Compatible stacks are always combined during bank visits. This setting controls item ordering.")
     }
 }

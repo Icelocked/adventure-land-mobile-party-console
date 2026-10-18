@@ -407,6 +407,27 @@ data class RealmOperation(
     val characters: List<RealmCharacter> = emptyList(),
 )
 
+/** events/boss-chase.ts BossChaseState, trimmed to what the realm panel shows. */
+@Serializable
+data class BossChaseState(
+    val enabled: Boolean = false,
+    val minEtaMinutes: Double = 15.0,
+    val trip: BossChaseTrip? = null,
+    val lastError: String? = null,
+    val checkedAt: Long = 0,
+    val sightings: List<BossSighting> = emptyList(),
+    val respawns: List<BossRespawn> = emptyList(),
+)
+
+@Serializable
+data class BossChaseTrip(val boss: String, val realm: String, val respawnAt: Long? = null, val returnRealm: String? = null, val arrived: Boolean = false)
+
+@Serializable
+data class BossSighting(val boss: String, val realm: String, val hp: Double = 0.0, val etaMinutes: Double? = null, val target: String? = null)
+
+@Serializable
+data class BossRespawn(val boss: String, val realm: String, val respawnAt: Long)
+
 /** Offering item id -> display name. */
 val UPGRADE_OFFERING_LABELS: Map<String, String> = linkedMapOf(
     "offeringp" to "Primling",

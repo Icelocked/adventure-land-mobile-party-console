@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 
@@ -39,7 +40,9 @@ private fun FakeConsole.ctype(name: String): String? =
     ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(name) as? JsonObject)?.get("ctype").str()
 
 internal fun FakeConsole.installConsole14Routes() {
-    // Console 1.4 default (initial-core.ts).
+    // Console 1.4 defaults (initial-core.ts initialBossChase, initialRealmHopBlacklist).
+    put("bossChase", Json.parseToJsonElement("""{"enabled":false,"minEtaMinutes":15,"trip":null,"returning":null,"retryAt":0,"lastError":null,"checkedAt":0,"sightings":[],"respawns":[]}"""), "config")
+    put("realmHopBlacklist", JsonArray(emptyList()), "config")
     put("eventAttendance", JsonObject(emptyMap()), "config")
 
     routes["formation"] = route@{ body ->
@@ -68,10 +71,98 @@ internal fun FakeConsole.installConsole14Routes() {
         ok()
     }
 
+    // Franky routine: http/encounter-mode.ts behind farming-scope.ts, which refuses followers.
+    routes["encounter-mode"] = route@{ body ->
+        val name = body["character"].str() ?: return@route error(400, "invalid character")
+        val leader = field("leader").str()
+        if (leader != null && name != leader && field("followers").obj()?.get(name).str() == "true") return@route error(409, "following leader settings")
+        if (body["encounter"].str() != "franky") return@route error(400, "invalid encounter mode")
+        val mode = body["mode"].str()
+        val deathLimit = body["deathLimit"]
+        if (mode == null && deathLimit == null) return@route error(400, "no encounter setting provided")
+        if (mode != null && mode !in listOf("auto", "offtank", "tank")) return@route error(400, "invalid encounter mode")
+        val limit = (deathLimit as? JsonPrimitive)?.doubleOrNull
+        if (deathLimit != null && (limit == null || limit < 0 || limit != Math.floor(limit))) return@route error(400, "invalid death limit")
+        fun JsonObject?.with(key: String, value: JsonElement?) = if (value == null) (this ?: JsonObject(emptyMap())) else JsonObject(this.orEmpty() + (key to value))
+        if (name == leader) {
+            put("encounterRoutines", field("encounterRoutines").obj().with("franky", mode?.let { JsonPrimitive(it) }))
+            put("encounterAutoDeathLimits", field("encounterAutoDeathLimits").obj().with("franky", deathLimit))
+        } else {
+            val profiles = field("farmingProfiles").obj().orEmpty()
+            val profile = profiles[name].obj().orEmpty()
+            val next = JsonObject(
+                profile + ("encounterRoutines" to profile["encounterRoutines"].obj().with("franky", mode?.let { JsonPrimitive(it) })) +
+                    ("encounterAutoDeathLimits" to profile["encounterAutoDeathLimits"].obj().with("franky", deathLimit)),
+            )
+            put("farmingProfiles", JsonObject(profiles + (name to next)), "config")
+        }
+        ok(""","encounter":"franky"""")
+    }
+
+    // Gear sets: characters/gear-sets.ts. Save captures the character's worn gear.
+    routes["gear-sets"] = route@{ body ->
+        val name = body["character"].str().orEmpty()
+        val set = body["set"].str().orEmpty()
+        if (name !in characterNames()) return@route error(400, "invalid character")
+        if (set !in listOf("luck", "tank", "gold")) return@route error(400, "invalid gear set")
+        val all = field("gearSets").obj().orEmpty()
+        val sets = all[name].obj().orEmpty()
+        val next: JsonObject = when (body["action"].str()) {
+            "clear" -> JsonObject(sets - set)
+            "save" -> {
+                if (name in staleEquipment) return@route error(409, "no fresh equipment report for $name")
+                val worn = ((sections["inventory"]?.get("characters") as? JsonObject)?.get(name) as? JsonObject)?.get("slots").obj().orEmpty()
+                val slots = buildMap {
+                    for (slot in listOf("mainhand", "offhand", "chest", "pants", "helmet", "gloves", "shoes", "cape", "belt", "orb", "amulet", "ring1", "ring2", "earring1", "earring2", "elixir")) {
+                        val item = worn[slot].obj()?.get("item").obj() ?: continue
+                        put(slot, JsonObject(item.filterKeys { it in setOf("name", "level", "p", "stat_type") }))
+                    }
+                }
+                if (slots.isEmpty()) return@route error(409, "nothing is equipped in the gear set slots")
+                JsonObject(sets + (set to JsonObject(mapOf("slots" to JsonObject(slots), "savedAt" to JsonPrimitive(System.currentTimeMillis())))))
+            }
+            else -> return@route error(400, "invalid gear set action")
+        }
+        put("gearSets", JsonObject(all + (name to next)), "config")
+        ok()
+    }
+
     // http/party-actions.ts escape/resume releases the hold (stage "released") and answers {escape}.
     routes["escape/resume"] = { _ ->
         escape = escape?.let { JsonObject(Json.parseToJsonElement(it).jsonObject + ("stage" to JsonPrimitive("released"))).toString() }
         200 to """{"escape":${escape ?: "null"}}"""
+    }
+
+    // events/boss-chase.ts update() and navigation/realm-hop-blacklist.ts.
+    routes["realm/boss-chase"] = route@{ body ->
+        val chase = field("bossChase").obj().orEmpty().toMutableMap()
+        body["enabled"]?.let { chase["enabled"] = JsonPrimitive((it as? JsonPrimitive)?.booleanOrNull == true) }
+        body["minEtaMinutes"]?.let {
+            val minEta = (it as? JsonPrimitive)?.doubleOrNull
+            if (minEta == null || minEta < 0 || minEta > 600) return@route error(400, "minEtaMinutes must be between 0 and 600")
+            chase["minEtaMinutes"] = it
+        }
+        if (chase["enabled"].str() != "true") { chase["trip"] = JsonNull; chase["returning"] = JsonNull }
+        put("bossChase", JsonObject(chase), "config")
+        ok()
+    }
+    routes["realm/hop-blacklist"] = route@{ body ->
+        val realms = (body["realms"] as? JsonArray)?.map { it.str() }
+        if (realms == null || realms.any { it == null }) return@route error(400, "realms must be a list of realm keys")
+        if (realms.toSet().size != realms.size) return@route error(400, "realms must not repeat")
+        val known = (field("realmControl").obj()?.get("realms") as? JsonArray)?.mapNotNull { it.obj()?.get("key").str() }.orEmpty()
+        val unknown = realms.filter { it !in known }
+        if (unknown.isNotEmpty()) return@route error(400, "unknown Adventure Land realm: " + unknown.joinToString(", "))
+        put("realmHopBlacklist", body["realms"]!!, "config")
+        ok()
+    }
+
+    // merchant/bank-sort.ts configure(): the layout part.
+    routes["merchant/bank-sort"] = route@{ body ->
+        val layout = body["layout"].str() ?: return@route null
+        if (layout !in listOf("packed", "gapped")) return@route error(400, "invalid bank sort setting")
+        put("bankSortLayout", JsonPrimitive(layout))
+        ok()
     }
 
     // http/market-ignored-items.ts + runtime/market-preferences.ts.
@@ -117,7 +208,18 @@ internal fun FakeConsole.installConsole14Routes() {
         ok()
     }
 
-    // http/manual-market-orders.ts refuses a snapshot entry older than two minutes.
+    // http/native-stand.ts resolvePurchase(): settles one unconfirmed purchase.
+    routes["merchant/native-stand"] = route@{ body ->
+        if (body["action"].str() != "resolve-purchase") return@route null
+        val stand = field("nativeStand").obj().orEmpty()
+        val purchases = stand["purchases"].obj().orEmpty()
+        val id = body["id"].str().orEmpty()
+        if (id !in purchases || (body["bought"] as? JsonPrimitive)?.booleanOrNull == null) return@route error(409, "That purchase is no longer pending")
+        put("nativeStand", JsonObject(stand + ("purchases" to JsonObject(purchases - id))), "config")
+        ok()
+    }
+
+    // http/manual-market-orders.ts: a snapshot entry older than two minutes is refused unless `check` is true.
     for (path in listOf("merchant/aldata-order", "merchant/aldata-sale")) {
         routes[path] = route@{ body ->
             val sale = path == "merchant/aldata-sale"
@@ -126,8 +228,28 @@ internal fun FakeConsole.installConsole14Routes() {
             val listing = (aldata?.get(if (sale) "buyOrders" else "listings") as? JsonArray)?.mapNotNull { it.obj() }?.firstOrNull { it["key"].str() == key } ?: return@route null
             if (listing["serverIdentifier"].str() == "PVP") return@route error(409, "automatic PVP realm travel is disabled")
             val seenAt = listing["seenAt"].str()?.toDoubleOrNull() ?: 0.0
-            if (seenAt < System.currentTimeMillis() - 120_000) return@route error(409, if (sale) "buy order is stale; refresh the market first" else "listing is stale; refresh the market first")
+            if (body["check"].str() != "true" && seenAt < System.currentTimeMillis() - 120_000) return@route error(409, if (sale) "buy order is stale; refresh the market first" else "listing is stale; refresh the market first")
             null
         }
+    }
+
+    // characters/cosmetic-commands.ts: each cx- command is checked against the latest cosmetics report.
+    routes["command"] = route@{ body ->
+        val type = body["type"].str().orEmpty()
+        if (!type.startsWith("cx-")) return@route null
+        val report = ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(body["character"].str()) as? JsonObject)?.get("cosmetics").obj()
+            ?: return@route error(409, "No cosmetics report from this character yet")
+        val owned = (report["owned"] as? JsonArray)?.mapNotNull { it.obj() }?.firstOrNull { it["name"].str() == body["name"].str() }
+        when (type) {
+            "cx-open-jar" -> {
+                val jar = (report["jars"] as? JsonArray)?.mapNotNull { it.obj() }?.firstOrNull { it["inventorySlot"].str() == body["inventorySlot"].str() }
+                if (jar?.get("usable").str() != "true" || jar?.get("data").str() == null) return@route error(400, "That inventory slot has no usable CX jar")
+            }
+            "cx-wear" -> if (owned == null || owned["kind"].str() != "appearance" || owned["slot"].str() == null || owned["slot"].str() != body["slot"].str()) return@route error(400, "Only an owned appearance cosmetic can be worn, in its own slot")
+            "cx-emote" -> if (owned == null || owned["kind"].str() != "emote") return@route error(400, "Only an owned emote can be used")
+            "cx-remove" -> if (body["slot"].str() == "skin" || report["worn"].obj()?.get(body["slot"].str()) == null) return@route error(400, "Nothing removable is worn in that slot")
+            else -> return@route error(400, "invalid command")
+        }
+        ok()
     }
 }
