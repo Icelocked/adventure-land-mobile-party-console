@@ -177,6 +177,7 @@ class ReferenceSettingsTest {
         assertEquals("earthiverse", viewModel.mailDraft.value?.recipient)
         assertEquals("aldata_auth", viewModel.mailDraft.value?.subject)
         assertTrue(viewModel.mailDraft.value?.message?.isNotEmpty() == true)
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Installed version: 1.2.0")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Installed version: 1.2.0").performScrollTo().assertExists()
         compose.onNodeWithText("Development checkout: update notifications only. Update your source manually, or use the editable release package for managed updates.").assertExists()
         compose.onNodeWithText("Start debug instance").performScrollTo().assertExists()

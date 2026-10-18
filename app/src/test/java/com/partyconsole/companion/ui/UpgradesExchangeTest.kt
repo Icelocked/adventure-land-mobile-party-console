@@ -1,5 +1,6 @@
 package com.partyconsole.companion.ui
 
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.hasClickAction
@@ -150,6 +151,11 @@ class UpgradesExchangeTest {
         return viewModel
     }
 
+    // Adding an item opens the cart and scrolls to its line; slow CI runners
+    // check before that scroll ends.
+    private fun awaitDisplayed(matcher: SemanticsMatcher) =
+        compose.waitUntil(5_000) { runCatching { compose.onNode(matcher).assertIsDisplayed() }.isSuccess }
+
     @Test
     fun theCartStaysPinnedSoAnItemAddedFarDownShowsAtOnce() {
         // Failure mode: the cart sits after the whole catalog, so confirming an
@@ -164,7 +170,7 @@ class UpgradesExchangeTest {
         compose.onAllNodes(hasText("Add"))[35].performScrollTo().performClick()
         compose.waitForIdle()
         val inCart = hasAnyAncestor(hasContentDescription("Cart"))
-        compose.onNode(hasContentDescription("Item 35 quantity") and inCart).assertIsDisplayed()
+        awaitDisplayed(hasContentDescription("Item 35 quantity") and inCart)
         compose.onNode(hasText("CART (1)") and inCart).assertIsDisplayed()
         compose.onNode(hasText("Gold: 45g") and inCart).assertIsDisplayed()
         compose.onNodeWithText("Buy all").assertIsDisplayed()
@@ -194,8 +200,9 @@ class UpgradesExchangeTest {
         compose.waitForIdle()
         compose.onNodeWithText("Add").performClick()
         val box = hasContentDescription("Health Potion quantity")
+        awaitDisplayed(box)
         compose.onNode(box).performTextClearance()
-        compose.onNode(box).assertIsDisplayed()
+        awaitDisplayed(box)
         compose.onNode(box).performTextInput("5")
         compose.waitForIdle()
         compose.onNode(hasText("Gold: 100g")).assertIsDisplayed()
@@ -224,7 +231,7 @@ class UpgradesExchangeTest {
         for (i in listOf(0, 3, 6, 9)) {
             compose.onAllNodes(hasText("Add") and hasClickAction())[i].performScrollTo().performClick()
             compose.waitForIdle()
-            compose.onNode(hasContentDescription("Recipe ${i.toString().padStart(2, '0')} quantity") and inCart).assertIsDisplayed()
+            awaitDisplayed(hasContentDescription("Recipe ${i.toString().padStart(2, '0')} quantity") and inCart)
         }
         compose.onNode(hasText("Ingredients: 8", substring = true) and inCart).assertIsDisplayed()
         compose.onNode(hasText("INGREDIENT TOTALS") and inCart).assertDoesNotExist()

@@ -67,6 +67,8 @@ class GearComparisonTest {
         compose.setContent { GearComparisonSheet(item, null, "Leada", viewModel, slot = slot, onClose = {}) }
         eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.merchantCatalog != null && viewModel.characters.value["Leada"]?.inventory != null && viewModel.characterDetails.value["Leada"]?.primaryStat != null }
         compose.waitForIdle()
+        // Both stat boxes draw a frame after the data loads; slow CI runners show the gap.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Attack: ", substring = true)).fetchSemanticsNodes().size >= 2 }
     }
 
     @Test
