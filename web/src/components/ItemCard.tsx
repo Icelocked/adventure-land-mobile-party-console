@@ -65,6 +65,8 @@ const EXTRA_COLORS: Record<string, string> = {
   id: '#808080',
   quantity: '#C3C3C3',
   stat_type: '#B484E5',
+  title: '#B484E5',
+  title_bonus: '#B484E5',
 }
 const EXTRA_LABELS: Record<string, string> = { stat_type: 'Stat Scroll' }
 const extraLabel = (key: string) =>

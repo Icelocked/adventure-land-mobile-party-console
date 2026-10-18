@@ -3,6 +3,7 @@ import { Slider } from '@/components/ui/slider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ITEM_DETAIL_PROPERTY_RANK, STAT_SCROLLS, itemMaximumLevel, propertiesAtLevel } from '@/lib/itemFormulas'
 import { GameBox } from '@/components/GameBox'
+import { titledName } from '@/lib/itemCardLines'
 import { comparisonStat, type CatalogComparisonEntry } from '@/lib/catalogComparison'
 import type { Sprite } from '@/models'
 
@@ -41,7 +42,7 @@ export function CatalogComparison({
             </th>
             {entries.map((value, index) => {
               const { entry, level, stat } = value
-              const name = String(entry.meta?.definition.name || entry.item.name)
+              const name = titledName(String(entry.meta?.definition.name || entry.item.name), entry.item.p)
               const label = String.fromCharCode(65 + index)
               return (
                 <th scope="col" key={index} className="min-w-44 border-l border-cyan-900 p-3 text-left align-top font-normal">

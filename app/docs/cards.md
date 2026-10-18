@@ -196,3 +196,29 @@ column. PWA: `web/e2e/catalog-comparison-card.spec.ts`.
 38. The headers or type rows disappear, or a slider stops moving its column's
     stats (`CatalogComparisonCardTest.everyColumnIsOneGameBoxWithNamedColoredLinesAndDeltas`,
     `ReferenceSettingsTest.catalogFiltersByTypeAndComparesAlternativesAgainstA`).
+
+### Item titles
+
+A copy's title (`item.p`, such as "shiny") changes its name and stats. The
+game's `calculate_item_properties` (`js/old_common_functions.js`) adds the
+title's stats before the upgrade scaling, and `render_item` (`js/html.js`)
+puts the title before the name. The console sends no `G.titles`, so other
+titles (superfast, sniper) get their name but no stats. PWA:
+`web/src/lib/itemTitles.test.ts` and `web/e2e/item-titles.spec.ts`.
+
+39. The name hides the title: item details read "Shiny Blade +3", the catalog
+    comparison "A: Shiny Blade +3", and an unknown title prints in title case
+    (`ItemTitlesTest.theTitleGoesBeforeTheName`,
+    `itemDetailsShowTheTitleTheBonusAndTheExtrasLine`,
+    `theCatalogComparisonNamesTheTitle`).
+40. A shiny copy misses its bonus: attack +4 (+3 more for an axe, basher or
+    great staff), else stat +2, else armor +12 and resistance +10, else DEX,
+    INT and STR +1 each (`ItemTitlesTest.shinyAddsTheBonusTheDefinitionPicks`).
+41. The bonus lands twice on a live copy, whose reported properties already
+    include it (`ItemTitlesTest.aLiveCopyKeepsItsReportedStatsAndACatalogCopyGetsTheBonus`).
+42. The item card misses the bonus: a shiny Blade +3 with attack 20 and 2 per
+    level reads "Damage: 30"
+    (`ItemTitlesTest.itemDetailsShowTheTitleTheBonusAndTheExtrasLine`).
+43. The extras box drops the title: "Title: Shiny", and a glitched copy's note
+    that its +1 DEX, INT or STR is rolled at random
+    (`ItemTitlesTest.theExtrasNameTheTitle`).

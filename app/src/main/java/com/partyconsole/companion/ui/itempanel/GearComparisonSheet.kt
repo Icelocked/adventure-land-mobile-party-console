@@ -274,7 +274,7 @@ fun GearComparisonSheet(
     val currentPreview = project(equipmentTotals(currentEquipment), currentSets.totals)
     val projected = project(equipmentTotals(proposedEquipment), proposedSets.totals)
     val changedSets = setDefinitions.values.filter { currentSets.counts[it.id] != proposedSets.counts[it.id] }
-    fun nameOf(value: Item, m: ItemMeta?) = (m?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(value.name)?.name ?: value.name
+    fun nameOf(value: Item, m: ItemMeta?) = com.partyconsole.companion.domain.titledName((m?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(value.name)?.name ?: value.name, value.p)
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {

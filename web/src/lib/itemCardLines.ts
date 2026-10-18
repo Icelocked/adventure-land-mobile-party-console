@@ -212,6 +212,11 @@ export function itemCardStat(key: string): { label: string; color: string } | un
   return line?.kind === 'prop' ? { label: line.label, color: line.color } : undefined
 }
 
+// render_item's name line: the title before the name ("Shiny Blade +7"). The console sends
+// no G.titles, so every title prints as the id in title case, which matches G.titles' own
+// names for shiny and glitched.
+export const titledName = (name: string, title: string | undefined) => (title ? `${titleCase(title)} ${name}` : name)
+
 // "Strength +10 · A.Piercing +40" for a bonus's stats, with the card's labels.
 export function statSummary(stats: Values): string {
   return statLines(stats, {})
@@ -390,6 +395,9 @@ function stateLines(item: Item): ItemCardLine[] {
 // Quantity and stat scroll for the extras box.
 export function itemSlotExtras(item: Item): [key: string, value: string][] {
   const extras: [string, string][] = []
+  if (item.p) extras.push(['title', titleCase(item.p)])
+  // calculate_item_properties rolls a glitched copy's +1 at random, so only the game knows which.
+  if (item.p === 'glitched') extras.push(['title_bonus', '+1 DEX, INT or STR, rolled at random'])
   if (Number(item.q) > 1) extras.push(['quantity', prettyNum(Number(item.q))])
   if (item.stat_type) extras.push(['stat_type', STAT_NAMES[item.stat_type] || titleCase(item.stat_type)])
   return extras

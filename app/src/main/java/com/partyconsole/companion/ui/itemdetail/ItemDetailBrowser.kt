@@ -223,7 +223,7 @@ private fun ItemDetailContent(
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)) {
         SpriteIcon(catalogItem.sprite, size = 48.dp)
         Text(
-            catalogItem.name + if (target.level > 0) " +${target.level}" else "",
+            com.partyconsole.companion.domain.titledName(catalogItem.name, if (isRoot) rootItem?.p else null) + if (target.level > 0) " +${target.level}" else "",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(start = 10.dp),
         )
@@ -289,7 +289,7 @@ private fun ItemDetailContent(
                     OutlinedButton(
                         onClick = {
                             comparePicker = null
-                            val item = com.partyconsole.companion.model.Item(name = target.id, level = previewLevel, statType = if (isRoot) rootStatType?.ifEmpty { null } else null)
+                            val item = com.partyconsole.companion.model.Item(name = target.id, level = previewLevel, statType = if (isRoot) rootStatType?.ifEmpty { null } else null, p = if (isRoot) rootItem?.p else null)
                             val properties = propertiesAtLevel(meta, item, previewLevel, item.statType).mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }
                             viewModel?.catalogComparison?.value = com.partyconsole.companion.domain.ComparisonSource(context?.slot ?: -1, item, meta?.copy(properties = properties))
                             viewModel?.navigate("account/catalog")
@@ -368,7 +368,7 @@ private fun ItemDetailContent(
     val comparison = comparing
     if (comparison != null && viewModel != null) {
         GearComparisonSheet(
-            item = com.partyconsole.companion.model.Item(name = target.id, level = previewLevel, statType = if (isRoot) rootStatType else null),
+            item = com.partyconsole.companion.model.Item(name = target.id, level = previewLevel, statType = if (isRoot) rootStatType else null, p = if (isRoot) rootItem?.p else null),
             meta = meta,
             characterName = comparison.first,
             viewModel = viewModel,
@@ -477,7 +477,7 @@ private fun OverviewSection(
             meta = meta,
             item = shown,
             level = previewLevel,
-            properties = itemCardProperties(meta, actualLevel, previewLevel, statType),
+            properties = itemCardProperties(meta, actualLevel, previewLevel, statType, item.p),
             setName = meta?.world?.set?.name,
             usable = usable,
             skillName = skillName,

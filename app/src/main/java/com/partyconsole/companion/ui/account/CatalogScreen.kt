@@ -53,6 +53,7 @@ import com.partyconsole.companion.domain.ComparisonSource
 import com.partyconsole.companion.domain.EQUIPMENT_TYPES
 import com.partyconsole.companion.domain.comparisonEntry
 import com.partyconsole.companion.domain.comparisonLine
+import com.partyconsole.companion.domain.titledName
 import com.partyconsole.companion.ui.components.GameBox
 import com.partyconsole.companion.ui.components.gameLineText
 import androidx.compose.ui.platform.LocalDensity
@@ -149,7 +150,7 @@ fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
     val comparing = source != null && entries.isNotEmpty()
     val selectedIds = entries.drop(1).map { it.entry.item.name }
     fun cancelComparison() { viewModel.catalogComparison.value = null }
-    val sourceName = source?.let { (it.meta?.definition?.get("name") as? JsonPrimitive)?.content ?: it.item.name }.orEmpty()
+    val sourceName = source?.let { titledName((it.meta?.definition?.get("name") as? JsonPrimitive)?.content ?: it.item.name, it.item.p) }.orEmpty()
 
     if (comparing && viewComparison) {
         AccountScreenScaffold("Compare catalog items", onBack) {
@@ -282,7 +283,7 @@ private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (
             Text("Stat", fontWeight = FontWeight.SemiBold, modifier = Modifier.width(96.dp).padding(12.dp))
             entries.forEachIndexed { index, value ->
                 val entry = value.entry
-                val name = (entry.meta?.definition?.get("name") as? JsonPrimitive)?.content ?: entry.item.name
+                val name = titledName((entry.meta?.definition?.get("name") as? JsonPrimitive)?.content ?: entry.item.name, entry.item.p)
                 val label = ('A' + index).toString()
                 Column(modifier = Modifier.width(columnWidth).padding(12.dp)) {
                     Text("$label${if (index == 0) " · Baseline" else " · vs A"}", fontWeight = FontWeight.SemiBold, color = Color(0xFFA5F3FC))
