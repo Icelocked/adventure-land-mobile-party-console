@@ -136,8 +136,8 @@ class ReferenceSettingsTest {
         compose.onNodeWithText("1/3 selected").assertExists()
         compose.onNodeWithText("Compare selected").performClick()
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("attack B").assertExists()
-        compose.onNode(hasText("(-10 · -33.333%)", substring = true)).assertExists()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Attack: 20 (-10 · -33.3%)") and hasAnyAncestor(hasContentDescription("B stats"))).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Attack: 30") and hasAnyAncestor(hasContentDescription("A stats"))).assertExists()
     }
 
     // Catalog items carry their sprite at the top level (CatalogItem.sprite), not in meta,

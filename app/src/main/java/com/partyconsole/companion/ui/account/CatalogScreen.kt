@@ -52,6 +52,13 @@ import com.partyconsole.companion.domain.CatalogComparisonEntry
 import com.partyconsole.companion.domain.ComparisonSource
 import com.partyconsole.companion.domain.EQUIPMENT_TYPES
 import com.partyconsole.companion.domain.comparisonEntry
+import com.partyconsole.companion.domain.comparisonLine
+import com.partyconsole.companion.ui.components.GameBox
+import com.partyconsole.companion.ui.components.gameLineText
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.sp
 import com.partyconsole.companion.model.CatalogItem
 import com.partyconsole.companion.model.Item
 import com.partyconsole.companion.model.Sprite
@@ -65,7 +72,6 @@ import com.partyconsole.companion.ui.itemdetail.propertiesAtLevel
 import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val SORTS = listOf(
@@ -262,7 +268,14 @@ private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (
     val keys = properties.flatMap { it.keys }.distinct()
         .filter { key -> key !in setOf("level", "attr0", "attr1") && properties.any { (it[key] ?: 0.0).let { v -> v.isFinite() && v != 0.0 } } }
         .sortedWith(compareBy<String> { ITEM_DETAIL_PROPERTY_RANK[it] ?: 999 }.thenBy { it })
-    val columnWidth = 176.dp
+    val lines = properties.mapIndexed { index, props -> keys.map { key -> comparisonLine(key, props[key] ?: 0.0, properties[0][key] ?: 0.0, index == 0) } }
+    // Columns widen to the longest stat line: the box's 16dp padding and 5dp border on each
+    // side plus the cell's 12dp padding.
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val lineStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+    val longest = lines.flatten().maxOfOrNull { measurer.measure(it.display(), lineStyle, softWrap = false).size.width } ?: 0
+    val columnWidth = maxOf(176.dp, with(density) { longest.toDp() } + 66.dp)
     Column(modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF155E75), RoundedCornerShape(4.dp)).verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())) {
         Text("Item stats only. Every difference is against A; character bonuses and passive damage are not included.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1), modifier = Modifier.width(columnWidth * (entries.size + 1) / 1.5f).padding(12.dp))
         Row {
@@ -315,19 +328,21 @@ private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (
                 }
             }
         }
-        for (key in keys) {
+        // One game box per column. Every column lists every stat on one unwrapped line, so a
+        // stat sits level with its counterpart in the other columns.
+        if (keys.isNotEmpty()) {
             Row {
-                Text(key.replace('_', ' ').replaceFirstChar { it.uppercase() }, color = Color(0xFFCBD5E1), style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(96.dp).padding(12.dp))
-                properties.forEachIndexed { index, props ->
-                    val v = props[key] ?: 0.0
-                    val baseline = properties[0][key] ?: 0.0
-                    val delta = v - baseline
-                    Text(
-                        localeAmount(v) + if (index > 0) " (${if (delta > 0) "+" else ""}${localeAmount(delta)}${if (baseline != 0.0) " · ${if (delta > 0) "+" else ""}${localeAmount(delta / abs(baseline) * 100)}%" else ""})" else "",
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.width(columnWidth).padding(12.dp).semantics { contentDescription = "$key ${'A' + index}" },
-                    )
+                Text("Stats", color = Color(0xFFCBD5E1), style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(96.dp).padding(12.dp))
+                lines.forEachIndexed { index, column ->
+                    GameBox("${'A' + index} stats", Modifier.padding(12.dp).width(columnWidth - 24.dp)) {
+                        for (line in column) {
+                            Text(
+                                gameLineText(line.label, line.value, line.color, suffix = line.change, suffixColor = line.changeColor),
+                                softWrap = false,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
         }

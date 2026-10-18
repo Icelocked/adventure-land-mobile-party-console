@@ -278,6 +278,10 @@ private fun hoursLine(hours: Double): CardLine = when {
 }
 
 /** "Strength +10 · A.Piercing +40" for a bonus's stats, with the card's labels. */
+/** The item card's label and color for one stat key, or null when the card has no line for it. */
+fun itemCardStat(key: String): Pair<String, String>? =
+    statLines(mapOf(key to JsonPrimitive(1)), emptyMap()).filterIsInstance<PropLine>().firstOrNull { it.key == key }?.let { it.label to it.color }
+
 fun statSummary(stats: Map<String, JsonElement>): String = statLines(stats, emptyMap())
     .filterIsInstance<PropLine>()
     .joinToString(" · ") { "${it.label} ${if (it.value.startsWith("+") || it.value.startsWith("-")) it.value else "+" + it.value}" }
