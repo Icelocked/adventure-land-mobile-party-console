@@ -206,6 +206,12 @@ function hoursLine(hours: number): ItemCardLine {
   return { kind: 'prop', key: 'duration', label: 'Hours', value: prettyFloat(hours), color: COLORS.gray }
 }
 
+// The item card's label and color for one stat key, or undefined when the card has no line for it.
+export function itemCardStat(key: string): { label: string; color: string } | undefined {
+  const line = statLines({ [key]: 1 }, {}).find((entry) => entry.kind === 'prop' && entry.key === key)
+  return line?.kind === 'prop' ? { label: line.label, color: line.color } : undefined
+}
+
 // "Strength +10 · A.Piercing +40" for a bonus's stats, with the card's labels.
 export function statSummary(stats: Values): string {
   return statLines(stats, {})

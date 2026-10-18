@@ -2,8 +2,13 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ITEM_DETAIL_PROPERTY_RANK, STAT_SCROLLS, itemMaximumLevel, propertiesAtLevel } from '@/lib/itemFormulas'
-import type { CatalogComparisonEntry } from '@/lib/catalogComparison'
+import { GameBox } from '@/components/GameBox'
+import { comparisonStat, type CatalogComparisonEntry } from '@/lib/catalogComparison'
 import type { Sprite } from '@/models'
+
+// The equipment comparison's gain and loss colors (GearComparisonSheet.tsx).
+const GAIN = '#85C76B',
+  LOSS = '#E13758'
 
 /** Item A as the baseline and up
  *  to three alternatives, each with a preview level and stat scroll. */
@@ -111,30 +116,44 @@ export function CatalogComparison({
                 ))}
               </tr>
             ))}
-          {keys.map((key) => (
-            <tr key={key} className="border-t border-cyan-900">
-              <th scope="row" className="p-3 text-left font-normal capitalize text-slate-300">
-                {key.replaceAll('_', ' ')}
+          {keys.length > 0 && (
+            <tr className="border-t border-cyan-900">
+              <th scope="row" className="p-3 text-left align-top font-normal text-slate-300">
+                Stats
               </th>
               {properties.map((props, index) => {
-                const value = Number(props[key]) || 0
-                const baseline = Number(properties[0][key]) || 0
-                const delta = value - baseline
+                const label = String.fromCharCode(65 + index)
                 return (
-                  <td key={index} className="border-l border-cyan-900 p-3 font-mono">
-                    {format(value)}
-                    {index > 0 && (
-                      <span className="ml-2 text-cyan-200">
-                        ({delta > 0 ? '+' : ''}
-                        {format(delta)}
-                        {baseline !== 0 ? ` · ${delta > 0 ? '+' : ''}${format((delta / Math.abs(baseline)) * 100)}%` : ''})
-                      </span>
-                    )}
+                  <td key={index} className="border-l border-cyan-900 p-3 align-top">
+                    {/* One line per stat in every column and no wrapping, so a stat sits level with its counterpart. */}
+                    <GameBox group label={`${label} stats`}>
+                      {keys.map((key) => {
+                        const { label: name, color } = comparisonStat(key)
+                        const value = Number(props[key]) || 0
+                        const baseline = Number(properties[0][key]) || 0
+                        const delta = value - baseline
+                        const changed = index > 0 && Math.abs(delta) > 0.0001
+                        return (
+                          <div key={key} data-line={key} className="whitespace-nowrap">
+                            <span data-label style={{ color }}>
+                              {name}
+                            </span>
+                            : {format(value)}
+                            {changed ? (
+                              <span data-change className="ml-1" style={{ color: delta > 0 ? GAIN : LOSS }}>
+                                ({delta > 0 ? '+' : '-'}
+                                {format(Math.abs(delta))} · {baseline === 0 ? 'new' : `${delta > 0 ? '+' : ''}${((delta / Math.abs(baseline)) * 100).toFixed(1)}%`})
+                              </span>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </GameBox>
                   </td>
                 )
               })}
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>

@@ -21,6 +21,9 @@ header, buttons, sliders and sections.
   breakdown.
 - **Equipment comparison**: each side's stat tiles become one game box, with
   changes in the game's success and failure colors.
+- **Catalog comparison** (Equipment catalog, Compare selected): the raw stat
+  rows under the column headers become one game box per column, named and
+  colored as on the equipment comparison, with each column's change against A.
 - **Skill card** (Class skills and an item's skill link): `render_skill` lines
   colored by meaning.
 - **Monster card** (Bestiary, Hunt settings and a monster opened from an
@@ -166,3 +169,30 @@ Written before the implementation. Each line names the test that checks it.
     `GameCardsUiTest.monsterLevelPreviewAndSpawnLinks`).
 33. Float error leaks into the card: 6 + 12 × 0.24 prints as 8.87, or 0.706 ×
     100 as 70.59 (`GameCardsTest.prettyNumbersFollowTheGamesFormatting`).
+
+### Catalog comparison
+
+The screen, its column headers (picture, name, level slider, stat scroll,
+Remove) and the type rows stay; the raw stat rows become one game box per
+column. PWA: `web/e2e/catalog-comparison-card.spec.ts`.
+
+34. A stat disappears. Every stat any column has is a line in every column, in
+    the item details order, so a column without it reads 0
+    (`CatalogComparisonCardTest.everyColumnIsOneGameBoxWithNamedColoredLinesAndDeltas`).
+35. Labels keep the raw keys. Lines use the equipment comparison's names
+    ("Armor", "Fortitude" for `for`, "STR" for `str`), then the item card's
+    ("Poison Res."), and the palette colors: Armor `#A3A9B0`, Resistance
+    `#8B74C9`, Fortitude `#9A6BC9`
+    (`CatalogComparisonCardTest.labelsAndColorsFollowTheEquipmentComparisonThenTheItemCard`).
+36. Deltas lose their direction. B and later columns show " (+x · +y%)" in
+    `#85C76B` and " (-x · -y%)" in `#E13758` against A, "new" when A has none of
+    the stat and nothing when the value matches; A shows none
+    (`CatalogComparisonCardTest.deltasReadAgainstAInGainAndLossColors`,
+    `everyColumnIsOneGameBoxWithNamedColoredLinesAndDeltas`).
+37. The columns drift out of line. A slider or stat scroll on some headers only,
+    or a long line in one column, must not move a stat off its counterpart's
+    height: every line stays on one row and every column takes the width of
+    the longest line (`CatalogComparisonCardTest.statsLineUpAcrossColumns`).
+38. The headers or type rows disappear, or a slider stops moving its column's
+    stats (`CatalogComparisonCardTest.everyColumnIsOneGameBoxWithNamedColoredLinesAndDeltas`,
+    `ReferenceSettingsTest.catalogFiltersByTypeAndComparesAlternativesAgainstA`).
