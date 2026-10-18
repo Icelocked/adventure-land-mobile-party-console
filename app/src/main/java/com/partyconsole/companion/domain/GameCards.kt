@@ -375,11 +375,19 @@ fun formatExpiry(expires: JsonElement, zone: ZoneId = ZoneId.systemDefault(), lo
     return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(locale).withZone(zone).format(instant)
 }
 
-/** Quantity and stat scroll for the extras box. */
+/** render_item's name line: the title before the name ("Shiny Blade +7"). The console
+ *  sends no G.titles, so every title prints as the id in title case, which matches
+ *  G.titles' own names for shiny and glitched. PWA: titledName in itemCardLines.ts. */
+fun titledName(name: String, title: String?): String = if (title.isNullOrEmpty()) name else "${titleCase(title)} $name"
+
+/** Quantity, stat scroll and title for the extras box. */
 fun itemSlotExtras(item: Item): List<Pair<String, String>> {
     val extras = mutableListOf<Pair<String, String>>()
     item.q?.takeIf { it > 1 }?.let { extras += "quantity" to prettyNum(it.toDouble()) }
     item.statType?.takeIf { it.isNotEmpty() }?.let { extras += "stat_type" to (STAT_NAMES[it] ?: titleCase(it)) }
+    item.p?.takeIf { it.isNotEmpty() }?.let { extras += "title" to titleCase(it) }
+    // calculate_item_properties rolls a glitched copy's +1 at random, so only the game knows which.
+    if (item.p == "glitched") extras += "title_bonus" to "+1 DEX, INT or STR, rolled at random"
     return extras
 }
 
@@ -387,6 +395,7 @@ fun itemSlotExtras(item: Item): List<Pair<String, String>> {
 private val ITEM_EXTRA_COLORS = mapOf(
     "equip_slot" to "#7AC0F5", "stackable" to "#7AC0F5", "max_stack_size" to "#7AC0F5", "tier" to "#56A244", "scroll" to "#B484E5",
     "extra_stat" to "#B484E5", "exclusive" to "#FC5F39", "id" to "#808080", "quantity" to "#C3C3C3", "stat_type" to "#B484E5",
+    "title" to "#B484E5", "title_bonus" to "#B484E5",
 )
 
 private fun extraLabel(key: String) = if (key == "stat_type") "Stat Scroll" else key.split('_').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }

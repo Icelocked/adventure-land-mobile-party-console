@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { EQUIPMENT_TYPES, comparisonEntry, type CatalogComparisonEntry, type ComparisonSource } from '@/lib/catalogComparison'
+import { titledName } from '@/lib/itemCardLines'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { CatalogComparison } from './CatalogComparison'
 import type { CatalogItem } from '@/models'
@@ -129,7 +130,7 @@ export function CatalogScreen() {
   const comparing = !!source && entries.length > 0
   const selectedIds = entries.slice(1).map(({ entry }) => entry.item.name)
   const cancelComparison = () => navigate('/catalog', { replace: true, state: null })
-  const sourceName = source ? String(source.meta?.definition.name || source.item.name) : ''
+  const sourceName = source ? titledName(String(source.meta?.definition.name || source.item.name), source.item.p) : ''
 
   if (comparing && viewComparison)
     return (

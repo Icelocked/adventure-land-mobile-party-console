@@ -120,7 +120,7 @@ private val NO_ROUND_KEYS = setOf(
  *  per-level scaling deltas - upgrade/compound tiers apply different
  *  multipliers at specific breakpoints (tier 7+ for upgrades, 5+ for
  *  compounds), matching the game's own progression curve. */
-fun calculatedLevelProperties(meta: ItemMeta?, statType: String?, level: Int): Map<String, Double> {
+fun calculatedLevelProperties(meta: ItemMeta?, statType: String?, level: Int, title: String? = null): Map<String, Double> {
     val definition = meta?.definition.orEmpty()
     val scaling = meta?.scaling.orEmpty()
     val values = mutableMapOf<String, Double>()
@@ -128,6 +128,7 @@ fun calculatedLevelProperties(meta: ItemMeta?, statType: String?, level: Int): M
         val base = definition[key]?.asDoubleOrNull() ?: continue
         values[key] = base
     }
+    if (title == "shiny") addShinyBonus(values, definition)
     for (step in 1..level) {
         val multiplier = when {
             meta?.upgradeable == true -> when (step) {
@@ -162,14 +163,33 @@ fun calculatedLevelProperties(meta: ItemMeta?, statType: String?, level: Int): M
     return values
 }
 
+// Two-handed weapon types for the shiny attack bonus (doublehand_types in the game's
+// js/old_common_functions.js).
+private val DOUBLEHAND_TYPES = setOf("axe", "basher", "great_staff")
+
+// calculate_item_properties' shiny bonus, picked by the definition: attack, else the stat
+// scroll stat, else armor and resistance, else one of each primary attribute. A glitched
+// copy's +1 is a random roll the app cannot know. The console sends no G.titles, so no
+// other title adds stats here. PWA: addShinyBonus in web/src/lib/itemFormulas.ts.
+private fun addShinyBonus(values: MutableMap<String, Double>, definition: Map<String, JsonElement>) {
+    fun add(key: String, amount: Double) { values[key] = (values[key] ?: 0.0) + amount }
+    fun has(key: String) = (definition[key]?.asDoubleOrNull() ?: 0.0) != 0.0
+    when {
+        has("attack") -> add("attack", if (definition["wtype"]?.asStringOrNull() in DOUBLEHAND_TYPES) 7.0 else 4.0)
+        has("stat") -> add("stat", 2.0)
+        has("armor") -> { add("armor", 12.0); add("resistance", 10.0) }
+        else -> for (key in listOf("dex", "int", "str")) add(key, 1.0)
+    }
+}
+
 /** The stat block to actually display at [previewLevel]: the server's own
  *  current-level `properties` (authoritative - covers anything the client
  *  formula above doesn't model) adjusted by the DELTA between the formula
  *  evaluated at the preview level vs. the actual level, rather than the
  *  formula's raw output, so a "no scaling data" stat doesn't silently vanish. */
-fun previewProperties(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?): Map<String, Double> {
-    val current = calculatedLevelProperties(meta, statType, actualLevel)
-    val preview = calculatedLevelProperties(meta, statType, previewLevel)
+fun previewProperties(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?, title: String? = null): Map<String, Double> {
+    val current = calculatedLevelProperties(meta, statType, actualLevel, title)
+    val preview = calculatedLevelProperties(meta, statType, previewLevel, title)
     val properties = meta?.properties.orEmpty()
     return (current.keys + preview.keys).associateWith { key ->
         val currentValue = properties[key]?.asDoubleOrNull() ?: current[key] ?: 0.0
@@ -369,9 +389,9 @@ data class StatRow(val key: String, val value: JsonElement)
  *  [previewProperties] (already-scaled current/preview stat values) overlaid
  *  on top, plus a derived stackable/max_stack_size pair, ignored keys
  *  stripped, and sorted by display rank. */
-fun buildStatRows(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?): List<StatRow> {
+fun buildStatRows(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?, title: String? = null): List<StatRow> {
     val definition = meta?.definition.orEmpty()
-    val preview = previewProperties(meta, actualLevel, previewLevel, statType)
+    val preview = previewProperties(meta, actualLevel, previewLevel, statType, title)
     val display = LinkedHashMap<String, JsonElement>(definition)
     for ((key, value) in preview) display[key] = JsonPrimitive(value)
     // Equipment shows where it goes instead of its type.
@@ -492,8 +512,8 @@ fun detailMeta(known: ItemMeta?, live: ItemMeta?): ItemMeta? = when {
  *  actual level/stat and the preview's. Non-numeric reported properties
  *  (flags) are left out - only the numbers feed the comparison. */
 fun propertiesAtLevel(meta: ItemMeta?, item: com.partyconsole.companion.model.Item, level: Int, statType: String?): Map<String, Double> {
-    val actualCalculated = calculatedLevelProperties(meta, item.statType, maxOf(0, item.level ?: 0))
-    val previewCalculated = calculatedLevelProperties(meta, statType, level)
+    val actualCalculated = calculatedLevelProperties(meta, item.statType, maxOf(0, item.level ?: 0), item.p)
+    val previewCalculated = calculatedLevelProperties(meta, statType, level, item.p)
     val reported = meta?.properties.orEmpty()
     val out = linkedMapOf<String, Double>()
     for (key in actualCalculated.keys + previewCalculated.keys + reported.keys) {
@@ -509,15 +529,15 @@ fun propertiesAtLevel(meta: ItemMeta?, item: com.partyconsole.companion.model.It
 /** The stats the item card shows at [previewLevel]: the live properties, with the level
  *  preview over them. Stats the level calculation doesn't cover, such as a fixed
  *  lifesteal, keep their live value. */
-fun itemCardProperties(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?): Map<String, JsonElement> =
-    meta?.properties.orEmpty() + previewProperties(meta, actualLevel, previewLevel, statType?.ifEmpty { null }).mapValues { JsonPrimitive(it.value) }
+fun itemCardProperties(meta: ItemMeta?, actualLevel: Int, previewLevel: Int, statType: String?, title: String? = null): Map<String, JsonElement> =
+    meta?.properties.orEmpty() + previewProperties(meta, actualLevel, previewLevel, statType?.ifEmpty { null }, title).mapValues { JsonPrimitive(it.value) }
 
 /** The item extras box: quantity and stat scroll, then every stats-table row the card
  *  has no line for, booleans as Yes and No. */
 fun itemExtras(meta: ItemMeta?, item: com.partyconsole.companion.model.Item, actualLevel: Int, previewLevel: Int): List<com.partyconsole.companion.domain.CardExtra> {
     val definition = meta?.definition.orEmpty()
     val definitionType = definitionString(meta, "type")
-    val rows = buildStatRows(meta, actualLevel, previewLevel, item.statType?.ifEmpty { null })
+    val rows = buildStatRows(meta, actualLevel, previewLevel, item.statType?.ifEmpty { null }, item.p)
         .filter { !com.partyconsole.companion.domain.onItemCard(it.key, definition) }
         .map { row ->
             val value = row.value

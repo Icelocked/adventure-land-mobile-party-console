@@ -18,6 +18,8 @@ export interface MockItem {
   level?: number
   q?: number
   stat_type?: string
+  // Title, such as "shiny".
+  p?: string
   // Per-copy state the game's item card shows: l (lock: "s" sealed, "u" unsealing, else locked), acl (account bound), expires.
   l?: string
   acl?: number

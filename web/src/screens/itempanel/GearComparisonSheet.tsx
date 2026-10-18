@@ -8,6 +8,7 @@ import { useCatalogLookup } from '@/lib/catalogLookup'
 import { statBadgeClass } from '@/lib/itemActionBanner'
 import { comparisonSlotsFor, detailMeta, itemMaximumLevel, propertiesAtLevel, STAT_SCROLLS } from '@/lib/itemFormulas'
 import { GameBox } from '@/components/GameBox'
+import { titledName } from '@/lib/itemCardLines'
 import { STAT_COLORS as S } from '@/lib/statColors'
 import type { EquippedEntry, Item, ItemMeta, ItemSetInfo } from '@/models'
 
@@ -232,7 +233,7 @@ export function GearComparisonSheet({
     ['Output', 'output', (v) => `${v.toFixed(3)}%`],
   ]
   const changedSets = Array.from(setDefinitions.values()).filter((set) => currentSets.counts[set.id] !== proposedSets.counts[set.id])
-  const nameOf = (value: Item, meta?: ItemMeta | null) => String(meta?.definition.name || catalogFor(value.name)?.name || value.name)
+  const nameOf = (value: Item, meta?: ItemMeta | null) => titledName(String(meta?.definition.name || catalogFor(value.name)?.name || value.name), value.p)
   const name = `${nameOf(item, entryMeta)} +${rightLevel}`
 
   const statButtons = (proposed: boolean) => {

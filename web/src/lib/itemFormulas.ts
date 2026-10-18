@@ -82,7 +82,7 @@ const NO_ROUND_KEYS = new Set(['evasion', 'miss', 'reflection', 'dreturn', 'life
 
 /** An item's stat block at [level]: base definition plus per-level scaling.
  *  Multipliers step up from tier 7 for upgrades and tier 5 for compounds. */
-export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: string | undefined, level: number): Record<string, number> {
+export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: string | undefined, level: number, title?: string): Record<string, number> {
   const definition = meta?.definition ?? {}
   const scaling = meta?.scaling ?? {}
   const values: Record<string, number> = {}
@@ -90,6 +90,7 @@ export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: 
     const base = asNumber(definition[key])
     if (base !== undefined) values[key] = base
   }
+  if (title === 'shiny') addShinyBonus(values, definition)
   for (let step = 1; step <= level; step += 1) {
     let multiplier = 1.0
     if (meta?.upgradeable) {
@@ -120,12 +121,30 @@ export function calculatedLevelProperties(meta: ItemMeta | undefined, statType: 
   return values
 }
 
+// Two-handed weapon types for the shiny attack bonus (doublehand_types in the game's
+// js/old_common_functions.js).
+const DOUBLEHAND_TYPES = new Set(['axe', 'basher', 'great_staff'])
+
+// calculate_item_properties' shiny bonus, picked by the definition: attack, else the
+// stat scroll stat, else armor and resistance, else one of each primary attribute.
+// A glitched copy's +1 is a random roll the app cannot know. The console sends no
+// G.titles, so no other title adds stats here.
+function addShinyBonus(values: Record<string, number>, definition: Record<string, unknown>) {
+  const add = (key: string, amount: number) => (values[key] = (values[key] ?? 0) + amount)
+  if (asNumber(definition.attack)) add('attack', DOUBLEHAND_TYPES.has(String(definition.wtype)) ? 7 : 4)
+  else if (asNumber(definition.stat)) add('stat', 2)
+  else if (asNumber(definition.armor)) {
+    add('armor', 12)
+    add('resistance', 10)
+  } else for (const key of ['dex', 'int', 'str']) add(key, 1)
+}
+
 /** The server-reported stat block, shifted by the formula's difference
  *  between the actual item and the preview (level and stat scroll). */
-export function propertiesAtLevel(meta: ItemMeta | undefined, item: { level?: number; stat_type?: string }, level: number, statType?: string | null) {
+export function propertiesAtLevel(meta: ItemMeta | undefined, item: { level?: number; stat_type?: string; p?: string }, level: number, statType?: string | null) {
   const actualLevel = Math.max(0, Number(item.level) || 0)
-  const actualCalculated = calculatedLevelProperties(meta, item.stat_type, actualLevel)
-  const previewCalculated = calculatedLevelProperties(meta, statType || undefined, level)
+  const actualCalculated = calculatedLevelProperties(meta, item.stat_type, actualLevel, item.p)
+  const previewCalculated = calculatedLevelProperties(meta, statType || undefined, level, item.p)
   const reported = (meta?.properties || {}) as Record<string, unknown>
   return Object.keys({ ...actualCalculated, ...previewCalculated, ...reported }).reduce<Record<string, string | number | boolean>>((out, key) => {
     const reportedValue = reported[key]
@@ -151,9 +170,9 @@ export function detailMeta(known: ItemMeta | null | undefined, live: ItemMeta | 
 /** The stat block to display at [previewLevel]: the server's current
  *  `properties` plus the formula's delta between the two levels. Using the
  *  delta rather than the raw formula keeps stats with no scaling data. */
-export function previewProperties(meta: ItemMeta | undefined, actualLevel: number, previewLevel: number, statType: string | undefined): Record<string, number> {
-  const current = calculatedLevelProperties(meta, statType, actualLevel)
-  const preview = calculatedLevelProperties(meta, statType, previewLevel)
+export function previewProperties(meta: ItemMeta | undefined, actualLevel: number, previewLevel: number, statType: string | undefined, title?: string): Record<string, number> {
+  const current = calculatedLevelProperties(meta, statType, actualLevel, title)
+  const preview = calculatedLevelProperties(meta, statType, previewLevel, title)
   const properties = meta?.properties ?? {}
   const keys = new Set([...Object.keys(current), ...Object.keys(preview)])
   const result: Record<string, number> = {}
@@ -348,9 +367,9 @@ export interface StatRow {
 /** The "Item stats" table: the raw definition with [previewProperties]
  *  overlaid, derived equip_slot/stackable/max_stack_size added, ignored
  *  keys stripped, sorted by display rank. */
-export function buildStatRows(meta: ItemMeta | undefined, actualLevel: number, previewLevel: number, statType: string | undefined): StatRow[] {
+export function buildStatRows(meta: ItemMeta | undefined, actualLevel: number, previewLevel: number, statType: string | undefined, title?: string): StatRow[] {
   const definition = meta?.definition ?? {}
-  const preview = previewProperties(meta, actualLevel, previewLevel, statType)
+  const preview = previewProperties(meta, actualLevel, previewLevel, statType, title)
   const display: Record<string, unknown> = { ...definition }
   for (const [key, value] of Object.entries(preview)) display[key] = value
   // Equipment shows where it goes instead of its type.

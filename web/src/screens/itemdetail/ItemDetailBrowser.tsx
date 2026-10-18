@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { ItemCard, ItemExtraStats } from '@/components/ItemCard'
 import { SkillCards } from '@/components/SkillCards'
-import { itemSlotExtras, onItemCard } from '@/lib/itemCardLines'
+import { itemSlotExtras, onItemCard, titledName } from '@/lib/itemCardLines'
 import {
   buildStatRows,
   comparisonSlotLabel,
@@ -259,7 +259,7 @@ function ItemDetailContent({
       <div className="mb-2 flex items-center gap-2.5 pt-1">
         <SpriteIcon sprite={catalogItem.sprite} size={48} />
         <span className="text-base font-semibold">
-          {catalogItem.name}
+          {titledName(catalogItem.name, isRoot ? rootItem?.p : undefined)}
           {target.level > 0 ? ` +${target.level}` : ''}
         </span>
       </div>
@@ -322,7 +322,7 @@ function ItemDetailContent({
                     type="button"
                     onClick={() => {
                       setComparePicker(false)
-                      const item = { name: target.id, level: previewLevel, ...(isRoot && rootStatType ? { stat_type: rootStatType } : {}) }
+                      const item = { name: target.id, level: previewLevel, ...(isRoot && rootStatType ? { stat_type: rootStatType } : {}), ...(isRoot && rootItem?.p ? { p: rootItem.p } : {}) }
                       navigate('/catalog', {
                         state: { comparison: { slot: context?.slot ?? -1, item, meta: meta ? { ...meta, properties: propertiesAtLevel(meta, item, previewLevel, item.stat_type) } : meta } },
                       })
@@ -396,7 +396,7 @@ function ItemDetailContent({
       )}
       {comparing && (
         <GearComparisonSheet
-          item={{ name: target.id, level: previewLevel, ...(isRoot && rootStatType ? { stat_type: rootStatType } : {}) }}
+          item={{ name: target.id, level: previewLevel, ...(isRoot && rootStatType ? { stat_type: rootStatType } : {}), ...(isRoot && rootItem?.p ? { p: rootItem.p } : {}) }}
           meta={meta}
           characterName={comparing.character}
           slot={comparing.slot}
@@ -450,10 +450,10 @@ function OverviewSection({
   const buyPrice = definitionNumber(meta, 'g')
   const maxLevel = itemMaximumLevel(meta)
   const defType = definitionString(meta, 'type')
-  const rows = buildStatRows(meta, actualLevel, previewLevel, statType)
+  const rows = buildStatRows(meta, actualLevel, previewLevel, statType, item.p)
   const classes = meta?.usage?.classes ?? []
   // Stats the level calculation doesn't cover, such as a fixed lifesteal, keep their live value.
-  const cardProperties = { ...meta?.properties, ...previewProperties(meta, actualLevel, previewLevel, statType) }
+  const cardProperties = { ...meta?.properties, ...previewProperties(meta, actualLevel, previewLevel, statType, item.p) }
   const extras: [string, string][] = [
     ...itemSlotExtras(item),
     ...rows
