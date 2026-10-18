@@ -3,6 +3,7 @@ import { Slider } from '@/components/ui/slider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { ITEM_DETAIL_PROPERTY_RANK, STAT_SCROLLS, itemMaximumLevel, propertiesAtLevel } from '@/lib/itemFormulas'
 import type { CatalogComparisonEntry } from '@/lib/catalogComparison'
+import type { Sprite } from '@/models'
 
 /** Item A as the baseline and up
  *  to three alternatives, each with a preview level and stat scroll. */
@@ -10,8 +11,11 @@ export function CatalogComparison({
   entries,
   onChange,
   onRemove,
+  spriteOf,
 }: {
   entries: CatalogComparisonEntry[]
+  // Catalog items carry their sprite outside meta, so the screen resolves each picture.
+  spriteOf: (entry: CatalogComparisonEntry) => Sprite | null | undefined
   onChange: (index: number, value: CatalogComparisonEntry) => void
   onRemove: (index: number) => void
 }) {
@@ -40,7 +44,7 @@ export function CatalogComparison({
                     {label}
                     {index === 0 ? ' · Baseline' : ' · vs A'}
                   </p>
-                  <SpriteIcon sprite={entry.meta?.sprite} size={48} className="mb-2" />
+                  <SpriteIcon sprite={spriteOf(value)} size={48} className="mb-2" />
                   <p className="mb-3 font-semibold">{name}</p>
                   {entry.meta?.upgradeable || entry.meta?.compoundable ? (
                     <div className="mb-4 rounded border border-violet-900 p-3">

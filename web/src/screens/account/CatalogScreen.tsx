@@ -80,6 +80,8 @@ export function CatalogScreen() {
       setExclusiveGear(false)
     }
   }
+  // CatalogItem.sprite sits outside meta; a live inventory copy brings its own meta.sprite.
+  const catalogSprites = useMemo(() => new Map(catalog.map((item) => [item.id, item.sprite])), [catalog])
   const equipment = useMemo(() => catalog.filter((item) => EQUIPMENT_TYPES.includes(String(item.meta?.definition.type || ''))), [catalog])
   const availableTypes = useMemo(() => [...new Set(equipment.map((item) => String(item.meta?.definition.type || '')))].sort(), [equipment])
   const availableClasses = useMemo(
@@ -143,6 +145,7 @@ export function CatalogScreen() {
             entries={entries}
             onChange={(index, value) => setEntries((previous) => previous.map((entry, i) => (i === index ? value : entry)))}
             onRemove={(index) => setEntries((previous) => previous.filter((_, i) => i !== index))}
+            spriteOf={({ entry }) => entry.meta?.sprite ?? catalogSprites.get(entry.item.name)}
           />
         </div>
       </AccountScreenScaffold>
