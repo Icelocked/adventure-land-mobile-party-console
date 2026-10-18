@@ -140,6 +140,31 @@ class ReferenceSettingsTest {
         compose.onNode(hasText("(-10 · -33.333%)", substring = true)).assertExists()
     }
 
+    // Catalog items carry their sprite at the top level (CatalogItem.sprite), not in meta,
+    // so a comparison that reads only meta.sprite shows a blank tile for every catalog column.
+    @Test
+    fun everyCatalogComparisonColumnShowsItsItemPicture() {
+        fun item(id: String, x: Int) =
+            """{"id":"$id","name":"${id.replaceFirstChar { it.uppercase() }}","sprite":{"url":"/sprites/items.png","columns":20,"rows":40,"x":$x,"y":0},"meta":{"definition":{"name":"${id.replaceFirstChar { it.uppercase() }}","type":"weapon","tier":1,"attack":10,"g":100},"properties":{"attack":10},"usage":{"classes":[{"id":"warrior","name":"Warrior"}],"hands":[]}}}"""
+        val catalog = console.sections.getValue("catalog")["merchantCatalog"]!!.jsonObject
+        console.override("catalog", mapOf("merchantCatalog" to JsonObject(catalog + ("allItems" to Json.parseToJsonElement("[${item("blade", 1)},${item("staff", 2)},${item("axe", 3)}]")))))
+        val viewModel = PartyViewModel(console.settings)
+        compose.setContent { CatalogScreen(viewModel, onBack = {}) }
+        eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.merchantCatalog?.allItems?.size == 3 }
+        compose.runOnIdle {
+            val blade = viewModel.dynamicState.value.merchantCatalog!!.allItems.first { it.id == "blade" }
+            viewModel.catalogComparison.value = ComparisonSource(-1, Item(name = "blade", level = 0), blade.meta)
+        }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Add to compare").fetchSemanticsNodes().size == 3 }
+        // Sorted by tier then name: Axe, Blade, Staff.
+        compose.onAllNodesWithText("Add to compare")[0].performClick()
+        compose.onAllNodesWithText("Add to compare")[1].performClick()
+        compose.onNodeWithText("Compare selected").performClick()
+        for (picture in listOf("A Blade picture", "B Axe picture", "C Staff picture")) {
+            compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription(picture)).fetchSemanticsNodes().isNotEmpty() }
+        }
+    }
+
     @Test
     fun logsListGameLogsWithFiltersAndDashboardSources() {
         val viewModel = PartyViewModel(console.settings)

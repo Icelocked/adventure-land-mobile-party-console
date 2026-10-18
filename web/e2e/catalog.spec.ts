@@ -82,3 +82,26 @@ test('Catalog comparison: From catalog starts with A, adds up to three, compares
   await expect(controls).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Add to compare' })).toHaveCount(0)
 })
+
+// Catalog items carry their sprite at the top level (CatalogItem.sprite), not in meta, so
+// a comparison that reads only meta.sprite shows a blank tile for every catalog column.
+test('Catalog comparison: every column shows its item picture', async ({ page }) => {
+  const server = catalogServer()
+  await server.install(page)
+  await page.goto('/catalog')
+
+  await page.getByRole('button', { name: /^Wolf Coat/ }).click()
+  await page.getByRole('button', { name: 'Compare', exact: true }).click()
+  await page.getByRole('group', { name: 'Compare for' }).getByRole('button', { name: 'From catalog' }).click()
+  const tile = (name: string) => page.locator('.grid > div', { has: page.getByRole('button', { name: new RegExp(`^${name}`) }) })
+  await tile('Plate Armor').getByRole('button', { name: 'Add to compare' }).click()
+  await tile('Coat').getByRole('button', { name: 'Add to compare' }).click()
+  await page.getByRole('group', { name: 'Catalog comparison' }).getByRole('button', { name: 'Compare selected' }).click()
+
+  const headers = page.getByRole('table').locator('thead th').filter({ hasText: /· (Baseline|vs A)/ })
+  await expect(headers).toHaveCount(3)
+  for (let index = 0; index < 3; index++)
+    await expect
+      .poll(() => headers.nth(index).locator('div.bg-muted').first().evaluate((node) => getComputedStyle(node).backgroundImage))
+      .toContain('e2e-sprite.png')
+})

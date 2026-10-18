@@ -54,6 +54,7 @@ import com.partyconsole.companion.domain.EQUIPMENT_TYPES
 import com.partyconsole.companion.domain.comparisonEntry
 import com.partyconsole.companion.model.CatalogItem
 import com.partyconsole.companion.model.Item
+import com.partyconsole.companion.model.Sprite
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.components.localeAmount
 import com.partyconsole.companion.ui.itemdetail.ITEM_DETAIL_PROPERTY_RANK
@@ -114,6 +115,8 @@ fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
             exclusiveGear = false
         }
     }
+    // CatalogItem.sprite sits outside meta; a live inventory copy brings its own meta.sprite.
+    val catalogSprites = remember(catalog) { catalog.associate { it.id to it.sprite } }
     val equipment = remember(catalog) { catalog.filter { it.type() in EQUIPMENT_TYPES } }
     val availableTypes = remember(equipment) { equipment.map { it.type() }.distinct().sorted() }
     val availableClasses = remember(equipment) {
@@ -151,6 +154,7 @@ fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                     entries,
                     onChange = { index, value -> entries = entries.mapIndexed { i, e -> if (i == index) value else e } },
                     onRemove = { index -> entries = entries.filterIndexed { i, _ -> i != index } },
+                    spriteOf = { it.entry.meta?.sprite ?: catalogSprites[it.entry.item.name] },
                 )
             }
         }
@@ -252,7 +256,7 @@ fun CatalogScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
 /** Item A as the baseline and up to three alternatives, each with a preview
  *  level and stat scroll; every stat difference is against A. */
 @Composable
-private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (Int, CatalogComparisonEntry) -> Unit, onRemove: (Int) -> Unit) {
+private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (Int, CatalogComparisonEntry) -> Unit, onRemove: (Int) -> Unit, spriteOf: (CatalogComparisonEntry) -> Sprite?) {
     val properties = entries.map { propertiesAtLevel(it.entry.meta, it.entry.item, it.level, it.stat.ifEmpty { null }) }
     // Ability parameters describe different effects; keep them with their named ability.
     val keys = properties.flatMap { it.keys }.distinct()
@@ -269,7 +273,8 @@ private fun CatalogComparison(entries: List<CatalogComparisonEntry>, onChange: (
                 val label = ('A' + index).toString()
                 Column(modifier = Modifier.width(columnWidth).padding(12.dp)) {
                     Text("$label${if (index == 0) " · Baseline" else " · vs A"}", fontWeight = FontWeight.SemiBold, color = Color(0xFFA5F3FC))
-                    SpriteIcon(entry.meta?.sprite, size = 48.dp)
+                    val sprite = spriteOf(value)
+                    SpriteIcon(sprite, size = 48.dp, modifier = if (sprite != null) Modifier.semantics { contentDescription = "$label $name picture" } else Modifier)
                     Text(name, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
                     if (entry.meta?.upgradeable == true || entry.meta?.compoundable == true) {
                         val max = maxOf(entry.item.level ?: 0, itemMaximumLevel(entry.meta))
