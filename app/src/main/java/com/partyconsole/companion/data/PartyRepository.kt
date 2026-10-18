@@ -172,6 +172,7 @@ class PartyRepository(
     private fun publish() {
         val decoded = decodeState(merged) ?: return
         _dynamicState.value = decoded.copy(
+            stateKeys = merged.keys,
             travelPlaces = catalog.travelPlaces,
             monsterChoices = catalog.monsterChoices,
             bestiaryCatalog = catalog.bestiaryCatalog,

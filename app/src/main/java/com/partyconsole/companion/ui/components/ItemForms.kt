@@ -247,12 +247,27 @@ fun DeconstructionConfirmation(
 }
 
 /** "Automatically sell to NPC?": what the rule matches, its scope, and the
- *  proceeds per sale. */
+ *  proceeds per sale. With `keeps` (a merchant-wide rule on the stable
+ *  console fork, #116) it also takes "Keep in storage", prefilled from
+ *  `savedKeep`; Ryan's v1.4.0 ignores `keep` and sells every copy.
+ *  `onConfirm` gets the typed keep text, blank without `keeps`. PWA:
+ *  ItemConfirmations.tsx AutoNpcSaleConfirmation. */
 @Composable
-fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character: String?, onConfirm: suspend () -> String?, onCancel: () -> Unit) {
+fun AutoNpcSaleConfirmation(
+    item: Item,
+    meta: ItemMeta?,
+    name: String,
+    character: String?,
+    onConfirm: suspend (keep: String) -> String?,
+    onCancel: () -> Unit,
+    keeps: Boolean = false,
+    savedKeep: Int? = null,
+) {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val keepField = keeps && character == null
+    var keep by remember { mutableStateOf(if (keepField) savedKeep?.toString().orEmpty() else "") }
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).border(BorderStroke(1.dp, Orange.copy(alpha = 0.6f)), RoundedCornerShape(6.dp)).padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -269,6 +284,24 @@ fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character
             Text("You will receive ${"%,d".format(npcSaleValue(item.level ?: 0, item.gift == true, item.expires, meta))}g per sale.", color = Color(0xFFFDE68A), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
             Text("The rule matches this exact +level, stat type, and special property.", style = MaterialTheme.typography.labelSmall)
         }
+        if (keepField) {
+            OutlinedTextField(
+                value = keep,
+                onValueChange = { keep = it },
+                enabled = !busy,
+                singleLine = true,
+                label = { Text("Keep in storage") },
+                placeholder = { Text("Sell every copy") },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Copies to keep across the merchant's bag, bank and BankBois. Only the rest is sold; leave blank to sell every copy.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
@@ -276,7 +309,7 @@ fun AutoNpcSaleConfirmation(item: Item, meta: ItemMeta?, name: String, character
                 scope.launch {
                     busy = true
                     error = null
-                    error = onConfirm()
+                    error = onConfirm(keep)
                     busy = false
                 }
             }) { Text("Enable auto sale", color = Color.Black) }

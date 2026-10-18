@@ -44,6 +44,7 @@ import com.partyconsole.companion.ui.merchant.MerchantSettings
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.partyconsole.companion.model.consoleFeatures
 
 private val Amber = Color(0xFFF59E0B)
 private val Emerald = Color(0xFF10B981)
@@ -158,6 +159,7 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
                     initialRealm = currentRealm?.let { "SR_$it" } ?: state.giveawayRealms.firstOrNull()?.key.orEmpty(),
                     realms = state.giveawayRealms,
                     players = state.giveawayPlayers,
+                    typedHost = state.consoleFeatures.forkCommerce,
                 ) { realm, seller -> run { viewModel.api.joinGiveaway(seller, realm) } }
             }
             TextButton(onClick = { toggle("settings") }) { Text("Merchant settings") }
@@ -202,10 +204,12 @@ private fun DonateForm(merchant: String?, xpPerGold: Double, onDonate: (Long) ->
     }
 }
 
-/** "Join giveaway": pick a realm, then a player online there (searchable)
- *  or the host's typed name (console 1.4). */
+/** "Join giveaway": pick a realm, then a player online there (searchable).
+ *  With `typedHost` the host's typed name also works: the stable console
+ *  fork finds an unseen host through the game's merchant directory
+ *  (merchant/giveaway-scheduler.ts). PWA: MerchantControlsSection.tsx. */
 @Composable
-private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, players: Map<String, List<String>>, onJoin: (String, String) -> Unit) {
+private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, players: Map<String, List<String>>, typedHost: Boolean, onJoin: (String, String) -> Unit) {
     var realm by remember { mutableStateOf(initialRealm) }
     var seller by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
@@ -216,7 +220,7 @@ private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, play
     // Hosts who are not stand merchants on a realm without our characters
     // never load, so an exact typed name stands in.
     val typed = search.trim()
-    val canUseTyped = typed.isNotEmpty() && typed.length <= 40 && typed !in online
+    val canUseTyped = typedHost && typed.isNotEmpty() && typed.length <= 40 && typed !in online
     Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("The merchant will switch realms, travel to the main market, find this player, and enter every active giveaway they are hosting.", style = MaterialTheme.typography.labelSmall)
         ExposedDropdownMenuBox(expanded = realmMenu, onExpandedChange = { realmMenu = it }) {
@@ -244,7 +248,7 @@ private fun GiveawayForm(initialRealm: String, realms: List<GiveawayRealm>, play
         if (realm.isNotEmpty() && seller.isEmpty()) {
             Column(modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
                 for (name in matches) Text(name, modifier = Modifier.fillMaxWidth().clickable { seller = name }.padding(8.dp))
-                if (matches.isEmpty()) Text("No loaded player matches. Type the host's exact name.", style = MaterialTheme.typography.labelSmall)
+                if (matches.isEmpty()) Text(if (typedHost) "No loaded player matches. Type the host's exact name." else "No online players loaded for this realm.", style = MaterialTheme.typography.labelSmall)
                 if (canUseTyped) Text("Use “$typed”", modifier = Modifier.fillMaxWidth().clickable { seller = typed; search = "" }.padding(8.dp))
             }
         }

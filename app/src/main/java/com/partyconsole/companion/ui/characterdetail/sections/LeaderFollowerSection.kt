@@ -56,6 +56,7 @@ import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.components.rememberClock
 import com.partyconsole.companion.ui.dungeon.CaveEventRow
 import kotlinx.coroutines.launch
+import com.partyconsole.companion.model.consoleFeatures
 
 /** Leader and follow as two independent tap targets on POST
  *  /party-api/formation. "Leader" sends only {leader} (a radio - tapping the
@@ -102,7 +103,7 @@ fun LeaderFollowerSection(characterName: String, dynamicState: PartyStateDynamic
             )
             EventSelectionControl(dynamicState, characterName, viewModel, onOpenAnniversary)
             // Merchant-class characters get no gear sets (connected-character-card.tsx).
-            if (characters[characterName]?.vitals?.ctype != "merchant") GearSetControl(characterName, dynamicState, viewModel)
+            if (characters[characterName]?.vitals?.ctype != "merchant" && dynamicState.consoleFeatures.gearSets) GearSetControl(characterName, dynamicState, viewModel)
         }
         ConfigLoadingNote(loaded)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
@@ -242,7 +243,7 @@ private fun EventSelectionControl(state: PartyStateDynamic, name: String, viewMo
                 }
                 // Console 1.4 reaches the Franky routine from inside Franky's
                 // event settings (event-limits-dialog.tsx).
-                if (settings == event.id && event.id == "franky" && combat) {
+                if (settings == event.id && event.id == "franky" && combat && state.consoleFeatures.frankyRoutine) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         OutlinedButton(onClick = { franky = !franky }, modifier = Modifier.fillMaxWidth()) { Text("Franky routine settings") }
                         if (franky) FrankyRoutineControl(name, state, viewModel)

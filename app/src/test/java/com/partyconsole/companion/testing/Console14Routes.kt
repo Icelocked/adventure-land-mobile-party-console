@@ -39,13 +39,48 @@ private fun FakeConsole.characterNames(): List<String> =
 private fun FakeConsole.ctype(name: String): String? =
     ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(name) as? JsonObject)?.get("ctype").str()
 
+/** The state keys only the stable console fork sends (model/ConsoleFeatures.kt). */
+private val FORK_KEYS = listOf("designatedTank", "gearSets", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
+
+/** Plays Ryan's v1.4.0 instead of the stable console fork: drops every fork
+ *  field and the "prim stack" routine, and the auto NPC sale route ignores
+ *  `keep`. The PWA's e2e mock does the same with consoleKind = 'v1.4.0'. */
+fun FakeConsole.ryanV140() {
+    ryanV140 = true
+    for ((name, section) in sections.toMap()) {
+        var next = JsonObject(section - FORK_KEYS.toSet())
+        next["merchantRoutinePriorities"].obj()?.let { next = JsonObject(next + ("merchantRoutinePriorities" to JsonObject(it - "prim stack"))) }
+        next["farmingProfiles"].obj()?.let { profiles ->
+            val stripped = profiles.mapValues { (_, profile) -> profile.obj()?.let { JsonObject(it - setOf("encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")) } ?: profile }
+            next = JsonObject(next + ("farmingProfiles" to JsonObject(stripped)))
+        }
+        sections[name] = next
+    }
+}
+
 internal fun FakeConsole.installConsole14Routes() {
     // Console 1.4 defaults (initial-core.ts initialBossChase, initialRealmHopBlacklist).
     put("bossChase", Json.parseToJsonElement("""{"enabled":false,"minEtaMinutes":15,"trip":null,"returning":null,"retryAt":0,"lastError":null,"checkedAt":0,"sightings":[],"respawns":[]}"""), "config")
     put("realmHopBlacklist", JsonArray(emptyList()), "config")
     put("eventAttendance", JsonObject(emptyMap()), "config")
+    // The rest of the stable fork's initial state: initial-core.ts (designatedTank,
+    // gearSets), merchant/bank-sort.ts (bankSortLayout) and the "prim stack"
+    // routine of merchant/initial-settings.ts.
+    put("designatedTank", JsonNull, "config")
+    put("gearSets", JsonObject(emptyMap()), "config")
+    put("bankSortLayout", JsonPrimitive("packed"))
+    // The e2e mock serves the leader scope's Franky routine at the top level.
+    put("encounterRoutines", JsonObject(emptyMap()))
+    put("merchantRoutinePriorities", JsonObject(mapOf("prim stack" to JsonPrimitive(70)) + field("merchantRoutinePriorities").obj().orEmpty()), "config")
 
     routes["formation"] = route@{ body ->
+        // http/formation.ts assignManaged: a managed name or null picks the designated tank.
+        if ("tank" in body && body["character"] == null) {
+            val tank = body["tank"].str()
+            if (tank != null && tank !in characterNames()) return@route error(400, "unknown tank")
+            put("designatedTank", tank?.let { JsonPrimitive(it) } ?: JsonNull, "config")
+            return@route ok()
+        }
         val name = body["character"].str() ?: return@route null
         if (body["eventLimits"] == null && body["eventPriorities"] == null) return@route null
         // http/formation.ts limits() then priorities(), each 400 on a bad value before the follower 409.
@@ -109,6 +144,8 @@ internal fun FakeConsole.installConsole14Routes() {
         val sets = all[name].obj().orEmpty()
         val next: JsonObject = when (body["action"].str()) {
             "clear" -> JsonObject(sets - set)
+            // Equip queues a gear-set-equip command and leaves the saved set as it is.
+            "equip" -> if (set in sets) JsonObject(sets) else return@route error(409, "that gear set is not saved")
             "save" -> {
                 if (name in staleEquipment) return@route error(409, "no fresh equipment report for $name")
                 val worn = ((sections["inventory"]?.get("characters") as? JsonObject)?.get(name) as? JsonObject)?.get("slots").obj().orEmpty()
@@ -124,6 +161,28 @@ internal fun FakeConsole.installConsole14Routes() {
             else -> return@route error(400, "invalid gear set action")
         }
         put("gearSets", JsonObject(all + (name to next)), "config")
+        ok()
+    }
+
+    // http/automatic-sales.ts npc(): with `character` a per-player rule, without it
+    // the merchant-wide rule, which may keep copies (#116). v1.4.0 ignores `keep`.
+    routes["merchant/auto-npc-sale"] = route@{ body ->
+        val action = body["action"].str() ?: "set"
+        if (action == "clear-all") return@route null
+        val item = body["item"].obj() ?: return@route error(400, "invalid automatic NPC sale item")
+        val character = body["character"].str()
+        val keepText = if (ryanV140) null else body["keep"].str()?.takeIf { it.isNotEmpty() }
+        val keep = keepText?.toDoubleOrNull()
+        if (keepText != null && (character != null || keep == null || keep < 0 || keep != Math.floor(keep))) return@route error(400, "enter a whole number of copies to keep, or leave it blank")
+        val ruleKey = com.partyconsole.companion.domain.automaticCommerceRuleKey(Json.decodeFromJsonElement(com.partyconsole.companion.model.Item.serializer(), item))
+        val key = character?.let { JsonArray(listOf(JsonPrimitive(it), JsonPrimitive(ruleKey))).toString() } ?: ruleKey
+        val rules = field("autoNpcSales").obj().orEmpty()
+        val rule = JsonObject(buildMap {
+            put("item", item)
+            character?.let { put("character", JsonPrimitive(it)) }
+            keep?.let { put("keep", JsonPrimitive(it.toInt())) }
+        })
+        put("autoNpcSales", JsonObject(if (action == "remove") rules - key else rules + (key to rule)), "config")
         ok()
     }
 

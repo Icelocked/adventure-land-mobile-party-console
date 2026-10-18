@@ -61,6 +61,8 @@ class FakeConsole : AutoCloseable {
     val escapeActions = CopyOnWriteArrayList<String>()
     /** Characters whose equipment report is older than gear-sets.ts's 10s window. */
     val staleEquipment = CopyOnWriteArrayList<String>()
+    /** Set by [ryanV140]: the fake plays Ryan's v1.4.0, not the stable console fork. */
+    @Volatile var ryanV140 = false
 
     init {
         // Poll at about the old desktop pace so tests don't wait on mobile cadences.

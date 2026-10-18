@@ -328,6 +328,9 @@ fun itemFromRuleKey(ruleKey: String): Item {
 data class AutoNpcSaleRule(
     val item: Item,
     val character: String? = null,
+    // The stable console fork's #116: copies a merchant-wide rule keeps
+    // across the merchant's bag, bank and BankBois.
+    val keep: Int? = null,
 )
 
 /** One entry in the flat autoStandMarks map - merchant-only. */

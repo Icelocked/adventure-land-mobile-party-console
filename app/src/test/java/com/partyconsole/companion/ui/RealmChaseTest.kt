@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.testing.field
 import com.partyconsole.companion.ui.account.SettingsScreen
@@ -213,5 +214,14 @@ class RealmChaseTest {
     fun withoutARealmListTheChaseSettingsWaitForIt() {
         show(control = null)
         compose.onNode(hasText("Waiting for the realm list…") and inBlacklist).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun ryanV140KeepsHomeChangesWithoutBossChaseOrTheHopBlacklist() {
+        console.ryanV140()
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("US I", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Chase event bosses across realms")).assertDoesNotExist()
+        compose.onNode(hasContentDescription("Realm hopping blacklist")).assertDoesNotExist()
     }
 }

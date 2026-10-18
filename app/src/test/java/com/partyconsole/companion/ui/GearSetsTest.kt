@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.performScrollToNode
 import com.partyconsole.companion.testing.FakeConsole
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.testing.field
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.ui.characterdetail.CharacterDetailScreen
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -26,9 +28,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** Console 1.4 gear sets (web/e2e/combat-party.spec.ts) on the native
- *  character screen. The "Equip" action is a Fonze-only control and is not
- *  ported.
+/** The stable console fork's gear sets (web/e2e/combat-party.spec.ts and
+ *  console-v140-gates.spec.ts) on the native character screen.
  *
  *  Failure modes:
  *  - Save or Clear posts without `character`, `set` or `action`, or with a
@@ -38,7 +39,9 @@ import org.robolectric.RobolectricTestRunner
  *    name alone when level, `p` or stat type differ.
  *  - A 409 (no fresh equipment report) hides the server's message.
  *  - Merchant-class characters get gear sets.
- *  - An Equip button appears (Fonze-only, excluded from the port).
+ *  - Equip shows for a set that is not saved, posts without action "equip",
+ *    changes the saved set, or hides the server's 409.
+ *  - Gear sets show on Ryan's v1.4.0, which has no `gearSets`.
  *  - A reserved bag slot shows an automatic rule's banner instead of its
  *    hold, or the hold hides a manual mark.
  *  - Gear swapped out for a set reads as a set member, or a set member at
@@ -77,6 +80,8 @@ class GearSetsTest {
     }
 
     private fun scrollTo(text: String): SemanticsNodeInteraction {
+        // The detail screen draws its scroll container a frame after the state loads.
+        compose.waitUntil(5_000) { compose.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange))[0].performScrollToNode(hasText(text))
         return compose.onNode(hasText(text))
     }
@@ -94,6 +99,8 @@ class GearSetsTest {
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("1/1 pieces available (1 worn, 0 in bag)") and inSet("Luck")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Gear sets (1) ▾").assertExists()
 
+        // Each button stays disabled until the previous request and its refresh end.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Clear") and inSet("Luck") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasText("Clear") and inSet("Luck")).performClick()
         eventually { posts("gear-sets").size == 2 }
         assertEquals(json("""{"character":"Leada","set":"luck","action":"clear"}"""), posts("gear-sets")[1])
@@ -101,6 +108,7 @@ class GearSetsTest {
 
         // gear-sets.ts refuses a save without an equipment report from the last 10s.
         console.staleEquipment += "Leada"
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Save current gear as Tank") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         scrollTo("Save current gear as Tank").performClick()
         eventually { posts("gear-sets").size == 3 }
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("no fresh equipment report for Leada")).fetchSemanticsNodes().isNotEmpty() }
@@ -117,9 +125,35 @@ class GearSetsTest {
         // The server-only gold set is not counted.
         scrollTo("Gear sets (1) ▾").performClick()
         compose.onNode(hasText("3/6 pieces available (1 worn, 2 in bag) · missing shoes, ring2, earring1") and inSet("Tank")).assertExists()
-        // Equip is a Fonze-only control.
-        compose.onNode(hasText("Equip Tank")).assertDoesNotExist()
-        compose.onNode(hasText("Equip wears", substring = true)).assertDoesNotExist()
+    }
+
+    @Test
+    fun equipShowsOnlyForASavedSetPostsActionEquipAndShowsA409() {
+        val saved = json("""{"Leada":{"tank":{"slots":{"chest":{"name":"coat","level":7}},"savedAt":1}}}""")
+        console.override("config", mapOf("gearSets" to saved))
+        show("Leada")
+        scrollTo("Gear sets (1) ▾").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Equip wears a saved set from the bag (never the elixir)", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Equip Luck")).assertDoesNotExist()
+        scrollTo("Equip Tank").performClick()
+        eventually { posts("gear-sets").size == 1 }
+        assertEquals(json("""{"character":"Leada","set":"tank","action":"equip"}"""), posts("gear-sets")[0])
+        // Equipping leaves the saved set in place.
+        assertEquals(saved, console.field("gearSets"))
+
+        console.failOnce["gear-sets"] = 409 to """{"error":"that gear set is not saved"}"""
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Equip Tank") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Equip Tank")).performClick()
+        eventually { posts("gear-sets").size == 2 }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("that gear set is not saved")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun ryanV140HasNoGearSets() {
+        console.ryanV140()
+        show("Leada")
+        scrollTo("Follow")
+        compose.onNode(hasText("Gear sets", substring = true)).assertDoesNotExist()
     }
 
     @Test

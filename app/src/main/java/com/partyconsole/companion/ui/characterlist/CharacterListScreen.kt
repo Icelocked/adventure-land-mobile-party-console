@@ -76,6 +76,7 @@ import com.partyconsole.companion.ui.roster.CreateCharacterSheet
 import com.partyconsole.companion.ui.roster.RosterPickerSheet
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import com.partyconsole.companion.model.consoleFeatures
 
 /** Party overview: live characters in the console's order, pending cards for
  *  ones still loading, the empty slots to load a character into, and the
@@ -159,6 +160,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
             // The dungeon panel heads the party while a visit runs.
             item { com.partyconsole.companion.ui.dungeon.DungeonPanel(viewModel) }
             if (names.isNotEmpty() || pending.isNotEmpty()) item { PartyControls(viewModel) }
+            if ((names.isNotEmpty() || pending.isNotEmpty()) && state.consoleFeatures.designatedTank) item { PartyRolesSettings(viewModel, state.designatedTank, names) }
             if (names.isEmpty() && pending.isEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {

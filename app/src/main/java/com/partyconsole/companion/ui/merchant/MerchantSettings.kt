@@ -35,6 +35,7 @@ import com.partyconsole.companion.ui.PartyViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.partyconsole.companion.model.consoleFeatures
 
 /** One merchant setting's busy/error state - each dashboard setting is its
  *  own mutation with its own inline error. */
@@ -103,17 +104,19 @@ private fun BankSortSetting(viewModel: PartyViewModel) {
                 Text(label, style = MaterialTheme.typography.bodySmall)
             }
         }
-        val gapped = state.bankSortLayout == "gapped"
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().toggleable(value = gapped, enabled = !setting.busy, role = Role.Checkbox) {
-                run({ viewModel.api.setBankSortLayout(if (it) "gapped" else "packed") }, {})
-            }.semantics(mergeDescendants = true) { contentDescription = "Leave gaps between item types" },
-        ) {
-            Checkbox(checked = gapped, onCheckedChange = null, enabled = !setting.busy)
-            Text("Leave gaps between item types", style = MaterialTheme.typography.bodySmall)
+        if (state.consoleFeatures.gappedBankSort) {
+            val gapped = state.bankSortLayout == "gapped"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().toggleable(value = gapped, enabled = !setting.busy, role = Role.Checkbox) {
+                    run({ viewModel.api.setBankSortLayout(if (it) "gapped" else "packed") }, {})
+                }.semantics(mergeDescendants = true) { contentDescription = "Leave gaps between item types" },
+            ) {
+                Checkbox(checked = gapped, onCheckedChange = null, enabled = !setting.busy)
+                Text("Leave gaps between item types", style = MaterialTheme.typography.bodySmall)
+            }
+            Help("Each item category starts on its own row with free slots after it, so new items drop into a gap instead of shifting the whole bank. Falls back to packed sorting when the bank is too full.")
         }
-        Help("Each item category starts on its own row with free slots after it, so new items drop into a gap instead of shifting the whole bank. Falls back to packed sorting when the bank is too full.")
         Help("Compatible stacks are always combined during bank visits. This setting controls item ordering.")
     }
 }

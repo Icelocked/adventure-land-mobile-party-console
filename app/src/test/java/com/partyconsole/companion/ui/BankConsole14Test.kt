@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.testing.field
 import com.partyconsole.companion.ui.account.BankScreen
@@ -211,5 +212,16 @@ class BankConsole14Test {
         compose.onNodeWithText("Send merchant to…").performClick()
         compose.onNodeWithText("Visit bank").performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("Merchant is busy")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun ryanV140HasNoGappedBankSort() {
+        console.ryanV140()
+        console.override("core", mapOf("bankSortMode" to JsonPrimitive("automatic")))
+        val viewModel = PartyViewModel(console.settings)
+        compose.setContent { androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) { MerchantSettings(viewModel) } }
+        eventually { viewModel.stateLoaded.value && viewModel.dynamicState.value.bankSortMode != null }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Sort every bank visit")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasContentDescription("Leave gaps between item types")).assertDoesNotExist()
     }
 }

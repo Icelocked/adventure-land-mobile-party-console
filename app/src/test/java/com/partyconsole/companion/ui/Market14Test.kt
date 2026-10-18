@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.ui.account.MarketScreen
 import com.partyconsole.companion.ui.account.MarketplaceSettingsScreen
@@ -216,5 +217,25 @@ class Market14Test {
         assertEquals(JsonPrimitive("w1"), (body["order"] as JsonObject)["key"])
         assertEquals(JsonPrimitive(1), body["sellQuantity"])
         assertEquals(JsonPrimitive(true), body["check"])
+    }
+
+    @Test
+    fun ryanV140OffersNoCheckAndSortsWtbOffersFreshFirst() {
+        console.ryanV140()
+        aldata(
+            listing("c", "$coat,\"price\":5000,\"seenAt\":1"),
+            buyOrders = """{"key":"w1","buyer":"Buyer1","serverRegion":"US","serverIdentifier":"I","map":"main","seenAt":1,"price":900,"quantity":2,"item":{"name":"wcoat","level":0}},
+                {"key":"w2","buyer":"Buyer1","serverRegion":"US","serverIdentifier":"I","map":"main","seenAt":$fresh,"price":900,"quantity":2,"item":{"name":"ironore","level":0}}""",
+        )
+        showMarket()
+        val row = hasAnyAncestor(group("WTS Wolf Coat from Seller2"))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Make WTB") and row).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Check") and row).assertDoesNotExist()
+        compose.onNode(hasText("Live WTB", substring = true)).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(group("WTB Wolf Coat from Buyer1")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Check") and hasAnyAncestor(group("WTB Wolf Coat from Buyer1"))).assertDoesNotExist()
+        // The fresh offer for an unowned item stays ahead of the stale owned one.
+        val offers = compose.onAllNodes(hasContentDescription("WTB ", substring = true)).fetchSemanticsNodes().map { it.config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].first() }
+        assertEquals(listOf("WTB Iron Ore from Buyer1", "WTB Wolf Coat from Buyer1"), offers.filter { it.startsWith("WTB ") && " from " in it })
     }
 }

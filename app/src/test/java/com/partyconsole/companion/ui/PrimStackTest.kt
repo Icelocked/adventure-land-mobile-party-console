@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.partyconsole.companion.model.Item
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.ui.itempanel.ItemActionPanel
 import com.partyconsole.companion.ui.itempanel.ItemActionTarget
@@ -171,5 +172,21 @@ class PrimStackTest {
         compose.onNodeWithText("Auto mark for upgrade").performScrollTo().performClick()
         compose.onNodeWithText("Add upgrade rule").performScrollTo().performClick()
         compose.onNodeWithText("Use an offering during manual and automatic upgrades within this level range.").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun ryanV140OffersNoPrimStackAndNoGrace() {
+        console.ryanV140()
+        setUp(
+            bow = """{"id":"bow","name":"Bow","upgradeable":true,"maxLevel":12,"meta":{"definition":{"name":"Bow","stat":1,"grades":[7,10,12,13]},"upgradeable":true,"maxLevel":12}}""",
+            merchyItem = """{"name":"bow","level":9,"stat_type":"dex"}""",
+            stock = 3,
+        )
+        console.routes["upgrade-preview"] = { _ -> 200 to """{"status":"complete","result":{"options":{"none":{"preview":{"chance":0.4,"grace":2.5},"observedAt":1700000000000}}}}""" }
+        open(Item(name = "bow", level = 9, statType = "dex"), 1)
+        compose.onNodeWithText("Mark for upgrade").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("40.00%") and hasAnyAncestor(hasContentDescription("Upgrade chances"))).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Grace", substring = true) and hasAnyAncestor(hasContentDescription("Upgrade chances"))).assertDoesNotExist()
+        compose.onNodeWithText("Prim stack…").assertDoesNotExist()
     }
 }

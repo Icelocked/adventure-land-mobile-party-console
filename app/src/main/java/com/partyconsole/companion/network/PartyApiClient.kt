@@ -147,6 +147,12 @@ class PartyApiClient(
     suspend fun setLeader(leader: String): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("leader" to JsonPrimitive(leader))))
 
+    /** POST /party-api/formation {tank}: the stable console fork's designated
+     *  tank, null for none (http/formation.ts assignManaged). Never sends
+     *  `leader`. */
+    suspend fun setDesignatedTank(tank: String?): ApiResult<CommandResult> =
+        post("formation", JsonObject(mapOf("tank" to (tank?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull))))
+
     /** POST /party-api/formation {character, follow}. Never sends `leader`:
      *  the server applies any `leader` key it gets. */
     suspend fun setFollow(character: String, follow: Boolean): ApiResult<CommandResult> =
@@ -522,15 +528,20 @@ class PartyApiClient(
 
     /** POST /party-api/merchant/auto-npc-sale - a standing "always sell this
      *  item type to an NPC" rule. */
-    suspend fun autoNpcSale(character: String?, item: Item, remove: Boolean = false): ApiResult<CommandResult> {
+    suspend fun autoNpcSale(character: String?, item: Item, remove: Boolean = false, keep: String = ""): ApiResult<CommandResult> {
         // `character` is omitted for the configured merchant (its rule is the
         // account-wide one); with it, the server stores a per-player rule
-        // that never fires for the merchant.
+        // that never fires for the merchant. The stable console fork sends
+        // `keep` as the trimmed text, and only for the merchant-wide rule;
+        // blank omits it so every copy sells (http/automatic-sales.ts
+        // requestedKeep). PWA: partyApi.ts autoNpcSale.
+        val copies = keep.trim()
         val body = JsonObject(
             buildMap {
                 character?.let { put("character", JsonPrimitive(it)) }
                 put("item", json.encodeToJsonElement(Item.serializer(), item))
                 put("action", JsonPrimitive(if (remove) "remove" else "set"))
+                if (character == null && copies.isNotEmpty()) put("keep", JsonPrimitive(copies))
             },
         )
         return post("merchant/auto-npc-sale", body)
@@ -1039,7 +1050,8 @@ class PartyApiClient(
 
     /** POST /party-api/gear-sets {character, set, action}. "save" captures
      *  the gear the character is wearing and 409s without an equipment
-     *  report from the last 10s; "clear" drops the set
+     *  report from the last 10s; "clear" drops the set; "equip" queues a
+     *  gear-set-equip command and 409s for a set that is not saved
      *  (characters/gear-sets.ts). */
     suspend fun gearSet(character: String, set: String, action: String): ApiResult<CommandResult> =
         post("gear-sets", JsonObject(mapOf("character" to JsonPrimitive(character), "set" to JsonPrimitive(set), "action" to JsonPrimitive(action))))

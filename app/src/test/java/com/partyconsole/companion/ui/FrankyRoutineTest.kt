@@ -21,6 +21,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.ui.characterdetail.sections.LeaderFollowerSection
 import kotlinx.serialization.json.Json
@@ -134,6 +135,14 @@ class FrankyRoutineTest {
     fun merchantsHaveNoRoutine() {
         openRoutine("Merchy", routine = false)
         compose.onNodeWithText("Franky settings").assertExists()
+        compose.onNodeWithText("Franky routine settings").assertDoesNotExist()
+    }
+
+    @Test
+    fun ryanV140FrankySettingsHaveNoRoutine() {
+        console.ryanV140()
+        openRoutine("Folla", routine = false)
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Franky settings")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Franky routine settings").assertDoesNotExist()
     }
 }

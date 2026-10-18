@@ -148,6 +148,9 @@ data class PartyStateDynamic(
     // Console 1.4 gear sets per character, then by set ("luck", "tank" or
     // the server-only "gold"), saved from worn gear (characters/gear-sets.ts).
     val gearSets: Map<String, Map<String, GearSet>> = emptyMap(),
+    // The stable console fork's designated tank (POST /formation {tank}),
+    // null when none is picked; see ConsoleFeatures.kt.
+    val designatedTank: String? = null,
     // Console 1.4 boss chase and the realms it never hops to.
     val bossChase: BossChaseState? = null,
     val realmHopBlacklist: List<String> = emptyList(),
@@ -185,6 +188,9 @@ data class PartyStateDynamic(
     val gatheringNoTool: Map<String, Boolean> = emptyMap(),
     val purchases: Map<String, List<PurchaseRecord>> = emptyMap(),
     val upgradeOfferingStock: Map<String, Int> = emptyMap(),
+    // Every top-level key the console sent. ConsoleFeatures.kt reads it to tell
+    // a field the console sent from one this model fills with its default.
+    @kotlinx.serialization.Transient val stateKeys: Set<String> = emptySet(),
 )
 
 @Serializable

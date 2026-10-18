@@ -193,13 +193,28 @@ fun ownedSource(item: Item, merchantItems: List<InventoryEntry?>, bankPacks: Map
     return null
 }
 
-fun filterBuyOrders(orders: List<AlDataBuyOrder>, query: String, now: Long, hideUnowned: Boolean, owned: Map<String, Int>, nameFor: (String) -> String?): List<AlDataBuyOrder> {
+/** WTB offers: fresh first, then by price. `ownedFirst` (the stable console
+ *  fork's stand-sheet.tsx, #34) puts offers the merchant can fill right now
+ *  ahead of freshness. PWA: lib/market.ts filterBuyOrders. */
+fun filterBuyOrders(
+    orders: List<AlDataBuyOrder>,
+    query: String,
+    now: Long,
+    hideUnowned: Boolean,
+    owned: Map<String, Int>,
+    nameFor: (String) -> String?,
+    ownedFirst: Boolean = false,
+): List<AlDataBuyOrder> {
     val cutoff = marketCutoff(now) - 120000
     val text = query.trim().lowercase()
     return orders
         .filter { !hideUnowned || (owned[ownedKey(it.item)] ?: 0) > 0 }
         .filter { "${nameFor(it.item.name).orEmpty()} ${it.item.name} ${it.buyer} ${it.serverRegion} ${it.serverIdentifier}".lowercase().contains(text) }
-        .sortedWith(compareBy<AlDataBuyOrder> { if (it.seenAt >= cutoff) 0 else 1 }.thenByDescending { it.price })
+        .sortedWith(
+            compareBy<AlDataBuyOrder> { if (ownedFirst && (owned[ownedKey(it.item)] ?: 0) > 0) 0 else 1 }
+                .thenBy { if (it.seenAt >= cutoff) 0 else 1 }
+                .thenByDescending { it.price },
+        )
 }
 
 data class PontyGroup(

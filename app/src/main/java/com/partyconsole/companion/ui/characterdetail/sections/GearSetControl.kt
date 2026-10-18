@@ -69,8 +69,8 @@ private fun completeness(inventory: CharacterInventory, slots: Map<String, GearS
 
 /** The console's "Gear sets (n)" popover as an inline group beside the
  *  Leader/Follow/Events chips. Saving captures the worn gear; the server
- *  refuses it (409) without a fresh equipment report. PWA:
- *  GearSetControl.tsx, without the Fonze-only Equip action. */
+ *  refuses it (409) without a fresh equipment report, and refuses Equip
+ *  (409) for a set that is not saved. PWA: GearSetControl.tsx. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun GearSetControl(name: String, state: PartyStateDynamic, viewModel: PartyViewModel) {
@@ -102,7 +102,9 @@ fun GearSetControl(name: String, state: PartyStateDynamic, viewModel: PartyViewM
             .semantics { contentDescription = "Gear sets" },
     ) {
         Text(
-            "Sets are saved from the gear $name is wearing, every slot included. Set members are never taken by automatic compound, upgrade or cleanout rules.",
+            "Sets are saved from the gear $name is wearing, every slot included. Equip wears a saved set from the bag (never the elixir) and pauses the tank's " +
+                "automatic return to its tank set for 10 minutes, so you can adjust and save again. Set members are never taken by automatic compound, upgrade or " +
+                "cleanout rules.",
             color = muted,
             style = MaterialTheme.typography.labelSmall,
         )
@@ -137,6 +139,12 @@ fun GearSetControl(name: String, state: PartyStateDynamic, viewModel: PartyViewM
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFD1FAE5)),
                     ) { Text("Save current gear as $label") }
                     if (set != null) {
+                        OutlinedButton(
+                            onClick = { update(id, "equip") },
+                            enabled = !busy,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0284C7)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE0F2FE)),
+                        ) { Text("Equip $label") }
                         OutlinedButton(
                             onClick = { update(id, "clear") },
                             enabled = !busy,

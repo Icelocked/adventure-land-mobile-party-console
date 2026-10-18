@@ -72,6 +72,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import com.partyconsole.companion.model.consoleFeatures
 
 private const val ACTIVE_OPEN_KEY = "adventure-land-active-wtb-open"
 private val VioletText = Color(0xFFC4B5FD)
@@ -216,7 +217,7 @@ fun WtbScreen(viewModel: PartyViewModel, onBack: () -> Unit) {
                                 problem?.let { Text(it, color = Color(0xFFF59E0B), style = MaterialTheme.typography.labelSmall) }
                             }
                         }
-                        WtbUnconfirmedPurchase(viewModel, itemId, name, state.nativeStand?.purchases.orEmpty())
+                        if (state.consoleFeatures.forkCommerce) WtbUnconfirmedPurchase(viewModel, itemId, name, state.nativeStand?.purchases.orEmpty())
                         OutlinedButton(enabled = savingBid == null, onClick = { cancelBid(itemId, bid) }) {
                             Text(
                                 when {

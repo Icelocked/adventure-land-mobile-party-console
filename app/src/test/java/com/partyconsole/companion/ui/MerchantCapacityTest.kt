@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.ui.characterdetail.sections.MerchantControlsSection
 import com.partyconsole.companion.ui.characterdetail.sections.MerchantQueueSection
@@ -131,5 +132,19 @@ class MerchantCapacityTest {
         compose.onNodeWithText("Join").performScrollTo().performClick()
         eventually { posts("merchant/join-giveaway").isNotEmpty() }
         assertEquals(json("""{"seller":"FarHost","realm":"EUI"}"""), posts("merchant/join-giveaway")[0])
+    }
+
+    @Test
+    fun ryanV140JoinGiveawayOffersOnlyLoadedPlayers() {
+        console.ryanV140()
+        merchantBag(1)
+        console.override("config", mapOf("giveawayRealms" to json("""[{"key":"EUI","label":"EU I"}]"""), "giveawayPlayers" to json("""{"EUI":["Generous","Other"]}""")))
+        val viewModel = show()
+        eventually { viewModel.dynamicState.value.giveawayRealms.isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithText("Join giveaway").performScrollTo().performClick()
+        compose.onNode(hasSetTextAction() and hasText("Merchant name")).performScrollTo().performTextReplacement("FarHost")
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("No online players loaded for this realm.")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("Use “", substring = true)).assertDoesNotExist()
     }
 }

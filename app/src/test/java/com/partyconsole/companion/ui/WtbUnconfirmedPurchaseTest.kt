@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.partyconsole.companion.testing.FakeConsole
+import com.partyconsole.companion.testing.ryanV140
 import com.partyconsole.companion.testing.eventually
 import com.partyconsole.companion.ui.account.WtbScreen
 import kotlinx.serialization.json.Json
@@ -73,5 +74,13 @@ class WtbUnconfirmedPurchaseTest {
         eventually { posts("merchant/native-stand").isNotEmpty() }
         assertEquals(Json.parseToJsonElement("""{"action":"resolve-purchase","id":"$id","bought":false}"""), posts("merchant/native-stand")[0])
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("That purchase is still in progress") and hasAnyAncestor(notice)).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun ryanV140ShowsNoResolveControl() {
+        console.ryanV140()
+        show("native-buy-7:Seller:hpot0")
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Health Potion", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(notice).assertDoesNotExist()
     }
 }

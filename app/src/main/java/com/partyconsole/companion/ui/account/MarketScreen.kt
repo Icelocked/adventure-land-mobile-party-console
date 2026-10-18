@@ -80,6 +80,7 @@ import com.partyconsole.companion.ui.itemicon.SpriteIcon
 import com.partyconsole.companion.ui.itemicon.rememberCatalogLookup
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import com.partyconsole.companion.model.consoleFeatures
 
 private val Emerald = Color(0xFF34D399)
 private val Rose = Color(0xFFFB7185)
@@ -181,7 +182,9 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
             (!hideBlacklisted || blacklistRecord(blacklist, state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier) == null)
     }
     val owned = ownedCounts(merchantItems, bankPacks)
-    val buyOrders = filterBuyOrders(allBuyOrders.filter { shown(it.item, it.seenAt) }, query, now, hideUnowned, owned, nameFor)
+    // Check and owned-first WTB offers need the stable console fork (ConsoleFeatures.kt forkCommerce).
+    val forkCommerce = state.consoleFeatures.forkCommerce
+    val buyOrders = filterBuyOrders(allBuyOrders.filter { shown(it.item, it.seenAt) }, query, now, hideUnowned, owned, nameFor, ownedFirst = forkCommerce)
     val bankWtb = buyOrders.filter { owned.containsKey(ownedKey(it.item)) }
     val ownOwner = merchantName?.let { diagnostics[it]?.owner }?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.toString() }.orEmpty()
     val publicTrades = aldata?.trades.orEmpty().map(::alDataPublicTrade).filter { it.owner != ownOwner }.flatMap { owner -> owner.listings.map { owner to it } }
@@ -394,7 +397,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                                 confirming = key
                             }) { Text(if (busy == key) "Queuing…" else "Buy") }
                         } else {
-                            OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
+                            if (forkCommerce) OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
                             OutlinedButton(onClick = { wtbItem = Item(name = entry.item.name, level = entry.item.level ?: 0) }) { Text("Make WTB") }
                         }
                         if (confirming == key) {
@@ -460,7 +463,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                                     checking = false
                                     confirming = key
                                 }) { Text("Sell") }
-                            } else if (!fresh && maximum > 0) {
+                            } else if (forkCommerce && !fresh && maximum > 0) {
                                 OutlinedButton(enabled = busy != key, onClick = { rowError = null; checking = true; confirming = key }) { Text("Check") }
                                 if (source != null) OutlinedButton(onClick = { listFor(key, order.item, order.price, maximum) }) { Text("List") }
                             } else if (!fresh && source != null) {

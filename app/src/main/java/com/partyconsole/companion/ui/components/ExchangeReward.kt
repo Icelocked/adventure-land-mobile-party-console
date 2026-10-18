@@ -48,6 +48,7 @@ import com.partyconsole.companion.domain.BannerCandidate
 import com.partyconsole.companion.domain.automaticCommerceRuleKey
 import com.partyconsole.companion.domain.itemActionBanner
 import com.partyconsole.companion.model.Item
+import com.partyconsole.companion.model.consoleFeatures
 import com.partyconsole.companion.model.ItemMeta
 import com.partyconsole.companion.model.Sprite
 import com.partyconsole.companion.network.ApiResult
@@ -266,7 +267,9 @@ private fun AutomaticItemActions(
         TapRow(if (npc) "Update auto sell to NPC…" else "Auto sell to NPC…") { toggle("npc") }
         if (expanded == "npc") {
             AutoNpcSaleConfirmation(item, meta, (meta?.definition?.get("name") as? JsonPrimitive)?.content ?: item.name, null, onCancel = { expanded = null },
-                onConfirm = { settle(api.autoNpcSale(null, item)) })
+                onConfirm = { keep -> settle(api.autoNpcSale(null, item, keep = keep)) },
+                keeps = state.consoleFeatures.forkCommerce,
+                savedKeep = state.autoNpcSales[com.partyconsole.companion.domain.automaticCommerceRuleKey(item)]?.keep)
         }
     }
 }

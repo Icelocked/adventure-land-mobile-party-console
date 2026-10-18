@@ -31,6 +31,7 @@ import com.partyconsole.companion.domain.automaticCommerceRuleKey
 import com.partyconsole.companion.domain.canDeconstruct
 import com.partyconsole.companion.domain.standIsFull
 import com.partyconsole.companion.model.Item
+import com.partyconsole.companion.model.consoleFeatures
 import com.partyconsole.companion.model.ItemMeta
 import com.partyconsole.companion.model.MerchantBuyItem
 import com.partyconsole.companion.model.RosterMember
@@ -392,7 +393,9 @@ private fun InventoryActions(
             if (expanded == "autonpc") {
                 val name = (meta?.definition?.get("name") as? JsonPrimitive)?.content ?: catalogFor(item.name)?.name ?: item.name
                 AutoNpcSaleConfirmation(item, meta, name, if (isMerchant) null else characterName, onCancel = { onExpand(null) },
-                    onConfirm = { finish(api.autoNpcSale(if (isMerchant) null else characterName, item)) })
+                    onConfirm = { keep -> finish(api.autoNpcSale(if (isMerchant) null else characterName, item, keep = keep)) },
+                    keeps = state.consoleFeatures.forkCommerce,
+                    savedKeep = state.autoNpcSales[com.partyconsole.companion.domain.automaticCommerceRuleKey(item)]?.keep)
             }
         }
 

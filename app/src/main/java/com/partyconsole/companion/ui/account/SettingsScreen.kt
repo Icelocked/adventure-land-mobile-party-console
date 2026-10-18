@@ -68,6 +68,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.partyconsole.companion.model.consoleFeatures
 
 private val settingsJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 private val Rose200 = Color(0xFFFECDD3)
@@ -712,7 +713,8 @@ private fun RealmSection(viewModel: PartyViewModel) {
                 Text("${member.name}: ${member.realm ?: "waiting"}$home", style = MaterialTheme.typography.labelSmall)
             }
         }
-        BossChaseSetting(viewModel, dynamicState.bossChase)
-        RealmHopBlacklistSetting(viewModel, realm.realms, dynamicState.realmHopBlacklist)
+        val features = dynamicState.consoleFeatures
+        if (features.bossChase) BossChaseSetting(viewModel, dynamicState.bossChase)
+        if (features.realmHopBlacklist) RealmHopBlacklistSetting(viewModel, realm.realms, dynamicState.realmHopBlacklist)
     }
 }

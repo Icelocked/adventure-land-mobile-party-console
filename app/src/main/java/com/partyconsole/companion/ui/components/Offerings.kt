@@ -60,6 +60,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.partyconsole.companion.model.consoleFeatures
 
 /** A different rule for the same item whose level range overlaps [next]'s. */
 fun offeringOverlap(rules: List<UpgradeOfferingRule>, next: UpgradeOfferingRule): UpgradeOfferingRule? =
@@ -308,7 +309,8 @@ fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingS
         Text("Next attempt: +$level → +${level + 1}", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
         Text("Server preview" + (executor?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(statusText, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
-        grace?.let { Text("Grace ${graceText(it)}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp)) }
+        // The grace line points at Prim stack, so it shows only where the console has it.
+        grace?.takeIf { state.consoleFeatures.primStack }?.let { Text("Grace ${graceText(it)}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp)) }
         for (option in PREVIEW_OPTIONS) {
             val value = options?.get(option) as? JsonObject
             val chance = ((value?.get("preview") as? JsonObject)?.get("chance") as? JsonPrimitive)?.content?.toDoubleOrNull()
@@ -338,7 +340,7 @@ fun UpgradePreviewPanel(viewModel: PartyViewModel, item: Item, source: OfferingS
 }
 
 /** Offering rows under Mark for upgrade: "Upgrade with X" (needs stock and a
- *  source), "Prim stack…" (console 1.4, merchant inventory items only) and,
+ *  source), "Prim stack…" (stable console fork, merchant inventory items only) and,
  *  beside them, the server preview. */
 @Composable
 fun OfferingRows(viewModel: PartyViewModel, character: String, item: Item, meta: ItemMeta?, source: OfferingSource? = null, enabled: Boolean = true) {
@@ -356,7 +358,9 @@ fun OfferingRows(viewModel: PartyViewModel, character: String, item: Item, meta:
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Upgrade with $label", modifier = Modifier.fillMaxWidth()) }
         }
-        TextButton(enabled = canStack, onClick = { stacking = true }, modifier = Modifier.fillMaxWidth()) { Text("Prim stack…", modifier = Modifier.fillMaxWidth()) }
+        if (state.consoleFeatures.primStack) {
+            TextButton(enabled = canStack, onClick = { stacking = true }, modifier = Modifier.fillMaxWidth()) { Text("Prim stack…", modifier = Modifier.fillMaxWidth()) }
+        }
         picked?.let { OfferingDialog(viewModel, character, item, meta, source, it, onClose = { picked = null }) }
         val slot = (source?.slot as? JsonPrimitive)?.content?.toIntOrNull()
         if (stacking && slot != null) PrimStackDialog(viewModel, character, slot, item, meta, onClose = { stacking = false })
