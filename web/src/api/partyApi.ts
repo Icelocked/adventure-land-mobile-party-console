@@ -429,11 +429,13 @@ export class PartyApiClient {
 
   /** POST /party-api/merchant/auto-npc-sale - a standing "always sell
    *  this item type to an NPC" rule. */
-  async autoNpcSale(character: string | undefined, item: Item, remove = false): Promise<ApiResult<CommandResult>> {
+  async autoNpcSale(character: string | undefined, item: Item, remove = false, keep = ''): Promise<ApiResult<CommandResult>> {
     // Omit `character` for the merchant (its rule is the account-wide
     // one); with it, the server stores a per-player rule that never fires
-    // for the merchant.
-    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set' })
+    // for the merchant. Console 1.4 sends `keep` as the trimmed text, and
+    // only for the merchant-wide rule; blank omits it so every copy sells.
+    const copies = keep.trim()
+    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set', ...(!character && copies !== '' ? { keep: copies } : {}) })
   }
 
   /** POST /party-api/merchant/auto-stand - a standing "always list this
@@ -714,6 +716,19 @@ export class PartyApiClient {
     return this.post('merchant/bid', { itemId, price, quantity, minimumQuality, clear, priorityOverride, ...options })
   }
 
+  /** POST /party-api/merchant/native-stand "resolve-purchase" - settles a
+   *  purchase whose merchant job ended unconfirmed: bought counts it toward
+   *  the WTB order, not bought releases it. */
+  async resolveNativePurchase(id: string, bought: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/native-stand', { action: 'resolve-purchase', id, bought })
+  }
+
+  /** POST /party-api/prim-stack - queues a merchant job that raises a
+   *  merchant inventory item's grace to `target` without a level attempt. */
+  async primStack(character: string, slot: number, item: Item, target: number, method: 'offering' | 'stat'): Promise<ApiResult<CommandResult>> {
+    return this.post('prim-stack', { character, slot, item, target, method })
+  }
+
   /** POST /party-api/upgrade-preview - polled, so a plain fetch with no
    *  action toast or refresh. `refresh` queues a new server preview;
    *  otherwise the stored one is returned. */
@@ -874,11 +889,13 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/merchant/aldata-order - buys from one ALData
-   *  listing, sent as received minus client-only fields. The server refuses
-   *  a listing that is gone or older than 120s (manual-market-orders.ts). */
-  async buyAlData(listing: MarketListing | Record<string, unknown>, buyQuantity: number): Promise<ApiResult<CommandResult>> {
+   *  listing, sent as received minus client-only fields. The listing must
+   *  still exist and be under 120s old unless `check` is set: console 1.4's
+   *  "Check" sends the merchant to verify a stale listing in person
+   *  (manual-market-orders.ts). */
+  async buyAlData(listing: MarketListing | Record<string, unknown>, buyQuantity: number, check = false): Promise<ApiResult<CommandResult>> {
     const { origin: _origin, groupedListings: _grouped, ...wire } = listing as Record<string, unknown>
-    return this.post('merchant/aldata-order', { listing: wire, buyQuantity })
+    return this.post('merchant/aldata-order', { listing: wire, buyQuantity, ...(check ? { check: true } : {}) })
   }
 
   /** POST /party-api/combat-log/:character/clear. */
@@ -887,9 +904,10 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/merchant/aldata-sale - sells owned copies into a
-   *  live ALData buy order, with the same staleness refusal as buyAlData. */
-  async sellAlData(order: Record<string, unknown>, sellQuantity: number): Promise<ApiResult<CommandResult>> {
-    return this.post('merchant/aldata-sale', { order, sellQuantity })
+   *  live ALData buy order. `check` skips the staleness refusal, as in
+   *  buyAlData. */
+  async sellAlData(order: Record<string, unknown>, sellQuantity: number, check = false): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/aldata-sale', { order, sellQuantity, ...(check ? { check: true } : {}) })
   }
 
   /** POST /party-api/merchant/ponty-order - `keys` lets the server
@@ -898,7 +916,8 @@ export class PartyApiClient {
     return this.post('merchant/ponty-order', { keys: listing.keys || [listing.key], quantity: listing.quantity, unitPrice: listing.unitPrice })
   }
 
-  // Console 1.4 events: event priority order and per-event limits.
+  // Console 1.4 events and realms: event priority order, per-event limits,
+  // boss chase and the realm hop blacklist.
 
   /** POST /party-api/formation {character, eventPriorities}. The server
    *  400s unless the list is a full permutation of supportedEvents, and
@@ -913,11 +932,63 @@ export class PartyApiClient {
     return this.post('formation', { character, eventLimits: { event, limits } })
   }
 
-  // Console 1.4 combat: escape resume.
+  /** POST /party-api/realm/boss-chase. minEtaMinutes must be 0-600. */
+  async setBossChase(body: { enabled?: boolean; minEtaMinutes?: number }): Promise<ApiResult<CommandResult>> {
+    return this.post('realm/boss-chase', body)
+  }
+
+  /** POST /party-api/realm/hop-blacklist {realms}: the whole list, replacing the saved one. */
+  async setRealmHopBlacklist(realms: string[]): Promise<ApiResult<CommandResult>> {
+    return this.post('realm/hop-blacklist', { realms })
+  }
+
+  // Console 1.4 combat and party: designated tank, gear sets, Franky routine, escape resume.
+  /** POST /party-api/formation {tank}. null clears the designated tank
+   *  (http/formation.ts assignManaged). */
+  async setDesignatedTank(tank: string | null): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { tank })
+  }
+
+  /** POST /party-api/gear-sets. "save" captures the gear the character is
+   *  wearing and 409s without an equipment report from the last 10s
+   *  (characters/gear-sets.ts). "equip" queues a gear-set-equip command and
+   *  409s for a set that is not saved. */
+  async gearSet(character: string, set: 'luck' | 'tank', action: 'save' | 'clear' | 'equip'): Promise<ApiResult<CommandResult>> {
+    return this.post('gear-sets', { character, set, action })
+  }
+
+  /** POST /party-api/encounter-mode {character, encounter, mode}. */
+  async setEncounterMode(character: string, encounter: 'franky', mode: 'auto' | 'offtank' | 'tank'): Promise<ApiResult<CommandResult>> {
+    return this.post('encounter-mode', { character, encounter, mode })
+  }
+
+  /** POST /party-api/encounter-mode {character, encounter, deathLimit}. */
+  async setEncounterAutoLimit(character: string, encounter: 'franky', deathLimit: number): Promise<ApiResult<CommandResult>> {
+    return this.post('encounter-mode', { character, encounter, deathLimit })
+  }
+
   /** POST /party-api/escape/resume - releases the automation hold an escape
    *  leaves at `complete` or `failed-hold`; answers {escape}. */
   async resumeEscape(): Promise<ApiResult<CommandResult>> {
     return this.post('escape/resume', {})
+  }
+
+  // Bank sort layout and cosmetics (console 1.4).
+  /** POST /party-api/merchant/bank-sort {layout} - "gapped" starts each item
+   *  category on its own row and leaves free slots after it; the server
+   *  falls back to packed sorting when the bank is too full. */
+  async setBankSortLayout(layout: 'packed' | 'gapped'): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/bank-sort', { layout })
+  }
+
+  /** POST /party-api/command cx-open-jar / cx-wear / cx-remove / cx-emote.
+   *  The server checks each against the character's latest cosmetics report
+   *  (characters/cosmetic-commands.ts). */
+  async cosmeticCommand(
+    character: string,
+    command: { type: 'cx-open-jar'; inventorySlot: number } | { type: 'cx-wear'; name: string; slot: string } | { type: 'cx-remove'; slot: string } | { type: 'cx-emote'; name: string; target: string | null },
+  ): Promise<ApiResult<CommandResult>> {
+    return this.sendCommand(character, command)
   }
 
   // Console 1.4 merchant and market: ignored market items and lucky slot locks.

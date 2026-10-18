@@ -124,6 +124,76 @@ test.describe('Market ignored items', () => {
   })
 })
 
+test.describe('ALData Check for stale listings', () => {
+  test('a stale WTS listing offers Check, which buys with check: true after confirming', async ({ page }) => {
+    const server = marketServer()
+    server.extraState = {
+      aldata: { auth: 'CORRECT', merchantsUpdatedAt: 1, listings: [listing('c', { seller: 'Seller2', item: { name: 'wcoat', level: 0 }, price: 5000, quantity: 1, seenAt: 1 })] },
+    }
+    await server.install(page)
+    const bodies = postBodies(page, 'merchant/aldata-order')
+
+    await page.goto('/market')
+    const coat = page.getByRole('group', { name: 'WTS Wolf Coat from Seller2' })
+    await expect(coat.getByRole('button', { name: 'Buy' })).toHaveCount(0)
+    await expect(coat.getByRole('button', { name: 'Make WTB' })).toBeVisible()
+    await coat.getByRole('button', { name: 'Check' }).click()
+    const confirm = coat.getByRole('group', { name: 'Check stale listing' })
+    await expect(confirm).toContainText(
+      "Send the merchant to check whether Seller2's listing for Wolf Coat is still live, and buy up to 1 for 5,000g each if so? If the listing is gone, this fails safely and reports back in merchant activity.",
+    )
+    await confirm.getByRole('button', { name: 'Yes' }).click()
+    await expect.poll(() => bodies.length).toBe(1)
+    expect((bodies[0].listing as { key: string }).key).toBe('c')
+    expect(bodies[0].buyQuantity).toBe(1)
+    expect(bodies[0].check).toBe(true)
+    await expect(confirm).toHaveCount(0)
+  })
+
+  test('a Check the server refuses keeps the confirmation open with its error', async ({ page }) => {
+    const server = marketServer()
+    server.extraState = {
+      aldata: { auth: 'CORRECT', merchantsUpdatedAt: 1, listings: [listing('c', { seller: 'Seller2', item: { name: 'wcoat', level: 0 }, price: 5000, quantity: 1, seenAt: 1 })] },
+    }
+    server.failOnce['merchant/aldata-order'] = 'ALData listing is no longer in the market snapshot'
+    await server.install(page)
+
+    await page.goto('/market')
+    const coat = page.getByRole('group', { name: 'WTS Wolf Coat from Seller2' })
+    await coat.getByRole('button', { name: 'Check' }).click()
+    const confirm = coat.getByRole('group', { name: 'Check stale listing' })
+    await confirm.getByRole('button', { name: 'Yes' }).click()
+    await expect(confirm.getByRole('alert')).toHaveText('ALData listing is no longer in the market snapshot')
+  })
+
+  test('a stale WTB offer for an owned item offers Check and List; Check sells with check: true', async ({ page }) => {
+    const server = marketServer()
+    server.extraState = {
+      aldata: {
+        auth: 'CORRECT',
+        merchantsUpdatedAt: 1,
+        buyOrders: [{ key: 'w1', buyer: 'Buyer1', serverRegion: 'US', serverIdentifier: 'I', map: 'main', seenAt: 1, price: 900, quantity: 2, item: { name: 'wcoat', level: 0 } }],
+      },
+    }
+    await server.install(page)
+    const bodies = postBodies(page, 'merchant/aldata-sale')
+
+    await page.goto('/market')
+    await page.getByRole('tab', { name: /Live WTB/ }).click()
+    const offer = page.getByRole('group', { name: 'WTB Wolf Coat from Buyer1' })
+    await expect(offer.getByRole('button', { name: 'Sell' })).toHaveCount(0)
+    await expect(offer.getByRole('button', { name: 'List', exact: true })).toBeVisible()
+    await offer.getByRole('button', { name: 'Check' }).click()
+    const confirm = offer.getByRole('group', { name: 'Check stale WTB listing' })
+    await expect(confirm).toContainText("Send the merchant to check whether Buyer1's WTB listing for Wolf Coat is still live, and sell up to 1 for 900g each if so?")
+    await confirm.getByRole('button', { name: 'Yes' }).click()
+    await expect.poll(() => bodies.length).toBe(1)
+    expect((bodies[0].order as { key: string }).key).toBe('w1')
+    expect(bodies[0].sellQuantity).toBe(1)
+    expect(bodies[0].check).toBe(true)
+  })
+})
+
 test.describe('Lucky slot position lock and sequential discovery', () => {
   const luckyServer = () => {
     const server = new MockPartyServer()

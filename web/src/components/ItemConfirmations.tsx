@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { PackageOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useDynamicState } from '@/data/PartyDataProvider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { npcSaleValue } from '@/lib/itemFormulas'
-import { deconstructionRewards } from '@/models'
+import { automaticCommerceRuleKey, deconstructionRewards } from '@/models'
 import type { CatalogItem, DeconstructionCatalog, Item, ItemMeta } from '@/models'
 
 /** Deconstruction confirmation: rewards per item (each row a separate roll),
@@ -79,7 +81,8 @@ export function DeconstructionConfirmation({
 }
 
 /** "Automatically sell to NPC?": what the rule matches, its scope, and the
- *  proceeds per sale. */
+ *  proceeds per sale. A merchant-wide rule (no `character`) also takes
+ *  "Keep in storage", prefilled from the saved rule (console 1.4 #116). */
 export function AutoNpcSaleConfirmation({
   item,
   meta,
@@ -92,11 +95,13 @@ export function AutoNpcSaleConfirmation({
   meta: ItemMeta | undefined
   name: string
   character?: string
-  onConfirm: () => Promise<string | null>
+  onConfirm: (keep: string) => Promise<string | null>
   onCancel: () => void
 }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const savedKeep = useDynamicState().autoNpcSales[automaticCommerceRuleKey(item)]?.keep
+  const [keep, setKeep] = useState(character || savedKeep === undefined ? '' : String(savedKeep))
   return (
     <div role="group" aria-label="Automatically sell to NPC?" className="my-1.5 flex flex-col gap-2 rounded-md border border-orange-700/60 bg-orange-950/20 p-2.5 pl-4">
       <p className="text-sm font-medium">Automatically sell to NPC?</p>
@@ -114,6 +119,13 @@ export function AutoNpcSaleConfirmation({
         <p className="mt-1 font-mono text-sm text-amber-200">You will receive {npcSaleValue(item.level ?? 0, !!item.gift, item.expires, meta).toLocaleString()}g per sale.</p>
         <p className="mt-1 text-xs text-muted-foreground">The rule matches this exact +level, stat type, and special property.</p>
       </div>
+      {!character && (
+        <label className="grid gap-1 text-sm">
+          <span>Keep in storage</span>
+          <Input type="number" min={0} step={1} inputMode="numeric" placeholder="Sell every copy" value={keep} disabled={busy} onChange={(event) => setKeep(event.target.value)} className="font-mono" />
+          <span className="text-xs text-muted-foreground">Copies to keep across the merchant&apos;s bag, bank and BankBois. Only the rest is sold; leave blank to sell every copy.</span>
+        </label>
+      )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
@@ -126,7 +138,7 @@ export function AutoNpcSaleConfirmation({
           onClick={async () => {
             setBusy(true)
             setError(null)
-            const failure = await onConfirm()
+            const failure = await onConfirm(keep)
             setBusy(false)
             if (failure) setError(failure || 'Automatic NPC sale failed')
           }}

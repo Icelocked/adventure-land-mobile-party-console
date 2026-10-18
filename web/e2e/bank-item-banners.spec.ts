@@ -87,20 +87,42 @@ test('Bank tiles: a manual NPC sale mark wins over automatic rules, two automati
   await expect(banner(page, /Potion x10/)).toHaveCount(0)
 })
 
-test('Inventory tiles: "Auto NPC" for automatic sales, Auto exchange on any character while a merchant exists, and Auto bank', async ({ page }) => {
+test('Inventory tiles: "Auto NPC" for automatic sales, Auto exchange on any character while a merchant exists, and a held gear-set item hides automatic banners', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
-  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, items: [{ name: 'ironore', q: 5 }, { name: 'gem0' }, { name: 'hpot0', q: 3 }] })
+  server.addCharacter({
+    name: 'Ranger1',
+    ctype: 'ranger',
+    level: 50,
+    items: [{ name: 'ironore', q: 5 }, { name: 'gem0' }, { name: 'bow', level: 7 }, { name: 'hpot0', q: 3 }],
+    reservedInventory: [
+      { slot: 2, item: { name: 'bow', level: 7 } },
+      { slot: 3, item: { name: 'hpot0', q: 3 } },
+    ],
+  })
   server.autoNpcSales = { [JSON.stringify(['Ranger1', ruleKey('ironore')])]: { item: { name: 'ironore', level: 0 }, character: 'Ranger1' } }
   server.extraState = {
     autoExchanges: { 'gem0@0': true },
+    autoUpgradeMarks: { Ranger1: { 'bow@+7': { tiers: 1, quantity: -1 } } },
     autoItemMarks: { Ranger1: { 'hpot0@+0': 'bank' } },
+    gearSets: { Ranger1: { luck: { slots: { mainhand: { name: 'bow', level: 7 } }, savedAt: 1 } } },
   }
+  server.addCatalogEntry({ id: 'bow', name: 'Bow', upgradeable: true })
+  server.upgrades = { Ranger1: [{ slot: 2, item: { name: 'bow', level: 7 }, tiers: 1 }] }
   await server.install(page)
   await page.goto('/characters/Ranger1')
 
   await expect(page.getByTestId('inventory-slot-0')).toContainText('Auto NPC')
   await expect(page.getByTestId('inventory-slot-1')).toContainText('Auto exchange')
-  await expect(page.getByTestId('inventory-slot-2')).toContainText('Auto bank')
+  // The luck set member keeps its manual upgrade mark visible over the hold; held outranks only automatic rules.
+  await expect(page.getByTestId('inventory-slot-2')).toContainText('+7 → +8')
+  // The potion matches no set: "Swapped-out gear" replaces its Auto bank banner.
+  await expect(page.getByTestId('inventory-slot-3')).toContainText('Swapped-out gear')
+  await expect(page.getByTestId('inventory-slot-3')).not.toContainText('Auto bank')
+
+  // Without the manual mark the hold label shows.
+  server.upgrades = {}
+  await page.reload()
+  await expect(page.getByTestId('inventory-slot-2')).toContainText('Luck set')
 })

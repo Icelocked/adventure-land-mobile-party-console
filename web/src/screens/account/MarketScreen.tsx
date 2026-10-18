@@ -80,7 +80,8 @@ function Confirm({ title, text, busy, error, onYes, onCancel }: { title: string;
  *  listings, "Make WTB" for stale rows, selling into live WTB offers (or
  *  "List" at the WTB price when stale), classifieds' Add to WTB / Add to
  *  stand, and Ponty's grouped lots. Every row inspects its item. Console
- *  1.4 adds a per-row ignore button and "Hide stale listings". */
+ *  1.4 adds a per-row ignore button, "Hide stale listings", and "Check" on
+ *  stale WTS rows and stale WTB offers the merchant can fill. */
 export function MarketScreen() {
   useDomainInterest('market')
   const api = usePartyApi()
@@ -111,6 +112,8 @@ export function MarketScreen() {
   }
   const [ignoring, setIgnoring] = useState(false)
   const [ignoreError, setIgnoreError] = useState('')
+  // Set together with `confirming`: true when the confirmation is a stale-listing Check.
+  const [checking, setChecking] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -168,13 +171,14 @@ export function MarketScreen() {
     setConfirming(null)
     await refreshNow()
   }
-  // Split the purchase quantity across the grouped listings.
-  const buyGrouped = async (entry: AlDataListing, quantity: number) => {
+  // Split the purchase quantity across the grouped listings. `check` asks
+  // the merchant to verify a stale listing in person (console 1.4).
+  const buyGrouped = async (entry: AlDataListing, quantity: number, check = false) => {
     let remaining = quantity
     for (const physical of entry.groupedListings || [entry]) {
       if (remaining <= 0) break
       const purchasing = Math.min(remaining, Math.max(1, Number(physical.quantity) || 1))
-      const result = await api.buyAlData(physical as unknown as Record<string, unknown>, purchasing)
+      const result = await api.buyAlData(physical as unknown as Record<string, unknown>, purchasing, check)
       if (result.kind === 'failure') return result.message
       remaining -= purchasing
     }
@@ -361,6 +365,7 @@ export function MarketScreen() {
                         onClick={() => {
                           if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > entry.quantity) return
                           setRowError(null)
+                          setChecking(false)
                           setConfirming(key)
                         }}
                       >
@@ -368,20 +373,44 @@ export function MarketScreen() {
                       </Button>
                     </>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => setWtbItem({ name: entry.item.name, level: Number(entry.item.level || 0) })}>
-                      Make WTB
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === key}
+                        onClick={() => {
+                          setRowError(null)
+                          setChecking(true)
+                          setConfirming(key)
+                        }}
+                      >
+                        Check
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setWtbItem({ name: entry.item.name, level: Number(entry.item.level || 0) })}>
+                        Make WTB
+                      </Button>
+                    </>
                   )}
-                  {confirming === key && (
-                    <Confirm
-                      title="Confirm marketplace purchase"
-                      text={`Really buy ${quantity.toLocaleString()} ${nameFor(entry.item.name) || entry.item.name} for ${(quantity * entry.price).toLocaleString()}g?`}
-                      busy={busy === key}
-                      error={rowError?.key === key ? rowError.message : null}
-                      onCancel={() => setConfirming(null)}
-                      onYes={() => void run(key, () => buyGrouped(entry, quantity))}
-                    />
-                  )}
+                  {confirming === key &&
+                    (checking ? (
+                      <Confirm
+                        title="Check stale listing"
+                        text={`Send the merchant to check whether ${entry.seller}'s listing for ${nameFor(entry.item.name) || entry.item.name} is still live, and buy up to ${entry.quantity.toLocaleString()} for ${entry.price.toLocaleString()}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.`}
+                        busy={busy === key}
+                        error={rowError?.key === key ? rowError.message : null}
+                        onCancel={() => setConfirming(null)}
+                        onYes={() => void run(key, () => buyGrouped(entry, entry.quantity, true))}
+                      />
+                    ) : (
+                      <Confirm
+                        title="Confirm marketplace purchase"
+                        text={`Really buy ${quantity.toLocaleString()} ${nameFor(entry.item.name) || entry.item.name} for ${(quantity * entry.price).toLocaleString()}g?`}
+                        busy={busy === key}
+                        error={rowError?.key === key ? rowError.message : null}
+                        onCancel={() => setConfirming(null)}
+                        onYes={() => void run(key, () => buyGrouped(entry, quantity))}
+                      />
+                    ))}
                 </div>
               )
             })
@@ -437,11 +466,32 @@ export function MarketScreen() {
                           onClick={() => {
                             if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > maximum) return
                             setRowError(null)
+                            setChecking(false)
                             setConfirming(key)
                           }}
                         >
                           Sell
                         </Button>
+                      </>
+                    ) : !fresh && maximum > 0 ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === key}
+                          onClick={() => {
+                            setRowError(null)
+                            setChecking(true)
+                            setConfirming(key)
+                          }}
+                        >
+                          Check
+                        </Button>
+                        {source && (
+                          <Button size="sm" variant="outline" onClick={() => listFor(key, order.item, order.price, maximum)}>
+                            List
+                          </Button>
+                        )}
                       </>
                     ) : !fresh && source ? (
                       <Button size="sm" variant="outline" onClick={() => listFor(key, order.item, order.price, maximum)}>
@@ -450,16 +500,26 @@ export function MarketScreen() {
                     ) : (
                       <span className="font-mono text-[10px] uppercase text-muted-foreground">{!fresh ? 'Stale · no match owned' : 'No match owned'}</span>
                     )}
-                    {confirming === key && (
-                      <Confirm
-                        title="Confirm marketplace sale"
-                        text={`Really sell ${quantity.toLocaleString()} ${nameFor(order.item.name) || order.item.name} to ${order.buyer} for ${(quantity * order.price).toLocaleString()}g?`}
-                        busy={busy === key}
-                        error={rowError?.key === key ? rowError.message : null}
-                        onCancel={() => setConfirming(null)}
-                        onYes={() => void run(key, () => api.sellAlData(order as unknown as Record<string, unknown>, quantity))}
-                      />
-                    )}
+                    {confirming === key &&
+                      (checking ? (
+                        <Confirm
+                          title="Check stale WTB listing"
+                          text={`Send the merchant to check whether ${order.buyer}'s WTB listing for ${nameFor(order.item.name) || order.item.name} is still live, and sell up to ${maximum.toLocaleString()} for ${order.price.toLocaleString()}g each if so? If the listing is gone, this fails safely and reports back in merchant activity.`}
+                          busy={busy === key}
+                          error={rowError?.key === key ? rowError.message : null}
+                          onCancel={() => setConfirming(null)}
+                          onYes={() => void run(key, () => api.sellAlData(order as unknown as Record<string, unknown>, maximum, true))}
+                        />
+                      ) : (
+                        <Confirm
+                          title="Confirm marketplace sale"
+                          text={`Really sell ${quantity.toLocaleString()} ${nameFor(order.item.name) || order.item.name} to ${order.buyer} for ${(quantity * order.price).toLocaleString()}g?`}
+                          busy={busy === key}
+                          error={rowError?.key === key ? rowError.message : null}
+                          onCancel={() => setConfirming(null)}
+                          onYes={() => void run(key, () => api.sellAlData(order as unknown as Record<string, unknown>, quantity))}
+                        />
+                      ))}
                     {listingForm(key)}
                   </div>
                 )

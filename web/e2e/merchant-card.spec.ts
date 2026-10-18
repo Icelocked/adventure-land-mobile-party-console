@@ -81,6 +81,33 @@ test('Donate shows the XP preview and validates; Join giveaway picks a realm and
   await expect.poll(() => bodies.find((b) => b.path === 'merchant/join-giveaway')?.body).toEqual({ seller: 'Generous', realm: 'EUI' })
 })
 
+test('Join giveaway takes a typed host name when no loaded player matches', async ({ page }) => {
+  const server = merchantServer()
+  server.extraState = { giveawayRealms: [{ key: 'EUI', label: 'EU I' }], giveawayPlayers: { EUI: ['Generous', 'Other'] } }
+  await server.install(page)
+  const bodies = posts(page)
+
+  await page.goto('/characters/Patinder')
+  await page.getByRole('button', { name: 'Join giveaway' }).click()
+  await page.getByRole('combobox', { name: 'Server realm' }).selectOption('EUI')
+  const search = page.getByPlaceholder('Search player name…')
+  // A loaded player's exact name offers no typed option.
+  await search.fill('Generous')
+  await expect(page.getByRole('button', { name: 'Generous' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Use “/ })).toHaveCount(0)
+  // Names over 40 characters are not offered.
+  await search.fill('x'.repeat(41))
+  await expect(page.getByText("No loaded player matches. Type the host's exact name.")).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Use “/ })).toHaveCount(0)
+
+  await search.fill('  FarHost ')
+  await expect(page.getByText("No loaded player matches. Type the host's exact name.")).toBeVisible()
+  await page.getByRole('button', { name: 'Use “FarHost”' }).click()
+  await expect(search).toHaveValue('FarHost')
+  await page.getByRole('button', { name: 'Join', exact: true }).click()
+  await expect.poll(() => bodies.find((b) => b.path === 'merchant/join-giveaway')?.body).toEqual({ seller: 'FarHost', realm: 'EUI' })
+})
+
 test('Send merchant to… queues a visit to an online character; map travel is "Travel to place…"', async ({ page }) => {
   const server = merchantServer()
   await server.install(page)

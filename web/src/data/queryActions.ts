@@ -25,6 +25,8 @@ export const actionDomains = {
   '/escape': core,
   '/bank-party': ['core', 'config', 'bank'],
   '/realm/switch': inventory,
+  '/realm/boss-chase': core,
+  '/realm/hop-blacklist': core,
   '/steam/action': inventory,
   '/steam/recover': inventory,
   '/roster/create': core,
@@ -34,6 +36,7 @@ export const actionDomains = {
   '/merchant/force-stand': core,
   '/merchant/stand-location': core,
   '/merchant/gather': core,
+  '/prim-stack': core,
   '/merchant/job/cancel': commerce,
   '/merchant/job/retry': commerce,
   '/merchant/routine-priorities': core,
@@ -63,7 +66,9 @@ export const actionDomains = {
   '/aldata/key': core,
   '/aldata/refresh': ['market', 'core', 'config'],
   '/anniversary/chat-advertise': core,
-  // Console 1.4 combat: escape resume.
+  // Console 1.4 combat and party: gear sets, Franky routine, escape resume.
+  '/gear-sets': core,
+  '/encounter-mode': core,
   '/escape/resume': core,
 } satisfies Record<string, readonly Domain[]>
 
