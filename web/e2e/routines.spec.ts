@@ -28,7 +28,8 @@ test('Routines: saving without edits sends back exactly the server state', async
 
   await expect.poll(() => server.lastRoutineSave).toBeTruthy()
   const { priorities, enabled } = server.lastRoutineSave as { priorities: Record<string, number>; enabled: Record<string, boolean> }
-  expect(priorities).toEqual(serverPriorities)
+  // The mock plays the stable console fork, whose defaults add "prim stack".
+  expect(priorities).toEqual({ 'prim stack': 70, ...serverPriorities })
   expect(enabled).toEqual({ 'auto upgrade': false, 'automatic exchange': true, fishing: false, mining: false })
   expect(server.gatheringModes).toEqual([])
 })

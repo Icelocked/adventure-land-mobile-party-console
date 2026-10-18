@@ -11,7 +11,7 @@ import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
-import type { CatalogItem, Item, PartyStateDynamic, StandBid } from '@/models'
+import { consoleFeatures, type CatalogItem, type Item, type PartyStateDynamic, type StandBid } from '@/models'
 
 const ACTIVE_OPEN_KEY = 'adventure-land-active-wtb-open'
 
@@ -185,7 +185,7 @@ export function WtbScreen() {
                         {problem && <p className="text-xs text-amber-500">{problem}</p>}
                       </div>
                     )}
-                    <WtbUnconfirmedPurchase itemId={itemId} name={name} purchases={state.nativeStand?.purchases} />
+                    {consoleFeatures(state).forkCommerce && <WtbUnconfirmedPurchase itemId={itemId} name={name} purchases={state.nativeStand?.purchases} />}
                     <Button size="sm" variant="outline" className="text-rose-500" disabled={!!savingBid} onClick={() => void cancelBid(itemId, bid)}>
                       {savingBid === itemId ? 'Saving…' : confirmCancel === itemId ? 'Really cancel?' : 'Cancel'}
                     </Button>

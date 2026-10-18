@@ -10,6 +10,7 @@ import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
+import { consoleFeatures } from '@/models'
 
 /** Merchant-only controls: Buy/Craft/Exchange navigation, Force stand,
  *  Mining/Fishing, Send to party, Donate, Join giveaway, Clear job queue,
@@ -136,6 +137,7 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
             })()}
             realms={state.giveawayRealms ?? []}
             players={state.giveawayPlayers ?? {}}
+            typedHost={consoleFeatures(state).forkCommerce}
             onJoin={(realm, seller) => run(() => api.joinGiveaway(seller, realm))}
           />
         )}
@@ -209,18 +211,22 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
 }
 
 
-/** "Join giveaway": pick a realm, then a
- *  player online there (searchable) or the host's typed name. */
+/** "Join giveaway": pick a realm, then a player online there (searchable).
+ *  With `typedHost` the host's typed name also works: the stable console
+ *  fork finds an unseen host through the game's merchant directory
+ *  (merchant/giveaway-scheduler.ts). */
 function GiveawayForm({
   realms,
   players,
   onJoin,
   initialRealm = '',
+  typedHost,
 }: {
   initialRealm?: string
   realms: { key: string; label: string }[]
   players: Record<string, string[]>
   onJoin: (realm: string, seller: string) => void
+  typedHost: boolean
 }) {
   const [realm, setRealm] = useState(initialRealm)
   const [seller, setSeller] = useState('')
@@ -230,7 +236,7 @@ function GiveawayForm({
   const matches = online.filter((name) => name.toLowerCase().includes(search.trim().toLowerCase()))
   // Hosts who are not stand merchants on a realm without our characters never load, so an exact typed name stands in.
   const typed = search.trim()
-  const canUseTyped = !!typed && typed.length <= 40 && !online.includes(typed)
+  const canUseTyped = typedHost && !!typed && typed.length <= 40 && !online.includes(typed)
   return (
     <div className="flex flex-col gap-2 py-1 pl-3">
       <p className="text-xs text-muted-foreground">The merchant will switch realms, travel to the main market, find this player, and enter every active giveaway they are hosting.</p>
@@ -264,7 +270,9 @@ function GiveawayForm({
               {name}
             </button>
           ))}
-          {!matches.length && <p className="px-2 text-xs text-muted-foreground">No loaded player matches. Type the host&apos;s exact name.</p>}
+          {!matches.length && (
+            <p className="px-2 text-xs text-muted-foreground">{typedHost ? "No loaded player matches. Type the host's exact name." : 'No online players loaded for this realm.'}</p>
+          )}
           {canUseTyped && (
             <button
               type="button"

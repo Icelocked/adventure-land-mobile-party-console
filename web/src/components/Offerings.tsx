@@ -4,7 +4,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { itemMaximumLevel } from '@/lib/itemFormulas'
-import { UPGRADE_OFFERING_LABELS } from '@/models'
+import { UPGRADE_OFFERING_LABELS, consoleFeatures } from '@/models'
 import type { Item, ItemMeta, UpgradeOffering, UpgradeOfferingRule } from '@/models'
 
 // Console: runtime/upgrade-offerings.ts.
@@ -198,7 +198,10 @@ export function OfferingDialog({
  *  inventory items. */
 export function UpgradePreviewPanel({ item, source, character }: { item: Item; source?: OfferingSource; character: string }) {
   const api = usePartyApi()
-  const executor = useDynamicState().merchantCharacter ?? null
+  const dynamicState = useDynamicState()
+  const executor = dynamicState.merchantCharacter ?? null
+  // The grace line points at Prim stack, so it shows only where the console has it.
+  const showGrace = consoleFeatures(dynamicState).primStack
   const refreshBody = useRef<string | null>(null)
   const [revision, refresh] = useState(0)
   const [state, setState] = useState<{ key: string; result?: { options: Record<string, PreviewResult> }; status?: string; error?: string }>()
@@ -255,7 +258,7 @@ export function UpgradePreviewPanel({ item, source, character }: { item: Item; s
       <p role="status" className="mt-2 text-xs">
         {statusText}
       </p>
-      {grace && 'preview' in grace && (
+      {showGrace && grace && 'preview' in grace && typeof grace.preview.grace === 'number' && (
         <p className="mt-2 font-mono text-xs tabular-nums" title="Item grace from the server preview; raise it with Prim stack">
           Grace {grace.preview.grace}
         </p>
@@ -316,6 +319,7 @@ export function OfferingRows({
   const stock = state.upgradeOfferingStock ?? {}
   const [picked, setPicked] = useState<UpgradeOffering | null>(null)
   const [stacking, setStacking] = useState(false)
+  const primStack = consoleFeatures(state).primStack
   // The coordinator only prim stacks merchant inventory items.
   const canStack = enabled && !!stock.offeringp && !!source && !source.equipped && character === state.merchantCharacter
   return (
@@ -332,9 +336,11 @@ export function OfferingRows({
             Upgrade with {label}
           </button>
         ))}
-        <button type="button" disabled={!canStack} onClick={() => setStacking(true)} className="block w-full rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50">
-          Prim stack…
-        </button>
+        {primStack && (
+          <button type="button" disabled={!canStack} onClick={() => setStacking(true)} className="block w-full rounded-md px-1 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50">
+            Prim stack…
+          </button>
+        )}
       </div>
       {picked && <OfferingDialog character={character} item={item} meta={meta} source={source} offering={picked} onClose={() => setPicked(null)} />}
       {stacking && source && <PrimStackDialog character={character} slot={Number(source.slot)} item={item} meta={meta} onClose={() => setStacking(false)} />}

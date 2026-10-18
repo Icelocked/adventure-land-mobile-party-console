@@ -147,13 +147,26 @@ export function ownedSource(item: Item, merchantItems: (InventoryEntry | null)[]
   return null
 }
 
-export function filterBuyOrders(orders: AlDataBuyOrder[], query: string, now: number, hideUnowned: boolean, owned: Map<string, number>, nameFor: (id: string) => string | undefined) {
+/** WTB offers: fresh first, then by price. `ownedFirst` (the stable console
+ *  fork's stand-sheet.tsx, #34) puts offers the merchant can fill right now
+ *  ahead of freshness. */
+export function filterBuyOrders(
+  orders: AlDataBuyOrder[],
+  query: string,
+  now: number,
+  hideUnowned: boolean,
+  owned: Map<string, number>,
+  nameFor: (id: string) => string | undefined,
+  ownedFirst = false,
+) {
   const marketCutoff = Math.floor(now / 30000) * 30000
   const text = query.trim().toLowerCase()
+  const fresh = (order: AlDataBuyOrder) => Number(order.seenAt >= marketCutoff - 120000)
+  const have = (order: AlDataBuyOrder) => Number(ownedFirst && (owned.get(ownedKey(order.item)) || 0) > 0)
   return orders
     .filter((order) => !hideUnowned || (owned.get(ownedKey(order.item)) || 0) > 0)
     .filter((order) => `${nameFor(order.item.name) || ''} ${order.item.name} ${order.buyer} ${order.serverRegion} ${order.serverIdentifier}`.toLowerCase().includes(text))
-    .sort((a, b) => Number(b.seenAt >= marketCutoff - 120000) - Number(a.seenAt >= marketCutoff - 120000) || b.price - a.price)
+    .sort((a, b) => have(b) - have(a) || fresh(b) - fresh(a) || b.price - a.price)
 }
 
 export type PontyGroup = PontyListing & { realms: Set<string>; stale: boolean }

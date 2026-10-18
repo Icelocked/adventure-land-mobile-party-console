@@ -282,7 +282,27 @@ export class MockPartyServer {
     return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level, ...(c.server ? { server: c.server } : {}) })), ...this.offlineRoster]
   }
 
+  /** Which console the mock plays. 'stable' is the stable console fork
+   *  (Ryan's v1.4.0 plus Thefonze74065's features); 'v1.4.0' is Ryan's
+   *  release, which sends none of the fork's fields (see
+   *  src/models/consoleFeatures.ts) and ignores NPC-sale `keep`. */
+  consoleKind: 'stable' | 'v1.4.0' = 'stable'
+
   private dynamicState(): Record<string, unknown> {
+    const state = this.forkState()
+    if (this.consoleKind === 'stable') return state
+    for (const key of ['designatedTank', 'gearSets', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
+    const { 'prim stack': _prim, ...priorities } = state.merchantRoutinePriorities as Record<string, number>
+    const profiles = Object.fromEntries(
+      Object.entries(state.farmingProfiles as Record<string, Record<string, unknown>>).map(([name, profile]) => {
+        const { encounterRoutines: _routines, encounterAutoDeathLimits: _limits, encounterAutoDeaths: _deaths, ...rest } = profile
+        return [name, rest]
+      }),
+    )
+    return { ...state, merchantRoutinePriorities: priorities, farmingProfiles: profiles }
+  }
+
+  private forkState(): Record<string, unknown> {
     return {
       bank: { gold: this.bankGold, packs: this.bankPacks },
       standListings: this.standListings,
@@ -313,7 +333,8 @@ export class MockPartyServer {
       skillCatalog: this.skillCatalog,
       combatLogs: this.combatLogs,
       merchantActivity: this.merchantActivity,
-      merchantRoutinePriorities: this.merchantRoutinePriorities,
+      // merchant/initial-settings.ts defaults; the fork adds "prim stack".
+      merchantRoutinePriorities: { 'prim stack': 70, ...this.merchantRoutinePriorities },
       merchantAutomations: this.merchantAutomations,
       gatheringModes: this.gatheringModes,
       standBids: this.standBids,
@@ -350,6 +371,8 @@ export class MockPartyServer {
       encounterRoutines: this.encounterRoutines,
       encounterAutoDeathLimits: this.encounterAutoDeathLimits,
       encounterAutoDeaths: this.encounterAutoDeaths,
+      // merchant/bank-sort.ts initial state.
+      bankSortLayout: 'packed',
       ...this.extraState,
     }
   }
@@ -692,8 +715,8 @@ export class MockPartyServer {
       if (typeof item?.name !== 'string') return { status: 400, json: { error: 'invalid automatic NPC sale item' } }
       const ruleKey = JSON.stringify({ name: item.name, level: Math.max(0, Number(item.level) || 0), p: (item as { p?: string }).p || null, stat_type: item.stat_type || null })
       const key = character ? JSON.stringify([character, ruleKey]) : ruleKey
-      // #116: a merchant-wide rule may keep copies; blank keeps none.
-      const keep = body.keep === undefined || body.keep === null || body.keep === '' ? undefined : Number(body.keep)
+      // #116: a merchant-wide rule may keep copies; blank keeps none. v1.4.0 ignores `keep`.
+      const keep = this.consoleKind === 'v1.4.0' || body.keep === undefined || body.keep === null || body.keep === '' ? undefined : Number(body.keep)
       if (keep !== undefined && (character || !Number.isSafeInteger(keep) || keep < 0)) return { status: 400, json: { error: 'enter a whole number of copies to keep, or leave it blank' } }
       if (body.action === 'remove') delete this.autoNpcSales[key]
       else this.autoNpcSales[key] = { item, ...(character ? { character } : {}), ...(keep !== undefined ? { keep } : {}) }

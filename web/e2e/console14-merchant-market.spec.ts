@@ -194,6 +194,17 @@ test.describe('ALData Check for stale listings', () => {
   })
 })
 
+test('Live WTB: an offer the merchant can fill sorts ahead of a fresh one it cannot (stand-sheet.tsx wtbOwned, #34)', async ({ page }) => {
+  const server = marketServer()
+  const order = (key: string, name: string, seenAt: number) => ({ key, buyer: 'Buyer1', serverRegion: 'US', serverIdentifier: 'I', map: 'main', seenAt, price: 900, quantity: 2, item: { name, level: 0 } })
+  server.extraState = { aldata: { auth: 'CORRECT', merchantsUpdatedAt: 1, buyOrders: [order('w2', 'ironore', fresh()), order('w1', 'wcoat', 1)] } }
+  await server.install(page)
+
+  await page.goto('/market')
+  await page.getByRole('tab', { name: /Live WTB/ }).click()
+  await expect(page.getByRole('group', { name: /^WTB / })).toHaveText([/Wolf Coat/, /Iron Ore/])
+})
+
 test.describe('Lucky slot position lock and sequential discovery', () => {
   const luckyServer = () => {
     const server = new MockPartyServer()

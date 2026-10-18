@@ -34,7 +34,7 @@ import { WtbDialog } from '@/components/Wtb'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
-import type { InventoryEntry, Item } from '@/models'
+import { consoleFeatures, type InventoryEntry, type Item } from '@/models'
 
 type Tab = 'wts' | 'wtb' | 'classifieds' | 'ponty'
 
@@ -86,6 +86,8 @@ export function MarketScreen() {
   useDomainInterest('market')
   const api = usePartyApi()
   const state = useDynamicState()
+  // Check and owned-first WTB offers need the stable console fork (consoleFeatures.ts forkCommerce).
+  const forkCommerce = consoleFeatures(state).forkCommerce
   const characters = useCharacters()
   const diagnostics = useCharacterDiagnosticsMap()
   const refreshNow = useRefreshDynamicStateNow()
@@ -150,7 +152,7 @@ export function MarketScreen() {
       (!hideBlacklisted || !blacklistRecord(blacklist, !!state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier)),
   )
   const owned = ownedCounts(merchantItems, bankPacks)
-  const buyOrders = filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor)
+  const buyOrders = filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor, forkCommerce)
   const bankWtb = buyOrders.filter((order) => owned.has(ownedKey(order.item)))
   const ownOwner = merchantName && diagnostics[merchantName]?.owner != null ? String(diagnostics[merchantName]?.owner) : ''
   const publicTrades = ((aldata.trades ?? []) as AlDataPublicTrade[]).filter((owner) => String(owner.owner) !== ownOwner).flatMap((owner) => (owner.listings || []).map((entry) => ({ owner, listing: entry })))
@@ -374,18 +376,20 @@ export function MarketScreen() {
                     </>
                   ) : (
                     <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy === key}
-                        onClick={() => {
-                          setRowError(null)
-                          setChecking(true)
-                          setConfirming(key)
-                        }}
-                      >
-                        Check
-                      </Button>
+                      {forkCommerce && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === key}
+                          onClick={() => {
+                            setRowError(null)
+                            setChecking(true)
+                            setConfirming(key)
+                          }}
+                        >
+                          Check
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" onClick={() => setWtbItem({ name: entry.item.name, level: Number(entry.item.level || 0) })}>
                         Make WTB
                       </Button>
@@ -473,7 +477,7 @@ export function MarketScreen() {
                           Sell
                         </Button>
                       </>
-                    ) : !fresh && maximum > 0 ? (
+                    ) : forkCommerce && !fresh && maximum > 0 ? (
                       <>
                         <Button
                           size="sm"

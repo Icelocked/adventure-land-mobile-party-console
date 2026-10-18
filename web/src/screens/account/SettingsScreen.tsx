@@ -20,12 +20,14 @@ import { Input } from '@/components/ui/input'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
 import { BossChaseSetting, RealmHopBlacklistSetting } from './RealmChaseSettings'
+import { consoleFeatures } from '@/models'
 
 /** Interface settings, in the console's order: state import/export, realm, characters (create, member grid,
  *  bankboi name), ALData, hosting, console updates and debugging - then
  *  this app's own connection and update controls. */
 export function SettingsScreen() {
   const dynamicState = useDynamicState()
+  const features = consoleFeatures(dynamicState)
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
@@ -64,8 +66,8 @@ export function SettingsScreen() {
         <p className="text-xs text-muted-foreground">Manage saved dashboard state, character connections, and market access.</p>
         <DashboardStateImport />
         <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }}>
-          <BossChaseSetting chase={dynamicState.bossChase} />
-          <RealmHopBlacklistSetting realms={dynamicState.realmControl?.realms || []} blacklist={dynamicState.realmHopBlacklist} />
+          {features.bossChase && <BossChaseSetting chase={dynamicState.bossChase} />}
+          {features.realmHopBlacklist && <RealmHopBlacklistSetting realms={dynamicState.realmControl?.realms || []} blacklist={dynamicState.realmHopBlacklist} />}
         </RealmSection>
 
         <section aria-label="Characters" className="rounded-md border border-border bg-card p-4">

@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { GearSetControl } from './GearSetControl'
 import { FrankyRoutineControl } from './FrankyRoutineControl'
-import type { PartyStateDynamic } from '@/models'
+import { consoleFeatures, type PartyStateDynamic } from '@/models'
 
 /** Two independent tap targets on POST /party-api/formation. "Leader" sends
  *  only {leader} (a radio: tapping the current leader does nothing);
@@ -67,7 +67,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
           Follow
         </Chip>
         <EventSelectionControl state={dynamicState} name={characterName} combat={combat} />
-        {combat && <GearSetControl name={characterName} state={dynamicState} />}
+        {combat && consoleFeatures(dynamicState).gearSets && <GearSetControl name={characterName} state={dynamicState} />}
       </div>
       <ConfigLoadingNote />
       {formationError && (
@@ -210,7 +210,7 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
                   />
                 )}
                 {/* Console 1.4 reaches the Franky routine from inside Franky's event settings (event-limits-dialog.tsx). */}
-                {settings === event.id && event.id === 'franky' && combat && (
+                {settings === event.id && event.id === 'franky' && combat && consoleFeatures(state).frankyRoutine && (
                   <div className="mb-2 flex flex-col gap-2">
                     <Button size="sm" variant="outline" aria-expanded={franky} onClick={() => setFranky(!franky)}>
                       Franky routine settings
