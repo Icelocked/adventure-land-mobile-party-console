@@ -49,7 +49,7 @@ function monsterLabel(id: string, ingredient: string, view?: CipherView) {
 }
 
 function Board({ view, onInspect }: { view?: CipherView; onInspect?: (id: string) => void }) {
-  const candidates = useMemo(() => (view?.board ? cipherCandidates(view.board) : []), [view?.board])
+  const candidates = useMemo(() => (view?.board ? cipherCandidates(view.board) : []), [view])
   const board = view?.board
   return (
     <section aria-label="Shared realm board" className="flex flex-col gap-2 rounded border border-purple-700 p-3">
@@ -115,14 +115,17 @@ export function CipherControls({
   const [sending, setSending] = useState(false)
   // The board samples the polled feed every 5 seconds, and at once when the round changes.
   const latestView = useRef(view)
-  latestView.current = view
   const [boardView, setBoardView] = useState(view)
+  useEffect(() => {
+    latestView.current = view
+  }, [view])
   useEffect(() => {
     const timer = setInterval(() => setBoardView(latestView.current), 5000)
     return () => clearInterval(timer)
   }, [])
-  useEffect(() => setBoardView(latestView.current), [view?.board?.id])
-  const candidates = useMemo(() => (view?.board ? cipherCandidates(view.board) : []), [view?.board])
+  const round = view?.board?.id
+  useEffect(() => setBoardView(latestView.current), [round])
+  const candidates = useMemo(() => (view?.board ? cipherCandidates(view.board) : []), [view])
   const fits = validMix(mix) && candidates.some((recipe) => recipe.join(',') === mix.join(','))
   const tried = view?.board?.board?.some((row) => row.mix.join(',') === mix.join(','))
   const plan = view?.gatheringPlan
