@@ -48,6 +48,16 @@ export interface RestockRange {
 export interface RestockPolicy {
   hp: RestockRange
   mp: RestockRange
+  // Console 1.5 http/restock.ts keeps an elixir only when a save sends `elixir.item`.
+  elixir?: ElixirRestock
+}
+
+export interface ElixirRestock {
+  item: string
+  min: number
+  max: number
+  autoConsume: boolean
+  autoAcquire: boolean
 }
 
 export const emptyRestockPolicy = (): RestockPolicy => ({

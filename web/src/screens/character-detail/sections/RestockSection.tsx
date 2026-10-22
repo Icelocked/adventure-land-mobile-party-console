@@ -73,6 +73,7 @@ export function RestockSection({ characterName, serverPolicy }: { characterName:
           const result = await api.saveRestock(characterName, {
             hp: { ...serverPolicy.hp, min: Number(hpMin), max: Number(hpMax) },
             mp: { ...serverPolicy.mp, min: Number(mpMin), max: Number(mpMax) },
+            elixir: serverPolicy.elixir,
           })
           if (result.kind === 'failure') setSaveError(result.message || 'Restock update failed')
           else setDirty(false)
