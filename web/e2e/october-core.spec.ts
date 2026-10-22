@@ -63,3 +63,19 @@ test('G3 elixir slot: a countdown to expiry replaces the +level badge', async ({
   await expect(page.getByRole('button', { name: 'elixir: Elixir of Luck' })).not.toContainText('+0')
   await expect(page.getByRole('button', { name: 'mainhand: Blade' })).toContainText('+3')
 })
+
+test('G6 skills: the screen covers the catalog conditions group', async ({ page }) => {
+  const mock = server()
+  mock.addCharacter({ name: 'Leada', ctype: 'warrior', level: 60 })
+  mock.skillCatalog = [
+    { id: 'warrior', name: 'Warrior', skills: [{ id: 'charge', name: 'Charge', sprite: null, definition: {} }] },
+    { id: 'conditions', name: 'Conditions', skills: [{ id: 'poisoned', name: 'Poisoned', sprite: null, definition: { explanation: 'Takes damage over time.' } }] },
+  ]
+  await mock.install(page)
+
+  await page.goto('/skills')
+  // skills-dialog.tsx:52 title and description.
+  await expect(page.getByText('Class skills and conditions')).toBeVisible()
+  await expect(page.getByText('Browse every class-bound skill, shared game action and condition. Click an entry for its complete definition.')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Conditions' }).getByText('Poisoned', { exact: true })).toBeVisible()
+})
