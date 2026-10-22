@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { farmingAreas, defaultPhoenixOrder, type FarmingArea } from '@/lib/farmingAreas'
 import type { Catalog } from '@/lib/farmingZones'
-import type { BestiaryMonster, Sprite } from '@/models'
+import type { BestiaryMonster, MonsterEventSource, Sprite } from '@/models'
 
 export interface SpawnRecord {
   sourceMap: string
@@ -33,12 +33,25 @@ const SPAWN_REASONS: Record<string, string> = {
   'invalid-geometry': 'Spawn coordinates unavailable',
 }
 
-/** Every recorded spawn and why ordinary routing can't use it. */
-export function MonsterSpawns({ records }: { records?: SpawnRecord[] }) {
+// Console 1.5 monster-spawns.tsx eventSourceText().
+function eventSourceText(source: MonsterEventSource) {
+  if (source.role === 'add') return `Spawns only during ${source.name}: raised by the boss at ${(source.at || []).map((at) => `${Math.round(at * 100)}%`).join(' and ')} HP.`
+  if (source.role === 'wave') return `Spawns only during ${source.name} in its waves.`
+  return `Spawns only during ${source.name} as its boss.`
+}
+
+/** Every recorded spawn and why ordinary routing can't use it; an event-only monster names its events instead. */
+export function MonsterSpawns({ records, eventSources }: { records?: SpawnRecord[]; eventSources?: MonsterEventSource[] }) {
   return (
     <section className="rounded border border-emerald-800 p-3 text-sm">
       <h3 className="mb-2 font-semibold">Recorded spawn locations</h3>
-      {records === undefined ? (
+      {eventSources?.length ? (
+        <ul className="space-y-1 text-amber-200">
+          {eventSources.map((source) => (
+            <li key={`${source.id}:${source.role}`}>{eventSourceText(source)}</li>
+          ))}
+        </ul>
+      ) : records === undefined ? (
         <p>Waiting for refreshed spawn data.</p>
       ) : !records.length ? (
         <p>No static spawn recorded in game data.</p>

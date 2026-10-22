@@ -55,7 +55,7 @@ export function MonsterDetail({
         </Button>
       </div>
       <MonsterAchievementProgress monster={monster} achievement={Object.keys(achievements).length ? achievements[monster.id] || null : null} />
-      <MonsterSpawns records={monster.spawnRecords as unknown as SpawnRecord[] | undefined} />
+      <MonsterSpawns records={monster.spawnRecords as unknown as SpawnRecord[] | undefined} eventSources={monster.eventSources} />
       <MonsterCards
         definition={monster.definition || {}}
         skillName={(id) => state.skillCatalog.flatMap((entry) => entry.skills).find((skill) => skill.id === id)?.name}
