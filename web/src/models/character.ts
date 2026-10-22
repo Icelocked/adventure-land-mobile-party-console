@@ -52,3 +52,17 @@ export interface CharacterState {
 }
 
 export const isOnline = (state: CharacterState): boolean => state.vitals != null
+
+/** Console 1.5: an account character that is not loaded, from config
+ *  characterSnapshots (its last observation) or GET /characters/:name/inspection
+ *  (its saved game profile, with `inspection`). Stats fields match the live status. */
+export interface OfflineCharacter extends CharacterVitals {
+  items: (InventoryEntry | null)[]
+  slots: Record<string, EquippedEntry | null>
+  skin?: string
+  characterSprite?: unknown
+  characterDollHtml?: string
+  updatedAt?: number
+  inspection?: { source: string; calculated: boolean; synchronizedAt: string | null; note: string }
+  [field: string]: unknown
+}

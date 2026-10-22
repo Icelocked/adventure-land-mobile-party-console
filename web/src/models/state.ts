@@ -1,6 +1,7 @@
 import type { StandPriceHistory } from '@/lib/suggestedItemValue'
 import type { Item, InventoryEntry, EquippedEntry } from './item'
 import type { Sprite } from './sprite'
+import type { OfflineCharacter } from './character'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
 import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
 
@@ -674,6 +675,8 @@ export interface PartyStateDynamic {
   referenceRevision?: string
   // Core's bank gold (null until the bank has been seen).
   bankGold?: number | null
+  // Console 1.5 config characterSnapshots: each account character's last saved observation.
+  characterSnapshots?: Record<string, OfflineCharacter>
   // Console 1.5 core accountGold (telemetry/account-gold.ts): bank plus every
   // assigned slot's last carried gold, offline slots included.
   accountGold?: { carried: number | null; total: number | null } | null

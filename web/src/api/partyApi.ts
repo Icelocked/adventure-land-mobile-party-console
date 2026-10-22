@@ -76,7 +76,7 @@ function signalAuthLoss(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_LOSS_EVENT))
 }
 
-async function getText(url: string, detectAuthLoss = false): Promise<ApiResult<string>> {
+async function getText(url: string, detectAuthLoss = false, serverError = false): Promise<ApiResult<string>> {
   try {
     const response = await timedFetch(url, {}, GET_TIMEOUT_MS)
     if (detectAuthLoss && isAuthLoss(response)) {
@@ -84,7 +84,17 @@ async function getText(url: string, detectAuthLoss = false): Promise<ApiResult<s
       return fail('Session expired. Reconnect this browser.', 401)
     }
     const text = await response.text()
-    return response.ok ? ok(text) : fail(`HTTP ${response.status}`, response.status)
+    if (response.ok) return ok(text)
+    // With `serverError`, a JSON {error} body names the failure instead of the status.
+    let message = `HTTP ${response.status}`
+    if (serverError)
+      try {
+        const error = (JSON.parse(text) as { error?: unknown }).error
+        if (typeof error === 'string' && error) message = error
+      } catch {
+        // A non-JSON body keeps the status message.
+      }
+    return fail(message, response.status)
   } catch (error) {
     return fail(errorMessage(error))
   }
@@ -162,6 +172,17 @@ export class PartyApiClient {
    *  body; callers decode it. */
   async get(path: string): Promise<ApiResult<string>> {
     return getText(this.url(path), true)
+  }
+
+  /** getJson() whose failure message is the server's {error} text when it sends one. */
+  async getJsonReportingError<T>(path: string): Promise<ApiResult<T>> {
+    const result = await getText(this.url(path), true, true)
+    if (result.kind === 'failure') return result
+    try {
+      return ok(JSON.parse(result.value) as T)
+    } catch {
+      return fail('Unexpected non-JSON response')
+    }
   }
 
   /** get() + JSON.parse, where an unparseable body (an HTML page from a

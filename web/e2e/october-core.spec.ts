@@ -221,3 +221,100 @@ test('G23 mail: automation settings post both values; the outbox lists and delet
   await expect.poll(() => deletes[0]).toEqual({ id: 's1' })
   await expect(sent.getByText('No sent mail recorded.')).toBeVisible()
 })
+
+// A saved observation as config characterSnapshots holds it (public-state.ts).
+function snapshot(name: string, ctype: string, extra: Record<string, unknown> = {}) {
+  return {
+    name, ctype, level: 70, xp: 10, max_xp: 100, hp: 900, max_hp: 1000, mp: 500, max_mp: 800, gold: 12345, map: 'main', x: 0, y: 0, rip: false, banking: false,
+    attack: 321, armor: 50, resistance: 40, int: 300, str: 10, dex: 20, vit: 30, speed: 55, primaryStat: 'int',
+    items: [{ slot: 0, item: { name: 'staff', level: 7 }, meta: { properties: { attack: 60, int: 9 } } }],
+    slots: { mainhand: { item: { name: 'staff', level: 4 }, meta: { properties: { attack: 40, int: 6 } } }, ring1: null },
+    updatedAt: Date.UTC(2026, 9, 20, 12, 0),
+    seenAt: Date.UTC(2026, 9, 20, 12, 0),
+    ...extra,
+  }
+}
+
+function offlineServer() {
+  const mock = server()
+  mock.addCharacter({ name: 'Leada', ctype: 'warrior', level: 60 })
+  mock.addCatalogEntry({ id: 'staff', name: 'Staff', upgradeable: true, definition: { type: 'weapon', wtype: 'staff' }, usage: { classes: [{ id: 'mage', name: 'Mage', hands: 2 }] } })
+  mock.offlineRoster = [
+    { name: 'Sleepy', ctype: 'mage', level: 70 },
+    { name: 'Remote', ctype: 'mage', level: 50 },
+  ]
+  mock.extraState = { characterSnapshots: { Sleepy: snapshot('Sleepy', 'mage') } }
+  // characters/inspection.ts: a profile without calculated stats.
+  const remote = snapshot('Remote', 'mage', { level: 50 })
+  mock.inspections = {
+    Remote: { json: { character: { ...remote, inspection: { source: 'account-snapshot', calculated: false, synchronizedAt: '2026-10-19T08:00:00.000Z', note: 'Derived stats unavailable for this saved profile.' } } } },
+  }
+  return mock
+}
+
+test('G4 offline character: a saved snapshot opens its equipment, inventory and Offline snapshot stats', async ({ page }) => {
+  const mock = offlineServer()
+  await mock.install(page)
+
+  await page.goto('/settings')
+  const characters = page.getByRole('region', { name: 'Characters' })
+  await characters.getByRole('button', { name: 'Inspect Sleepy' }).click()
+  // offline-character-view.tsx.
+  const view = page.getByRole('dialog', { name: 'Sleepy inventory and equipment' })
+  await expect(view.getByText(/^Offline · saved observation · /)).toBeVisible()
+  await expect(view.getByText('Level 70 mage · 12,345 gold')).toBeVisible()
+  await expect(view.getByRole('button', { name: 'Inspect Staff +4' })).toBeVisible()
+  await expect(view.getByRole('button', { name: 'Inspect Staff +7' })).toBeVisible()
+  expect(mock.inspectionRequests).toEqual([])
+
+  await view.getByRole('button', { name: 'View Sleepy stats' }).click()
+  await expect(page.getByText('Offline snapshot')).toBeVisible()
+})
+
+test('G4 offline character: without a snapshot the inspection route fills in, and its note shows', async ({ page }) => {
+  const mock = offlineServer()
+  await mock.install(page)
+
+  await page.goto('/settings')
+  await page.getByRole('region', { name: 'Characters' }).getByRole('button', { name: 'Inspect Remote' }).click()
+  const view = page.getByRole('dialog', { name: 'Remote inventory and equipment' })
+  await expect(view.getByText('Derived stats unavailable for this saved profile.', { exact: false })).toBeVisible()
+  expect(mock.inspectionRequests).toEqual(['Remote'])
+  await view.getByRole('button', { name: 'View Remote stats' }).click()
+  await expect(page.getByText('Maximum HP/MP, attack, armor, resistance and attributes: unavailable')).toBeVisible()
+})
+
+test('G4 offline character: a failed inspection shows the server error', async ({ page }) => {
+  const mock = offlineServer()
+  mock.inspections = { Remote: { status: 502, json: { error: 'Could not read the saved game profile' } } }
+  await mock.install(page)
+
+  await page.goto('/settings')
+  const characters = page.getByRole('region', { name: 'Characters' })
+  await characters.getByRole('button', { name: 'Inspect Remote' }).click()
+  await expect(characters.getByRole('alert')).toHaveText('Could not read the saved game profile')
+})
+
+test('G5 compare: offline characters join the Compare list, from a snapshot or the inspection route', async ({ page }) => {
+  const mock = offlineServer()
+  mock.characters[0].items = [{ name: 'staff', level: 5 }]
+  await mock.install(page)
+
+  await page.goto('/characters/Leada')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Item details' }).click()
+  await page.getByRole('button', { name: 'Compare', exact: true }).click()
+  const picker = page.getByRole('group', { name: 'Compare for' })
+  // item-details.tsx:580: saved characters like live ones, others "ctype · offline".
+  await expect(picker.getByRole('button', { name: /^Sleepy/ })).toBeVisible()
+  await expect(picker.getByRole('button', { name: 'Remote mage · offline' })).toBeVisible()
+  await picker.getByRole('button', { name: /^Sleepy/ }).click()
+  const sheet = page.getByRole('dialog').filter({ hasText: 'Sleepy' }).last()
+  await expect(sheet.getByText('Staff +4').first()).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'Compare', exact: true }).click()
+  await picker.getByRole('button', { name: 'Remote mage · offline' }).click()
+  await expect.poll(() => mock.inspectionRequests).toEqual(['Remote'])
+  await expect(page.getByRole('dialog').filter({ hasText: 'Remote' }).last()).toBeVisible()
+})

@@ -109,6 +109,8 @@ const CONFIG_FIELDS = [
   'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
   // Console 1.4 combat and party: designated tank and gear sets.
   'designatedTank', 'gearSets',
+  // Console 1.5: each account character's last saved observation.
+  'characterSnapshots',
 ] as const
 // Console 1.5 events and realms: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
@@ -303,6 +305,10 @@ export class MockPartyServer {
 
   /** Roster members that aren't live (offline, not in a slot). */
   offlineRoster: { name: string; ctype: string; level: number; online?: boolean }[] = []
+  // GET /characters/:name/inspection (characters/inspection.ts): {character} for an owned
+  // name with a saved account profile; unset names answer 404 as not owned.
+  inspections: Record<string, { status?: number; json: Record<string, unknown> }> = {}
+  inspectionRequests: string[] = []
 
   private roster() {
     return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level, ...(c.server ? { server: c.server } : {}) })), ...this.offlineRoster]
@@ -1523,6 +1529,12 @@ export class MockPartyServer {
     await page.route('**/party-api/dashboard-stream', async (route) => {
       const base = await this.startSseServer()
       return route.continue({ url: `${base}/dashboard-stream` })
+    })
+    await page.route('**/party-api/characters/*/inspection', (route) => {
+      const name = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^.*\/characters\//, '').replace(/\/inspection$/, ''))
+      this.inspectionRequests.push(name)
+      const answer = this.inspections[name]
+      return answer ? route.fulfill({ status: answer.status ?? 200, json: answer.json }) : route.fulfill({ status: 404, json: { error: 'Character is not on this account' } })
     })
     await page.route('**/party-api/maps/**', (route) => {
       const url = new URL(route.request().url())

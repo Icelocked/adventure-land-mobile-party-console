@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, DollarSign, HandCoins, SlidersHorizontal } from 'lucide-react'
-import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/data/PartyDataProvider'
+import { useCharacterDiagnosticsMap, useCharacters, useDynamicState, usePartyApi, useRoster } from '@/data/PartyDataProvider'
+import { loadCharacterInspection } from '@/lib/characterInspection'
 import { WtbDialog } from '@/components/Wtb'
 import { standIsFull } from '@/lib/standInspection'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
@@ -47,6 +48,7 @@ import type {
   ItemSetInfo,
   ItemDropSource,
   MerchantCatalog,
+  OfflineCharacter,
   SkillEntry,
   Sprite,
 } from '@/models'
@@ -234,6 +236,25 @@ function ItemDetailContent({
   const navigate = useNavigate()
   const standFull = standIsFull(state.standListings, state.standBids)
   const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
+  // Console 1.5 item-details.tsx:580 and party-item-details.tsx:69: saved snapshots list
+  // like live characters; other roster members load their saved profile on demand.
+  const api = usePartyApi()
+  const roster = useRoster()
+  const [loadedOffline, setLoadedOffline] = useState<Record<string, OfflineCharacter>>({})
+  const [offlineLoading, setOfflineLoading] = useState<string | null>(null)
+  const [offlineError, setOfflineError] = useState('')
+  const savedCharacters: Record<string, OfflineCharacter> = { ...loadedOffline }
+  for (const [name, saved] of Object.entries(state.characterSnapshots ?? {})) if (!partyNames.includes(name)) savedCharacters[name] = saved
+  const savedNames = Object.keys(state.characterSnapshots ?? {}).filter((name) => !partyNames.includes(name))
+  const unloadedMembers = Object.values(roster).filter((member) => !partyNames.includes(member.name) && !state.characterSnapshots?.[member.name])
+  const ctypeOf = (name: string) => savedCharacters[name]?.ctype ?? characters[name]?.vitals?.ctype ?? ''
+  const slotsOf = (name: string) => savedCharacters[name]?.slots ?? characters[name]?.inventory?.slots
+  const chooseCompare = (name: string) => {
+    const slots = comparisonSlotsFor(meta, ctypeOf(name))
+    if (slots.length > 1) return setComparePicker(name)
+    setComparePicker(false)
+    setComparing({ character: name, slot: slots[0] })
+  }
   const comparable = isEquipment(meta?.definition)
   const tracktrix = context && ['tracker', 'supercomputer'].includes(target.id) ? (diagnostics[context.character]?.tracktrix as { active?: boolean; bonuses?: Record<string, number> | null } | undefined) : undefined
   const explanation = typeof meta?.definition.explanation === 'string' ? meta.definition.explanation : undefined
@@ -302,22 +323,47 @@ function ItemDetailContent({
               {comparePicker === null ? (
                 <>
                   <p className="font-mono text-[10px] uppercase text-cyan-400">Compare +{previewLevel} for</p>
-                  {partyNames.map((name) => (
+                  {[...partyNames, ...savedNames].map((name) => (
+                    <button key={name} type="button" onClick={() => chooseCompare(name)} className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs">
+                      <span>{name}</span>
+                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{ctypeOf(name)}</span>
+                    </button>
+                  ))}
+                  {unloadedMembers.map((member) => (
                     <button
-                      key={name}
+                      key={member.name}
                       type="button"
-                      onClick={() => {
-                        const slots = comparisonSlotsFor(meta, characters[name]?.vitals?.ctype ?? '')
-                        if (slots.length > 1) return setComparePicker(name)
-                        setComparePicker(false)
-                        setComparing({ character: name, slot: slots[0] })
+                      disabled={!!offlineLoading}
+                      onClick={async () => {
+                        if (loadedOffline[member.name]) return chooseCompare(member.name)
+                        setOfflineLoading(member.name)
+                        setOfflineError('')
+                        try {
+                          const loaded = await loadCharacterInspection(api, member.name)
+                          setLoadedOffline((old) => ({ ...old, [member.name]: loaded }))
+                          const slots = comparisonSlotsFor(meta, loaded.ctype)
+                          if (slots.length > 1) setComparePicker(member.name)
+                          else {
+                            setComparePicker(false)
+                            setComparing({ character: member.name, slot: slots[0] })
+                          }
+                        } catch (failure) {
+                          setOfflineError(failure instanceof Error ? failure.message : String(failure))
+                        } finally {
+                          setOfflineLoading(null)
+                        }
                       }}
                       className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs"
                     >
-                      <span>{name}</span>
-                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{characters[name]?.vitals?.ctype}</span>
+                      <span>{member.name}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground">{offlineLoading === member.name ? 'Loading…' : `${member.ctype} · offline`}</span>
                     </button>
                   ))}
+                  {offlineError && (
+                    <p role="alert" className="text-xs text-destructive">
+                      {offlineError}
+                    </p>
+                  )}
                   {/* "From catalog": this item at the preview level becomes A. */}
                   <button
                     type="button"
@@ -338,8 +384,8 @@ function ItemDetailContent({
                   <button type="button" onClick={() => setComparePicker(null)} className="flex items-center gap-1 text-xs text-muted-foreground">
                     <ArrowLeft className="size-3.5" /> {comparePicker} · Choose equipment slot
                   </button>
-                  {comparisonSlotsFor(meta, characters[comparePicker]?.vitals?.ctype ?? '').map((slot) => {
-                    const equipped = characters[comparePicker]?.inventory?.slots?.[slot]
+                  {comparisonSlotsFor(meta, ctypeOf(comparePicker)).map((slot) => {
+                    const equipped = slotsOf(comparePicker)?.[slot]
                     return (
                       <button
                         key={slot}
@@ -401,6 +447,7 @@ function ItemDetailContent({
           meta={meta}
           characterName={comparing.character}
           slot={comparing.slot}
+          offline={savedCharacters[comparing.character]}
           onClose={() => setComparing(null)}
         />
       )}
