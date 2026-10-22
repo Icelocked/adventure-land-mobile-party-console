@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MapDefinition, MapFrame } from './mapTypes'
 import { cachedMapImage, croppedTile, dollLayers, drawDreamsGate, drawDue, markerStyle, prepareMap, visibleTiles, type MapRenderBuffer, type PreparedPlacement } from './mapRendering'
+import { drawMapProjectile, drawMapSprites } from './mapSprites'
 
 /** Console: map-canvas.tsx. The 2D canvas renderer for
  *  a map definition plus the buffered live frame (terrain, layered
@@ -233,7 +234,14 @@ export function MapCanvas({
             const drawY =
               y + (attackTarget ? ((attackTarget.y - y) / attackLength) * attackAmount : 0);
             let drewDoll = false;
-            if (entity.dollHtml) {
+            // Native layers (console map-canvas.tsx) win; the doll is the fallback when none drew.
+            if (entity.layers?.length) {
+              ctx.save();
+              ctx.translate(drawX, drawY);
+              drewDoll = drawMapSprites(ctx, entity.layers);
+              ctx.restore();
+            }
+            if (!drewDoll && entity.dollHtml) {
               const layers = dollLayers(entity.dollHtml),
                 outerLeft = drawX - 13.5,
                 outerTop = drawY - 38;
@@ -298,7 +306,7 @@ export function MapCanvas({
                 ctx.fillRect(x - 4, y - 8, 8, 8);
               }
             }
-            for (const weapon of entity.weapons || []) {
+            for (const weapon of entity.layers?.length && drewDoll ? [] : entity.weapons || []) {
               const sprite = weapon.sprite, image = sprite && cachedMapImage(sprite.url);
               if (!sprite || !image?.complete || !image.naturalWidth) continue;
               const sw = image.naturalWidth/sprite.columns, sh = image.naturalHeight/sprite.rows;
@@ -308,7 +316,7 @@ export function MapCanvas({
               ctx.drawImage(image,sprite.x*sw+.5,sprite.y*sh+.5,sw-1,sh-1,-8,-16,16,16);
               ctx.restore();
             }
-            if (entity.stand && entity.standSprite) {
+            if (!entity.layers?.length && entity.stand && entity.standSprite) {
               const stand = entity.standSprite,
                 standImage = cachedMapImage(stand.url);
               if (standImage?.complete && standImage.naturalWidth) {
@@ -376,6 +384,26 @@ export function MapCanvas({
           },
         });
       });
+      // Projectiles and visuals are transient, so a frame older than 1s draws none.
+      const fresh = performance.now() - p.receivedAt < 1000;
+      const projectileNow = (p.frame.projectilesAt || p.frame.at) + performance.now() - p.receivedAt;
+      for (const projectile of (fresh ? p.frame.projectiles || [] : []).slice(0, 64))
+        layers.push({ y: projectile.y, draw: () => drawMapProjectile(ctx, projectile, projectileNow) });
+      if (fresh) {
+        const previousVisuals = new Map((old.visuals || []).map((visual) => [visual.id, visual]));
+        for (const visual of (p.frame.visuals || []).slice(0, 64)) {
+          const prior = previousVisuals.get(visual.id) || visual;
+          layers.push({
+            y: visual.y,
+            draw: () => {
+              ctx.save();
+              ctx.translate(prior.x + (visual.x - prior.x) * alpha, prior.y + (visual.y - prior.y) * alpha);
+              drawMapSprites(ctx, visual.layers);
+              ctx.restore();
+            },
+          });
+        }
+      }
       layers.sort((a, b) => a.y - b.y).forEach((layer) => layer.draw());
       // The game's normal camera never exposes space beyond GEO bounds, and
       // some maps include black boundary artwork there. Our centered minimap
