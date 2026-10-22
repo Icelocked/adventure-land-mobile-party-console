@@ -57,6 +57,11 @@ export const actionDomains = {
   '/merchant/aldata-order': commerce,
   '/merchant/aldata-sale': commerce,
   '/merchant/ponty-order': commerce,
+  // dashboard query-actions.ts: settings change only the market section.
+  '/npc-shop/orders': ['market', 'core'],
+  '/npc-shop/stop': ['market', 'core'],
+  '/npc-shop/settings': ['market'],
+  '/npc-shop/ron-visit': ['market', 'core'],
   '/merchant/donate': inventory,
   '/merchant/join-giveaway': inventory,
   '/merchant/send-mail': [...commerce, 'mail'],

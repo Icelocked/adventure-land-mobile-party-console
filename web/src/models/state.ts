@@ -183,6 +183,9 @@ export interface MarketListing {
   price: number
   unitPrice?: number
   quantity: number
+  // Ponty listings name their realm, e.g. "US" + "III".
+  serverRegion?: string
+  serverIdentifier?: string
 }
 
 /** One open player stand found by a stand search. Buying echoes these
@@ -549,6 +552,8 @@ export interface PartyStateDynamic {
   standListings: StandListing[]
   aldata?: AlDataState | null
   ponty?: PontyState | null
+  // The fork's Ponty and Ron standing orders, from section=market.
+  npcShop?: import('@/lib/npcShop').NpcShopView | null
   merchantCatalog?: MerchantCatalog | null
   standSearch: StandSearchState
   marked: Record<string, BankMark[]>

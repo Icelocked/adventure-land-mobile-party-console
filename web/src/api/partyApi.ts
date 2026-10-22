@@ -939,6 +939,28 @@ export class PartyApiClient {
     return this.post('formation', { character, ...(eventSelections ? { eventSelections } : {}), eventLimits: { event: 'witchcipher', limits } })
   }
 
+  // The console fork's Ponty and Ron shop (http/npc-shop-routes.ts).
+
+  /** POST /party-api/npc-shop/orders. A "count" order buys `quantity`; "all" buys every copy at or under maxUnitPrice. */
+  async createNpcShopOrder(order: { npc: 'ponty' | 'ron'; item: string; level: number; mode: 'count' | 'all'; quantity: number; maxUnitPrice: number }): Promise<ApiResult<CommandResult>> {
+    return this.post('npc-shop/orders', order)
+  }
+
+  /** POST /party-api/npc-shop/stop {id}. 404 for an unknown order. */
+  async stopNpcShopOrder(id: string): Promise<ApiResult<CommandResult>> {
+    return this.post('npc-shop/stop', { id })
+  }
+
+  /** POST /party-api/npc-shop/settings with any of goldReserve, ronDonation or ronVisitMinutes (1-1440). */
+  async saveNpcShopSettings(settings: { goldReserve?: number; ronDonation?: boolean; ronVisitMinutes?: number }): Promise<ApiResult<CommandResult>> {
+    return this.post('npc-shop/settings', settings)
+  }
+
+  /** POST /party-api/npc-shop/ron-visit {}. 409 when no merchant is configured. */
+  async visitRon(): Promise<ApiResult<CommandResult>> {
+    return this.post('npc-shop/ron-visit', {})
+  }
+
   /** POST /party-api/realm/boss-chase. minEtaMinutes must be 0-600. */
   async setBossChase(body: { enabled?: boolean; minEtaMinutes?: number }): Promise<ApiResult<CommandResult>> {
     return this.post('realm/boss-chase', body)

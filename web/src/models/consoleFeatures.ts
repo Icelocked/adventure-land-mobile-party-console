@@ -29,6 +29,9 @@ export interface ConsoleFeatures {
    *  error, so they gate on the fork's gearSets and bossChase fields both
    *  being present: those ship in the same stable build. */
   forkCommerce: boolean
+  /** POST /npc-shop/* (Ponty and Ron orders). The fork's market section
+   *  always sends `npcShop` (commerce/npc-shop.ts). */
+  npcShop: boolean
 }
 
 const isObject = (value: unknown) => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -45,5 +48,6 @@ export function consoleFeatures(state: PartyStateDynamic): ConsoleFeatures {
     gappedBankSort: typeof state.bankSortLayout === 'string',
     primStack: 'prim stack' in (state.merchantRoutinePriorities ?? {}),
     forkCommerce: gearSets && bossChase,
+    npcShop: isObject(state.npcShop),
   }
 }
