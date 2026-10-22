@@ -963,6 +963,26 @@ export class MockPartyServer {
       else listings.push(listing)
       return { status: 200, json: { ok: true } }
     }
+    if (path === 'restock') {
+      // http/restock.ts: hp/mp rebuilt from the body; an elixir only with a catalog elixir item.
+      const supply = (value: unknown, item: string, min: number, max: number) => {
+        const object = (value ?? {}) as Record<string, unknown>
+        const count = (raw: unknown, fallback: number) => (Number.isSafeInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : fallback)
+        return { item, min: count(value && object.min, min), max: count(value && object.max, max) }
+      }
+      const policy: Record<string, unknown> = { hp: supply(body.hp, 'hpot1', 5, 20), mp: supply(body.mp, 'mpot1', 0, 0) }
+      const elixir = (body.elixir ?? {}) as Record<string, unknown>
+      if (elixir.item) {
+        const entry = this.catalogEntries[String(elixir.item)]
+        if (typeof elixir.item !== 'string' || entry?.definition?.type !== 'elixir') return { status: 400, json: { error: 'Select a valid elixir' } }
+        const ranged = supply(elixir, elixir.item, 1, 2)
+        if (ranged.min > ranged.max) return { status: 400, json: { error: 'minimum cannot exceed maximum' } }
+        policy.elixir = { ...ranged, autoConsume: elixir.autoConsume !== false, autoAcquire: elixir.autoAcquire === true }
+      }
+      const saved = (this.extraState.restockPolicies as Record<string, unknown> | undefined) ?? {}
+      this.extraState = { ...this.extraState, restockPolicies: { ...saved, [String(body.character)]: policy } }
+      return { status: 200, json: { ok: true, policy } }
+    }
     if (path === 'mail/settings') {
       // mailbox.ts configure(): both settings are required booleans.
       this.mailboxActions.push({ action: 'settings' })
