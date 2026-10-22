@@ -131,3 +131,35 @@ test('G17 donation preview: the level after donating, and a target level fills t
   await page.getByLabel('Merchant level after donation').fill('4')
   await expect(page.getByLabel('Donation amount')).toHaveValue('275')
 })
+
+test('G18 merchant jobs: a waiting job shows "Retry at" its retry time', async ({ page }) => {
+  const mock = server()
+  mock.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  const retryAt = Date.now() + 10 * 60_000
+  mock.extraState = { merchantQueue: [{ id: 'job-1', target: 'Sadokunn', reason: 'restock', status: 'queued', retryAt }] }
+  await mock.install(page)
+
+  await page.goto('/characters/Patinder')
+  // merchant-card-controls.tsx:208-209.
+  await expect(page.getByText(`Retry at ${new Date(retryAt).toLocaleTimeString('en-US')}`)).toBeVisible()
+})
+
+test('G21 auto NPC sales: an inline Keep editor posts {item, keep, action: set}', async ({ page }) => {
+  const mock = server()
+  mock.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  mock.addCatalogEntry({ id: 'hpbelt', name: 'Belt' })
+  const item = { name: 'hpbelt', level: 0 }
+  mock.autoNpcSales = { [JSON.stringify({ name: 'hpbelt', level: 0, p: null, stat_type: null })]: { item, keep: 2 } }
+  await mock.install(page)
+  const bodies = postBodies(page, 'merchant/auto-npc-sale')
+
+  await page.goto('/characters/Merchantina')
+  const section = page.getByRole('region', { name: 'Auto NPC sales' })
+  await section.getByRole('button', { name: /^Auto NPC sales\s*1$/ }).click()
+  // inventory-panel.tsx:1635-1637 labels the reserve "Keep N".
+  await section.getByRole('button', { name: 'Keep 2' }).click()
+  await section.getByLabel('New reserve for Belt').fill('5')
+  await section.getByRole('button', { name: 'Save reserve for Belt' }).click()
+  await expect.poll(() => bodies[0]).toEqual({ item, keep: 5, action: 'set' })
+  await expect(section.getByRole('button', { name: 'Keep 5' })).toBeVisible()
+})

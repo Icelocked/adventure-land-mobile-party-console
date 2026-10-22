@@ -438,6 +438,12 @@ export class PartyApiClient {
     return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set', ...(!character && copies !== '' ? { keep: copies } : {}) })
   }
 
+  /** POST /party-api/merchant/auto-npc-sale {item, keep, action: 'set'} - the
+   *  merchant-wide rule's reserve, as connected-inventory.tsx onUpdateNpcReserve sends it. */
+  async setAutoNpcSaleKeep(item: Item, keep: number): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/auto-npc-sale', { item, keep, action: 'set' })
+  }
+
   /** POST /party-api/merchant/auto-stand - a standing "always list this
    *  item type on the stand at this price" rule, merchant-only. */
   async autoStand(item: Item, price: number, remove = false): Promise<ApiResult<CommandResult>> {
