@@ -62,7 +62,7 @@ test('Bank: tapping an item opens its options with Item details first; upgrade m
   await expect.poll(() => bodies.find((b) => b.path === 'command')?.body).toMatchObject({ character: 'Patinder', type: 'withdraw', pack: 'items1', slot: 1, upgradeTiers: 2 })
 })
 
-test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as the merchant', async ({ page }) => {
+test('Bank: Auto mark for upgrade, the merchant-wide auto sell to NPC and Clear all marks act as the merchant', async ({ page }) => {
   const server = bankServer()
   await server.install(page)
   const bodies = posts(page)
@@ -76,7 +76,8 @@ test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as t
   await page.getByRole('button', { name: /Iron Ore x5/ }).click()
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await page.getByRole('button', { name: 'Enable auto sale' }).click()
-  await expect.poll(() => bodies.find((b) => b.path === 'merchant/auto-npc-sale')?.body).toMatchObject({ character: 'Patinder', action: 'set' })
+  // partyApi.ts autoNpcSale(): the merchant's rule is the account-wide one, sent without `character`.
+  await expect.poll(() => bodies.find((b) => b.path === 'merchant/auto-npc-sale')?.body).toEqual({ item: expect.objectContaining({ name: 'ironore' }), action: 'set' })
 
   await page.getByRole('button', { name: /Iron Ore x5/ }).click()
   await page.getByRole('button', { name: 'Clear all marks' }).click()

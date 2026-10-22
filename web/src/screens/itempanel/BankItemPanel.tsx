@@ -226,7 +226,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               }}
             />
           )}
-          {/* The rule is created for the merchant. */}
+          {/* A bank item's rule is the merchant-wide one; partyApi.ts autoNpcSale() omits the character for it. */}
           <TapRow
             label={state.autoNpcSales[automaticCommerceRuleKey(item)] ? 'Update auto sell to NPC…' : 'Auto sell to NPC…'}
             className="text-rose-400"
@@ -238,9 +238,8 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               item={item}
               meta={meta}
               name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
-              character={merchant}
               onCancel={() => setExpanded(null)}
-              onConfirm={() => confirmWith(() => api.autoNpcSale(merchant, item))}
+              onConfirm={(keep) => confirmWith(() => api.autoNpcSale(undefined, item, false, keep))}
             />
           )}
 
