@@ -115,3 +115,19 @@ test('G13 bestiary: event-only monsters say which event spawns them', async ({ p
   await expect(page.getByText('Spawns only during Giga Crab: raised by the boss at 50% and 25% HP.')).toBeVisible()
   await expect(page.getByText('No static spawn recorded in game data.')).toHaveCount(0)
 })
+
+test('G17 donation preview: the level after donating, and a target level fills the amount', async ({ page }) => {
+  const mock = server()
+  // donationLevelXp is native G.levels, the XP needed to leave each level.
+  mock.addCharacter({ name: 'Merchy', ctype: 'merchant', level: 2, vitalsExtra: { xp: 50 }, diagnostics: { donationXpPerGold: 2, donationLevelXp: [0, 100, 200, 400, 800] } })
+  mock.merchantCharacter = 'Merchy'
+  await mock.install(page)
+
+  await page.goto('/characters/Merchy')
+  await page.getByRole('button', { name: 'Donate gold' }).click()
+  await page.getByLabel('Donation amount').fill('100')
+  // donation-preview.tsx: 50 + 100 * 2 = 250 XP, so level 3 with 50 of 400.
+  await expect(page.getByRole('status').filter({ hasText: 'XP/gold' })).toHaveText('Level 3 · 12.50% to next level · 200 XP (2 XP/gold)')
+  await page.getByLabel('Merchant level after donation').fill('4')
+  await expect(page.getByLabel('Donation amount')).toHaveValue('275')
+})

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePartyApi, useRefreshDynamicStateNow, useConfigLoaded, useDynamicState, useCharacters, useCharacterDiagnostics } from '@/data/PartyDataProvider'
 import { merchantPartyGroups } from '@/lib/partyGroups'
-import { abbreviatedGold } from '@/lib/gold'
 import { useClock } from '@/lib/duration'
 import { MerchantSettings } from '@/screens/merchant/MerchantSettings'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
@@ -123,7 +122,16 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('donate')}>
           Donate gold
         </Button>
-        {expanded === 'donate' && <DonateForm merchant={state.merchantCharacter ?? null} xpPerGold={xpPerGold} onDonate={(amount) => run(() => api.donateGold(amount))} />}
+        {expanded === 'donate' && (
+          <DonateForm
+            merchant={state.merchantCharacter ?? null}
+            xpPerGold={xpPerGold}
+            level={Number(merchantDetails?.level) || 0}
+            xp={Number(characters[state.merchantCharacter ?? '']?.vitals?.xp) || 0}
+            levels={Array.isArray(merchantDetails?.donationLevelXp) ? (merchantDetails.donationLevelXp as number[]) : undefined}
+            onDonate={(amount) => run(() => api.donateGold(amount))}
+          />
+        )}
 
         <Button variant="outline" size="sm" className="justify-start" onClick={() => toggle('giveaway')}>
           Join giveaway
@@ -177,9 +185,46 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
   )
 }
 
-function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null; xpPerGold: number; onDonate: (amount: number) => void }) {
+/** The donation dialog with console 1.5 donation-preview.tsx: the merchant's level after
+ *  donating, and a target level that fills in the amount. `levels` is native G.levels,
+ *  the XP needed to leave each level. */
+function DonateForm({
+  merchant,
+  xpPerGold,
+  level: currentLevel,
+  xp: currentXp,
+  levels,
+  onDonate,
+}: {
+  merchant: string | null
+  xpPerGold: number
+  level: number
+  xp: number
+  levels?: number[]
+  onDonate: (amount: number) => void
+}) {
   const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
+  let level = currentLevel
+  let xp = currentXp + Math.floor((Number(amount) || 0) * xpPerGold)
+  if (levels)
+    while (Number(levels[level]) > 0 && xp >= levels[level]) {
+      xp -= levels[level]
+      level++
+    }
+  const progress = levels?.[level] ? Math.min(100, (xp / levels[level]) * 100) : null
+  const known = !!levels?.[currentLevel]
+  const [targetDraft, setTargetDraft] = useState<string | null>(null)
+  const target = (value: string) => {
+    const wanted = Number(value)
+    if (!levels || !Number.isSafeInteger(wanted) || wanted < currentLevel || wanted >= levels.length) return
+    let required = -currentXp
+    for (let index = currentLevel; index < wanted; index++) {
+      if (!(levels[index] > 0)) return
+      required += levels[index]
+    }
+    setAmount(String(Math.max(0, Math.ceil(required / xpPerGold))))
+  }
   return (
     <div className="flex flex-col gap-2 py-1 pl-3">
       {/* Donation dialog title. */}
@@ -188,7 +233,15 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
       <div className="flex items-end gap-2">
         <label className="flex-1 text-xs text-muted-foreground">
           Donation amount
-          <Input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} className="mt-1" />
+          <Input
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => {
+              setTargetDraft(null)
+              setAmount(e.target.value.replace(/[^0-9]/g, ''))
+            }}
+            className="mt-1"
+          />
         </label>
         <Button
           size="sm"
@@ -202,8 +255,24 @@ function DonateForm({ merchant, xpPerGold, onDonate }: { merchant: string | null
           Donate
         </Button>
       </div>
-      <p className="font-mono text-xs text-violet-400">
-        Preview: {abbreviatedGold(Math.floor((Number(amount) || 0) * xpPerGold))} XP <span className="text-[10px] opacity-70">({xpPerGold} XP/gold)</span>
+      <label className="text-xs text-muted-foreground">
+        Merchant level after donation
+        <Input
+          type="number"
+          min={currentLevel}
+          max={levels ? levels.length - 1 : undefined}
+          disabled={!known}
+          value={known ? (targetDraft ?? String(level)) : ''}
+          onChange={(e) => {
+            setTargetDraft(e.target.value)
+            target(e.target.value)
+          }}
+          className="mt-1"
+        />
+      </label>
+      <p role="status" className="font-mono text-xs text-violet-400">
+        {known ? `Level ${level} · ${progress === null ? 'maximum level' : `${progress.toFixed(2)}% to next level`}` : 'Connect the merchant to load its native XP curve.'} ·{' '}
+        {Math.floor((Number(amount) || 0) * xpPerGold).toLocaleString()} XP ({xpPerGold} XP/gold)
       </p>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
