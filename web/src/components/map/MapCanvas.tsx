@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MapDefinition, MapFrame } from './mapTypes'
-import { cachedMapImage, croppedTile, dollLayers, drawDreamsGate, drawDue, markerStyle, prepareMap, visibleTiles, type MapRenderBuffer, type PreparedPlacement } from './mapRendering'
+import { cachedMapImage, croppedTile, dollLayers, dollOuterBox, drawDreamsGate, drawDue, markerStyle, prepareMap, visibleTiles, type MapRenderBuffer, type PreparedPlacement } from './mapRendering'
 import { drawMapProjectile, drawMapSprites } from './mapSprites'
 
 /** Console: map-canvas.tsx. The 2D canvas renderer for
@@ -243,13 +243,14 @@ export function MapCanvas({
             }
             if (!drewDoll && entity.dollHtml) {
               const layers = dollLayers(entity.dollHtml),
-                outerLeft = drawX - 13.5,
-                outerTop = drawY - 38;
+                box = dollOuterBox(drawX, drawY, layers),
+                outerLeft = box.left,
+                outerTop = box.top;
               layers.forEach((layer) => {
                 const image = cachedMapImage(layer.url);
                 if (!image?.complete || !image.naturalWidth) return;
                 const clipX = outerLeft + layer.left,
-                  clipY = outerTop + 38 - layer.bottom - layer.height;
+                  clipY = outerTop + box.height - layer.bottom - layer.height;
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(clipX, clipY, layer.width, layer.height);

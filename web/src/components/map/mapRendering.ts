@@ -91,6 +91,14 @@ export function croppedTile(image: HTMLImageElement, url: string, x: number, y: 
 // The doll markup is sanitized first (lib/safeHtml.ts): it can come from any
 // player in view, and innerHTML would run an inline handler.
 const dollLayerCache = new Map<string, DollLayer[]>()
+/** Where a doll's outer box sits for a character drawn at (x, y): centred on the
+ *  doll's outer width and standing on its outer height, as console 1.5
+ *  map-canvas.tsx:249-256 places it. The native doll is 27 x 38 when the HTML gives no size. */
+export function dollOuterBox(x: number, y: number, layers: { outerWidth?: number; outerHeight?: number }[]) {
+  const height = layers[0]?.outerHeight || 38
+  return { left: x - (layers[0]?.outerWidth || 27) / 2, top: y - height, height }
+}
+
 export function dollLayers(html: string) {
   const cached = dollLayerCache.get(html)
   if (cached) return cached
@@ -99,7 +107,11 @@ export function dollLayers(html: string) {
   const layers = Array.from(host.querySelectorAll('img')).map((img) => {
     const parent = img.parentElement as HTMLElement
     const px = (value: string) => Number.parseFloat(value || '0') || 0
+    // The doll's outer element sets its cosmetic bounds (doll-layers.tsx).
+    const outer = host.firstElementChild as HTMLElement | null
     return {
+      outerWidth: px(outer?.style.width || '27') || 27,
+      outerHeight: px(outer?.style.height || '38') || 38,
       url: img.src,
       left: px(parent.style.left),
       bottom: px(parent.style.bottom),

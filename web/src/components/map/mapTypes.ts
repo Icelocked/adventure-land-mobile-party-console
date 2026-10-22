@@ -101,6 +101,9 @@ export type MapFrame = {
 }
 
 export type DollLayer = {
+  // The doll's outer box, the same on every layer of one doll (default 27 x 38).
+  outerWidth: number
+  outerHeight: number
   url: string
   left: number
   bottom: number
