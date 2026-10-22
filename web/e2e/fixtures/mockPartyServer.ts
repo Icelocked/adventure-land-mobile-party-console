@@ -433,6 +433,22 @@ export class MockPartyServer {
    *  like a built-in field. */
   extraState: Record<string, unknown> = {}
 
+  /** GET /party-api/metrics* bodies (runtime/coordinator/metrics/service.ts).
+   *  Each path answers its own field; a null field answers 503 the way the
+   *  console does while metrics storage is off. */
+  metrics: {
+    range: Record<string, unknown> | null
+    gold: Record<string, unknown> | null
+    kills: Record<string, unknown> | null
+    damage: Record<string, unknown> | null
+    loot: Record<string, unknown> | null
+    accountGold: Record<string, unknown> | null
+  } = { range: null, gold: null, kills: null, damage: null, loot: null, accountGold: null }
+
+  /** Every metrics GET as path plus query, and every reset body, in order. */
+  metricsRequests: string[] = []
+  metricsResets: Record<string, unknown>[] = []
+
   /** GET /console-update (tools/update): null = service unavailable. */
   consoleUpdate: Record<string, unknown> | null = { current: '1.2.0', displayVersion: '1.2.0', available: false, phase: 'idle' }
 
@@ -487,7 +503,8 @@ export class MockPartyServer {
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
         serverNow: Date.now(),
         bankGold: this.bankGold,
-        accountGold: this.accountGold ?? (() => {
+        // extraState.accountGold (metrics.spec.ts) wins over the computed sum.
+        accountGold: this.accountGold ?? (this.extraState.accountGold as typeof this.accountGold) ?? (() => {
           const balances = this.characters.map((c) => (c as { gold?: number }).gold)
           const carried = balances.every((gold) => typeof gold === 'number') ? balances.reduce<number>((sum, gold) => sum + gold!, 0) : null
           return { carried, total: carried === null ? null : this.bankGold + carried }
@@ -1502,6 +1519,31 @@ export class MockPartyServer {
       if (section === 'config' && this.configDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.configDelayMs))
       if (section === 'logs' && this.failLogs) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
       return route.fulfill({ json: this.stateSection(section, dashboard) })
+    })
+    await page.route('**/party-api/metrics**', (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const path = url.pathname.replace(/^.*\/party-api\//, '')
+      if (request.method() === 'POST' && path === 'metrics/reset') {
+        const body = (request.postDataJSON() as Record<string, unknown>) ?? {}
+        this.metricsResets.push(body)
+        const now = Date.now()
+        // service.ts: 'performance' cuts kills and damage and answers every cut.
+        const kinds = body.metric === 'performance' ? ['kills', 'damage'] : [String(body.metric)]
+        return route.fulfill({ json: { ok: true, resets: Object.fromEntries(kinds.map((kind) => [kind, now])) } })
+      }
+      if (request.method() !== 'GET') return route.fallback()
+      this.metricsRequests.push(path + url.search)
+      const params = url.searchParams
+      const body =
+        path === 'metrics/kills' ? this.metrics.kills
+        : path === 'metrics/account-gold' ? this.metrics.accountGold
+        : path === 'metrics/bars' ? (params.get('metric') === 'loot' ? this.metrics.loot : this.metrics.damage)
+        : params.get('sinceReset') === 'gold' ? this.metrics.gold
+        : this.metrics.range
+      if (!body) return route.fulfill({ status: 503, json: { error: 'Metrics storage unavailable' } })
+      const from = Number(params.get('from') ?? params.get('resetAt') ?? 0), to = Number(params.get('to') ?? Date.now())
+      return route.fulfill({ json: { ...body, ...(path === 'metrics/account-gold' ? {} : { from, to }) } })
     })
     await page.route('**/party-api/mail**', (route) => {
       // Also matches POST /party-api/mail/collect; leave that to the fallback.

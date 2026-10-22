@@ -7,7 +7,7 @@ import { loadMenuLinks } from '@/lib/menuLinks'
 
 /** The account-wide tools menu behind any character's hamburger icon:
  *  Mail, Catalog, Bestiary, Skills, Inspect Stand, View Market, Inspect
- *  Bank, Logs, Settings, then any links saved in Settings > Menu links. */
+ *  Bank, Logs, Metrics, Settings, then any links saved in Settings > Menu links. */
 const ITEMS: { label: string; path: string }[] = [
   { label: 'Mail', path: '/mail' },
   { label: 'Catalog', path: '/catalog' },
@@ -19,6 +19,7 @@ const ITEMS: { label: string; path: string }[] = [
   { label: 'Merchant routines', path: '/routines' },
   { label: 'WTB orders', path: '/wtb' },
   { label: 'Logs', path: '/logs' },
+  { label: 'Metrics', path: '/metrics' },
   { label: 'Settings', path: '/settings' },
 ]
 
