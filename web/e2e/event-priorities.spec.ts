@@ -146,6 +146,33 @@ test('Event limits: Save sends {event, limits} with blanks as null, validates, a
   expect(bodies).toHaveLength(3)
 })
 
+test('Event limits: a save keeps the saved monsters and cipher fields (formation.ts stores the whole limits)', async ({ page }) => {
+  const server = partyServer()
+  const cipher = { automatic: true, minClues: 12, gatherMonsters: ['bat', 'bee', 'crab', 'goo'] }
+  server.extraState = {
+    eventLimitsByCharacter: { Leada: { graveyard: { deathLimit: 1, timeLimitMinutes: null, monsters: ['zombie'] }, witchcipher: { deathLimit: null, timeLimitMinutes: null, cipher } } },
+  }
+  await server.install(page)
+  const bodies = postBodies(page, 'formation')
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Events (1) ▾' }).click()
+  await page.getByRole('button', { name: 'Graveyard Rising settings' }).click()
+  const graveyard = page.getByRole('group', { name: 'Graveyard Rising settings' })
+  await graveyard.getByLabel('Death limit').fill('2')
+  await graveyard.getByRole('button', { name: 'Save event settings' }).click()
+  await expect.poll(() => bodies[0]).toEqual({
+    character: 'Leada',
+    eventLimits: { event: 'graveyard', limits: { deathLimit: 2, timeLimitMinutes: null, monsters: ['zombie'] } },
+  })
+
+  await page.getByRole('button', { name: "Witch's Cipher settings" }).click()
+  const witch = page.getByRole('group', { name: "Witch's Cipher settings" })
+  await witch.getByLabel('Time limit (mins)').fill('5')
+  await witch.getByRole('button', { name: 'Save event settings' }).click()
+  await expect.poll(() => bodies[1]).toEqual({ character: 'Leada', eventLimits: { event: 'witchcipher', limits: { deathLimit: null, timeLimitMinutes: 5, cipher } } })
+})
+
 test('Event limits: a follower sees the leader’s limits read-only', async ({ page }) => {
   const server = partyServer()
   server.extraState = { eventLimitsByCharacter: { Leada: { franky: { deathLimit: 0, timeLimitMinutes: 30 } } } }

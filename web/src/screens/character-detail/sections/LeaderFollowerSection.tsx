@@ -250,7 +250,9 @@ function EventLimitsPanel({
   const [minutes, setMinutes] = useState(limits.timeLimitMinutes == null ? '' : String(limits.timeLimitMinutes))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const value = { deathLimit: deaths.trim() ? Number(deaths) : null, timeLimitMinutes: minutes.trim() ? Number(minutes) : null }
+  // Console 1.5 formation.ts stores the posted limits whole, so the save
+  // carries the saved monsters and cipher fields back (event-limits-dialog.tsx:24).
+  const value = { ...limits, deathLimit: deaths.trim() ? Number(deaths) : null, timeLimitMinutes: minutes.trim() ? Number(minutes) : null }
   return (
     <div role="group" aria-label={`${label} settings`} className="mb-2 flex flex-col gap-2 rounded-md border border-border p-3">
       <p className="text-sm font-medium">{label} settings</p>
