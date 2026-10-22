@@ -122,7 +122,16 @@ const completeOrder = (value: unknown): string[] | null => {
 const validEventLimits = (value: unknown) => {
   const { deathLimit, timeLimitMinutes, monsters, cipher } = (value ?? {}) as Record<string, unknown>
   const graveyard = ['zombie', 'ghoul', 'gargoyle']
-  const settings = cipher as { automatic?: unknown; minClues?: unknown } | undefined
+  const ingredients = ['verdantspore', 'frostscale', 'embercoal', 'gloomfeather']
+  const settings = cipher as { automatic?: unknown; minClues?: unknown; gatherMonsters?: unknown; manual?: { id?: unknown; round?: unknown; cracks?: unknown; mix?: unknown } } | undefined
+  // event-policy.ts validEventLimits also checks gatherMonsters and a manual solution.
+  if (settings?.gatherMonsters !== undefined && (!Array.isArray(settings.gatherMonsters) || settings.gatherMonsters.length !== 4)) return false
+  if (
+    settings?.manual !== undefined &&
+    (!settings.manual?.id || !settings.manual.round || !Number.isSafeInteger(settings.manual.cracks) || !Array.isArray(settings.manual.mix) ||
+      settings.manual.mix.length !== 5 || settings.manual.mix.some((id) => !ingredients.includes(id)))
+  )
+    return false
   return (
     !!value &&
     typeof value === 'object' &&
@@ -686,7 +695,7 @@ export class MockPartyServer {
       // priorities(), each 400 on a bad value before the follower 409.
       if (body.character !== undefined && (body.eventLimits !== undefined || body.eventPriorities !== undefined)) {
         const name = String(body.character)
-        const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : this.characters.find((c) => c.ctype === 'merchant')?.name
         const inherited = !!this.leader && name !== this.leader && name !== merchant && this.followers[name] === true
         const state = this.extraState as { eventLimitsByCharacter?: Record<string, Record<string, unknown>>; eventPrioritiesByCharacter?: Record<string, string[]> }
         if (body.eventLimits !== undefined) {
@@ -708,7 +717,7 @@ export class MockPartyServer {
       if (body.character !== undefined && body.eventSelections !== undefined) {
         // http/formation.ts: followers of a leader use the leader's events.
         const name = String(body.character)
-        const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : this.characters.find((c) => c.ctype === 'merchant')?.name
         const listed = body.eventSelections
         if (!Array.isArray(listed) || listed.some((id) => !SUPPORTED_EVENTS.includes(id))) return { status: 400, json: { error: 'invalid event selections' } }
         if (this.leader && name !== this.leader && name !== merchant && this.followers[name]) return { status: 409, json: { ok: false, error: 'using leader events' } }

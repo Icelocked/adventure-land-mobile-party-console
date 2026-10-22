@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronUp, Settings } from 'lucide-react'
-import { useCharacters, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import {
   eventDisplayNames,
   eventLimits,
   eventPolicy,
   eventPriorityOrder,
   eventTimeLabel,
+  graveyardMonsters,
+  leaderCipher,
   selectedEvents,
   supportedEvents,
   validEventLimits,
@@ -24,6 +26,10 @@ import { SectionCard } from '../SectionCard'
 import { GearSetControl } from './GearSetControl'
 import { FrankyRoutineControl } from './FrankyRoutineControl'
 import { consoleFeatures, type PartyStateDynamic } from '@/models'
+import { CipherControls } from '@/components/CipherControls'
+import { defaultCipherSettings, type CipherSettings, type CipherView } from '@/lib/cipher'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 
 /** Two independent tap targets on POST /party-api/formation. "Leader" sends
  *  only {leader} (a radio: tapping the current leader does nothing);
@@ -96,6 +102,13 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
   const policy = eventPolicy(state, name)
   const selected = selectedEvents(state, name)
   const order = eventPriorityOrder(state, name)
+  // The merchant edits the leader's cipher policy when it inherits the leader's Witch's Cipher.
+  const cipherSource = leaderCipher(state, name) ? state.leader! : policy.source
+  const saveCipher = async (limits: EventLimits, enable = false) => {
+    const result = await api.saveCipher(cipherSource, limits, enable ? [...new Set([...selectedEvents(state, cipherSource), 'witchcipher'])] : undefined)
+    if (result.kind === 'failure') throw Error(result.message)
+    await refreshNow()
+  }
   // Server schedules are observations, not the supported catalog: seasonal
   // bosses stay selectable even when the current feed omits them.
   const schedules = new Map((state.eventSchedules ?? []).map((event) => [event.id, event]))
@@ -199,8 +212,27 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
                     label={event.name}
                     limits={eventLimits(state, name)[event.id] ?? { deathLimit: null, timeLimitMinutes: null }}
                     inherited={policy.inherited}
+                    cipherView={schedules.get('witchcipher')?.cipher}
+                    cipherOwner={cipherSource !== policy.source ? cipherSource : undefined}
+                    onManual={async (mix, limits) => {
+                      const schedule = schedules.get('witchcipher')
+                      const board = schedule?.cipher?.board
+                      if (!board?.live || !board.id || schedule?.stale) throw Error('Wait for a fresh live realm board')
+                      await saveCipher(
+                        { ...limits, cipher: { ...limits.cipher!, automatic: false, manual: { id: crypto.randomUUID(), round: board.id, cracks: board.cracks ?? 0, mix } } },
+                        true,
+                      )
+                    }}
                     onClose={() => setSettings(null)}
                     onSave={async (limits) => {
+                      if (event.id === 'witchcipher' && cipherSource !== policy.source) {
+                        try {
+                          await saveCipher(limits)
+                          return null
+                        } catch (failure) {
+                          return failure instanceof Error ? failure.message : String(failure)
+                        }
+                      }
                       const result = await api.setEventLimits(name, event.id, limits)
                       if (result.kind === 'failure') return result.message
                       await refreshNow()
@@ -227,12 +259,15 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
   )
 }
 
-/** Console 1.4 event-limits-dialog.tsx as an inline group under the event's row. */
+/** Console 2db4d763 event-limits-dialog.tsx as an inline group under the event's row. */
 function EventLimitsPanel({
   event,
   label,
   limits,
   inherited,
+  cipherView,
+  cipherOwner,
+  onManual,
   onClose,
   onSave,
   onAnniversary,
@@ -241,6 +276,10 @@ function EventLimitsPanel({
   label: string
   limits: EventLimits
   inherited: boolean
+  cipherView?: CipherView
+  // The leader whose cipher policy the merchant shares.
+  cipherOwner?: string
+  onManual: (mix: string[], limits: EventLimits) => Promise<unknown>
   onClose: () => void
   // Resolves to the server's error message, or null once saved.
   onSave: (limits: EventLimits) => Promise<string | null>
@@ -250,7 +289,18 @@ function EventLimitsPanel({
   const [minutes, setMinutes] = useState(limits.timeLimitMinutes == null ? '' : String(limits.timeLimitMinutes))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const value = { deathLimit: deaths.trim() ? Number(deaths) : null, timeLimitMinutes: minutes.trim() ? Number(minutes) : null }
+  const [monsters, setMonsters] = useState(limits.monsters ?? graveyardMonsters)
+  const [cipher, setCipher] = useState<CipherSettings>({ ...defaultCipherSettings, ...limits.cipher })
+  const [inspected, setInspected] = useState<string | null>(null)
+  const catalog = useDynamicState()
+  // The server stores the limits object whole, so the save spreads the saved keys back.
+  const value: EventLimits = {
+    ...limits,
+    deathLimit: deaths.trim() ? Number(deaths) : null,
+    timeLimitMinutes: minutes.trim() ? Number(minutes) : null,
+    ...(event === 'graveyard' ? { monsters } : {}),
+    ...(event === 'witchcipher' ? { cipher } : {}),
+  }
   return (
     <div role="group" aria-label={`${label} settings`} className="mb-2 flex flex-col gap-2 rounded-md border border-border p-3">
       <p className="text-sm font-medium">{label} settings</p>
@@ -285,6 +335,51 @@ function EventLimitsPanel({
         />
       </label>
       {inherited && <p className="text-amber-200">Using the leader’s event settings.</p>}
+      {event === 'witchcipher' && cipherOwner && <p className="text-amber-200">Shared Cipher policy with {cipherOwner}. Changes here apply to the party.</p>}
+      {event === 'graveyard' && (
+        <fieldset className="flex flex-col gap-2 rounded border border-border p-3">
+          <legend className="px-1">Monsters to fight</legend>
+          {[
+            ['zombie', 'Zombie'],
+            ['ghoul', 'Ghoul'],
+            ['gargoyle', 'Gargoyle'],
+          ].map(([id, monster]) => (
+            <label key={id} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={monsters.includes(id)}
+                disabled={inherited || saving}
+                onChange={(e) => setMonsters(e.target.checked ? [...monsters, id] : monsters.filter((entry) => entry !== id))}
+              />
+              {monster}
+            </label>
+          ))}
+          <p className="text-muted-foreground">Unchecked monsters will not be pulled. The party can defend itself if attacked.</p>
+        </fieldset>
+      )}
+      {event === 'trickortreat' && (
+        <p className="rounded border border-orange-700 p-3 text-orange-100">
+          Visits all seven doors, then resumes the saved farming activity. Each character can knock once per door per UTC day; the account shares a limit of 14 knocks.
+          Resets at 00:00 UTC.
+        </p>
+      )}
+      {event === 'witchcipher' && (
+        <CipherControls
+          value={cipher}
+          onChange={setCipher}
+          view={cipherView}
+          disabled={inherited || saving}
+          onInspectIngredient={setInspected}
+          onManual={(mix) => onManual(mix, value)}
+        />
+      )}
+      {inspected && (
+        <Sheet open onOpenChange={(open) => !open && setInspected(null)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <ItemDetailBrowser rootItemId={inspected} rootLevel={0} catalog={catalog.merchantCatalog} monsters={catalog.bestiaryCatalog} context={{ character: label, slot: -1 }} />
+          </SheetContent>
+        </Sheet>
+      )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {event === 'anniversary' && (
         <Button variant="outline" size="sm" onClick={onAnniversary}>

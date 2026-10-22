@@ -932,6 +932,13 @@ export class PartyApiClient {
     return this.post('formation', { character, eventLimits: { event, limits } })
   }
 
+  /** POST /party-api/formation {character, eventSelections?, eventLimits}
+   *  for the Witch's Cipher (event-selection-control.tsx saveCipher). A
+   *  manual solution also selects witchcipher, so it sends eventSelections. */
+  async saveCipher(character: string, limits: EventLimits, eventSelections?: string[]): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', { character, ...(eventSelections ? { eventSelections } : {}), eventLimits: { event: 'witchcipher', limits } })
+  }
+
   /** POST /party-api/realm/boss-chase. minEtaMinutes must be 0-600. */
   async setBossChase(body: { enabled?: boolean; minEtaMinutes?: number }): Promise<ApiResult<CommandResult>> {
     return this.post('realm/boss-chase', body)

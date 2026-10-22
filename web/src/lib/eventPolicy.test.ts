@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventDisplayNames, eventPriorityOrder, selectedEvents, supportedEvents } from './eventPolicy'
+import { eventDisplayNames, eventLimits, eventPolicy, eventPriorityOrder, selectedEvents, supportedEvents, validEventLimits } from './eventPolicy'
 
 const october = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
 
@@ -22,5 +22,54 @@ describe('eventPolicy October events', () => {
     expect(order).toHaveLength(14)
     expect(order.slice(0, 3)).toEqual(saved)
     expect(order).toEqual(expect.arrayContaining(october))
+  })
+})
+
+// Cases below follow the console's dashboard/lib/event-policy.ts at 2db4d763.
+
+const cipher = { automatic: true, minClues: 1, gatherMonsters: ['goo', 'arcticbee', 'plantoid', 'snake'] }
+
+describe('validEventLimits for October settings', () => {
+  it('accepts a graveyard monster subset and rejects unknown or repeated monsters', () => {
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, monsters: ['zombie', 'gargoyle'] })).toBe(true)
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, monsters: ['zombie', 'zombie'] })).toBe(false)
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, monsters: ['goo'] })).toBe(false)
+  })
+
+  it('bounds the cipher clue minimum to 0-1024 and needs four gathering monsters', () => {
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, cipher })).toBe(true)
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, cipher: { ...cipher, minClues: 1025 } })).toBe(false)
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, cipher: { ...cipher, gatherMonsters: ['goo'] } })).toBe(false)
+  })
+
+  it('checks a manual solution mix', () => {
+    const manual = { id: 'm1', round: 'r1', cracks: 0, mix: Array(5).fill('embercoal') }
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, cipher: { ...cipher, manual } })).toBe(true)
+    expect(validEventLimits({ deathLimit: null, timeLimitMinutes: null, cipher: { ...cipher, manual: { ...manual, mix: ['embercoal'] } } })).toBe(false)
+  })
+})
+
+describe('the merchant inherits the leader’s Witch’s Cipher', () => {
+  const party = {
+    leader: 'Leada',
+    merchantCharacter: 'Merchy',
+    followers: {},
+    eventSelectionsByCharacter: { Leada: ['anniversary', 'witchcipher'] },
+    eventLimitsByCharacter: { Leada: { witchcipher: { deathLimit: null, timeLimitMinutes: null, cipher } }, Merchy: { goobrawl: { deathLimit: 2, timeLimitMinutes: null } } },
+  }
+
+  it('selects witchcipher for the merchant and enables its events', () => {
+    expect(selectedEvents(party, 'Merchy')).toEqual(['anniversary', 'witchcipher'])
+    expect(eventPolicy(party, 'Merchy').enabled).toBe(true)
+  })
+
+  it('reads the leader’s cipher limits next to the merchant’s own', () => {
+    expect(eventLimits(party, 'Merchy')).toEqual({ goobrawl: { deathLimit: 2, timeLimitMinutes: null }, witchcipher: { deathLimit: null, timeLimitMinutes: null, cipher } })
+  })
+
+  it('leaves the merchant alone when the leader has no cipher selected', () => {
+    const plain = { ...party, eventSelectionsByCharacter: { Leada: ['anniversary'] } }
+    expect(selectedEvents(plain, 'Merchy')).toEqual(['anniversary'])
+    expect(eventLimits(plain, 'Merchy').witchcipher).toBeUndefined()
   })
 })
