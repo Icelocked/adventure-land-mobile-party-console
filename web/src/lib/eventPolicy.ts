@@ -1,7 +1,11 @@
-/** Console 1.4: dashboard/lib/event-policy.ts. */
+/** Console 1.5: dashboard/lib/event-policy.ts. */
 export interface EventLimits {
   deathLimit: number | null
   timeLimitMinutes: number | null
+  // Graveyard's monster filter, a subset of zombie, ghoul and gargoyle.
+  monsters?: string[]
+  // Witch's Cipher settings (runtime/events/october.ts CipherSettings).
+  cipher?: Record<string, unknown>
 }
 /** Blank (null) means unlimited; a death limit is a whole number >= 0, a time limit a positive number of minutes. */
 export function validEventLimits(value: unknown): value is EventLimits {
@@ -25,11 +29,15 @@ interface EventFormation {
 // A saved legacy all-events flag covers the events that existed when it was saved; newer
 // fights need an explicit selection, so an upgrade never opts a character into them.
 const legacyDefaultEvents = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman']
-export const supportedEvents = [...legacyDefaultEvents, 'slenderman', 'mrgreen', 'mrpumpkin']
+// Console 1.5 dashboard lib/event-policy.ts octoberEvents. A list without them
+// makes a checkbox or reorder POST drop their saved selections and order.
+export const octoberEvents = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
+export const supportedEvents = [...legacyDefaultEvents, 'slenderman', 'mrgreen', 'mrpumpkin', ...octoberEvents]
 export const eventDisplayNames: Record<string, string> = {
   anniversary: 'Anniversary', abtesting: 'A/B Testing', goobrawl: 'Goobrawl',
   crabxx: 'Crabxx', franky: 'Franky', icegolem: 'Ice Golem', snowman: 'Snowman',
   slenderman: 'Slenderman', mrgreen: 'Mr. Green', mrpumpkin: 'Mr. Pumpkin',
+  horseman: 'Headless Horseman', graveyard: 'Graveyard Rising', trickortreat: 'Trick or Treat', witchcipher: "Witch's Cipher",
 }
 
 export function selectedEvents(party: EventFormation, name: string): string[] {

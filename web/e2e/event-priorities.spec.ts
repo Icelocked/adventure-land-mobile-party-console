@@ -33,23 +33,54 @@ test('Event priorities: arrows send the full supportedEvents permutation; the sa
   await page.getByRole('button', { name: 'Events (1) ▾' }).click()
   const events = page.getByRole('group', { name: 'Events' })
   await expect(events.getByText('Higher numbers attend first. Use the arrows to reorder.')).toBeVisible()
-  await expect(priority(page, 'Anniversary')).toHaveText('10')
-  await expect(priority(page, 'Goobrawl')).toHaveText('8')
-  await expect(priority(page, 'Mr. Pumpkin')).toHaveText('1')
+  await expect(priority(page, 'Anniversary')).toHaveText('14')
+  await expect(priority(page, 'Goobrawl')).toHaveText('12')
+  await expect(priority(page, 'Mr. Pumpkin')).toHaveText('5')
+  await expect(priority(page, "Witch's Cipher")).toHaveText('1')
   await expect(events.getByRole('button', { name: 'Move Anniversary up' })).toBeDisabled()
-  await expect(events.getByRole('button', { name: 'Move Mr. Pumpkin down' })).toBeDisabled()
+  await expect(events.getByRole('button', { name: "Move Witch's Cipher down" })).toBeDisabled()
 
   await events.getByRole('button', { name: 'Move Goobrawl up' }).click()
   await expect.poll(() => bodies[0]).toEqual({
     character: 'Leada',
-    eventPriorities: ['anniversary', 'goobrawl', 'abtesting', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin'],
+    eventPriorities: ['anniversary', 'goobrawl', 'abtesting', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin', 'horseman', 'graveyard', 'trickortreat', 'witchcipher'],
   })
-  await expect(priority(page, 'Goobrawl')).toHaveText('9')
-  await expect(priority(page, 'A/B Testing')).toHaveText('8')
+  await expect(priority(page, 'Goobrawl')).toHaveText('13')
+  await expect(priority(page, 'A/B Testing')).toHaveText('12')
 
   await events.getByRole('button', { name: 'Move Anniversary down' }).click()
   await expect.poll(() => (bodies[1]?.eventPriorities as string[] | undefined)?.slice(0, 2)).toEqual(['goobrawl', 'anniversary'])
   await expect(events.getByRole('checkbox').first()).toHaveAccessibleName('Goobrawl')
+})
+
+test('Event priorities: a reorder keeps the saved October order (console formation.ts completeOrder)', async ({ page }) => {
+  const server = partyServer()
+  const saved = ['witchcipher', 'graveyard', 'anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin', 'horseman', 'trickortreat']
+  server.extraState = { eventPrioritiesByCharacter: { Leada: saved } }
+  await server.install(page)
+  const bodies = postBodies(page, 'formation')
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Events (1) ▾' }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  await expect(priority(page, "Witch's Cipher")).toHaveText('14')
+  await events.getByRole('button', { name: 'Move Goobrawl up' }).click()
+  await expect.poll(() => bodies[0]?.eventPriorities).toEqual([...saved.slice(0, 3), 'goobrawl', 'abtesting', ...saved.slice(5)])
+})
+
+test('Event selections: a checkbox POST keeps the saved October selections', async ({ page }) => {
+  const server = partyServer()
+  server.extraState = { eventSelectionsByCharacter: { Leada: ['anniversary', 'graveyard', 'witchcipher'] } }
+  await server.install(page)
+  const bodies = postBodies(page, 'formation')
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Events (3) ▾' }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  await expect(events.getByText('Graveyard Rising —')).toBeVisible()
+  await expect(events.getByText(/Unsupported/)).toHaveCount(0)
+  await events.getByRole('checkbox', { name: 'Crabxx' }).click()
+  await expect.poll(() => bodies[0]?.eventSelections).toEqual(['anniversary', 'graveyard', 'witchcipher', 'crabxx'])
 })
 
 test('Event priorities: a rejected move shows the server error; followers use the leader order and cannot reorder', async ({ page }) => {
@@ -63,13 +94,13 @@ test('Event priorities: a rejected move shows the server error; followers use th
   server.failOnce['formation'] = 'using leader events'
   await events.getByRole('button', { name: 'Move Anniversary up' }).click()
   await expect(events.getByRole('alert')).toHaveText('using leader events')
-  await expect(priority(page, 'Mr. Pumpkin')).toHaveText('10')
+  await expect(priority(page, 'Mr. Pumpkin')).toHaveText('14')
 
   await page.goto('/characters/Folla')
   await page.getByRole('button', { name: 'Events (1) ▾' }).click()
   const follower = page.getByRole('group', { name: 'Events' })
   await expect(follower.getByText('Using Leada’s events')).toBeVisible()
-  await expect(priority(page, 'Mr. Pumpkin')).toHaveText('10')
+  await expect(priority(page, 'Mr. Pumpkin')).toHaveText('14')
   await expect(follower.getByRole('button', { name: 'Move Anniversary up' })).toBeDisabled()
   await expect(follower.getByRole('button', { name: 'Move Anniversary down' })).toBeDisabled()
 })

@@ -108,14 +108,26 @@ const CONFIG_FIELDS = [
   // Console 1.4 combat and party: designated tank and gear sets.
   'designatedTank', 'gearSets',
 ] as const
-// Console 1.4 events and realms: dashboard/lib/event-policy.ts supportedEvents,
+// Console 1.5 events and realms: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
-const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin']
+const OCTOBER_EVENTS = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
+const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin', ...OCTOBER_EVENTS]
+// http/formation.ts completeOrder(): a list without the October ids gets them appended.
+const completeOrder = (value: unknown): string[] | null => {
+  if (!Array.isArray(value) || new Set(value).size !== value.length) return null
+  const ids = value.filter((id): id is string => typeof id === 'string' && SUPPORTED_EVENTS.includes(id))
+  if (ids.length !== value.length || SUPPORTED_EVENTS.some((id) => !OCTOBER_EVENTS.includes(id) && !ids.includes(id))) return null
+  return [...ids, ...SUPPORTED_EVENTS.filter((id) => !ids.includes(id))]
+}
 const validEventLimits = (value: unknown) => {
-  const { deathLimit, timeLimitMinutes } = (value ?? {}) as Record<string, unknown>
+  const { deathLimit, timeLimitMinutes, monsters, cipher } = (value ?? {}) as Record<string, unknown>
+  const graveyard = ['zombie', 'ghoul', 'gargoyle']
+  const settings = cipher as { automatic?: unknown; minClues?: unknown } | undefined
   return (
     !!value &&
     typeof value === 'object' &&
+    (monsters === undefined || (Array.isArray(monsters) && new Set(monsters).size === monsters.length && monsters.every((id) => graveyard.includes(id)))) &&
+    (settings === undefined || (!!settings && typeof settings.automatic === 'boolean' && Number.isSafeInteger(settings.minClues) && Number(settings.minClues) >= 0 && Number(settings.minClues) <= 1024)) &&
     (deathLimit === null || (Number.isSafeInteger(deathLimit) && Number(deathLimit) >= 0)) &&
     (timeLimitMinutes === null || (typeof timeLimitMinutes === 'number' && Number.isFinite(timeLimitMinutes) && timeLimitMinutes > 0))
   )
@@ -681,22 +693,24 @@ export class MockPartyServer {
           const patch = (body.eventLimits ?? {}) as { event?: unknown; limits?: { deathLimit: unknown; timeLimitMinutes: unknown } }
           if (!SUPPORTED_EVENTS.includes(String(patch.event)) || !validEventLimits(patch.limits)) return { status: 400, json: { error: 'invalid event limits' } }
           if (inherited) return { status: 409, json: { error: 'using leader events' } }
-          const limits = { deathLimit: patch.limits!.deathLimit, timeLimitMinutes: patch.limits!.timeLimitMinutes }
+          // formation.ts limits() stores structuredClone(patch.limits), so a missing key is gone.
+          const limits = structuredClone(patch.limits)
           const saved = { ...state.eventLimitsByCharacter, [name]: { ...state.eventLimitsByCharacter?.[name], [String(patch.event)]: limits } }
           this.extraState = { ...this.extraState, eventLimitsByCharacter: saved }
         }
         if (body.eventPriorities !== undefined) {
-          const value = body.eventPriorities
-          if (!Array.isArray(value) || value.length !== SUPPORTED_EVENTS.length || new Set(value).size !== value.length || value.some((id) => !SUPPORTED_EVENTS.includes(id)))
-            return { status: 400, json: { error: 'invalid event priorities' } }
+          const order = completeOrder(body.eventPriorities)
+          if (!order) return { status: 400, json: { error: 'invalid event priorities' } }
           if (inherited) return { status: 409, json: { error: 'using leader events' } }
-          this.extraState = { ...this.extraState, eventPrioritiesByCharacter: { ...state.eventPrioritiesByCharacter, [name]: [...value] } }
+          this.extraState = { ...this.extraState, eventPrioritiesByCharacter: { ...state.eventPrioritiesByCharacter, [name]: order } }
         }
       }
       if (body.character !== undefined && body.eventSelections !== undefined) {
         // http/formation.ts: followers of a leader use the leader's events.
         const name = String(body.character)
         const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const listed = body.eventSelections
+        if (!Array.isArray(listed) || listed.some((id) => !SUPPORTED_EVENTS.includes(id))) return { status: 400, json: { error: 'invalid event selections' } }
         if (this.leader && name !== this.leader && name !== merchant && this.followers[name]) return { status: 409, json: { ok: false, error: 'using leader events' } }
         const current = (this.extraState.eventSelectionsByCharacter as Record<string, string[]> | undefined) ?? {}
         this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
