@@ -662,6 +662,9 @@ export interface PartyStateDynamic {
   referenceRevision?: string
   // Core's bank gold (null until the bank has been seen).
   bankGold?: number | null
+  // Console 1.5 core accountGold (telemetry/account-gold.ts): bank plus every
+  // assigned slot's last carried gold, offline slots included.
+  accountGold?: { carried: number | null; total: number | null } | null
   // Giveaways
   giveawayRealms?: { key: string; label: string }[]
   giveawayPlayers?: Record<string, string[]>

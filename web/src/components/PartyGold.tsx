@@ -10,10 +10,13 @@ export function PartyGold() {
   const characters = useCharacters()
   const [exactShown, setExactShown] = useState(false)
   const bankGold = state.bankGold
-  const { carried, total } = goldTotals(
-    bankGold,
-    partyGoldNames(state).map((name) => characters[name]?.vitals?.gold),
-  )
+  // party-gold.tsx prefers the server's accountGold; older consoles lack it.
+  const { carried, total } =
+    state.accountGold ??
+    goldTotals(
+      bankGold,
+      partyGoldNames(state).map((name) => characters[name]?.vitals?.gold),
+    )
   const exact = (value: number | null | undefined) => (value == null ? 'unknown' : value.toLocaleString())
   return (
     <button type="button" className="text-right font-mono text-xs text-amber-500" onClick={() => setExactShown((v) => !v)} aria-label="Party gold">
