@@ -243,12 +243,29 @@ function ItemDetailContent({
   const [loadedOffline, setLoadedOffline] = useState<Record<string, OfflineCharacter>>({})
   const [offlineLoading, setOfflineLoading] = useState<string | null>(null)
   const [offlineError, setOfflineError] = useState('')
-  const savedCharacters: Record<string, OfflineCharacter> = { ...loadedOffline }
-  for (const [name, saved] of Object.entries(state.characterSnapshots ?? {})) if (!partyNames.includes(name)) savedCharacters[name] = saved
+  const savedCharacters: Record<string, OfflineCharacter> = {
+    ...loadedOffline,
+    ...Object.fromEntries(Object.entries(state.characterSnapshots ?? {}).filter(([name]) => !partyNames.includes(name))),
+  }
   const savedNames = Object.keys(state.characterSnapshots ?? {}).filter((name) => !partyNames.includes(name))
   const unloadedMembers = Object.values(roster).filter((member) => !partyNames.includes(member.name) && !state.characterSnapshots?.[member.name])
   const ctypeOf = (name: string) => savedCharacters[name]?.ctype ?? characters[name]?.vitals?.ctype ?? ''
-  const slotsOf = (name: string) => savedCharacters[name]?.slots ?? characters[name]?.inventory?.slots
+  const compareOffline = async (name: string) => {
+    if (loadedOffline[name]) return chooseCompare(name)
+    setOfflineLoading(name)
+    setOfflineError('')
+    const loaded = await loadCharacterInspection(api, name).catch((failure: unknown) => {
+      setOfflineError(failure instanceof Error ? failure.message : String(failure))
+      return null
+    })
+    setOfflineLoading(null)
+    if (!loaded) return
+    setLoadedOffline((old) => ({ ...old, [name]: loaded }))
+    const slots = comparisonSlotsFor(meta, loaded.ctype)
+    if (slots.length > 1) return setComparePicker(name)
+    setComparePicker(false)
+    setComparing({ character: name, slot: slots[0] })
+  }
   const chooseCompare = (name: string) => {
     const slots = comparisonSlotsFor(meta, ctypeOf(name))
     if (slots.length > 1) return setComparePicker(name)
@@ -334,25 +351,7 @@ function ItemDetailContent({
                       key={member.name}
                       type="button"
                       disabled={!!offlineLoading}
-                      onClick={async () => {
-                        if (loadedOffline[member.name]) return chooseCompare(member.name)
-                        setOfflineLoading(member.name)
-                        setOfflineError('')
-                        try {
-                          const loaded = await loadCharacterInspection(api, member.name)
-                          setLoadedOffline((old) => ({ ...old, [member.name]: loaded }))
-                          const slots = comparisonSlotsFor(meta, loaded.ctype)
-                          if (slots.length > 1) setComparePicker(member.name)
-                          else {
-                            setComparePicker(false)
-                            setComparing({ character: member.name, slot: slots[0] })
-                          }
-                        } catch (failure) {
-                          setOfflineError(failure instanceof Error ? failure.message : String(failure))
-                        } finally {
-                          setOfflineLoading(null)
-                        }
-                      }}
+                      onClick={() => void compareOffline(member.name)}
                       className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs"
                     >
                       <span>{member.name}</span>
@@ -384,8 +383,8 @@ function ItemDetailContent({
                   <button type="button" onClick={() => setComparePicker(null)} className="flex items-center gap-1 text-xs text-muted-foreground">
                     <ArrowLeft className="size-3.5" /> {comparePicker} · Choose equipment slot
                   </button>
-                  {comparisonSlotsFor(meta, ctypeOf(comparePicker)).map((slot) => {
-                    const equipped = slotsOf(comparePicker)?.[slot]
+                  {comparisonSlotsFor(meta, savedCharacters[comparePicker]?.ctype ?? characters[comparePicker]?.vitals?.ctype ?? '').map((slot) => {
+                    const equipped = (savedCharacters[comparePicker]?.slots ?? characters[comparePicker]?.inventory?.slots)?.[slot]
                     return (
                       <button
                         key={slot}
