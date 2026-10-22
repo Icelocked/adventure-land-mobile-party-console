@@ -157,8 +157,12 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       mergeState({ ...patch, ...(characterHunt ? { characterHunt } : {}) })
       // The catalog is refetched whenever core's referenceRevision changes.
       if (patch.referenceRevision && patch.referenceRevision !== lastReferenceRevision.current) {
+        const first = !lastReferenceRevision.current
         lastReferenceRevision.current = patch.referenceRevision
         void triggers.catalog()
+        // A sleeping market poll has read only GET /aldata/market so far.
+        // Waking it loads the market section without a 60s wait.
+        if (first) wakeDomain.current.market?.()
       }
     }
 
@@ -184,7 +188,9 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
           marketAldata.current = result.value
           mergeState({ aldata: result.value })
         }
-        return
+        // Core's first revision often lands during that read; the section
+        // follows at once so the fork's npcShop gate appears without a 60s wait.
+        if (!lastReferenceRevision.current) return
       }
       const result = await section<Partial<PartyStateDynamic>>('market')
       if (result.kind !== 'success') return

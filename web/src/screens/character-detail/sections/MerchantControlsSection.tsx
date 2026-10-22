@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { consoleFeatures } from '@/models'
+import { NpcShopButton } from '@/components/NpcShopSheet'
 
 /** Merchant-only controls: Buy/Craft/Exchange navigation, Force stand,
  *  Mining/Fishing, Send to party, Donate, Join giveaway, Clear job queue,
@@ -80,6 +81,7 @@ export function MerchantControlsSection({ forceStand, gatheringModes }: { forceS
         <Button size="sm" variant="outline" onClick={() => navigate('/merchant/exchange')}>
           Exchange
         </Button>
+        {consoleFeatures(state).npcShop && <NpcShopButton />}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">

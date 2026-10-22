@@ -22,6 +22,7 @@ const stableState = (): PartyStateDynamic => ({
   bankSortLayout: 'packed',
   merchantRoutinePriorities: { 'upgrade preview': 70, 'manual upgrades': 70, 'prim stack': 70 },
   farmingProfiles: { Leada: { farmingPolicy: 'auto', encounterRoutines: {} } },
+  npcShop: { orders: [], settings: { goldReserve: 0, ronDonation: false, ronVisitMinutes: 10 }, ron: null, merchantRealm: 'USIII', spendable: 0 },
 })
 
 describe('consoleFeatures', () => {
@@ -39,6 +40,7 @@ describe('consoleFeatures', () => {
       gappedBankSort: true,
       primStack: true,
       forkCommerce: true,
+      npcShop: true,
     })
   })
 
@@ -52,6 +54,9 @@ describe('consoleFeatures', () => {
     expect(gearOnly.gearSets).toBe(true)
     expect(gearOnly.forkCommerce).toBe(false)
     expect(consoleFeatures({ ...base, bossChase: null }).bossChase).toBe(false)
+    // The market section carries npcShop; before it loads the gate stays off.
+    expect(consoleFeatures({ ...base, npcShop: stableState().npcShop }).npcShop).toBe(true)
+    expect(consoleFeatures({ ...base, npcShop: null }).npcShop).toBe(false)
   })
 })
 

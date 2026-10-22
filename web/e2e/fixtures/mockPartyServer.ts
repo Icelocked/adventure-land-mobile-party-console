@@ -126,7 +126,16 @@ const completeOrder = (value: unknown): string[] | null => {
 const validEventLimits = (value: unknown) => {
   const { deathLimit, timeLimitMinutes, monsters, cipher } = (value ?? {}) as Record<string, unknown>
   const graveyard = ['zombie', 'ghoul', 'gargoyle']
-  const settings = cipher as { automatic?: unknown; minClues?: unknown } | undefined
+  const ingredients = ['verdantspore', 'frostscale', 'embercoal', 'gloomfeather']
+  const settings = cipher as { automatic?: unknown; minClues?: unknown; gatherMonsters?: unknown; manual?: { id?: unknown; round?: unknown; cracks?: unknown; mix?: unknown } } | undefined
+  // event-policy.ts validEventLimits also checks gatherMonsters and a manual solution.
+  if (settings?.gatherMonsters !== undefined && (!Array.isArray(settings.gatherMonsters) || settings.gatherMonsters.length !== 4)) return false
+  if (
+    settings?.manual !== undefined &&
+    (!settings.manual?.id || !settings.manual.round || !Number.isSafeInteger(settings.manual.cracks) || !Array.isArray(settings.manual.mix) ||
+      settings.manual.mix.length !== 5 || settings.manual.mix.some((id) => !ingredients.includes(id)))
+  )
+    return false
   return (
     !!value &&
     typeof value === 'object' &&
@@ -140,7 +149,7 @@ const CONFIG_EXTRA_KEYS = ['roster', 'classChoices', 'eventStrategy', 'giveawayR
 // public-state.ts catalogs() - served only by section=catalog (core omits them).
 const CATALOG_FIELDS = ['travelPlaces', 'monsterChoices', 'bestiaryCatalog', 'skillCatalog', 'appearanceChoices', 'merchantCatalog', 'bankVaults'] as const
 const BANK_FIELDS = ['bank', 'bankVaults', 'bankCurrent', 'bankQueue'] as const
-const MARKET_FIELDS = ['aldata', 'ponty', 'standPriceHistory'] as const
+const MARKET_FIELDS = ['aldata', 'ponty', 'npcShop', 'standPriceHistory'] as const
 const LOGS_FIELDS = ['gameLogs', 'combatLogs', 'merchantActivity'] as const
 
 // merchant/initial-settings.ts defaults: the keys the server accepts in
@@ -208,6 +217,9 @@ export class MockPartyServer {
   standBids: Record<string, Record<string, unknown>> = {}
   aldataListings: Record<string, unknown>[] = []
   pontyListings: Record<string, unknown>[] = []
+  /** The fork's market `npcShop` (commerce/npc-shop.ts npcShopView). Unset
+   *  means a console without the Ponty/Ron shop. */
+  npcShop: { orders: Record<string, unknown>[]; settings: Record<string, unknown>; ron: Record<string, unknown> | null; merchantRealm: string | null; spendable: number } | undefined = undefined
   realmControl: Record<string, unknown> | null = null
   merchantCurrent: Record<string, unknown> | null = null
   merchantQueue: Record<string, unknown>[] = []
@@ -387,6 +399,7 @@ export class MockPartyServer {
       farmingProfiles: this.farmingProfiles,
       aldata: { listings: this.aldataListings },
       ponty: { listings: this.pontyListings },
+      ...(this.npcShop ? { npcShop: this.npcShop } : {}),
       // A configured account always has a merchant (config section);
       // default to the first merchant-class character unless overridden.
       // Core's activeSlots: one loaded slot per mock character.
@@ -458,7 +471,7 @@ export class MockPartyServer {
     if (section === 'logs') return { gameLogs: this.gameLogs, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }
     if (section === 'core') {
       if (!dashboard) return omit(full, [...CATALOG_FIELDS])
-      const core = omit(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS, ...CATALOG_FIELDS, 'bank', 'ponty', 'combatLogs', 'merchantActivity', 'standPriceHistory'])
+      const core = omit(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS, ...CATALOG_FIELDS, 'bank', 'ponty', 'npcShop', 'combatLogs', 'merchantActivity', 'standPriceHistory'])
       // fullPayload(omitCatalog) drops aldata's listings/trades/buyOrders.
       const aldata = { ...((full.aldata as Record<string, unknown>) ?? {}) }
       delete aldata.listings
@@ -724,7 +737,7 @@ export class MockPartyServer {
       // priorities(), each 400 on a bad value before the follower 409.
       if (body.character !== undefined && (body.eventLimits !== undefined || body.eventPriorities !== undefined)) {
         const name = String(body.character)
-        const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : this.characters.find((c) => c.ctype === 'merchant')?.name
         const inherited = !!this.leader && name !== this.leader && name !== merchant && this.followers[name] === true
         const state = this.extraState as { eventLimitsByCharacter?: Record<string, Record<string, unknown>>; eventPrioritiesByCharacter?: Record<string, string[]> }
         if (body.eventLimits !== undefined) {
@@ -746,7 +759,7 @@ export class MockPartyServer {
       if (body.character !== undefined && body.eventSelections !== undefined) {
         // http/formation.ts: followers of a leader use the leader's events.
         const name = String(body.character)
-        const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : this.characters.find((c) => c.ctype === 'merchant')?.name
         const listed = body.eventSelections
         if (!Array.isArray(listed) || listed.some((id) => !SUPPORTED_EVENTS.includes(id))) return { status: 400, json: { error: 'invalid event selections' } }
         if (this.leader && name !== this.leader && name !== merchant && this.followers[name]) return { status: 409, json: { ok: false, error: 'using leader events' } }
@@ -754,6 +767,42 @@ export class MockPartyServer {
         this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
       }
       return { status: 200, json: { ok: true, leader: this.leader, tank: this.designatedTank, followers: this.followers } }
+    }
+    if (path.startsWith('npc-shop/') && this.npcShop) {
+      // http/npc-shop-routes.ts over commerce/npc-shop.ts create/stop/settings/visitRon.
+      const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null)
+      const whole = (value: unknown, min: number) => (Number.isSafeInteger(value) && Number(value) >= min ? Number(value) : null)
+      const shop = this.npcShop
+      if (path === 'npc-shop/orders') {
+        if (!merchant) return { status: 400, json: { error: 'configure a merchant first' } }
+        const npc = ['ponty', 'ron'].includes(String(body.npc)) ? body.npc : null
+        const mode = ['count', 'all'].includes(String(body.mode)) ? body.mode : null
+        const item = typeof body.item === 'string' ? body.item.trim() : ''
+        const level = whole(body.level ?? 0, 0)
+        const maxUnitPrice = whole(body.maxUnitPrice, 1)
+        const quantity = mode === 'count' ? whole(body.quantity, 1) : 0
+        if (!npc || !mode || !item || level === null || maxUnitPrice === null || quantity === null) return { status: 400, json: { error: 'invalid order' } }
+        const order = { id: `npc-order-${Date.now()}-${shop.orders.length}`, npc, item, level, mode, quantity, maxUnitPrice, bought: 0, spent: 0, status: 'active' }
+        this.npcShop = { ...shop, orders: [...shop.orders, order] }
+        return { status: 200, json: { ok: true, order } }
+      }
+      if (path === 'npc-shop/stop') {
+        if (!shop.orders.some((order) => order.id === body.id)) return { status: 404, json: { error: 'unknown order' } }
+        this.npcShop = { ...shop, orders: shop.orders.map((order) => (order.id === body.id && order.status === 'active' ? { ...order, status: 'stopped' } : order)) }
+        return { status: 200, json: { ok: true } }
+      }
+      if (path === 'npc-shop/settings') {
+        const reserve = body.goldReserve === undefined ? shop.settings.goldReserve : whole(body.goldReserve, 0)
+        const minutes = body.ronVisitMinutes === undefined ? shop.settings.ronVisitMinutes : whole(body.ronVisitMinutes, 1)
+        if (reserve === null) return { status: 400, json: { error: 'enter a whole-number gold reserve' } }
+        if (minutes === null || Number(minutes) > 1440) return { status: 400, json: { error: 'enter a Ron visit interval from 1 to 1440 minutes' } }
+        this.npcShop = { ...shop, settings: { goldReserve: reserve, ronVisitMinutes: minutes, ronDonation: typeof body.ronDonation === 'boolean' ? body.ronDonation : shop.settings.ronDonation } }
+        return { status: 200, json: { ok: true } }
+      }
+      if (path === 'npc-shop/ron-visit') {
+        if (!merchant) return { status: 409, json: { error: 'configure a merchant first' } }
+        return { status: 200, json: { ok: true, jobId: `merchant-${Date.now()}` } }
+      }
     }
     if (path === 'merchant/auto-npc-sale') {
       // http/automatic-sales.ts npc(): with `character` the rule is per-player
