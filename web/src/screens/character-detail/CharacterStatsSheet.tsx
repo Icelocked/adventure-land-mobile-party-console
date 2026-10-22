@@ -73,12 +73,15 @@ export function CharacterStatsSheet({
   vitals,
   diagnostics,
   slots,
+  offline = false,
   onClose,
 }: {
   name: string
   vitals: CharacterVitals
   diagnostics: CharacterDiagnostics
   slots: Record<string, EquippedEntry | null>
+  // A saved observation of a character that is not loaded (character-stats-dialog.tsx:528).
+  offline?: boolean
   onClose: () => void
 }) {
   const character = { ...diagnostics, ...vitals, ctype: vitals.ctype || diagnostics.ctype || '', level: vitals.level || Number(diagnostics.level || 0) }
@@ -267,7 +270,7 @@ export function CharacterStatsSheet({
             <GameLine line="speed" label="RUNSPD" color={SPEED} value={Math.round(Number(character.speed || 0))} />
             <GameLine line="armor" label="ARMOR" color={ARMOR} value={Number(character.armor || 0)} />
             <GameLine line="resistance" label="RESIST." color={RESISTANCE} value={Number(character.resistance || 0)} />
-            <GameLine line="code" label="CODE" color="gold" value="Active" />
+            <GameLine line="code" label="CODE" color="gold" value={offline ? 'Offline snapshot' : 'Active'} />
           </GameBox>
           <GameBox label="Character extras" className="min-w-[min(100%,20rem)] flex-1 columns-1 gap-6 pl-7 sm:columns-2">
             {extras.map((entry) => (

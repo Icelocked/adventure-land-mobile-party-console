@@ -92,6 +92,7 @@ export function VitalsHeader({
 
       <VitalBar label="HP" current={vitals.hp} max={vitals.max_hp} color="#E05C5C" />
       <VitalBar label="MP" current={vitals.mp} max={vitals.max_mp} color="#5CA3E0" />
+      {vitals.cc != null && <VitalBar label="CC" current={vitals.cc} max={200} color={vitals.cc >= 180 ? '#7f1d1d' : '#ffffff'} />}
 
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>Carrying {vitals.gold.toLocaleString()}g</span>
@@ -113,14 +114,21 @@ function VitalBar({ label, current, max, color }: { label: string; current: numb
           {current} / {max}
         </span>
       </div>
-      <ProgressBar fraction={fraction} color={color} />
+      <ProgressBar fraction={fraction} color={color} label={label} current={current} max={max} />
     </div>
   )
 }
 
-function ProgressBar({ fraction, color }: { fraction: number; color: string }) {
+function ProgressBar({ fraction, color, label, current, max }: { fraction: number; color: string; label?: string; current?: number; max?: number }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+    <div
+      role={label ? 'meter' : undefined}
+      aria-label={label}
+      aria-valuenow={label ? current : undefined}
+      aria-valuemin={label ? 0 : undefined}
+      aria-valuemax={label ? max : undefined}
+      className="h-1.5 w-full overflow-hidden rounded-full bg-secondary"
+    >
       <div className="h-full rounded-full transition-[width]" style={{ width: `${fraction * 100}%`, backgroundColor: color }} />
     </div>
   )

@@ -25,7 +25,8 @@ const ITEMS: { label: string; path: string }[] = [
 export function AccountMenu({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   // "Mail (N)" while the inbox has messages.
-  const mailCount = useMail().count
+  const mail = useMail()
+  const mailCount = mail.count
   // "Inspect stand · N/16" (occupied stand slots).
   const state = useDynamicState()
   const standCount = occupiedStandSlots(state.standListings, state.nativeStand, useStandMerchant())
@@ -45,6 +46,7 @@ export function AccountMenu({ onClose }: { onClose: () => void }) {
             >
               {item.label}
               {item.path === '/mail' && mailCount > 0 ? ` (${mailCount})` : ''}
+              {item.path === '/mail' && (mail.newCount || 0) > 0 && <span aria-label="New mail" className="ml-1 inline-block size-2 rounded-full bg-amber-300" />}
               {item.path === '/stand' ? ` · ${standCount}/16` : ''}
             </button>
           ))}

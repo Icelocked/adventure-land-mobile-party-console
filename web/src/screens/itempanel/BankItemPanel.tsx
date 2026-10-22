@@ -11,7 +11,7 @@ import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/component
 import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type InventoryEntry } from '@/models'
-import { CLEAR_MARKS_TITLE, TapRow, UpgradeTierPicker } from './ItemActionPanel'
+import { CLEAR_MARKS_TITLE, CompoundTierPicker, TapRow, UpgradeTierPicker } from './ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 
 /** The options list for one bank item, all acting through the configured
@@ -38,6 +38,12 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   const standListing = state.standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, item))
   // A full stand blocks new marks, but an already-marked copy can still be edited.
   const standFull = standIsFull(state.standListings, state.standBids)
+  // Console 1.5 bank-production-actions.tsx: no exchange or compound for a locked,
+  // bound or busy item. Exchangeable means a non-reward merchantCatalog.exchangeable row.
+  const producible = !!merchant && !item.l && !(item as { b?: unknown }).b && !entry.operation
+  const exchangeable = producible && (state.merchantCatalog?.exchangeable ?? []).some((choice) => !(choice as { reward?: unknown }).reward && choice.id === item.name && choice.level === level)
+  const compoundMax = Math.min(7, itemMaximumLevel(meta))
+  const compoundable = producible && !!meta?.compoundable && level < compoundMax
   const canUpgrade = !!merchant && !item.l && !(item as { b?: unknown }).b && !!meta?.upgradeable && itemMaximumLevel(meta) > level
 
   const confirmWith = async (action: () => Promise<ApiResult<CommandResult>>) => {
@@ -180,6 +186,26 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               )}
             </>
           )}
+          {exchangeable && (
+            <>
+              <TapRow label="Exchange" onClick={() => void run(() => api.submitExchangeOrder([{ id: item.name, level, quantity: Number(item.q || 1) }]))} />
+              <TapRow label="Auto exchange" onClick={() => void run(() => api.itemCommand('auto-exchange', merchant!, item, -1))} />
+            </>
+          )}
+          {compoundable && (
+            <>
+              <TapRow label="Compound one level" onClick={() => void run(() => api.itemCommand('compound-mark', merchant!, item, entry.slot, { pack, targetTier: level + 1 }))} />
+              <TapRow label="Auto compound" onClick={() => toggle('autocompound')} />
+              {expanded === 'autocompound' && (
+                <CompoundTierPicker
+                  meta={meta}
+                  level={level}
+                  buyable={state.merchantCatalog?.buyable ?? []}
+                  onPick={(targetTier) => void run(() => api.itemCommand('auto-compound-mark', merchant!, item, null, { targetTier }))}
+                />
+              )}
+            </>
+          )}
           <div className="my-1 border-t border-border" />
 
           {canDeconstruct(item, state.deconstructionCatalog) && (
@@ -226,7 +252,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               }}
             />
           )}
-          {/* The rule is created for the merchant. */}
+          {/* A bank item's rule is the merchant-wide one; partyApi.ts autoNpcSale() omits the character for it. */}
           <TapRow
             label={state.autoNpcSales[automaticCommerceRuleKey(item)] ? 'Update auto sell to NPC…' : 'Auto sell to NPC…'}
             className="text-rose-400"
@@ -238,9 +264,8 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
               item={item}
               meta={meta}
               name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
-              character={merchant}
               onCancel={() => setExpanded(null)}
-              onConfirm={() => confirmWith(() => api.autoNpcSale(merchant, item))}
+              onConfirm={(keep) => confirmWith(() => api.autoNpcSale(undefined, item, false, keep))}
             />
           )}
 

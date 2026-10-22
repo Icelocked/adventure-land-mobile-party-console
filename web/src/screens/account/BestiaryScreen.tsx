@@ -143,6 +143,11 @@ export function BestiaryScreen() {
                 <p className="font-mono text-[10px] text-rose-300/75">
                   {monster.attack.toLocaleString()} ATK · {monster.threat.toFixed(1)} threat
                 </p>
+                {!!monster.eventSources?.length && (
+                  <p className="truncate font-mono text-[10px] text-amber-300/90" title={monster.eventSources.map((source) => source.name).join(', ')}>
+                    Event only: {[...new Set(monster.eventSources.map((source) => source.name))].join(', ')}
+                  </p>
+                )}
                 {!!finalMilestone && achievements && (
                   <>
                     <p className="mt-1 font-mono text-[10px] text-amber-200/80">

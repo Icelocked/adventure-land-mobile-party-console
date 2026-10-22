@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, DollarSign, HandCoins, SlidersHorizontal } from 'lucide-react'
-import { useCharacterDiagnosticsMap, useCharacters, useDynamicState } from '@/data/PartyDataProvider'
+import { useCharacterDiagnosticsMap, useCharacters, useDynamicState, usePartyApi, useRoster } from '@/data/PartyDataProvider'
+import { loadCharacterInspection } from '@/lib/characterInspection'
 import { WtbDialog } from '@/components/Wtb'
 import { standIsFull } from '@/lib/standInspection'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
@@ -28,6 +29,7 @@ import {
   exchangeSections,
   exchangeTarget,
   formatDropRate,
+  isDirectDrop,
   formatStatValue,
   itemMaximumLevel,
   npcSaleValue,
@@ -46,6 +48,7 @@ import type {
   ItemSetInfo,
   ItemDropSource,
   MerchantCatalog,
+  OfflineCharacter,
   SkillEntry,
   Sprite,
 } from '@/models'
@@ -233,6 +236,42 @@ function ItemDetailContent({
   const navigate = useNavigate()
   const standFull = standIsFull(state.standListings, state.standBids)
   const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
+  // Console 1.5 item-details.tsx:580 and party-item-details.tsx:69: saved snapshots list
+  // like live characters; other roster members load their saved profile on demand.
+  const api = usePartyApi()
+  const roster = useRoster()
+  const [loadedOffline, setLoadedOffline] = useState<Record<string, OfflineCharacter>>({})
+  const [offlineLoading, setOfflineLoading] = useState<string | null>(null)
+  const [offlineError, setOfflineError] = useState('')
+  const savedCharacters: Record<string, OfflineCharacter> = {
+    ...loadedOffline,
+    ...Object.fromEntries(Object.entries(state.characterSnapshots ?? {}).filter(([name]) => !partyNames.includes(name))),
+  }
+  const savedNames = Object.keys(state.characterSnapshots ?? {}).filter((name) => !partyNames.includes(name))
+  const unloadedMembers = Object.values(roster).filter((member) => !partyNames.includes(member.name) && !state.characterSnapshots?.[member.name])
+  const ctypeOf = (name: string) => savedCharacters[name]?.ctype ?? characters[name]?.vitals?.ctype ?? ''
+  const compareOffline = async (name: string) => {
+    if (loadedOffline[name]) return chooseCompare(name)
+    setOfflineLoading(name)
+    setOfflineError('')
+    const loaded = await loadCharacterInspection(api, name).catch((failure: unknown) => {
+      setOfflineError(failure instanceof Error ? failure.message : String(failure))
+      return null
+    })
+    setOfflineLoading(null)
+    if (!loaded) return
+    setLoadedOffline((old) => ({ ...old, [name]: loaded }))
+    const slots = comparisonSlotsFor(meta, loaded.ctype)
+    if (slots.length > 1) return setComparePicker(name)
+    setComparePicker(false)
+    setComparing({ character: name, slot: slots[0] })
+  }
+  const chooseCompare = (name: string) => {
+    const slots = comparisonSlotsFor(meta, ctypeOf(name))
+    if (slots.length > 1) return setComparePicker(name)
+    setComparePicker(false)
+    setComparing({ character: name, slot: slots[0] })
+  }
   const comparable = isEquipment(meta?.definition)
   const tracktrix = context && ['tracker', 'supercomputer'].includes(target.id) ? (diagnostics[context.character]?.tracktrix as { active?: boolean; bonuses?: Record<string, number> | null } | undefined) : undefined
   const explanation = typeof meta?.definition.explanation === 'string' ? meta.definition.explanation : undefined
@@ -301,22 +340,29 @@ function ItemDetailContent({
               {comparePicker === null ? (
                 <>
                   <p className="font-mono text-[10px] uppercase text-cyan-400">Compare +{previewLevel} for</p>
-                  {partyNames.map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => {
-                        const slots = comparisonSlotsFor(meta, characters[name]?.vitals?.ctype ?? '')
-                        if (slots.length > 1) return setComparePicker(name)
-                        setComparePicker(false)
-                        setComparing({ character: name, slot: slots[0] })
-                      }}
-                      className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs"
-                    >
+                  {[...partyNames, ...savedNames].map((name) => (
+                    <button key={name} type="button" onClick={() => chooseCompare(name)} className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs">
                       <span>{name}</span>
-                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{characters[name]?.vitals?.ctype}</span>
+                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{ctypeOf(name)}</span>
                     </button>
                   ))}
+                  {unloadedMembers.map((member) => (
+                    <button
+                      key={member.name}
+                      type="button"
+                      disabled={!!offlineLoading}
+                      onClick={() => void compareOffline(member.name)}
+                      className="flex items-center justify-between rounded border border-border px-3 py-2 text-left text-xs"
+                    >
+                      <span>{member.name}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground">{offlineLoading === member.name ? 'Loading…' : `${member.ctype} · offline`}</span>
+                    </button>
+                  ))}
+                  {offlineError && (
+                    <p role="alert" className="text-xs text-destructive">
+                      {offlineError}
+                    </p>
+                  )}
                   {/* "From catalog": this item at the preview level becomes A. */}
                   <button
                     type="button"
@@ -337,8 +383,8 @@ function ItemDetailContent({
                   <button type="button" onClick={() => setComparePicker(null)} className="flex items-center gap-1 text-xs text-muted-foreground">
                     <ArrowLeft className="size-3.5" /> {comparePicker} · Choose equipment slot
                   </button>
-                  {comparisonSlotsFor(meta, characters[comparePicker]?.vitals?.ctype ?? '').map((slot) => {
-                    const equipped = characters[comparePicker]?.inventory?.slots?.[slot]
+                  {comparisonSlotsFor(meta, savedCharacters[comparePicker]?.ctype ?? characters[comparePicker]?.vitals?.ctype ?? '').map((slot) => {
+                    const equipped = (savedCharacters[comparePicker]?.slots ?? characters[comparePicker]?.inventory?.slots)?.[slot]
                     return (
                       <button
                         key={slot}
@@ -400,6 +446,7 @@ function ItemDetailContent({
           meta={meta}
           characterName={comparing.character}
           slot={comparing.slot}
+          offline={savedCharacters[comparing.character]}
           onClose={() => setComparing(null)}
         />
       )}
@@ -718,30 +765,47 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
   )
 }
 
+/** Console 1.5 item-details.tsx:779-800: direct drops only, home rewards in their own
+ *  section, and one row per monster listing each of its rolls. */
 function DropsSection({ drops, onNavigateMonster }: { drops: ItemDropSource[]; onNavigateMonster: (id: string) => void }) {
-  // Sort by percentage (default) or name; ties by name.
+  // Sort by chance (default) or name; ties by name.
   const [dropSort, setDropSort] = useState<'name' | 'percentage'>('percentage')
-  const sorted = useMemo(
-    () => [...drops].sort((a, b) => (dropSort === 'percentage' ? effectiveDropRate(b) - effectiveDropRate(a) : 0) || a.monsterName.localeCompare(b.monsterName)),
+  const sections = useMemo(
+    () =>
+      [false, true].map((home) => {
+        const groups = new Map<string, ItemDropSource[]>()
+        const sources = drops
+          .filter((source) => isDirectDrop(source) && (source.sourceType === 'home') === home)
+          .sort((a, b) => (dropSort === 'percentage' ? effectiveDropRate(b) - effectiveDropRate(a) : 0) || a.monsterName.localeCompare(b.monsterName))
+        for (const source of sources) groups.set(source.monsterId, [...(groups.get(source.monsterId) || []), source])
+        return { home, groups: [...groups.values()] }
+      }),
     [drops, dropSort],
   )
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-sm font-semibold">Monster drops</span>
-        <label className="flex items-center gap-2 text-xs">
-          Sort
-          <select aria-label="Sort monster drops" value={dropSort} onChange={(event) => setDropSort(event.target.value as 'name' | 'percentage')} className="rounded border border-border bg-background px-2 py-1">
-            <option value="name">Name</option>
-            <option value="percentage">Percentage</option>
-          </select>
-        </label>
-      </div>
-      <div className="flex flex-col gap-1">
-        {sorted.map((drop, index) => (
-          <RelatedItemRow key={`${drop.monsterId}-${index}`} name={drop.monsterName} sprite={drop.sprite} detail={formatDropRate(drop)} onClick={() => onNavigateMonster(drop.monsterId)} />
-        ))}
-      </div>
+    <div className="flex flex-col gap-3">
+      {sections.map(({ home, groups }) =>
+        groups.length ? (
+          <section key={String(home)} aria-label={home ? 'Home rewards' : 'Monster drops'}>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-sm font-semibold">{home ? 'Home rewards' : 'Monster drops'}</span>
+              <label className="flex items-center gap-2 text-xs">
+                Sort
+                <select aria-label={home ? 'Sort home rewards' : 'Sort monster drops'} value={dropSort} onChange={(event) => setDropSort(event.target.value as 'name' | 'percentage')} className="rounded border border-border bg-background px-2 py-1">
+                  <option value="name">Name</option>
+                  <option value="percentage">Chance</option>
+                </select>
+              </label>
+            </div>
+            {home && <p className="mb-1.5 text-xs text-muted-foreground">Home-server bonus required; these rewards are separate from normal monster drops.</p>}
+            <div className="flex flex-col gap-1">
+              {groups.map((rolls, index) => (
+                <RelatedItemRow key={`${rolls[0].monsterId}-${index}`} name={rolls[0].monsterName} sprite={rolls[0].sprite} detail={rolls.map(formatDropRate).join(' · ')} onClick={() => onNavigateMonster(rolls[0].monsterId)} />
+              ))}
+            </div>
+          </section>
+        ) : null,
+      )}
     </div>
   )
 }

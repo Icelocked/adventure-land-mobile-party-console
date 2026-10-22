@@ -11,6 +11,9 @@ import { CaveMap } from './CaveMap'
 
 const exitButton = 'rounded border-2 border-red-500 bg-slate-950 px-3 py-2 text-red-100 hover:border-red-300 hover:bg-red-950 disabled:opacity-50'
 
+// A merchant room is done once its encounter resolves; its item can still be bought.
+const merchantRoom = (room?: string) => !!room && /^\d+:shop$/.test(room)
+
 /** The Cave of Many Dreams run controls at the top of
  *  the party screen while a visit is underway. Its dialogs (exit
  *  confirmation, encounter, shop item) are inline groups and sheets. */
@@ -26,8 +29,12 @@ export function DungeonPanel() {
   const [exitConfirm, setExitConfirm] = useState(false)
   const [itemInspection, setItemInspection] = useState<string | null>(null)
   if (!view || ['idle', 'held'].includes(view.state.phase)) return null
-  const cave = view.members.find((m) => m.fresh && m.observation?.cave)?.observation?.cave,
-    choice = cave?.choice
+  // Console 1.5 dungeon-panel.tsx: talking to a merchant reopens its shop for
+  // the one member who talked, so the shop comes from that member's observation.
+  const sameRun = view.members.filter((m) => m.observation?.cave?.run === view.state.run)
+  const cave = (sameRun.find((m) => m.fresh && m.observation?.cave) ?? view.members.find((m) => m.fresh && m.observation?.cave))?.observation?.cave
+  const reopened = requestedRoom ? sameRun.map((m) => m.observation?.cave?.choice).find((c) => c?.shop?.room === requestedRoom) : undefined
+  const choice = cave ? reopened || cave.choice : undefined
   const recovery = view.state.priestRecovery
   const priest = view.members.find((m) => m.name === recovery?.priest)
   const report = priest?.fresh && priest.observation?.recovery?.id === recovery?.id ? priest.observation?.recovery : undefined
@@ -134,7 +141,7 @@ export function DungeonPanel() {
             <button
               className={dungeonButton + (p.done ? ' !border-2 !border-green-500 disabled:!opacity-80' : p.required ? ' !border-2 !border-orange-500' : '')}
               key={p.id}
-              disabled={query.busy || cave.paused || p.locked || p.done || view.state.phase !== 'active'}
+              disabled={query.busy || cave.paused || p.locked || (p.done && !merchantRoom(p.room)) || view.state.phase !== 'active'}
               onClick={() => {
                 setRequestedRoom(p.room || null)
                 if (choice?.shop?.nearby && p.room === choice.shop.room) setInspectedChoice(choice.id)
@@ -143,7 +150,7 @@ export function DungeonPanel() {
             >
               {p.label}
               {p.map !== 'zone_' + cave.run + '_' + cave.floor ? ' — different floor' : ''}
-              {p.locked ? ' — locked' : p.done ? ' — complete' : ''}
+              {p.locked ? ' — locked' : p.done && merchantRoom(p.room) ? ' - reopen shop' : p.done ? ' — complete' : ''}
             </button>
           ))}
       </div>

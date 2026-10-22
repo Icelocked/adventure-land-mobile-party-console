@@ -12,6 +12,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { CatalogItem, InventoryEntry, Item, ReceivedMail } from '@/models'
+import type { ApiResult, CommandResult } from '@/api/partyApi'
 
 type CatalogFor = (id: string) => CatalogItem | undefined
 /** A prefilled draft, e.g. from ALData's "Prepare mail". */
@@ -48,6 +49,7 @@ export function MailScreen() {
   const [mailBusy, setMailBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const selected = mail.messages.find((message) => message.id === selectedId)
+  const [tab, setTab] = useState<'inbox' | 'outbox'>('inbox')
 
   const mailAction = async (action: 'refresh' | 'collect' | 'delete', id?: string) => {
     setMailBusy(true)
@@ -79,6 +81,7 @@ export function MailScreen() {
           {error}
         </p>
       )}
+      <MailboxControls tab={tab} onTab={setTab} />
       {composing && (
         <ComposeSection
           key={draft?.key ?? 0}
@@ -91,7 +94,7 @@ export function MailScreen() {
         />
       )}
       {mail.error && <p className="mx-3 mb-2 text-sm text-amber-500">Mail may be out of date: {mail.error}</p>}
-      {!mail.messages.length ? (
+      {tab === 'outbox' ? null : !mail.messages.length ? (
         <p className="p-6 text-center text-sm text-muted-foreground">{mail.updatedAt ? 'No received mail.' : 'Loading mail…'}</p>
       ) : (
         <div className="flex flex-col gap-1.5 p-3">
@@ -477,5 +480,76 @@ function ComposeSection({ draft, catalogFor, onClose }: { draft: MailDraft | nul
         </Button>
       </div>
     </section>
+  )
+}
+
+/** Console 1.5 mailbox-controls.tsx: automatic collect and delete, the Inbox
+ *  and Outbox tabs, and the sent-mail list. While the mailbox reports new mail,
+ *  it posts /mail/seen once per new count. */
+function MailboxControls({ tab, onTab }: { tab: 'inbox' | 'outbox'; onTab: (tab: 'inbox' | 'outbox') => void }) {
+  const mail = useMail()
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const settings = mail.settings ?? { autoCollect: false, autoDelete: false }
+  const newCount = mail.newCount || 0
+  useEffect(() => {
+    if (newCount <= 0) return
+    void api.markMailSeen().then((result) => {
+      if (result.kind === 'failure') setError(result.message || 'Could not mark mail read')
+    })
+  }, [api, newCount])
+  const run = async (request: () => Promise<ApiResult<CommandResult>>) => {
+    setBusy(true)
+    setError('')
+    const result = await request()
+    setBusy(false)
+    if (result.kind === 'failure') setError(result.message || 'Mailbox update failed')
+    await refreshNow()
+  }
+  const toggle = (name: 'autoCollect' | 'autoDelete', label: string) => (
+    <label className="flex items-center gap-2">
+      <input type="checkbox" className="size-4" checked={settings[name]} disabled={busy} onChange={(event) => void run(() => api.saveMailSettings({ ...settings, [name]: event.target.checked }))} />
+      {label}
+    </label>
+  )
+  return (
+    <div className="mx-3 mb-2 flex flex-col gap-3 rounded-md border border-border p-3 text-sm">
+      {toggle('autoCollect', 'Automatically collect mail attachments')}
+      {toggle('autoDelete', 'Automatically delete messages after attachments are collected')}
+      <div className="flex gap-2">
+        <Button size="sm" variant={tab === 'inbox' ? 'default' : 'outline'} aria-pressed={tab === 'inbox'} onClick={() => onTab('inbox')}>
+          Inbox
+        </Button>
+        <Button size="sm" variant={tab === 'outbox' ? 'default' : 'outline'} aria-pressed={tab === 'outbox'} onClick={() => onTab('outbox')}>
+          Outbox
+        </Button>
+      </div>
+      {error && <p role="alert" className="text-destructive">{error}</p>}
+      {tab === 'outbox' && (
+        <section aria-label="Sent mail" className="flex flex-col gap-2">
+          {!mail.outbox?.length && <p className="text-muted-foreground">No sent mail recorded.</p>}
+          {mail.outbox?.map((sent) => (
+            <article key={sent.id} className="rounded-md border border-border bg-card p-3">
+              <h3 className="break-words font-medium">{sent.subject}</h3>
+              <p className="text-xs text-muted-foreground">
+                To {sent.recipient} · {new Date(sent.sent).toLocaleString()}
+              </p>
+              <p className="whitespace-pre-wrap break-words">{sent.message}</p>
+              {sent.item != null && (
+                <p className="text-amber-500">
+                  Attachment: {String(sent.item.name || 'item')} × {sent.quantity || 1}
+                </p>
+              )}
+              <Button size="sm" variant="outline" className="mt-2" disabled={busy} aria-label={`Delete sent record ${sent.subject}`} onClick={() => void run(() => api.deleteSentMail(sent.id))}>
+                Delete sent record
+              </Button>
+            </article>
+          ))}
+          <p className="text-xs text-muted-foreground">Deleting a sent record does not recall the message or its attachment.</p>
+        </section>
+      )}
+    </div>
   )
 }

@@ -10,7 +10,7 @@ import { comparisonSlotsFor, detailMeta, itemMaximumLevel, propertiesAtLevel, ST
 import { GameBox } from '@/components/GameBox'
 import { titledName } from '@/lib/itemCardLines'
 import { STAT_COLORS as S } from '@/lib/statColors'
-import type { EquippedEntry, Item, ItemMeta, ItemSetInfo } from '@/models'
+import type { EquippedEntry, Item, ItemMeta, ItemSetInfo, OfflineCharacter } from '@/models'
 
 type Props = Record<string, string | number | boolean>
 type Stats = Record<string, number>
@@ -58,20 +58,24 @@ export function GearComparisonSheet({
   meta: liveMeta,
   characterName,
   slot: pickedSlot,
+  offline,
   onClose,
 }: {
   item: Item
   meta: ItemMeta | undefined
   characterName: string
   slot?: string
+  // A character that is not loaded: its saved equipment and stats stand in for the live ones.
+  offline?: OfflineCharacter
   onClose: () => void
 }) {
   const characters = useCharacters()
-  const diagnostics = useCharacterDiagnosticsMap()[characterName] ?? {}
+  const liveDiagnostics = useCharacterDiagnosticsMap()[characterName] ?? {}
+  const diagnostics = (offline ?? liveDiagnostics) as typeof liveDiagnostics
   const state = useDynamicState()
   const catalogFor = useCatalogLookup(state.merchantCatalog)
-  const vitals = characters[characterName]?.vitals
-  const slots = characters[characterName]?.inventory?.slots ?? {}
+  const vitals = offline ?? characters[characterName]?.vitals
+  const slots = offline?.slots ?? characters[characterName]?.inventory?.slots ?? {}
   const metaOf = (value: { item: Item; meta?: ItemMeta | null }) => detailMeta(catalogFor(value.item.name)?.meta, value.meta)
   const entryMeta = detailMeta(catalogFor(item.name)?.meta, liveMeta)
   const ctype = vitals?.ctype || diagnostics.ctype || ''

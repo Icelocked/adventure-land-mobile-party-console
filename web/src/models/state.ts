@@ -1,6 +1,7 @@
 import type { StandPriceHistory } from '@/lib/suggestedItemValue'
 import type { Item, InventoryEntry, EquippedEntry } from './item'
 import type { Sprite } from './sprite'
+import type { OfflineCharacter } from './character'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
 import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
 
@@ -48,6 +49,16 @@ export interface RestockRange {
 export interface RestockPolicy {
   hp: RestockRange
   mp: RestockRange
+  // Console 1.5 http/restock.ts keeps an elixir only when a save sends `elixir.item`.
+  elixir?: ElixirRestock
+}
+
+export interface ElixirRestock {
+  item: string
+  min: number
+  max: number
+  autoConsume: boolean
+  autoAcquire: boolean
 }
 
 export const emptyRestockPolicy = (): RestockPolicy => ({
@@ -115,6 +126,18 @@ export interface BestiaryMonster {
   sprite?: Sprite | null
   drops: BestiaryDrop[]
   spawnRecords: MonsterSpawnRecord[]
+  // Console 1.5: the events that spawn this monster, when only events do.
+  eventSources?: MonsterEventSource[]
+  // Console 1.5: rolls that need the home-server bonus, apart from `drops`.
+  homeRewards?: BestiaryDrop[]
+}
+
+/** bestiaryCatalog[].eventSources: a boss, its wave, or an add raised at HP fractions `at`. */
+export interface MonsterEventSource {
+  id: string
+  name: string
+  role: 'boss' | 'wave' | 'add' | string
+  at?: number[]
 }
 
 /** A class's skill list. */
@@ -652,6 +675,11 @@ export interface PartyStateDynamic {
   referenceRevision?: string
   // Core's bank gold (null until the bank has been seen).
   bankGold?: number | null
+  // Console 1.5 config characterSnapshots: each account character's last saved observation.
+  characterSnapshots?: Record<string, OfflineCharacter>
+  // Console 1.5 core accountGold (telemetry/account-gold.ts): bank plus every
+  // assigned slot's last carried gold, offline slots included.
+  accountGold?: { carried: number | null; total: number | null } | null
   // Giveaways
   giveawayRealms?: { key: string; label: string }[]
   giveawayPlayers?: Record<string, string[]>

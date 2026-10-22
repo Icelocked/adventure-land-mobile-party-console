@@ -8,6 +8,7 @@ import {
   eventPolicy,
   eventPriorityOrder,
   eventTimeLabel,
+  realmTimeLabel,
   selectedEvents,
   supportedEvents,
   validEventLimits,
@@ -178,9 +179,30 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
                   />
                   <span>
                     {event.name} —{' '}
-                    {!supported ? 'Unsupported' : event.live ? 'LIVE' : event.next ? eventTimeLabel(event.next, now) : event.slotAt ? `Next chance: ${eventTimeLabel(event.slotAt, now)}` : 'Time not announced'}
+                    {!supported
+                      ? 'Unsupported'
+                      : event.live
+                        ? 'LIVE'
+                        : event.next
+                          ? eventTimeLabel(event.next, now, event.clockOffsetMs)
+                          : event.slotAt
+                            ? `Next chance: ${eventTimeLabel(event.slotAt, now, event.clockOffsetMs)}`
+                            : 'Time not announced'}
+                    {!!event.next && event.realmOffsetHours !== undefined && <span className="block text-slate-300">{realmTimeLabel(event.next, event.realmOffsetHours)}</span>}
+                    {event.confirmed && <span className="block text-cyan-200">Realm schedule confirmed</span>}
                     {event.stale ? ' · timing stale' : ''}
                     {ignored && <span className="block text-amber-200">Skipped this instance: {ignored}</span>}
+                    {!!event.occurrences?.length && (
+                      <details className="mt-1 text-slate-300">
+                        <summary className="cursor-pointer">Next seven days</summary>
+                        {event.occurrences
+                          .slice()
+                          .sort((a, b) => a.at - b.at)
+                          .map((entry, index) => (
+                            <div key={index}>{new Date(entry.at).toLocaleString()}</div>
+                          ))}
+                      </details>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -250,7 +272,9 @@ function EventLimitsPanel({
   const [minutes, setMinutes] = useState(limits.timeLimitMinutes == null ? '' : String(limits.timeLimitMinutes))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const value = { deathLimit: deaths.trim() ? Number(deaths) : null, timeLimitMinutes: minutes.trim() ? Number(minutes) : null }
+  // Console 1.5 formation.ts stores the posted limits whole, so the save
+  // carries the saved monsters and cipher fields back (event-limits-dialog.tsx:24).
+  const value = { ...limits, deathLimit: deaths.trim() ? Number(deaths) : null, timeLimitMinutes: minutes.trim() ? Number(minutes) : null }
   return (
     <div role="group" aria-label={`${label} settings`} className="mb-2 flex flex-col gap-2 rounded-md border border-border p-3">
       <p className="text-sm font-medium">{label} settings</p>

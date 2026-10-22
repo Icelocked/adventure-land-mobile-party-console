@@ -68,7 +68,7 @@ test('Donate shows the XP preview and validates; Join giveaway picks a realm and
   await page.goto('/characters/Patinder')
   await page.getByRole('button', { name: 'Donate gold' }).click()
   await page.getByRole('textbox', { name: 'Donation amount' }).fill('1000')
-  await expect(page.getByText('Preview: 3,200 XP')).toBeVisible()
+  await expect(page.getByText('Connect the merchant to load its native XP curve. · 3,200 XP (3.2 XP/gold)')).toBeVisible()
   await page.getByRole('button', { name: 'Donate', exact: true }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'merchant/donate')?.body).toEqual({ amount: 1000 })
 

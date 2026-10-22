@@ -9,14 +9,18 @@ type Listener = { frame: (frame: MapFrame) => void; state?: (state: 'live' | 're
  *  and closed when the last leaves. While a stream is open the character
  *  keeps posting frames to the console, so only map views open one.
  *  Passive listeners only hear frames from a stream a map view opened. */
-const streams = new Map<string, { source: EventSource; listeners: Set<Listener> }>()
+// `last` is the latest frame with the floor definition attached. The console's
+// telemetry/map-stream.ts message() sends `definition` only on a subscriber's
+// first frame for a floor, so a listener that joins an open stream gets it from here.
+type Stream = { source: EventSource; listeners: Set<Listener>; last?: MapFrame }
+const streams = new Map<string, Stream>()
 const passive = new Map<string, Set<Listener>>()
 
 export function subscribeMapFrames(url: string, listener: Listener): () => void {
   let stream = streams.get(url)
   if (!stream) {
     const source = new EventSource(url)
-    const created = { source, listeners: new Set<Listener>() }
+    const created: Stream = { source, listeners: new Set<Listener>() }
     const everyone = () => [...created.listeners, ...(passive.get(url) || [])]
     source.onopen = () => everyone().forEach((entry) => entry.state?.('live'))
     source.onerror = () => everyone().forEach((entry) => entry.state?.('reconnecting'))
@@ -27,12 +31,15 @@ export function subscribeMapFrames(url: string, listener: Listener): () => void 
       } catch {
         return
       }
+      const known = frame.definition?.name === frame.map ? frame.definition : created.last?.definition?.name === frame.map ? created.last.definition : undefined
+      created.last = known ? { ...frame, definition: known } : frame
       everyone().forEach((entry) => entry.frame(frame))
     }
     streams.set(url, created)
     stream = created
-  } else if (stream.source.readyState === EventSource.OPEN) {
-    listener.state?.('live')
+  } else {
+    if (stream.source.readyState === EventSource.OPEN) listener.state?.('live')
+    if (stream.last) listener.frame(stream.last)
   }
   stream.listeners.add(listener)
   const owned = stream

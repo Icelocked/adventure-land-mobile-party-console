@@ -55,6 +55,8 @@ export interface MockCharacter {
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
   // Console 1.4: live vitals.reservedInventory, the bag slots a gear set holds (inventory/swap-reservations.ts).
   reservedInventory?: { slot: number; item: MockItem | null }[]
+  // Further live status fields (cc, donationLevelXp, ...) sent in both fast and the stream's vitals.
+  vitalsExtra?: Record<string, unknown>
 }
 
 export interface MockCatalogEntry {
@@ -107,15 +109,29 @@ const CONFIG_FIELDS = [
   'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
   // Console 1.4 combat and party: designated tank and gear sets.
   'designatedTank', 'gearSets',
+  // Console 1.5: each account character's last saved observation.
+  'characterSnapshots',
 ] as const
-// Console 1.4 events and realms: dashboard/lib/event-policy.ts supportedEvents,
+// Console 1.5 events and realms: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
-const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin']
+const OCTOBER_EVENTS = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
+const SUPPORTED_EVENTS = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman', 'slenderman', 'mrgreen', 'mrpumpkin', ...OCTOBER_EVENTS]
+// http/formation.ts completeOrder(): a list without the October ids gets them appended.
+const completeOrder = (value: unknown): string[] | null => {
+  if (!Array.isArray(value) || new Set(value).size !== value.length) return null
+  const ids = value.filter((id): id is string => typeof id === 'string' && SUPPORTED_EVENTS.includes(id))
+  if (ids.length !== value.length || SUPPORTED_EVENTS.some((id) => !OCTOBER_EVENTS.includes(id) && !ids.includes(id))) return null
+  return [...ids, ...SUPPORTED_EVENTS.filter((id) => !ids.includes(id))]
+}
 const validEventLimits = (value: unknown) => {
-  const { deathLimit, timeLimitMinutes } = (value ?? {}) as Record<string, unknown>
+  const { deathLimit, timeLimitMinutes, monsters, cipher } = (value ?? {}) as Record<string, unknown>
+  const graveyard = ['zombie', 'ghoul', 'gargoyle']
+  const settings = cipher as { automatic?: unknown; minClues?: unknown } | undefined
   return (
     !!value &&
     typeof value === 'object' &&
+    (monsters === undefined || (Array.isArray(monsters) && new Set(monsters).size === monsters.length && monsters.every((id) => graveyard.includes(id)))) &&
+    (settings === undefined || (!!settings && typeof settings.automatic === 'boolean' && Number.isSafeInteger(settings.minClues) && Number(settings.minClues) >= 0 && Number(settings.minClues) <= 1024)) &&
     (deathLimit === null || (Number.isSafeInteger(deathLimit) && Number(deathLimit) >= 0)) &&
     (timeLimitMinutes === null || (typeof timeLimitMinutes === 'number' && Number.isFinite(timeLimitMinutes) && timeLimitMinutes > 0))
   )
@@ -145,6 +161,8 @@ const DEFAULT_MERCHANT_AUTOMATIONS: Record<string, boolean> = {
   deliveries: true, withdrawals: true, 'merchant luck': true, 'party collection': true, 'auto npc sales': true,
   restock: true, 'gold threshold': true, 'inventory cleanout': true, 'auto compound': true, 'auto upgrade': true,
   'automatic exchange': true, 'stand bid purchases': true, 'join giveaway': true,
+  // Console 1.5 replacement gathering tools, off until enabled.
+  'craft fishing tools': false, 'craft mining tools': false,
 }
 
 function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
@@ -163,11 +181,19 @@ export class MockPartyServer {
   exchangeable: Record<string, unknown>[] = []
   bankPacks: Record<string, (Record<string, unknown> | null)[]> = {}
   bankGold = 0
+  // Core's accountGold (telemetry/account-gold.ts accountGoldSnapshot). Unset, the
+  // mock sums every character's gold, since each mock character holds a slot.
+  accountGold: { carried: number | null; total: number | null } | undefined
   mailMessages: Record<string, unknown>[] = []
   mailPostage: number | null = null
   // inventory-entry.tsx operation, per character then slot (an upgrade/compound in progress).
   inventoryOperations: Record<string, Record<number, Record<string, unknown>>> = {}
   mailActions: { action: string; id?: unknown }[] = []
+  // Console 1.5 commerce/mailbox.ts: automation settings, read ids and the sent-mail record.
+  mailSettings = { autoCollect: false, autoDelete: false }
+  mailboxActions: { action: string; id?: unknown }[] = []
+  mailSeenIds: string[] = []
+  mailOutbox: { id: string; recipient: string; subject: string; message: string; sent: string; item?: MockItem; quantity?: number }[] = []
   standListings: Record<string, unknown>[] = []
   bestiaryCatalog: Record<string, unknown>[] = []
   skillCatalog: Record<string, unknown>[] = []
@@ -279,6 +305,10 @@ export class MockPartyServer {
 
   /** Roster members that aren't live (offline, not in a slot). */
   offlineRoster: { name: string; ctype: string; level: number; online?: boolean }[] = []
+  // GET /characters/:name/inspection (characters/inspection.ts): {character} for an owned
+  // name with a saved account profile; unset names answer 404 as not owned.
+  inspections: Record<string, { status?: number; json: Record<string, unknown> }> = {}
+  inspectionRequests: string[] = []
 
   private roster() {
     return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level, ...(c.server ? { server: c.server } : {}) })), ...this.offlineRoster]
@@ -418,7 +448,7 @@ export class MockPartyServer {
       return {
         characters: Object.fromEntries(
           // fastCharacters: the whole status minus items/slots and other omitted fields.
-          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}) }]),
+          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}), ...c.vitalsExtra }]),
         ),
       }
     if (section === 'inventory')
@@ -444,6 +474,11 @@ export class MockPartyServer {
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
         serverNow: Date.now(),
         bankGold: this.bankGold,
+        accountGold: this.accountGold ?? (() => {
+          const balances = this.characters.map((c) => (c as { gold?: number }).gold)
+          const carried = balances.every((gold) => typeof gold === 'number') ? balances.reduce<number>((sum, gold) => sum + gold!, 0) : null
+          return { carried, total: carried === null ? null : this.bankGold + carried }
+        })(),
         // public-state.ts core: the catalog's reference revision.
         referenceRevision: 'mock',
       }
@@ -478,12 +513,27 @@ export class MockPartyServer {
           ...(c.target ? { target: c.target } : {}),
           ...(c.conditions ? { conditions: c.conditions } : {}),
           ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}),
+          ...c.vitalsExtra,
         },
         items,
         slots: c.slots ?? {},
       }
     }
     return { type: 'snapshot', epoch: 'e1', sequence, characters }
+  }
+
+  /** GET /party-api/mail as mailbox.ts snapshot() sends it. */
+  private mailSnapshot(): Record<string, unknown> {
+    const seen = new Set(this.mailSeenIds)
+    return {
+      messages: this.mailMessages,
+      count: this.mailMessages.length,
+      updatedAt: Date.now(),
+      error: null,
+      settings: { ...this.mailSettings },
+      outbox: this.mailOutbox.map((m) => ({ ...m })),
+      newCount: this.mailMessages.filter((m) => typeof m.id === 'string' && !seen.has(m.id)).length,
+    }
   }
 
   private sseServer: Server | null = null
@@ -681,22 +731,24 @@ export class MockPartyServer {
           const patch = (body.eventLimits ?? {}) as { event?: unknown; limits?: { deathLimit: unknown; timeLimitMinutes: unknown } }
           if (!SUPPORTED_EVENTS.includes(String(patch.event)) || !validEventLimits(patch.limits)) return { status: 400, json: { error: 'invalid event limits' } }
           if (inherited) return { status: 409, json: { error: 'using leader events' } }
-          const limits = { deathLimit: patch.limits!.deathLimit, timeLimitMinutes: patch.limits!.timeLimitMinutes }
+          // formation.ts limits() stores structuredClone(patch.limits), so a missing key is gone.
+          const limits = structuredClone(patch.limits)
           const saved = { ...state.eventLimitsByCharacter, [name]: { ...state.eventLimitsByCharacter?.[name], [String(patch.event)]: limits } }
           this.extraState = { ...this.extraState, eventLimitsByCharacter: saved }
         }
         if (body.eventPriorities !== undefined) {
-          const value = body.eventPriorities
-          if (!Array.isArray(value) || value.length !== SUPPORTED_EVENTS.length || new Set(value).size !== value.length || value.some((id) => !SUPPORTED_EVENTS.includes(id)))
-            return { status: 400, json: { error: 'invalid event priorities' } }
+          const order = completeOrder(body.eventPriorities)
+          if (!order) return { status: 400, json: { error: 'invalid event priorities' } }
           if (inherited) return { status: 409, json: { error: 'using leader events' } }
-          this.extraState = { ...this.extraState, eventPrioritiesByCharacter: { ...state.eventPrioritiesByCharacter, [name]: [...value] } }
+          this.extraState = { ...this.extraState, eventPrioritiesByCharacter: { ...state.eventPrioritiesByCharacter, [name]: order } }
         }
       }
       if (body.character !== undefined && body.eventSelections !== undefined) {
         // http/formation.ts: followers of a leader use the leader's events.
         const name = String(body.character)
         const merchant = this.characters.find((c) => c.ctype === 'merchant')?.name
+        const listed = body.eventSelections
+        if (!Array.isArray(listed) || listed.some((id) => !SUPPORTED_EVENTS.includes(id))) return { status: 400, json: { error: 'invalid event selections' } }
         if (this.leader && name !== this.leader && name !== merchant && this.followers[name]) return { status: 409, json: { ok: false, error: 'using leader events' } }
         const current = (this.extraState.eventSelectionsByCharacter as Record<string, string[]> | undefined) ?? {}
         this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
@@ -916,6 +968,43 @@ export class MockPartyServer {
       if (index >= 0) listings[index] = listing
       else listings.push(listing)
       return { status: 200, json: { ok: true } }
+    }
+    if (path === 'restock') {
+      // http/restock.ts: hp/mp rebuilt from the body; an elixir only with a catalog elixir item.
+      const supply = (value: unknown, item: string, min: number, max: number) => {
+        const object = (value ?? {}) as Record<string, unknown>
+        const count = (raw: unknown, fallback: number) => (Number.isSafeInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : fallback)
+        return { item, min: count(value && object.min, min), max: count(value && object.max, max) }
+      }
+      const policy: Record<string, unknown> = { hp: supply(body.hp, 'hpot1', 5, 20), mp: supply(body.mp, 'mpot1', 0, 0) }
+      const elixir = (body.elixir ?? {}) as Record<string, unknown>
+      if (elixir.item) {
+        const entry = this.catalogEntries[String(elixir.item)]
+        if (typeof elixir.item !== 'string' || entry?.definition?.type !== 'elixir') return { status: 400, json: { error: 'Select a valid elixir' } }
+        const ranged = supply(elixir, elixir.item, 1, 2)
+        if (ranged.min > ranged.max) return { status: 400, json: { error: 'minimum cannot exceed maximum' } }
+        policy.elixir = { ...ranged, autoConsume: elixir.autoConsume !== false, autoAcquire: elixir.autoAcquire === true }
+      }
+      const saved = (this.extraState.restockPolicies as Record<string, unknown> | undefined) ?? {}
+      this.extraState = { ...this.extraState, restockPolicies: { ...saved, [String(body.character)]: policy } }
+      return { status: 200, json: { ok: true, policy } }
+    }
+    if (path === 'mail/settings') {
+      // mailbox.ts configure(): both settings are required booleans.
+      this.mailboxActions.push({ action: 'settings' })
+      if (typeof body.autoCollect !== 'boolean' || typeof body.autoDelete !== 'boolean') return { status: 400, json: { error: 'Choose both mailbox automation settings' } }
+      this.mailSettings = { autoCollect: body.autoCollect, autoDelete: body.autoDelete }
+      return { status: 200, json: this.mailSnapshot() }
+    }
+    if (path === 'mail/seen') {
+      this.mailboxActions.push({ action: 'seen' })
+      this.mailSeenIds = [...new Set([...this.mailSeenIds, ...this.mailMessages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))])]
+      return { status: 200, json: this.mailSnapshot() }
+    }
+    if (path === 'mail/outbox-delete') {
+      this.mailboxActions.push({ action: 'outbox-delete', id: body.id })
+      this.mailOutbox = this.mailOutbox.filter((m) => m.id !== body.id)
+      return { status: 200, json: this.mailSnapshot() }
     }
     if (path === 'mail/collect' || path === 'mail/delete' || path === 'mail/refresh') {
       const action = path.slice('mail/'.length)
@@ -1370,7 +1459,7 @@ export class MockPartyServer {
       if (route.request().method() !== 'GET') return route.fallback()
       if (new URL(route.request().url()).pathname.endsWith('/mail/postage'))
         return this.mailPostage === null ? route.fulfill({ status: 503, json: { error: 'unavailable' } }) : route.fulfill({ json: { gold: this.mailPostage } })
-      return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length, updatedAt: Date.now(), error: null } })
+      return route.fulfill({ json: this.mailSnapshot() })
     })
     await page.route('**/console-update', (route) =>
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
@@ -1440,6 +1529,12 @@ export class MockPartyServer {
     await page.route('**/party-api/dashboard-stream', async (route) => {
       const base = await this.startSseServer()
       return route.continue({ url: `${base}/dashboard-stream` })
+    })
+    await page.route('**/party-api/characters/*/inspection', (route) => {
+      const name = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^.*\/characters\//, '').replace(/\/inspection$/, ''))
+      this.inspectionRequests.push(name)
+      const answer = this.inspections[name]
+      return answer ? route.fulfill({ status: answer.status ?? 200, json: answer.json }) : route.fulfill({ status: 404, json: { error: 'Character is not on this account' } })
     })
     await page.route('**/party-api/maps/**', (route) => {
       const url = new URL(route.request().url())

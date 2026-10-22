@@ -62,7 +62,7 @@ test('Bank: tapping an item opens its options with Item details first; upgrade m
   await expect.poll(() => bodies.find((b) => b.path === 'command')?.body).toMatchObject({ character: 'Patinder', type: 'withdraw', pack: 'items1', slot: 1, upgradeTiers: 2 })
 })
 
-test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as the merchant', async ({ page }) => {
+test('Bank: Auto mark for upgrade, the merchant-wide auto sell to NPC and Clear all marks act as the merchant', async ({ page }) => {
   const server = bankServer()
   await server.install(page)
   const bodies = posts(page)
@@ -76,7 +76,8 @@ test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as t
   await page.getByRole('button', { name: /Iron Ore x5/ }).click()
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await page.getByRole('button', { name: 'Enable auto sale' }).click()
-  await expect.poll(() => bodies.find((b) => b.path === 'merchant/auto-npc-sale')?.body).toMatchObject({ character: 'Patinder', action: 'set' })
+  // partyApi.ts autoNpcSale(): the merchant's rule is the account-wide one, sent without `character`.
+  await expect.poll(() => bodies.find((b) => b.path === 'merchant/auto-npc-sale')?.body).toEqual({ item: expect.objectContaining({ name: 'ironore' }), action: 'set' })
 
   await page.getByRole('button', { name: /Iron Ore x5/ }).click()
   await page.getByRole('button', { name: 'Clear all marks' }).click()
@@ -237,4 +238,35 @@ test('Bank: an item with an auto NPC sale rule is tagged, and its option says Up
   await expect(page.getByRole('button', { name: /^Bow \+2/ }).getByText('Auto NPC')).toHaveCount(0)
   await ore.click()
   await expect(page.getByRole('button', { name: 'Update auto sell to NPC…', exact: true })).toBeVisible()
+})
+
+test('Bank: exchange and compound rows send the dashboard bodies (bank-production-actions.tsx)', async ({ page }) => {
+  const server = bankServer()
+  server.addCatalogEntry({ id: 'gem0', name: 'Shiny Gem' })
+  server.addCatalogEntry({ id: 'ringsj', name: 'Ring of Sweet Jacko', compoundable: true })
+  server.exchangeable = [{ key: 'gem0@0', id: 'gem0', level: 0, name: 'Shiny Gem', cost: 0, required: 1 }]
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'gem0', q: 3 } }, { slot: 1, item: { name: 'ringsj', level: 1 } }, { slot: 2, item: { name: 'ironore', q: 5 } }] }
+  await server.install(page)
+  const bodies = posts(page)
+
+  await page.goto('/bank')
+  await page.getByRole('button', { name: /Shiny Gem x3/ }).click()
+  await page.getByRole('button', { name: 'Exchange', exact: true }).click()
+  await expect.poll(() => bodies.find((b) => b.path === 'merchant/exchange-order')?.body).toEqual({ exchanges: [{ id: 'gem0', level: 0, quantity: 3 }] })
+  await page.getByRole('button', { name: /Shiny Gem x3/ }).click()
+  await page.getByRole('button', { name: 'Auto exchange' }).click()
+  await expect.poll(() => bodies.find((b) => b.body.type === 'auto-exchange')?.body).toEqual({ character: 'Patinder', type: 'auto-exchange', item: { name: 'gem0', q: 3 }, slot: -1 })
+
+  await page.getByRole('button', { name: /Ring of Sweet Jacko \+1/ }).click()
+  await page.getByRole('button', { name: 'Compound one level' }).click()
+  await expect.poll(() => bodies.find((b) => b.body.type === 'compound-mark')?.body).toEqual({ character: 'Patinder', type: 'compound-mark', item: { name: 'ringsj', level: 1 }, pack: 'items1', slot: 1, targetTier: 2 })
+  await page.getByRole('button', { name: /Ring of Sweet Jacko \+1/ }).click()
+  await page.getByRole('button', { name: 'Auto compound' }).click()
+  await page.getByRole('button', { name: /^\+3/ }).click()
+  await expect.poll(() => bodies.find((b) => b.body.type === 'auto-compound-mark')?.body).toEqual({ character: 'Patinder', type: 'auto-compound-mark', item: { name: 'ringsj', level: 1 }, targetTier: 3 })
+
+  // Neither row shows for an item that is not exchangeable or compoundable.
+  await page.getByRole('button', { name: /Iron Ore x5/ }).click()
+  await expect(page.getByRole('button', { name: 'Exchange', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Compound one level' })).toHaveCount(0)
 })
