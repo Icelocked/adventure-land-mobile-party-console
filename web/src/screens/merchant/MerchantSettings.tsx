@@ -27,13 +27,14 @@ function useSetting() {
 const box = 'flex flex-col gap-2 rounded-md border border-border p-3 text-sm'
 const help = 'text-xs text-muted-foreground'
 
-/** "Merchant settings": bank sorting,
+/** "Merchant settings": bank sorting, replacement gathering tools,
  *  upgrade buy batch, stand location, delivery/withdrawal trips, and the
  *  gold and item collection thresholds. */
 export function MerchantSettings() {
   return (
     <div className="flex flex-col gap-3 py-1 pl-3">
       <BankSortSetting />
+      <GatheringToolSetting />
       <BuyUpgradeBatchSetting />
       <StandLocationSetting />
       <TripSetting kind="deliveries" />
@@ -135,6 +136,31 @@ function StandLocationSetting() {
       <Button size="sm" disabled={!valid} onClick={() => void run(() => api.post('merchant/stand-location', { map: 'main', x: Number(x), y: Number(y) }))}>
         Save stand location
       </Button>
+      {error && <p role="alert" className="text-destructive">{error}</p>}
+    </fieldset>
+  )
+}
+
+/** Console 1.5 gathering-tool-settings.tsx: craft a replacement fishing pole or pickaxe. */
+function GatheringToolSetting() {
+  const api = usePartyApi()
+  const automations = useDynamicState().merchantAutomations
+  const { busy, error, run } = useSetting()
+  return (
+    <fieldset disabled={busy} className={box}>
+      <legend className="px-1">Replacement gathering tools</legend>
+      {(['fishing', 'mining'] as const).map((mode) => (
+        <label key={mode} className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={automations[`craft ${mode} tools`] === true}
+            onChange={(event) => void run(() => api.saveRoutinePriorities({}, { [`craft ${mode} tools`]: event.target.checked }))}
+            className="size-4"
+          />
+          Automatically craft new {mode === 'fishing' ? 'fishing poles' : 'pickaxes'}
+        </label>
+      ))}
+      <p className={help}>When gathering has no tool in inventory or bank, queue one through normal crafting. This may buy materials and spend crafting gold.</p>
       {error && <p role="alert" className="text-destructive">{error}</p>}
     </fieldset>
   )

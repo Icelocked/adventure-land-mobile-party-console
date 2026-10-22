@@ -163,3 +163,20 @@ test('G21 auto NPC sales: an inline Keep editor posts {item, keep, action: set}'
   await expect.poll(() => bodies[0]).toEqual({ item, keep: 5, action: 'set' })
   await expect(section.getByRole('button', { name: 'Keep 5' })).toBeVisible()
 })
+
+test('G16 merchant settings: replacement gathering tool crafting toggles', async ({ page }) => {
+  const mock = server()
+  mock.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  mock.merchantAutomations = { 'craft fishing tools': true, 'craft mining tools': false }
+  await mock.install(page)
+  const bodies = postBodies(page, 'merchant/routine-priorities')
+
+  await page.goto('/characters/Patinder')
+  await page.getByRole('button', { name: 'Merchant settings' }).click()
+  const tools = page.getByRole('group', { name: 'Replacement gathering tools' })
+  await expect(tools.getByRole('checkbox', { name: 'Automatically craft new fishing poles' })).toBeChecked()
+  await tools.getByRole('checkbox', { name: 'Automatically craft new pickaxes' }).click()
+  // gathering-tool-settings.tsx posts one key at a time.
+  await expect.poll(() => bodies[0]).toEqual({ priorities: {}, enabled: { 'craft mining tools': true } })
+  await expect(tools.getByRole('checkbox', { name: 'Automatically craft new pickaxes' })).toBeChecked()
+})

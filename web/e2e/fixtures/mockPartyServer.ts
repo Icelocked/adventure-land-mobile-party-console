@@ -159,6 +159,8 @@ const DEFAULT_MERCHANT_AUTOMATIONS: Record<string, boolean> = {
   deliveries: true, withdrawals: true, 'merchant luck': true, 'party collection': true, 'auto npc sales': true,
   restock: true, 'gold threshold': true, 'inventory cleanout': true, 'auto compound': true, 'auto upgrade': true,
   'automatic exchange': true, 'stand bid purchases': true, 'join giveaway': true,
+  // Console 1.5 replacement gathering tools, off until enabled.
+  'craft fishing tools': false, 'craft mining tools': false,
 }
 
 function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
