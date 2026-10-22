@@ -98,7 +98,8 @@ export function eventTimeLabel(next: number | undefined, now: number, clockOffse
   return `${new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(ms)} (${Math.floor(remaining / 60000)}m ${Math.floor(remaining / 1000) % 60}s)`
 }
 
-/** The start time on the realm's clock, e.g. "Realm: 14:05 (UTC−5)". */
+/** The start time on the realm's clock, e.g. "Realm: 14:05 (UTC-5)" with a U+2212 minus, as
+ *  event-selection-control.tsx realmTimeLabel() writes it. */
 export function realmTimeLabel(next: number, offset: number) {
   const ms = next < 1e12 ? next * 1000 : next
   const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms + offset * 3600000)
