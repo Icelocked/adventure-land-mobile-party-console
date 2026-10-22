@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { MapPin } from 'lucide-react'
 import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { useMonsterAchievements } from '@/data/useMonsterAchievements'
-import { formatDropRate } from '@/lib/itemFormulas'
+import { formatDropRate, isDirectDrop } from '@/lib/itemFormulas'
 import { MonsterCards } from '@/components/MonsterCards'
 import { displayValue } from '@/lib/statusDuration'
 import { FarmingAreaPicker, MonsterSpawns, type SpawnRecord } from '@/components/FarmingAreaPicker'
@@ -170,7 +170,7 @@ function indirectBestiaryDrops(monster: BestiaryMonster, catalog: CatalogItem[])
   const seen = new Set<string>()
   for (const item of catalog) {
     for (const source of (item.meta?.world?.drops || []) as (ItemDropSource & { mapId?: string; mapName?: string })[]) {
-      if (source.monsterId !== monster.id || (source.sourceType !== 'zone' && source.sourceType !== 'world')) continue
+      if (source.monsterId !== monster.id || !isDirectDrop(source) || (source.sourceType !== 'zone' && source.sourceType !== 'world')) continue
       const key = `${item.id}:${source.sourceType}:${source.mapId || ''}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -180,13 +180,21 @@ function indirectBestiaryDrops(monster: BestiaryMonster, catalog: CatalogItem[])
   return drops.sort((a, b) => b.rate - a.rate || a.name.localeCompare(b.name))
 }
 
-/** Monster-specific drops in server order, then zone and world drops. */
+/** Home rewards, monster-specific drops in server order, then zone and world drops
+ *  (console 1.5 bestiary-drops.tsx). Rolls of one item from one source share a card. */
 function BestiaryDrops({ monster, catalog, onInspectDrop }: { monster: BestiaryMonster; catalog: CatalogItem[]; onInspectDrop: (itemId: string) => void }) {
   const otherDrops = indirectBestiaryDrops(monster, catalog)
-  const cards = (drops: DropCard[], indirect = false) =>
-    drops.length ? (
+  const cards = (drops: DropCard[], indirect = false) => {
+    const groups = new Map<string, DropCard[]>()
+    for (const drop of drops) {
+      const key = `${drop.id}:${drop.sourceType || 'monster'}:${drop.mapName || ''}`
+      groups.set(key, [...(groups.get(key) || []), drop])
+    }
+    return drops.length ? (
       <div className="grid gap-2">
-        {drops.map((drop, index) => (
+        {[...groups.values()].map((rolls, index) => {
+          const drop = rolls[0]
+          return (
           <button
             type="button"
             key={`${drop.id}-${drop.sourceType || 'monster'}-${drop.mapName || ''}-${index}`}
@@ -196,17 +204,29 @@ function BestiaryDrops({ monster, catalog, onInspectDrop }: { monster: BestiaryM
             <SpriteIcon sprite={drop.sprite} size={36} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs">{drop.name}</span>
-              <span className="font-mono text-[10px] text-amber-300">{formatDropRate(drop as unknown as ItemDropSource)}</span>
+              <span className="font-mono text-[10px] text-amber-300">
+                {rolls.map((roll, rollIndex) => (
+                  <span key={rollIndex} className="block break-all">
+                    {formatDropRate(roll as unknown as ItemDropSource)}
+                  </span>
+                ))}
+              </span>
               {indirect ? <span className="block truncate font-mono text-[10px] text-cyan-300/70">{drop.sourceType === 'world' ? 'World drop' : `${drop.mapName || 'Map'} zone drop`}</span> : null}
             </span>
           </button>
-        ))}
+          )
+        })}
       </div>
     ) : (
       <p className="text-xs text-muted-foreground">None listed in the current game data.</p>
     )
+  }
   return (
     <>
+      <h4 className="mb-2 font-mono text-xs uppercase text-violet-300">Home rewards ({monster.homeRewards?.length || 0})</h4>
+      <p className="mb-2 text-xs text-muted-foreground">Home-server bonus required. These rolls are separate from normal monster drops.</p>
+      {cards(monster.homeRewards || [])}
+      <p className="mb-2 mt-4 text-xs text-muted-foreground">Base odds at full contribution and neutral luck, level and event modifiers. Your contribution, luck and monster level scale each chance.</p>
       <h4 className="mb-2 font-mono text-xs uppercase text-amber-300">Monster-specific drops ({monster.drops.length})</h4>
       {cards(monster.drops)}
       <h4 className="mb-2 mt-4 font-mono text-xs uppercase text-cyan-300">Zone &amp; world drops ({otherDrops.length})</h4>

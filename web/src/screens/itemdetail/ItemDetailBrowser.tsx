@@ -28,6 +28,7 @@ import {
   exchangeSections,
   exchangeTarget,
   formatDropRate,
+  isDirectDrop,
   formatStatValue,
   itemMaximumLevel,
   npcSaleValue,
@@ -718,30 +719,47 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
   )
 }
 
+/** Console 1.5 item-details.tsx:779-800: direct drops only, home rewards in their own
+ *  section, and one row per monster listing each of its rolls. */
 function DropsSection({ drops, onNavigateMonster }: { drops: ItemDropSource[]; onNavigateMonster: (id: string) => void }) {
-  // Sort by percentage (default) or name; ties by name.
+  // Sort by chance (default) or name; ties by name.
   const [dropSort, setDropSort] = useState<'name' | 'percentage'>('percentage')
-  const sorted = useMemo(
-    () => [...drops].sort((a, b) => (dropSort === 'percentage' ? effectiveDropRate(b) - effectiveDropRate(a) : 0) || a.monsterName.localeCompare(b.monsterName)),
+  const sections = useMemo(
+    () =>
+      [false, true].map((home) => {
+        const groups = new Map<string, ItemDropSource[]>()
+        const sources = drops
+          .filter((source) => isDirectDrop(source) && (source.sourceType === 'home') === home)
+          .sort((a, b) => (dropSort === 'percentage' ? effectiveDropRate(b) - effectiveDropRate(a) : 0) || a.monsterName.localeCompare(b.monsterName))
+        for (const source of sources) groups.set(source.monsterId, [...(groups.get(source.monsterId) || []), source])
+        return { home, groups: [...groups.values()] }
+      }),
     [drops, dropSort],
   )
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-sm font-semibold">Monster drops</span>
-        <label className="flex items-center gap-2 text-xs">
-          Sort
-          <select aria-label="Sort monster drops" value={dropSort} onChange={(event) => setDropSort(event.target.value as 'name' | 'percentage')} className="rounded border border-border bg-background px-2 py-1">
-            <option value="name">Name</option>
-            <option value="percentage">Percentage</option>
-          </select>
-        </label>
-      </div>
-      <div className="flex flex-col gap-1">
-        {sorted.map((drop, index) => (
-          <RelatedItemRow key={`${drop.monsterId}-${index}`} name={drop.monsterName} sprite={drop.sprite} detail={formatDropRate(drop)} onClick={() => onNavigateMonster(drop.monsterId)} />
-        ))}
-      </div>
+    <div className="flex flex-col gap-3">
+      {sections.map(({ home, groups }) =>
+        groups.length ? (
+          <section key={String(home)} aria-label={home ? 'Home rewards' : 'Monster drops'}>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-sm font-semibold">{home ? 'Home rewards' : 'Monster drops'}</span>
+              <label className="flex items-center gap-2 text-xs">
+                Sort
+                <select aria-label={home ? 'Sort home rewards' : 'Sort monster drops'} value={dropSort} onChange={(event) => setDropSort(event.target.value as 'name' | 'percentage')} className="rounded border border-border bg-background px-2 py-1">
+                  <option value="name">Name</option>
+                  <option value="percentage">Chance</option>
+                </select>
+              </label>
+            </div>
+            {home && <p className="mb-1.5 text-xs text-muted-foreground">Home-server bonus required; these rewards are separate from normal monster drops.</p>}
+            <div className="flex flex-col gap-1">
+              {groups.map((rolls, index) => (
+                <RelatedItemRow key={`${rolls[0].monsterId}-${index}`} name={rolls[0].monsterName} sprite={rolls[0].sprite} detail={rolls.map(formatDropRate).join(' · ')} onClick={() => onNavigateMonster(rolls[0].monsterId)} />
+              ))}
+            </div>
+          </section>
+        ) : null,
+      )}
     </div>
   )
 }

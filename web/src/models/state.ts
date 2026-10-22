@@ -127,6 +127,8 @@ export interface BestiaryMonster {
   spawnRecords: MonsterSpawnRecord[]
   // Console 1.5: the events that spawn this monster, when only events do.
   eventSources?: MonsterEventSource[]
+  // Console 1.5: rolls that need the home-server bonus, apart from `drops`.
+  homeRewards?: BestiaryDrop[]
 }
 
 /** bestiaryCatalog[].eventSources: a boss, its wave, or an add raised at HP fractions `at`. */
