@@ -883,6 +883,21 @@ export class PartyApiClient {
     return this.post(`mail/${action}`, { id })
   }
 
+  /** GET /party-api/metrics, /metrics/kills, /metrics/bars or
+   *  /metrics/account-gold with the dashboard's own query string
+   *  (dashboard/features/party/metrics-*.tsx). Every route answers 503
+   *  while metrics storage is off (runtime/coordinator/metrics/service.ts). */
+  async metrics<T>(path: 'metrics' | 'metrics/kills' | 'metrics/bars' | 'metrics/account-gold', params: Record<string, string>): Promise<ApiResult<T>> {
+    return this.getJson<T>(`${path}?${new URLSearchParams(params)}`)
+  }
+
+  /** POST /party-api/metrics/reset {metric}. 'performance' deletes the
+   *  stored kills and damage history; the reply carries every cut as
+   *  {resets: {kills?, damage?, ...}}. */
+  async resetMetrics(metric: 'kills' | 'damage' | 'performance'): Promise<ApiResult<CommandResult>> {
+    return this.post('metrics/reset', { metric })
+  }
+
   /** POST /party-api/mail/collect - collects a message's attachment. */
   async collectMail(id: string): Promise<ApiResult<CommandResult>> {
     return this.post('mail/collect', { id })
