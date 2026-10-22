@@ -17,6 +17,13 @@ export function durationLabel(ms?: number | null) {
   return formatDurationMs(Math.ceil(ms / 1000) * 1000)
 }
 
+/** The current time for event handlers and timers. Components read it here
+ *  rather than calling Date.now in their body, which the React Compiler flags
+ *  as impure during render. */
+export function wallClock(): number {
+  return Date.now()
+}
+
 /** The current time, ticking every second. */
 export function useClock(): number {
   const [now, setNow] = useState(() => Date.now())

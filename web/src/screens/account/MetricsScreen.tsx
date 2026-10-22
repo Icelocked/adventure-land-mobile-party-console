@@ -7,6 +7,7 @@ import {
   type MetricResetKind, type MetricResets, type MetricsResponse, type TemporaryMetricReset, unwrap,
 } from '@/lib/metrics'
 import { cn } from '@/lib/utils'
+import { wallClock } from '@/lib/duration'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { MetricsChart } from './metrics/MetricsChart'
 import { MetricsFilter, MetricsSelect, metricsControl } from './metrics/MetricsControls'
@@ -63,16 +64,21 @@ export function MetricsScreen() {
   const [goldResetAt, setGoldResetAt] = useGoldReset(account, 'goldResetAt')
   const [accountResetAt, setAccountResetAt] = useGoldReset(account, 'accountGoldResetAt')
   const [duration, setDuration] = useState(3_600_000), [live, setLive] = useState(true), [clock, setClock] = useState(Date.now)
-  const [customFrom, setCustomFrom] = useState(() => localDate(Date.now() - 3_600_000)), [customTo, setCustomTo] = useState(() => localDate(Date.now()))
+  const [customFrom, setCustomFrom] = useState(() => localDate(wallClock() - 3_600_000)), [customTo, setCustomTo] = useState(() => localDate(wallClock()))
   const [characters, setCharacters] = useState<string[]>([]), [server, setServer] = useState('')
   const [filtersVersion, setFiltersVersion] = useState(0)
   const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
     if (!live || !visible) return
-    setClock(Date.now())
-    const timer = setInterval(() => setClock(Date.now()), 1000)
-    return () => clearInterval(timer)
+    // The first tick runs on the next task, so turning live on still refreshes at once.
+    const tick = () => setClock(wallClock())
+    const first = setTimeout(tick, 0)
+    const timer = setInterval(tick, 1000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(timer)
+    }
   }, [live, visible, duration])
 
   // Only a tap on Reset data reaches this destructive route; filter changes never erase data.
@@ -108,10 +114,10 @@ export function MetricsScreen() {
   const accountTotal = state.accountGold?.total ?? null
 
   function clearView(kinds: MetricResetKind[]) {
-    if (kinds.includes('gold')) { setGoldResetAt(Date.now()); setAccountResetAt(Date.now()) }
+    if (kinds.includes('gold')) { setGoldResetAt(wallClock()); setAccountResetAt(wallClock()) }
     if (!rawData) return
     const latest = rawData.points[rawData.points.length - 1]
-    const baseline: TemporaryMetricReset = { at: Date.now(), bucketAt: latest?.at ?? 0, resolutionMs: rawData.resolutionMs, values: structuredClone(latest?.values || []) }
+    const baseline: TemporaryMetricReset = { at: wallClock(), bucketAt: latest?.at ?? 0, resolutionMs: rawData.resolutionMs, values: structuredClone(latest?.values || []) }
     setTemporaryResets((previous) => ({ ...previous, ...Object.fromEntries(kinds.map((kind) => [kind, baseline])) }))
   }
   function resetMetric(kind: MetricResetKind | 'all') {
@@ -131,7 +137,7 @@ export function MetricsScreen() {
   function resetFilters() {
     setCharacters([]); setServer(''); setFiltersVersion((value) => value + 1)
     setTemporaryResets({}); setGoldResetAt(0); setAccountResetAt(0)
-    setDuration(3_600_000); setLive(true); setClock(Date.now())
+    setDuration(3_600_000); setLive(true); setClock(wallClock())
   }
   const rangeLive = live && duration !== 0
   const range = { active: visible, live: rangeLive, from, to, clock, characters, server }
@@ -142,7 +148,7 @@ export function MetricsScreen() {
       <section aria-label="Game metrics" className="flex flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
           <span title={status} aria-label={status} className={cn('size-2 rounded-full', query.isError ? 'bg-rose-400' : data?.incomplete ? 'bg-amber-400' : live ? 'bg-emerald-400' : 'bg-slate-500')} />
-          <MetricsSelect label="Time range" value={String(duration)} onChange={(value) => { setDuration(Number(value)); setClock(Date.now()) }}
+          <MetricsSelect label="Time range" value={String(duration)} onChange={(value) => { setDuration(Number(value)); setClock(wallClock()) }}
             options={[...RANGES.map((entry) => ({ value: String(entry.value), label: entry.label })), { value: '0', label: 'Custom' }]} />
           <MetricsFilter label="Filter characters" allLabel="All characters" icon={<Users className="size-4" />} selected={characters}
             options={(data?.characters || []).map((name) => ({ id: name, label: name }))} onChange={setCharacters} />
@@ -182,7 +188,7 @@ export function MetricsScreen() {
             <MetricsGold key={`gold:${filtersVersion}`} active={visible} live={live} clock={clock} resetAt={goldResetAt} roster={data.characters}
               characters={characters} server={server} {...resetControls('gold')} />
             <MetricsAccountGold active={visible} live={live} clock={clock} resetAt={accountResetAt} total={accountTotal}
-              onReset={() => setAccountResetAt(Date.now())} resetDisabled={resetMutation.isPending} />
+              onReset={() => setAccountResetAt(wallClock())} resetDisabled={resetMutation.isPending} />
             <MetricsMeasurements key={`loot:${filtersVersion}`} metric="loot" {...range} names={itemNames} monsterNames={monsterNames} skillNames={skillNames}
               resetAt={rawData?.resets?.loot || 0} temporaryReset={temporaryResets.loot} {...resetControls('loot')} />
             <MetricsLoot key={`loot-days:${filtersVersion}`} active={visible} live={live} clock={clock} characters={characters} server={server} names={itemNames}
