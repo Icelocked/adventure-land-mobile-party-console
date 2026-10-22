@@ -63,6 +63,10 @@ export const actionDomains = {
   '/mail/collect': ['mail', 'inventory', 'config', 'bank', 'core'],
   '/mail/delete': ['mail'],
   '/mail/refresh': ['mail'],
+  // Console 1.5 dashboard query-actions.ts:83-85.
+  '/mail/settings': ['mail', 'config', 'core'],
+  '/mail/seen': ['mail'],
+  '/mail/outbox-delete': ['mail'],
   '/aldata/key': core,
   '/aldata/refresh': ['market', 'core', 'config'],
   '/anniversary/chat-advertise': core,

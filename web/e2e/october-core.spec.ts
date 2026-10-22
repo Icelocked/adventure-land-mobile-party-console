@@ -180,3 +180,44 @@ test('G16 merchant settings: replacement gathering tool crafting toggles', async
   await expect.poll(() => bodies[0]).toEqual({ priorities: {}, enabled: { 'craft mining tools': true } })
   await expect(tools.getByRole('checkbox', { name: 'Automatically craft new pickaxes' })).toBeChecked()
 })
+
+test('G23 mail: a new-mail dot until the Mail screen marks the inbox seen', async ({ page }) => {
+  const mock = server()
+  mock.mailMessages = [{ id: 'mail-1', from: 'Someone', subject: 'Hi', taken: false }]
+  await mock.install(page)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Menu' }).click()
+  // mail-count.tsx: the dot shows while newCount > 0.
+  await expect(page.getByRole('button', { name: /^Mail \(1\)/ }).getByLabel('New mail')).toBeVisible()
+  await page.getByRole('button', { name: /^Mail \(1\)/ }).click()
+  // mailbox-controls.tsx posts /mail/seen {} while newCount > 0.
+  await expect.poll(() => mock.mailboxActions.filter((a) => a.action === 'seen').length).toBe(1)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Menu' }).click()
+  await expect(page.getByRole('button', { name: /^Mail \(1\)/ })).toBeVisible()
+  await expect(page.getByLabel('New mail')).toHaveCount(0)
+})
+
+test('G23 mail: automation settings post both values; the outbox lists and deletes sent records', async ({ page }) => {
+  const mock = server()
+  mock.mailSettings = { autoCollect: false, autoDelete: true }
+  mock.mailOutbox = [{ id: 's1', recipient: 'Friend', subject: 'Gift', message: 'Enjoy', sent: '2026-10-21T10:00:00.000Z', item: { name: 'wcoat' }, quantity: 2 }]
+  await mock.install(page)
+  const settings = postBodies(page, 'mail/settings')
+  const deletes = postBodies(page, 'mail/outbox-delete')
+
+  await page.goto('/mail')
+  await expect(page.getByRole('checkbox', { name: 'Automatically delete messages after attachments are collected' })).toBeChecked()
+  await page.getByRole('checkbox', { name: 'Automatically collect mail attachments' }).click()
+  await expect.poll(() => settings[0]).toEqual({ autoCollect: true, autoDelete: true })
+  await expect(page.getByRole('checkbox', { name: 'Automatically collect mail attachments' })).toBeChecked()
+
+  await page.getByRole('button', { name: 'Outbox' }).click()
+  const sent = page.getByRole('region', { name: 'Sent mail' })
+  await expect(sent.getByText('To Friend')).toBeVisible()
+  await expect(sent.getByText('Attachment: wcoat × 2')).toBeVisible()
+  await sent.getByRole('button', { name: 'Delete sent record Gift' }).click()
+  await expect.poll(() => deletes[0]).toEqual({ id: 's1' })
+  await expect(sent.getByText('No sent mail recorded.')).toBeVisible()
+})

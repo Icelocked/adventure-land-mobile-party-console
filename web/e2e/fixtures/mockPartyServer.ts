@@ -187,6 +187,11 @@ export class MockPartyServer {
   // inventory-entry.tsx operation, per character then slot (an upgrade/compound in progress).
   inventoryOperations: Record<string, Record<number, Record<string, unknown>>> = {}
   mailActions: { action: string; id?: unknown }[] = []
+  // Console 1.5 commerce/mailbox.ts: automation settings, read ids and the sent-mail record.
+  mailSettings = { autoCollect: false, autoDelete: false }
+  mailboxActions: { action: string; id?: unknown }[] = []
+  mailSeenIds: string[] = []
+  mailOutbox: { id: string; recipient: string; subject: string; message: string; sent: string; item?: MockItem; quantity?: number }[] = []
   standListings: Record<string, unknown>[] = []
   bestiaryCatalog: Record<string, unknown>[] = []
   skillCatalog: Record<string, unknown>[] = []
@@ -509,6 +514,20 @@ export class MockPartyServer {
       }
     }
     return { type: 'snapshot', epoch: 'e1', sequence, characters }
+  }
+
+  /** GET /party-api/mail as mailbox.ts snapshot() sends it. */
+  private mailSnapshot(): Record<string, unknown> {
+    const seen = new Set(this.mailSeenIds)
+    return {
+      messages: this.mailMessages,
+      count: this.mailMessages.length,
+      updatedAt: Date.now(),
+      error: null,
+      settings: { ...this.mailSettings },
+      outbox: this.mailOutbox.map((m) => ({ ...m })),
+      newCount: this.mailMessages.filter((m) => typeof m.id === 'string' && !seen.has(m.id)).length,
+    }
   }
 
   private sseServer: Server | null = null
@@ -943,6 +962,23 @@ export class MockPartyServer {
       if (index >= 0) listings[index] = listing
       else listings.push(listing)
       return { status: 200, json: { ok: true } }
+    }
+    if (path === 'mail/settings') {
+      // mailbox.ts configure(): both settings are required booleans.
+      this.mailboxActions.push({ action: 'settings' })
+      if (typeof body.autoCollect !== 'boolean' || typeof body.autoDelete !== 'boolean') return { status: 400, json: { error: 'Choose both mailbox automation settings' } }
+      this.mailSettings = { autoCollect: body.autoCollect, autoDelete: body.autoDelete }
+      return { status: 200, json: this.mailSnapshot() }
+    }
+    if (path === 'mail/seen') {
+      this.mailboxActions.push({ action: 'seen' })
+      this.mailSeenIds = [...new Set([...this.mailSeenIds, ...this.mailMessages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))])]
+      return { status: 200, json: this.mailSnapshot() }
+    }
+    if (path === 'mail/outbox-delete') {
+      this.mailboxActions.push({ action: 'outbox-delete', id: body.id })
+      this.mailOutbox = this.mailOutbox.filter((m) => m.id !== body.id)
+      return { status: 200, json: this.mailSnapshot() }
     }
     if (path === 'mail/collect' || path === 'mail/delete' || path === 'mail/refresh') {
       const action = path.slice('mail/'.length)
@@ -1397,7 +1433,7 @@ export class MockPartyServer {
       if (route.request().method() !== 'GET') return route.fallback()
       if (new URL(route.request().url()).pathname.endsWith('/mail/postage'))
         return this.mailPostage === null ? route.fulfill({ status: 503, json: { error: 'unavailable' } }) : route.fulfill({ json: { gold: this.mailPostage } })
-      return route.fulfill({ json: { messages: this.mailMessages, count: this.mailMessages.length, updatedAt: Date.now(), error: null } })
+      return route.fulfill({ json: this.mailSnapshot() })
     })
     await page.route('**/console-update', (route) =>
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),

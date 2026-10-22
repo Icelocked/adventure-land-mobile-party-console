@@ -884,6 +884,21 @@ export class PartyApiClient {
     return this.post('merchant/send-mail', mail)
   }
 
+  /** POST /party-api/mail/settings - both automation flags are required (mailbox.ts configure). */
+  async saveMailSettings(settings: { autoCollect: boolean; autoDelete: boolean }): Promise<ApiResult<CommandResult>> {
+    return this.post('mail/settings', settings)
+  }
+
+  /** POST /party-api/mail/seen {} - marks every listed message read. */
+  async markMailSeen(): Promise<ApiResult<CommandResult>> {
+    return this.post('mail/seen', {})
+  }
+
+  /** POST /party-api/mail/outbox-delete {id} - drops a sent-mail record. */
+  async deleteSentMail(id: string): Promise<ApiResult<CommandResult>> {
+    return this.post('mail/outbox-delete', { id })
+  }
+
   /** POST /party-api/mail/{refresh,collect,delete} {id}. */
   async mailAction(action: 'refresh' | 'collect' | 'delete', id?: string): Promise<ApiResult<CommandResult>> {
     return this.post(`mail/${action}`, { id })
