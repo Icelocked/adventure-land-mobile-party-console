@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { MapCanvas } from '@/components/map/MapCanvas'
-import type { MapFrame } from '@/components/map/mapTypes'
+import type { MapDefinition, MapFrame } from '@/components/map/mapTypes'
 import { mapStreamUrl } from '@/config/serverConfig'
 import { useServerSettings } from '@/data/PartyDataProvider'
-import { subscribeMapFrames } from '@/data/useMapFrames'
+import { subscribeMapFrames, useVisible } from '@/data/useMapFrames'
 import type { CaveObservation, DungeonView } from '@/models/dungeon'
 import { dungeonButton } from './CaveEventRow'
 
@@ -26,22 +26,29 @@ export function CaveMap({
     [adding, setAdding] = useState(false)
   const [waypoint, setWaypoint] = useState<{ x: number; y: number } | null>(null)
   const [frames, setFrames] = useState<Record<string, MapFrame>>({})
+  // Each stream delivers the floor definition once; later frames omit it (dashboard cave-map.tsx).
+  const [definition, setDefinition] = useState<MapDefinition | null>(null)
+  const visible = useVisible()
   const [busy, setBusy] = useState(false)
   const [nativeSize, setNativeSize] = useState(false)
   const names = view.state.participants.join(',')
   const map = 'zone_' + cave.run + '_' + cave.floor
   useEffect(() => {
-    if (!open) return
+    if (!open || !visible) return
     const unsubscribe = names.split(',').map((name) =>
       subscribeMapFrames(mapStreamUrl(settings, name), {
         frame: (frame) => {
-          if (frame.map === map) setFrames((old) => ({ ...old, [name]: frame }))
+          if (frame.map !== map) return
+          const supplied = frame.definition
+          if (supplied?.name === map) setDefinition((old) => (old === supplied ? old : supplied))
+          setFrames((old) => ({ ...old, [name]: frame }))
         },
       }),
     )
     return () => unsubscribe.forEach((stop) => stop())
-  }, [open, names, map, settings])
-  const frame = frames[view.state.participants[0]]?.definition ? frames[view.state.participants[0]] : Object.values(frames).find((f) => f.definition?.name === map)
+  }, [open, visible, names, map, settings])
+  const shown = definition?.name === map ? definition : null
+  const frame = shown ? frames[view.state.participants[0]] || Object.values(frames)[0] : undefined
   const pins = [
     ...cave.points
       .filter((p) => p.map === map && !p.exit)
@@ -67,7 +74,7 @@ export function CaveMap({
           </div>
           <div className="min-h-0 flex-1 overflow-hidden rounded border border-emerald-800 bg-[#07110f]">
             <MapCanvas
-              definition={frame?.definition || null}
+              definition={shown}
               frame={frame ? { ...frame, entities: Array.from(new Map(Object.values(frames).flatMap((f) => f.entities).map((e) => [e.id, e])).values()) } : null}
               previous={null}
               receivedAt={0}
