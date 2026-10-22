@@ -73,11 +73,34 @@ export function eventLimits(party: EventFormation, name: string): Record<string,
   return party.eventLimitsByCharacter?.[eventPolicy(party, name).source] ?? {}
 }
 
-export type EventSchedule = { id: string; name: string; live?: boolean; next?: number; expires?: number; stale?: boolean; slotAt?: number; slotKind?: string }
+export type EventSchedule = {
+  id: string
+  name: string
+  live?: boolean
+  next?: number
+  expires?: number
+  stale?: boolean
+  slotAt?: number
+  slotKind?: string
+  // Console 1.5: the realm clock's lead over this machine, the realm's UTC offset,
+  // whether the realm schedule is confirmed, and the next seven days of starts.
+  clockOffsetMs?: number
+  realmOffsetHours?: number
+  confirmed?: boolean
+  occurrences?: { at: number; status: string }[]
+}
 
-export function eventTimeLabel(next: number | undefined, now: number) {
+/** Console 1.5 event-selection-control.tsx eventTimeLabel: weekday, local time and the countdown. */
+export function eventTimeLabel(next: number | undefined, now: number, clockOffsetMs = 0) {
   if (!next || !Number.isFinite(next)) return 'Time not announced'
   const ms = next < 1e12 ? next * 1000 : next
-  const remaining = Math.max(0, ms - now)
-  return `${new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(ms)} (${Math.floor(remaining / 60000)}m ${Math.floor(remaining / 1000) % 60}s)`
+  const remaining = Math.max(0, ms - now - clockOffsetMs)
+  return `${new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(ms)} (${Math.floor(remaining / 60000)}m ${Math.floor(remaining / 1000) % 60}s)`
+}
+
+/** The start time on the realm's clock, e.g. "Realm: 14:05 (UTC−5)". */
+export function realmTimeLabel(next: number, offset: number) {
+  const ms = next < 1e12 ? next * 1000 : next
+  const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms + offset * 3600000)
+  return `Realm: ${time} (UTC${offset < 0 ? '−' : '+'}${Math.abs(offset)})`
 }

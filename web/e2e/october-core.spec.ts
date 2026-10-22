@@ -79,3 +79,21 @@ test('G6 skills: the screen covers the catalog conditions group', async ({ page 
   await expect(page.getByText('Browse every class-bound skill, shared game action and condition. Click an entry for its complete definition.')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Conditions' }).getByText('Poisoned', { exact: true })).toBeVisible()
 })
+
+test('G12 event schedule: realm time, confirmed realm schedule and the next seven days', async ({ page }) => {
+  const mock = server()
+  mock.addCharacter({ name: 'Leada', ctype: 'warrior', level: 60 })
+  const next = Date.now() + 3_600_000
+  mock.extraState = {
+    eventSchedules: [{ id: 'crabxx', name: 'Crabxx', next, clockOffsetMs: 0, realmOffsetHours: -5, confirmed: true, occurrences: [{ at: next + 86_400_000, status: 'predicted' }, { at: next, status: 'confirmed' }] }],
+  }
+  await mock.install(page)
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: 'Events (1) ▾' }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  await expect(events.getByText(/^Realm: \d\d:\d\d \(UTC\u22125\)$/)).toBeVisible()
+  await expect(events.getByText('Realm schedule confirmed')).toBeVisible()
+  await events.getByText('Next seven days').click()
+  await expect(events.getByText(new Date(next).toLocaleString('en-US'))).toBeVisible()
+})
