@@ -34,7 +34,7 @@ import { WtbDialog } from '@/components/Wtb'
 import { MarketFilterBar } from '@/components/MarketFilterBar'
 import { latestSeen, marketRowFor, useStoredMarketFilter } from '@/lib/marketRows'
 import { WatchListSheet, type WatchPrefill } from '@/components/NpcShopSheet'
-import { filterMarket } from '@/lib/marketFilter'
+import { filterMarket, realmName, serverOptions } from '@/lib/marketFilter'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
@@ -159,11 +159,11 @@ export function MarketScreen() {
         (!hideBlacklisted || !blacklistRecord(blacklist, !!state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier)),
     ),
     marketFilter,
-    (entry) => marketRowFor(catalogFor(entry.item.name), entry.item, entry.price, latestSeen(entry.groupedListings || [entry])),
+    (entry) => marketRowFor(catalogFor(entry.item.name), entry.item, entry.price, latestSeen(entry.groupedListings || [entry]), realmName(entry.serverRegion, entry.serverIdentifier)),
   )
   const owned = ownedCounts(merchantItems, bankPacks)
   const buyOrders = filterMarket(filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor, forkCommerce), marketFilter, (order) =>
-    marketRowFor(catalogFor(order.item.name), order.item, order.price, latestSeen([order])),
+    marketRowFor(catalogFor(order.item.name), order.item, order.price, latestSeen([order]), realmName(order.serverRegion, order.serverIdentifier)),
   )
   const bankWtb = buyOrders.filter((order) => owned.has(ownedKey(order.item)))
   const ownOwner = merchantName && diagnostics[merchantName]?.owner != null ? String(diagnostics[merchantName]?.owner) : ''
@@ -177,11 +177,18 @@ export function MarketScreen() {
     marketFilter,
     ({ listing: entry }) => marketRowFor(catalogFor(entry.name), entry, entry.wts?.price ?? null, latestSeen([entry])),
   )
-  const pontyListings = ((ponty.listings ?? []) as PontyListing[]).filter((entry) => shown(entry.item, entry.seenAt))
+  // groupPonty can merge realms into one lot, so the server choice applies to listings before grouping.
+  const pontyListings = ((ponty.listings ?? []) as PontyListing[]).filter(
+    (entry) => shown(entry.item, entry.seenAt) && (marketFilter.server === null || realmName(entry.serverRegion, entry.serverIdentifier) === marketFilter.server),
+  )
   const pontySeen = new Map(pontyListings.map((entry) => [entry.key, latestSeen([entry])]))
   const pontyRows = filterMarket(groupPonty(pontyListings, query, now, nameFor), marketFilter, (group) =>
-    marketRowFor(catalogFor(group.item.name), group.item, group.unitPrice, latestSeen((group.keys ?? [group.key]).map((key) => ({ firstSeenAt: pontySeen.get(key) ?? undefined })))),
+    marketRowFor(catalogFor(group.item.name), group.item, group.unitPrice, latestSeen((group.keys ?? [group.key]).map((key) => ({ firstSeenAt: pontySeen.get(key) ?? undefined }))), realmName(group.serverRegion, group.serverIdentifier)),
   )
+
+  const realmsOf = (entries: { serverRegion?: string; serverIdentifier?: string }[]) => serverOptions(entries.map((entry) => ({ server: realmName(entry.serverRegion, entry.serverIdentifier) })))
+  // Classifieds carry no realm, so that tab offers only All.
+  const tabServers = tab === 'wts' ? realmsOf(allAlData) : tab === 'wtb' ? realmsOf(allBuyOrders) : tab === 'ponty' ? realmsOf((ponty.listings ?? []) as PontyListing[]) : []
 
   const run = async (key: string, action: () => Promise<ApiResult<CommandResult> | string | null>) => {
     setBusy(key)
@@ -306,7 +313,7 @@ export function MarketScreen() {
           ))}
         </div>
         <Input aria-label="Search market" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search item, seller, server, or map…" />
-        <MarketFilterBar filter={marketFilter} onChange={setMarketFilter} />
+        <MarketFilterBar filter={marketFilter} onChange={setMarketFilter} servers={tabServers} />
         {watchPrefill && <WatchListSheet prefill={watchPrefill} onClose={() => setWatchPrefill(null)} />}
         <div className="flex flex-wrap gap-2" title="Hide observations older than two minutes; classifieds use the last successful feed refresh.">
           {check('Hide stale listings', hideStale, setHideStale)}

@@ -39,7 +39,7 @@ export function latestSeen(entries: readonly object[]): number | null {
 
 type CatalogEntry = { name?: string; meta?: { definition?: Record<string, unknown> } | null }
 /** The filter's view of a listing: display name, key, level, unit price and tier from G.items. */
-export function marketRowFor(entry: CatalogEntry | undefined, item: { name: string; level?: number | null }, price: number | null | undefined, firstSeenAt: number | null): MarketRow {
+export function marketRowFor(entry: CatalogEntry | undefined, item: { name: string; level?: number | null }, price: number | null | undefined, firstSeenAt: number | null, server: string | null = null): MarketRow {
   const tier = entry?.meta?.definition?.tier
   return {
     name: entry?.name || item.name,
@@ -48,5 +48,6 @@ export function marketRowFor(entry: CatalogEntry | undefined, item: { name: stri
     price: typeof price === 'number' ? price : null,
     tier: typeof tier === 'number' ? tier : null,
     firstSeenAt,
+    server,
   }
 }

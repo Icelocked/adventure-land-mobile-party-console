@@ -13,7 +13,8 @@ const fields = [
   ['maxTier', 'Maximum tier', 'Tier to'],
 ] as const
 
-export function MarketFilterBar({ filter, onChange }: { filter: MarketFilter; onChange: (next: MarketFilter) => void }) {
+/** `servers` lists the realms in the tab's data (serverOptions); All is always first. */
+export function MarketFilterBar({ filter, onChange, servers = [] }: { filter: MarketFilter; onChange: (next: MarketFilter) => void; servers?: readonly string[] }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <Input aria-label="Keywords" placeholder="Keywords" value={filter.keywords} onChange={(event) => onChange({ ...filter, keywords: event.target.value })} className="h-8 w-40" />
@@ -28,6 +29,14 @@ export function MarketFilterBar({ filter, onChange }: { filter: MarketFilter; on
           className="h-8 w-24"
         />
       ))}
+      <select aria-label="Server" value={filter.server ?? ''} onChange={(event) => onChange({ ...filter, server: event.target.value || null })} className="h-8 rounded border border-border bg-background px-2">
+        <option value="">All servers</option>
+        {servers.map((server) => (
+          <option key={server} value={server}>
+            {server}
+          </option>
+        ))}
+      </select>
       <select
         aria-label="Sort market"
         value={filter.sort}

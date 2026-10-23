@@ -14,6 +14,8 @@ export interface MarketFilter {
   maxPrice: number | null
   minTier: number | null
   maxTier: number | null
+  /** Region and identifier as realmName joins them, such as 'US II'; null keeps every realm. */
+  server: string | null
   sort: MarketSort
 }
 export interface MarketRow {
@@ -23,10 +25,11 @@ export interface MarketRow {
   price?: number | null
   tier?: number | null
   firstSeenAt?: number | null
+  server?: string | null
 }
 
 export const emptyMarketFilter: MarketFilter = {
-  keywords: '', minLevel: null, maxLevel: null, minPrice: null, maxPrice: null, minTier: null, maxTier: null, sort: 'newest',
+  keywords: '', minLevel: null, maxLevel: null, minPrice: null, maxPrice: null, minTier: null, maxTier: null, server: null, sort: 'newest',
 }
 const bounds = ['minLevel', 'maxLevel', 'minPrice', 'maxPrice', 'minTier', 'maxTier'] as const
 
@@ -43,7 +46,8 @@ export function passesMarketFilter(row: MarketRow, filter: MarketFilter): boolea
     words.every((word) => text.includes(word)) &&
     within(row.level ?? 0, filter.minLevel, filter.maxLevel) &&
     within(row.price, filter.minPrice, filter.maxPrice) &&
-    within(row.tier, filter.minTier, filter.maxTier)
+    within(row.tier, filter.minTier, filter.maxTier) &&
+    (filter.server === null || row.server === filter.server)
   )
 }
 
@@ -77,6 +81,17 @@ export function parseMarketFilter(raw: string | null): MarketFilter {
     const bound = value[field]
     if (typeof bound === 'number' && Number.isFinite(bound)) filter[field] = bound
   }
+  if (typeof value.server === 'string' && value.server) filter.server = value.server
   if (value.sort === 'price' || value.sort === 'level') filter.sort = value.sort
   return filter
+}
+
+/** A realm's display name, such as 'US II'; null unless both parts are present. */
+export function realmName(region: string | null | undefined, identifier: string | null | undefined): string | null {
+  return region && identifier ? region + ' ' + identifier : null
+}
+
+/** The realms present in a tab's rows, each once and sorted, for the server choice. */
+export function serverOptions(rows: readonly Pick<MarketRow, 'server'>[]): string[] {
+  return [...new Set(rows.flatMap((row) => (row.server ? [row.server] : [])))].sort()
 }
