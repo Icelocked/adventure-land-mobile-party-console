@@ -60,6 +60,7 @@ export const actionDomains = {
   // dashboard query-actions.ts: settings change only the market section.
   '/npc-shop/orders': ['market', 'core'],
   '/npc-shop/stop': ['market', 'core'],
+  '/npc-shop/resume': ['market', 'core'],
   '/npc-shop/settings': ['market'],
   '/npc-shop/ron-visit': ['market', 'core'],
   '/merchant/donate': inventory,

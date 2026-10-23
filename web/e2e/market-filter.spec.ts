@@ -38,7 +38,7 @@ const rowNames = (page: import('@playwright/test').Page) =>
 test('Ponty lists newest first and every filter bound narrows it', async ({ page }) => {
   await server().install(page)
   await page.goto('/market')
-  await page.getByRole('button', { name: /^Ponty \(/ }).click()
+  await page.getByRole('tab', { name: /^Ponty \(/ }).click()
   await expect.poll(() => rowNames(page)).toEqual(['Ponty Amulet of Strength', 'Ponty Ring of Small Joys', 'Ponty Coat'])
 
   await page.getByRole('combobox', { name: 'Sort market' }).selectOption('price')
@@ -60,16 +60,16 @@ test('Ponty lists newest first and every filter bound narrows it', async ({ page
 
   // The filter persists per tab in browser storage.
   await page.reload()
-  await page.getByRole('button', { name: /^Ponty \(/ }).click()
+  await page.getByRole('tab', { name: /^Ponty \(/ }).click()
   await expect(page.getByRole('textbox', { name: 'Keywords' })).toHaveValue('amulet STR')
-  await page.getByRole('button', { name: /^Live WTS/ }).click()
+  await page.getByRole('tab', { name: /^Live WTS/ }).click()
   await expect(page.getByRole('textbox', { name: 'Keywords' })).toHaveValue('')
 })
 
 test('a Ponty row Watch action opens the watch list prefilled', async ({ page }) => {
   await server().install(page)
   await page.goto('/market')
-  await page.getByRole('button', { name: /^Ponty \(/ }).click()
+  await page.getByRole('tab', { name: /^Ponty \(/ }).click()
   await page.getByRole('button', { name: 'Watch Amulet of Strength' }).click()
   const watch = page.getByRole('dialog', { name: 'Watch list' })
   await expect(watch.getByRole('combobox', { name: 'Watch item' })).toHaveValue('Amulet of Strength')

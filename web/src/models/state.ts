@@ -575,7 +575,7 @@ export interface PartyStateDynamic {
   standListings: StandListing[]
   aldata?: AlDataState | null
   ponty?: PontyState | null
-  // The fork's Ponty and Ron standing orders, from section=market.
+  // The fork's Ponty and Ron watches and Ron's last-visit stock, from section=market.
   npcShop?: import('@/lib/npcShop').NpcShopView | null
   merchantCatalog?: MerchantCatalog | null
   standSearch: StandSearchState

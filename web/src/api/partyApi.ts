@@ -998,12 +998,18 @@ export class PartyApiClient {
 
   // The console fork's Ponty and Ron shop (http/npc-shop-routes.ts).
 
-  /** POST /party-api/npc-shop/orders. A "count" order buys `quantity`; "all" buys every copy at or under maxUnitPrice. */
-  async createNpcShopOrder(order: { npc: 'ponty' | 'ron'; item: string; level: number; mode: 'count' | 'all'; quantity: number; maxUnitPrice: number }): Promise<ApiResult<CommandResult>> {
+  /** POST /party-api/npc-shop/orders. A watch buys new copies in its level range up to `quantity`, or until
+   *  stopped when `quantity` is null; `spendCap` caps its total gold. A "now" order needs a quantity. */
+  async createNpcShopOrder(order: import('@/lib/npcShop').NpcShopOrderRequest): Promise<ApiResult<CommandResult>> {
     return this.post('npc-shop/orders', order)
   }
 
-  /** POST /party-api/npc-shop/stop {id}. 404 for an unknown order. */
+  /** POST /party-api/npc-shop/resume {id}. 409 unless the watch is paused. */
+  async resumeNpcShopOrder(id: string): Promise<ApiResult<CommandResult>> {
+    return this.post('npc-shop/resume', { id })
+  }
+
+  /** POST /party-api/npc-shop/stop {id}: a watch pauses, a buy-now order stops. 404 for an unknown order. */
   async stopNpcShopOrder(id: string): Promise<ApiResult<CommandResult>> {
     return this.post('npc-shop/stop', { id })
   }

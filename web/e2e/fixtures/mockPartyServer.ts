@@ -786,26 +786,36 @@ export class MockPartyServer {
       return { status: 200, json: { ok: true, leader: this.leader, tank: this.designatedTank, followers: this.followers } }
     }
     if (path.startsWith('npc-shop/') && this.npcShop) {
-      // http/npc-shop-routes.ts over commerce/npc-shop.ts create/stop/settings/visitRon.
+      // http/npc-shop-routes.ts over commerce/npc-shop.ts create/stop/resume/settings/visitRon
+      // (topic15/ponty-ron-buys).
       const merchant = this.merchantCharacter !== undefined ? this.merchantCharacter : (this.characters.find((c) => c.ctype === 'merchant')?.name ?? null)
       const whole = (value: unknown, min: number) => (Number.isSafeInteger(value) && Number(value) >= min ? Number(value) : null)
       const shop = this.npcShop
       if (path === 'npc-shop/orders') {
         if (!merchant) return { status: 400, json: { error: 'configure a merchant first' } }
         const npc = ['ponty', 'ron'].includes(String(body.npc)) ? body.npc : null
-        const mode = ['count', 'all'].includes(String(body.mode)) ? body.mode : null
+        const kind = ['watch', 'now'].includes(String(body.kind)) ? body.kind : null
         const item = typeof body.item === 'string' ? body.item.trim() : ''
-        const level = whole(body.level ?? 0, 0)
-        const maxUnitPrice = whole(body.maxUnitPrice, 1)
-        const quantity = mode === 'count' ? whole(body.quantity, 1) : 0
-        if (!npc || !mode || !item || level === null || maxUnitPrice === null || quantity === null) return { status: 400, json: { error: 'invalid order' } }
-        const order = { id: `npc-order-${Date.now()}-${shop.orders.length}`, npc, item, level, mode, quantity, maxUnitPrice, bought: 0, spent: 0, status: 'active' }
+        const levelMin = whole(body.levelMin ?? 0, 0)
+        const levelMax = whole(body.levelMax ?? body.levelMin ?? 0, 0)
+        const quantity = body.quantity === null || body.quantity === undefined ? null : whole(body.quantity, 1)
+        const spendCap = body.spendCap === null || body.spendCap === undefined ? null : whole(body.spendCap, 1)
+        const badCount = (body.quantity != null && quantity === null) || (kind === 'now' && quantity === null)
+        if (!npc || !kind || !item || levelMin === null || levelMax === null || levelMin > levelMax || badCount || (body.spendCap != null && spendCap === null))
+          return { status: 400, json: { error: 'invalid order' } }
+        const order = { id: `npc-order-${Date.now()}-${shop.orders.length}`, npc, kind, item, levelMin, levelMax, quantity, spendCap, bought: 0, spent: 0, status: 'active', createdAt: Date.now(), purchases: [] }
         this.npcShop = { ...shop, orders: [...shop.orders, order] }
         return { status: 200, json: { ok: true, order } }
       }
       if (path === 'npc-shop/stop') {
         if (!shop.orders.some((order) => order.id === body.id)) return { status: 404, json: { error: 'unknown order' } }
-        this.npcShop = { ...shop, orders: shop.orders.map((order) => (order.id === body.id && order.status === 'active' ? { ...order, status: 'stopped' } : order)) }
+        // A watch pauses; a buy-now order stops.
+        this.npcShop = { ...shop, orders: shop.orders.map((order) => (order.id === body.id && order.status === 'active' ? { ...order, status: order.kind === 'watch' ? 'paused' : 'stopped' } : order)) }
+        return { status: 200, json: { ok: true } }
+      }
+      if (path === 'npc-shop/resume') {
+        if (!shop.orders.some((order) => order.id === body.id && order.status === 'paused')) return { status: 409, json: { error: 'only a paused watch can resume' } }
+        this.npcShop = { ...shop, orders: shop.orders.map((order) => (order.id === body.id ? { ...order, status: 'active' } : order)) }
         return { status: 200, json: { ok: true } }
       }
       if (path === 'npc-shop/settings') {

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import {emptyMarketFilter,passesMarketFilter,filterMarket,parseMarketFilter} from './marketFilter'
+import {emptyMarketFilter,passesMarketFilter,filterMarket,parseMarketFilter,type MarketFilter,type MarketRow} from './marketFilter'
 // Copied from the console fork's scripts/tests/market-filter.test.cjs (topic15/ponty-ron-buys).
 
-const row=(over={})=>({name:'Amulet of Strength',key:'stramulet',level:1,price:5000,tier:2,firstSeenAt:100,...over});
-const pass=(filter,entry=row())=>passesMarketFilter(entry,{...emptyMarketFilter,...filter});
+const row=(over: Partial<MarketRow>={}): MarketRow=>({name:'Amulet of Strength',key:'stramulet',level:1,price:5000,tier:2,firstSeenAt:100,...over});
+const pass=(filter: Partial<MarketFilter>,entry: MarketRow=row())=>passesMarketFilter(entry,{...emptyMarketFilter,...filter});
 
 test('an empty filter passes every row, including rows with missing fields',()=>{
  assert.equal(pass({}),true);
@@ -42,7 +42,7 @@ test('tier bounds are inclusive and an item without a tier passes only without a
 test('bounds combine, and the sort is newest first by default with price and level as alternatives',()=>{
  const rows=[row({key:'a',level:0,price:300,firstSeenAt:10}),row({key:'b',level:3,price:100,firstSeenAt:30}),
   row({key:'c',level:1,price:200,firstSeenAt:undefined}),row({key:'d',level:2,price:900,firstSeenAt:20})];
- const keys=(filter)=>filterMarket(rows,{...emptyMarketFilter,...filter},entry=>entry).map(entry=>entry.key);
+ const keys=(filter: Partial<MarketFilter>)=>filterMarket(rows,{...emptyMarketFilter,...filter},entry=>entry).map(entry=>entry.key);
  assert.deepEqual(keys({}),['b','d','a','c'],'a row with no first-seen time sorts last');
  assert.deepEqual(keys({sort:'price'}),['b','c','a','d']);
  assert.deepEqual(keys({sort:'level'}),['b','d','c','a']);
