@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import {emptyMarketFilter,passesMarketFilter,filterMarket,parseMarketFilter,type MarketFilter,type MarketRow} from './marketFilter'
+import {emptyMarketFilter,passesMarketFilter,filterMarket,parseMarketFilter,realmName,serverOptions,type MarketFilter,type MarketRow} from './marketFilter'
 // Copied from the console fork's scripts/tests/market-filter.test.cjs (topic15/ponty-ron-buys).
 
 const row=(over: Partial<MarketRow>={}): MarketRow=>({name:'Amulet of Strength',key:'stramulet',level:1,price:5000,tier:2,firstSeenAt:100,...over});
@@ -54,4 +54,21 @@ test('a stored filter parses back and rejects malformed values',()=>{
  assert.deepEqual(parseMarketFilter('{"minLevel":"x","sort":"cheap","keywords":5}'),emptyMarketFilter);
  assert.deepEqual(parseMarketFilter('not json'),emptyMarketFilter);
  assert.deepEqual(parseMarketFilter(null),emptyMarketFilter);
+});
+
+test('a server bound keeps only that realm, and a row without a realm passes only without one',()=>{
+ assert.equal(pass({server:'US II'},row({server:'US II'})),true);
+ assert.equal(pass({server:'EU I'},row({server:'US II'})),false);
+ assert.equal(pass({server:'US II'},row({server:undefined})),false);
+ assert.equal(pass({},row({server:undefined})),true);
+ assert.equal(pass({server:'US II',minLevel:2},row({server:'US II'})),false,'the server bound combines with the others');
+});
+
+test('server choices list each realm in the data once, and realm names join region and identifier',()=>{
+ assert.deepEqual(serverOptions([row({server:'US II'}),row({server:'EU I'}),row({server:'US II'}),row({server:null}),row({server:undefined})]),['EU I','US II']);
+ assert.equal(realmName('US','II'),'US II');
+ assert.equal(realmName('US',undefined),null);
+ assert.equal(realmName(undefined,'II'),null);
+ assert.deepEqual(parseMarketFilter(JSON.stringify({server:'EU I'})),{...emptyMarketFilter,server:'EU I'});
+ assert.deepEqual(parseMarketFilter(JSON.stringify({server:7})),emptyMarketFilter);
 });
