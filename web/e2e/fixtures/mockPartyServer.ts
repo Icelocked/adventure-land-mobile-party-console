@@ -449,6 +449,12 @@ export class MockPartyServer {
   metricsRequests: string[] = []
   metricsResets: Record<string, unknown>[] = []
 
+  /** GET /console-build (tools/console-build/routes.ts, contracts.ts ConsoleBuildStatus).
+   *  null answers 503 like tools/hosting/authorize.ts routeConsoleService on a
+   *  console without managed builds. */
+  consoleBuild: Record<string, unknown> | null = null
+  /** A running DeploymentJournal that makes POST /console-build/deploy answer 409 (controller.ts DeploymentConflict). */
+  consoleBuildConflict: Record<string, unknown> | null = null
   /** GET /console-update (tools/update): null = service unavailable. */
   consoleUpdate: Record<string, unknown> | null = { current: '1.2.0', displayVersion: '1.2.0', available: false, phase: 'idle' }
 
@@ -1561,6 +1567,26 @@ export class MockPartyServer {
       if (new URL(route.request().url()).pathname.endsWith('/mail/postage'))
         return this.mailPostage === null ? route.fulfill({ status: 503, json: { error: 'unavailable' } }) : route.fulfill({ json: { gold: this.mailPostage } })
       return route.fulfill({ json: this.mailSnapshot() })
+    })
+    await page.route(/\/console-build(\/(status|deploy))?$/, async (route) => {
+      const request = route.request()
+      const path = new URL(request.url()).pathname
+      if (!this.consoleBuild) return route.fulfill({ status: 503, json: { error: 'Staged builds are unavailable on this console.' } })
+      if (request.method() === 'GET') return route.fulfill({ json: this.consoleBuild })
+      if (path === '/console-build/status') return route.fulfill({ status: 405, json: { error: 'Use POST' } })
+      // routes.ts deploymentId: a string buildId and a mode of now, safe or main (default now).
+      const body = (request.postDataJSON() ?? {}) as { buildId?: unknown; mode?: unknown }
+      if (typeof body.buildId !== 'string') return route.fulfill({ status: 400, json: { error: 'Provide a completed candidate ID' } })
+      const mode = body.mode ?? 'now'
+      if (!['now', 'safe', 'main'].includes(String(mode))) return route.fulfill({ status: 400, json: { error: 'Choose a console load mode' } })
+      if (this.consoleBuildConflict) {
+        this.consoleBuild = { ...this.consoleBuild, operation: this.consoleBuildConflict }
+        return route.fulfill({ status: 409, json: { error: 'Another console deployment is running', operation: this.consoleBuildConflict } })
+      }
+      const now = new Date().toISOString()
+      const operation = { id: `op-${Date.now()}`, target: body.buildId, previous: this.consoleBuild.active, startedAt: now, phaseStartedAt: now, phase: 'activating', mode }
+      this.consoleBuild = { ...this.consoleBuild, operation }
+      return route.fulfill({ status: 202, json: operation })
     })
     await page.route('**/console-update', (route) =>
       this.consoleUpdate ? route.fulfill({ json: this.consoleUpdate }) : route.fulfill({ status: 503, json: { error: 'starting' } }),
