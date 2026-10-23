@@ -1,6 +1,7 @@
 import type { Item, MarketListing, RestockPolicy, StandListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
+import type { DeploymentJournal, DeploymentMode } from '@/lib/consoleBuild'
 import { PARTY_ACTION_EVENT, type PartyActionDetail } from '@/data/queryActions'
 import type { EventLimits } from '@/lib/eventPolicy'
 
@@ -876,6 +877,28 @@ export class PartyApiClient {
   /** POST /console-update/{check,download,restart,preferences}. */
   async consoleUpdateAction(name: 'check' | 'download' | 'restart' | 'preferences', value: Record<string, unknown> = {}): Promise<ApiResult<string>> {
     return this.postRoot(`console-update/${name}`, value)
+  }
+
+  /** GET /console-build (tools/console-build/routes.ts). 503 on a console without managed builds. */
+  async consoleBuilds(): Promise<ApiResult<string>> {
+    return this.getRoot('console-build')
+  }
+
+  /** POST /console-build/deploy {buildId, mode}, the body console-build-control.tsx sends.
+   *  A 409 still carries the running DeploymentJournal as `operation`. */
+  async deployConsoleBuild(buildId: string, mode: DeploymentMode): Promise<{ operation?: DeploymentJournal; error?: string }> {
+    const toastId = beginActionToast()
+    try {
+      const response = await timedFetch(this.rootUrl('console-build/deploy'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildId, mode }) })
+      const result = (await response.json().catch(() => ({}))) as DeploymentJournal & { error?: string; operation?: DeploymentJournal }
+      const operation = response.status === 409 && result.operation ? result.operation : response.ok ? result : undefined
+      const error = operation ? undefined : result.error || `HTTP ${response.status}`
+      resolveActionToast(toastId, operation && response.ok ? 'sent' : 'failed', error ?? (response.ok ? undefined : result.error))
+      return { operation, error }
+    } catch (error) {
+      resolveActionToast(toastId, 'failed', errorMessage(error))
+      return { error: errorMessage(error) }
+    }
   }
 
   /** GET /console-debug and POST /console-debug/{start,stop}. */

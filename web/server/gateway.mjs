@@ -106,7 +106,7 @@ export function createGateway({ root, consoleUrl = 'http://127.0.0.1:3010', noti
   function route(path) {
     if (path.startsWith('/party-api/')) return { upstream: 'console', zone: 'api', timeout: 3600_000 }
     if (path.startsWith('/setup/')) return { upstream: 'console', zone: 'auth', timeout: 60_000 }
-    if (path.startsWith('/console-update') || path.startsWith('/console-debug') || path.startsWith('/debug-assets/')) return { upstream: 'console', zone: 'api', timeout: 60_000 }
+    if (path.startsWith('/console-update') || path.startsWith('/console-build') || path.startsWith('/console-debug') || path.startsWith('/debug-assets/')) return { upstream: 'console', zone: 'api', timeout: 60_000 }
     if (path.startsWith('/debug-game/')) return { upstream: 'console', zone: 'api', timeout: 3600_000 }
     if (path.startsWith('/notify/')) return { upstream: 'notifier', zone: 'auth', timeout: 60_000, maxBody: 64 * 1024 }
     return null
