@@ -120,12 +120,24 @@ class CharacterScreenTest {
     fun statusesOpenWithTheirCountdownAndThePortraitOpensTheStats() {
         show("Leada")
         compose.onNode(hasText("Active status") and hasText("1")).assertExists()
+        // Collapsed, the statuses show as one row of icons, each naming its status.
+        val icon = hasContentDescription("Merchant's Luck, ", substring = true)
+        compose.onNode(icon).assertExists()
         compose.onNodeWithText("Active status").performClick()
         compose.onNodeWithText("Merchant's Luck").assertExists()
+        // The open list replaces the icon row.
+        compose.onNode(icon).assertDoesNotExist()
         compose.onNodeWithContentDescription("View Leada stats").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Leada stats").assertExists()
         compose.onNode(hasText("A.Piercing: ", substring = true)).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun aCollapsedStatusIconOpensItsConditionDetails() {
+        show("Leada")
+        compose.onNode(hasContentDescription("Merchant's Luck, ", substring = true)).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasContentDescription("Condition details")).fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test

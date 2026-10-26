@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -71,9 +72,11 @@ internal fun CollapsibleCard(title: String, open: Boolean, onToggle: () -> Unit,
     }
 }
 
-/** A collapsed "Active status" with the count; open, each status shows its
- *  sprite, a ticking countdown over a depleting bar, and stacks, and opens
- *  its Condition details. Shown for every class. */
+/** A collapsed "Active status" with the count and one row of status
+ *  icons, as the console's status-icon-row.tsx shows them under the XP bar;
+ *  open, each status shows its sprite, a ticking countdown over a depleting
+ *  bar, and stacks. Every icon and row opens its Condition details. Shown
+ *  for every class. PWA: StatusesSection.tsx. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StatusesSection(characterName: String, conditions: List<Condition>) {
@@ -86,6 +89,20 @@ fun StatusesSection(characterName: String, conditions: List<Condition>) {
     LaunchedEffect(signature) { durations = reconcileDurations(signature, durations, System.currentTimeMillis()) }
 
     CollapsibleCard("Active status", open, { open = !open }, trailing = "${conditions.size}") {
+        if (!open && conditions.isNotEmpty()) {
+            FlowRow(modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Status icons" }, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (condition in conditions) {
+                    val remaining = statusRemaining(durations[condition.id], now) ?: condition.remainingMs
+                    val stacks = stacksLabel(condition)
+                    Box(
+                        modifier = Modifier.size(24.dp).clip(RoundedCornerShape(2.dp)).border(1.dp, Color(0xFF155E75), RoundedCornerShape(2.dp)).background(Color.Black)
+                            .clickable { selected = condition }
+                            .semantics { contentDescription = "${condition.name}, ${durationLabel(remaining)}$stacks" },
+                        contentAlignment = Alignment.Center,
+                    ) { condition.sprite?.let { SpriteIcon(it, size = 22.dp) } }
+                }
+            }
+        }
         if (open && conditions.isEmpty()) Text("No active effects", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         if (open && conditions.isNotEmpty()) {
             FlowRow(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -102,7 +119,7 @@ fun StatusesSection(characterName: String, conditions: List<Condition>) {
                             Column(modifier = Modifier.padding(start = 8.dp)) {
                                 Text(condition.name, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                                 Text(
-                                    durationLabel(remaining ?: condition.remainingMs) + (condition.stacks?.takeIf { it !is kotlinx.serialization.json.JsonNull }?.let { " · ${(it as? JsonPrimitive)?.content ?: it} stacks" } ?: ""),
+                                    durationLabel(remaining ?: condition.remainingMs) + stacksLabel(condition),
                                     fontFamily = FontFamily.Monospace,
                                     style = MaterialTheme.typography.labelSmall,
                                 )
@@ -115,6 +132,10 @@ fun StatusesSection(characterName: String, conditions: List<Condition>) {
     }
     selected?.let { ConditionDetailsSheet(characterName, it) { selected = null } }
 }
+
+/** " · N stacks", or nothing when the status reports no stacks. */
+private fun stacksLabel(condition: Condition): String =
+    condition.stacks?.takeIf { it !is kotlinx.serialization.json.JsonNull }?.let { " · ${(it as? JsonPrimitive)?.content ?: it} stacks" } ?: ""
 
 /** Condition details: the status's name, owner and duration, its explanation,
  *  and every definition/live field (durations formatted). */
