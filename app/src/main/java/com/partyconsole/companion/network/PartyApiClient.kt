@@ -147,11 +147,11 @@ class PartyApiClient(
     suspend fun setLeader(leader: String): ApiResult<CommandResult> =
         post("formation", JsonObject(mapOf("leader" to JsonPrimitive(leader))))
 
-    /** POST /party-api/formation {tank}: the stable console fork's designated
-     *  tank, null for none (http/formation.ts assignManaged). Never sends
-     *  `leader`. */
-    suspend fun setDesignatedTank(tank: String?): ApiResult<CommandResult> =
-        post("formation", JsonObject(mapOf("tank" to (tank?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull))))
+    /** POST /party-api/formation with any of {tank, offTank, pullMode}. null
+     *  clears a role (http/formation.ts tankRoles), and the console 400s an
+     *  unknown name or a non-boolean pullMode. Never sends `leader`. */
+    suspend fun setFormationRoles(roles: Map<String, JsonElement>): ApiResult<CommandResult> =
+        post("formation", JsonObject(roles))
 
     /** POST /party-api/formation {character, follow}. Never sends `leader`:
      *  the server applies any `leader` key it gets. */

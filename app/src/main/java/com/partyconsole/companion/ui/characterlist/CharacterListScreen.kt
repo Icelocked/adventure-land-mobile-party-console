@@ -160,7 +160,6 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
             // The dungeon panel heads the party while a visit runs.
             item { com.partyconsole.companion.ui.dungeon.DungeonPanel(viewModel) }
             if (names.isNotEmpty() || pending.isNotEmpty()) item { PartyControls(viewModel) }
-            if ((names.isNotEmpty() || pending.isNotEmpty()) && state.consoleFeatures.designatedTank) item { PartyRolesSettings(viewModel, state.designatedTank, names) }
             if (names.isEmpty() && pending.isEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {

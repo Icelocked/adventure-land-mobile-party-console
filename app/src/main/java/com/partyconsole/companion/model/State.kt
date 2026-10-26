@@ -148,6 +148,11 @@ data class PartyStateDynamic(
     // The stable console fork's designated tank (POST /formation {tank}),
     // null when none is picked; see ConsoleFeatures.kt.
     val designatedTank: String? = null,
+    // Console fork: the member that takes the tank's attackers while the tank
+    // is in danger, and whether the longest-range member pulls one monster at
+    // a time (http/formation.ts tankRoles).
+    val offTank: String? = null,
+    val pullMode: Boolean? = null,
     // Console 1.4 boss chase and the realms it never hops to.
     val bossChase: BossChaseState? = null,
     val realmHopBlacklist: List<String> = emptyList(),

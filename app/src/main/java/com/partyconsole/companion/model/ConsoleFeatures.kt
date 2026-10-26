@@ -10,6 +10,9 @@ data class ConsoleFeatures(
     /** POST /formation {tank}. initial-core.ts always sets `designatedTank`,
      *  to null when no tank is picked, and public-state.ts configFields sends it. */
     val designatedTank: Boolean,
+    /** POST /formation {offTank, pullMode}. initial-core.ts always sets
+     *  `pullMode`, and public-state.ts configFields sends it. */
+    val tankRoles: Boolean,
     /** POST /encounter-mode. hunt/scopes.ts gives every farming profile an
      *  `encounterRoutines` object. */
     val frankyRoutine: Boolean,
@@ -36,6 +39,7 @@ val PartyStateDynamic.consoleFeatures: ConsoleFeatures get() {
     val bossChase = bossChase != null
     return ConsoleFeatures(
         designatedTank = designatedTank,
+        tankRoles = pullMode != null,
         frankyRoutine = "encounterRoutines" in stateKeys || farmingProfiles.values.any { it.encounterRoutines != null },
         bossChase = bossChase,
         realmHopBlacklist = "realmHopBlacklist" in stateKeys,

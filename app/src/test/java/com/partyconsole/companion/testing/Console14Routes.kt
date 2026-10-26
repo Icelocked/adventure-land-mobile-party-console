@@ -40,7 +40,7 @@ private fun FakeConsole.ctype(name: String): String? =
     ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(name) as? JsonObject)?.get("ctype").str()
 
 /** The state keys only the stable console fork sends (model/ConsoleFeatures.kt). */
-private val FORK_KEYS = listOf("designatedTank", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
+private val FORK_KEYS = listOf("designatedTank", "offTank", "pullMode", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
 
 /** Plays Ryan's v1.4.0 instead of the stable console fork: drops every fork
  *  field and the "prim stack" routine, and the auto NPC sale route ignores
@@ -67,17 +67,25 @@ internal fun FakeConsole.installConsole14Routes() {
     // (designatedTank), merchant/bank-sort.ts (bankSortLayout) and the "prim
     // stack" routine of merchant/initial-settings.ts.
     put("designatedTank", JsonNull, "config")
+    put("offTank", JsonNull, "config")
+    put("pullMode", JsonPrimitive(false), "config")
     put("bankSortLayout", JsonPrimitive("packed"))
     // The e2e mock serves the leader scope's Franky routine at the top level.
     put("encounterRoutines", JsonObject(emptyMap()))
     put("merchantRoutinePriorities", JsonObject(mapOf("prim stack" to JsonPrimitive(70)) + field("merchantRoutinePriorities").obj().orEmpty()), "config")
 
     routes["formation"] = route@{ body ->
-        // http/formation.ts assignManaged: a managed name or null picks the designated tank.
-        if ("tank" in body && body["character"] == null) {
-            val tank = body["tank"].str()
-            if (tank != null && tank !in characterNames()) return@route error(400, "unknown tank")
-            put("designatedTank", tank?.let { JsonPrimitive(it) } ?: JsonNull, "config")
+        // http/formation.ts tankRoles(): `tank`, `offTank` and `pullMode` are
+        // checked together, and null clears a role.
+        if (("tank" in body || "offTank" in body || "pullMode" in body) && body["character"] == null) {
+            fun managed(key: String) = body[key].let { it is JsonNull || it.str() in characterNames() }
+            if ("tank" in body && !managed("tank")) return@route error(400, "unknown tank")
+            if ("offTank" in body && !managed("offTank")) return@route error(400, "unknown off tank")
+            val pull = body["pullMode"]
+            if (pull != null && (pull as? JsonPrimitive)?.booleanOrNull == null) return@route error(400, "invalid pull mode")
+            if ("tank" in body) put("designatedTank", body["tank"].str()?.let { JsonPrimitive(it) } ?: JsonNull, "config")
+            if ("offTank" in body) put("offTank", body["offTank"].str()?.let { JsonPrimitive(it) } ?: JsonNull, "config")
+            if (pull != null) put("pullMode", pull, "config")
             return@route ok()
         }
         val name = body["character"].str() ?: return@route null

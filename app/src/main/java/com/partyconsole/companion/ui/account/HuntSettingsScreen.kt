@@ -1,6 +1,9 @@
 package com.partyconsole.companion.ui.account
 
 import androidx.compose.foundation.clickable
+import com.partyconsole.companion.model.consoleFeatures
+import com.partyconsole.companion.ui.characterlist.PartyRolesSettings
+import com.partyconsole.companion.ui.characterlist.partyRoleNames
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,6 +64,7 @@ import kotlinx.serialization.json.JsonPrimitive
 fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Unit) {
     val dynamicState by viewModel.dynamicState.collectAsState()
     val loaded by viewModel.stateLoaded.collectAsState()
+    val characters by viewModel.characters.collectAsState()
     val scope = rememberCoroutineScope()
     // Monster names/sprites live in the bestiary catalog, NOT the item
     // catalog - a monster id like "booboo" would never resolve there.
@@ -150,6 +154,18 @@ fun HuntSettingsScreen(viewModel: PartyViewModel, name: String, onBack: () -> Un
 
     AccountScreenScaffold("Farming settings · ${context.owner}", onBack, onRefresh = { scope.launch { viewModel.refreshDynamicStateNow() } }) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            // Party-wide, so a follower edits them too; console farming-mode-control.tsx puts them first.
+            val features = dynamicState.consoleFeatures
+            if (features.designatedTank) {
+                PartyRolesSettings(
+                    viewModel,
+                    tank = dynamicState.designatedTank,
+                    offTank = dynamicState.offTank,
+                    pullMode = dynamicState.pullMode == true,
+                    pull = features.tankRoles,
+                    characters = partyRoleNames(dynamicState, characters.keys.toList()),
+                )
+            }
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     "Configure Hunt relocation and automatic blacklisting. Blacklisted quests are skipped until you clear the entry. Normal farming selections are unaffected.",

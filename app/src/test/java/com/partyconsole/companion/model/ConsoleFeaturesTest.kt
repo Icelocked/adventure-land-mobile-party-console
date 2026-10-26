@@ -31,24 +31,25 @@ class ConsoleFeaturesTest {
     }
 
     private val v140 = """{"leader":"Lead","merchantRoutinePriorities":{"upgrade preview":70},"farmingProfiles":{"Lead":{"farmingPolicy":"auto"}}}"""
-    private val stable = """{"leader":"Lead","designatedTank":null,"realmHopBlacklist":[],"bankSortLayout":"packed",
+    private val stable = """{"leader":"Lead","designatedTank":null,"offTank":null,"pullMode":false,"realmHopBlacklist":[],"bankSortLayout":"packed",
         "bossChase":{"enabled":false,"minEtaMinutes":15,"sightings":[],"respawns":[]},
         "merchantRoutinePriorities":{"upgrade preview":70,"prim stack":70},
         "farmingProfiles":{"Lead":{"farmingPolicy":"auto","encounterRoutines":{}}}}"""
 
     @Test
     fun ryanV140SupportsNoForkFeature() {
-        assertEquals(ConsoleFeatures(false, false, false, false, false, false, false), state(v140).consoleFeatures)
+        assertEquals(ConsoleFeatures(false, false, false, false, false, false, false, false), state(v140).consoleFeatures)
     }
 
     @Test
     fun theStableForkSupportsEveryFeatureFromItsInitialStateWithNoTankPicked() {
-        assertEquals(ConsoleFeatures(true, true, true, true, true, true, true), state(stable).consoleFeatures)
+        assertEquals(ConsoleFeatures(true, true, true, true, true, true, true, true), state(stable).consoleFeatures)
     }
 
     @Test
     fun eachSignalStandsAlone() {
         assertTrue(state("""{"designatedTank":"Tanky"}""").consoleFeatures.designatedTank)
+        assertTrue(state("""{"pullMode":false}""").consoleFeatures.tankRoles)
         assertTrue(state("""{"encounterRoutines":{"franky":"tank"}}""").consoleFeatures.frankyRoutine)
         assertTrue(state("""{"merchantRoutinePriorities":{"prim stack":10}}""").consoleFeatures.primStack)
         val tankOnly = state("""{"designatedTank":null}""").consoleFeatures
