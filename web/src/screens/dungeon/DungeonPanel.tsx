@@ -8,6 +8,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { dungeonButton } from './CaveEventRow'
 import { CaveMap } from './CaveMap'
+import type { CavePoint } from '@/models/dungeon'
 
 const exitButton = 'rounded border-2 border-red-500 bg-slate-950 px-3 py-2 text-red-100 hover:border-red-300 hover:bg-red-950 disabled:opacity-50'
 
@@ -28,6 +29,8 @@ export function DungeonPanel() {
   const [requestedRoom, setRequestedRoom] = useState<string | null>(null)
   const [exitConfirm, setExitConfirm] = useState(false)
   const [itemInspection, setItemInspection] = useState<string | null>(null)
+  // The open map belongs to one run and floor; a new floor closes it.
+  const [mapOpenFloor, setMapOpenFloor] = useState<string | null>(null)
   if (!view || ['idle', 'held'].includes(view.state.phase)) return null
   // Console 1.5 dungeon-panel.tsx: talking to a merchant reopens its shop for
   // the one member who talked, so the shop comes from that member's observation.
@@ -56,6 +59,34 @@ export function DungeonPanel() {
   const action = (body: Record<string, unknown>) => query.action({ run: cave?.run, ...body })
   const shopItem = state.merchantCatalog?.allItems?.find((item) => item.id === choice?.shop?.name)
   const travelling = view.state.progress?.enabled || !!view.state.travel || Object.values(view.state.commands).some((command) => command.action === 'move')
+  const mapFloor = cave ? cave.run + ':' + cave.floor : null
+  const mapOpen = !!mapFloor && mapOpenFloor === mapFloor
+  const selectable = (p: CavePoint) => !!cave && !query.busy && !cave.paused && !p.locked && !(p.done && !merchantRoom(p.room)) && view.state.phase === 'active'
+  const selectPoint = (p: CavePoint) => {
+    if (!selectable(p)) return
+    setRequestedRoom(p.room || null)
+    if (choice?.shop?.nearby && p.room === choice.shop.room) setInspectedChoice(choice.id)
+    else void action({ action: 'move', target: p.id })
+  }
+  // One list: under the panel while the map is closed, in the map view while it is open.
+  const destinations = (
+    <div className={mapOpen ? 'grid grid-cols-2 gap-2 md:grid-cols-1' : 'mt-3 grid grid-cols-2 gap-2'}>
+      {cave?.points
+        .filter((p) => !p.exit)
+        .map((p) => (
+          <button
+            className={dungeonButton + (p.done ? ' !border-2 !border-green-500 disabled:!opacity-80' : p.required ? ' !border-2 !border-orange-500' : '')}
+            key={p.id}
+            disabled={!selectable(p)}
+            onClick={() => selectPoint(p)}
+          >
+            {p.label}
+            {p.map !== 'zone_' + cave.run + '_' + cave.floor ? ' — different floor' : ''}
+            {p.locked ? ' — locked' : p.done && merchantRoom(p.room) ? ' - reopen shop' : p.done ? ' — complete' : ''}
+          </button>
+        ))}
+    </div>
+  )
   const choiceOpen = !!choice && (!choice.resolved || inspectedChoice === choice.id || !!(choice.shop?.nearby && requestedRoom === choice.shop.room))
   const exitControls = (
     <>
@@ -105,7 +136,19 @@ export function DungeonPanel() {
           : view.state.phase}
       </p>
       <p className="text-slate-300">{view.members.map((m) => m.name + (m.fresh ? '' : ' — awaiting connection')).join(' · ')}</p>
-      {cave && <CaveMap key={cave.run + ':' + cave.floor} view={view} cave={cave} action={action} error={query.actionError} />}
+      {cave && (
+        <CaveMap
+          key={mapFloor}
+          view={view}
+          cave={cave}
+          action={action}
+          error={query.actionError}
+          open={mapOpen}
+          onOpenChange={(open) => setMapOpenFloor(open ? mapFloor : null)}
+          destinations={destinations}
+          onSelectPoint={selectPoint}
+        />
+      )}
       {view.state.phase === 'active' && (
         <div className="mt-3">
           <p className="text-slate-200">{view.state.progress?.message || 'Continue through the cave toward the next floor.'}</p>
@@ -134,26 +177,7 @@ export function DungeonPanel() {
           Call Nera — revival choices
         </button>
       )}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {cave?.points
-          .filter((p) => !p.exit)
-          .map((p) => (
-            <button
-              className={dungeonButton + (p.done ? ' !border-2 !border-green-500 disabled:!opacity-80' : p.required ? ' !border-2 !border-orange-500' : '')}
-              key={p.id}
-              disabled={query.busy || cave.paused || p.locked || (p.done && !merchantRoom(p.room)) || view.state.phase !== 'active'}
-              onClick={() => {
-                setRequestedRoom(p.room || null)
-                if (choice?.shop?.nearby && p.room === choice.shop.room) setInspectedChoice(choice.id)
-                else void action({ action: 'move', target: p.id })
-              }}
-            >
-              {p.label}
-              {p.map !== 'zone_' + cave.run + '_' + cave.floor ? ' — different floor' : ''}
-              {p.locked ? ' — locked' : p.done && merchantRoom(p.room) ? ' - reopen shop' : p.done ? ' — complete' : ''}
-            </button>
-          ))}
-      </div>
+      {!mapOpen && destinations}
       {choice?.resolved && (
         <button className={dungeonButton + ' mt-3'} onClick={() => setInspectedChoice(choice.id)}>
           View encounter — {choice.title}

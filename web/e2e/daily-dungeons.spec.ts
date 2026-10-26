@@ -203,6 +203,35 @@ test('Cave map: full floor from the participants’ streams, waypoint placement 
   await expect(map).toHaveCount(0)
 })
 
+test('Cave map: the destination list moves into the map view, and a tap near a room pin travels there (cave-map.tsx 34092356)', async ({ page }) => {
+  const server = partyServer()
+  server.dailyDungeon = activeCave()
+  const definition = { name: 'zone_ab12_1', min_x: -200, min_y: -200, max_x: 200, max_y: 200, default: null, tiles: [], placements: [], groups: [], tilesets: {} }
+  server.setMapFrame('Leada', { name: 'Leada', map: 'zone_ab12_1', at: Date.now(), x: 0, y: 0, definition, entities: [] })
+  await server.install(page)
+
+  await page.goto('/')
+  const panel = page.getByRole('region', { name: 'Cave of Many Dreams controls' })
+  await expect(panel.getByRole('button', { name: 'Fountain' })).toBeVisible()
+  await page.getByRole('button', { name: 'View full map' }).click()
+  const map = page.getByRole('group', { name: 'Cave map' })
+  const destinations = map.getByRole('region', { name: 'Cave destinations' })
+  await expect(destinations.getByRole('button', { name: 'Library — complete' })).toBeDisabled()
+  await expect(destinations.getByRole('button', { name: 'Stairs — different floor' })).toBeEnabled()
+  // One list: the panel's copy is gone while the map is open.
+  await expect(page.getByRole('button', { name: 'Fountain' })).toHaveCount(1)
+  await destinations.getByRole('button', { name: 'Fountain' }).click()
+  await expect.poll(() => server.dungeonActions[0]).toMatchObject({ action: 'move', target: 'p1', run: 'ab12' })
+  // The Fountain pin sits at the floor's centre (0, 0).
+  await expect(map.locator('canvas')).toBeVisible()
+  const box = (await map.locator('canvas').boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect.poll(() => server.dungeonActions.length).toBe(2)
+  expect(server.dungeonActions[1]).toMatchObject({ action: 'move', target: 'p1' })
+  await map.getByRole('button', { name: 'Close cave map' }).click()
+  await expect(panel.getByRole('button', { name: 'Fountain' })).toBeVisible()
+})
+
 test('Cave map: later frames without the definition keep the floor drawn (map-stream.ts sends it once)', async ({ page }) => {
   const server = partyServer()
   server.dailyDungeon = activeCave()

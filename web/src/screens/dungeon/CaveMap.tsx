@@ -1,29 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { MapCanvas } from '@/components/map/MapCanvas'
 import type { MapDefinition, MapFrame } from '@/components/map/mapTypes'
 import { mapStreamUrl } from '@/config/serverConfig'
 import { useServerSettings } from '@/data/PartyDataProvider'
 import { subscribeMapFrames, useVisible } from '@/data/useMapFrames'
-import type { CaveObservation, DungeonView } from '@/models/dungeon'
+import type { CaveObservation, CavePoint, DungeonView } from '@/models/dungeon'
 import { dungeonButton } from './CaveEventRow'
 
 /** The full floor map with party, room and waypoint pins,
- *  opened from the dungeon panel as a full-screen view. */
+ *  opened from the dungeon panel as a full-screen view. DungeonPanel owns
+ *  the open state and hands in its destination list, which sits under the
+ *  map on a phone and beside it on a wide screen. A tap within 80 map
+ *  units of a room or stairs pin selects that destination. Console:
+ *  cave-map.tsx (34092356). */
 export function CaveMap({
   view,
   cave,
   action,
   error,
+  open,
+  onOpenChange: setOpen,
+  destinations,
+  onSelectPoint,
 }: {
   view: DungeonView
   cave: NonNullable<CaveObservation['cave']>
   action: (body: Record<string, unknown>) => Promise<unknown>
   error: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  destinations: ReactNode
+  onSelectPoint: (point: CavePoint) => void
 }) {
   const settings = useServerSettings()
-  const [open, setOpen] = useState(false),
-    [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [waypoint, setWaypoint] = useState<{ x: number; y: number } | null>(null)
   const [frames, setFrames] = useState<Record<string, MapFrame>>({})
   // Each stream delivers the floor definition once; later frames omit it (dashboard cave-map.tsx).
@@ -49,9 +60,16 @@ export function CaveMap({
   }, [open, visible, names, map, settings])
   const shown = definition?.name === map ? definition : null
   const frame = shown ? frames[view.state.participants[0]] || Object.values(frames)[0] : undefined
+  const floorPoints = cave.points.filter((p) => p.map === map && !p.exit)
+  const selectNear = (point: { x: number; y: number }) => {
+    const near = floorPoints
+      .map((p) => ({ p, d: Math.hypot(p.x - point.x, p.y - point.y) }))
+      .filter(({ d }) => d <= 80)
+      .sort((a, b) => a.d - b.d)[0]
+    if (near) onSelectPoint(near.p)
+  }
   const pins = [
-    ...cave.points
-      .filter((p) => p.map === map && !p.exit)
+    ...floorPoints
       .map((p) => ({ x: p.x, y: p.y, label: p.label, color: p.done ? '#4ade80' : p.required ? '#fb923c' : '#facc15' })),
     ...Object.values(frames).map((f) => ({ x: f.x, y: f.y, label: f.name, color: '#67e8f9' })),
     ...(waypoint ? [{ ...waypoint, label: 'Waypoint', color: '#f472b6' }] : []),
@@ -66,12 +84,13 @@ export function CaveMap({
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="font-semibold">Cave of Many Dreams — Floor {cave.floor + 1}</p>
-              <p className="text-xs text-slate-300">Cyan: party · Orange: required · Green: complete · Yellow: events · Pink: waypoint</p>
+              <p className="text-xs text-slate-300">Cyan: party · Orange: required · Green: complete · Yellow: events · Pink: waypoint. Tap a room on the map or in the list to travel there.</p>
             </div>
             <button type="button" aria-label="Close cave map" onClick={() => setOpen(false)} className="rounded border border-emerald-600 bg-slate-950 p-1">
               <X className="size-5" />
             </button>
           </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-2 md:flex-row">
           <div className="min-h-0 flex-1 overflow-hidden rounded border border-emerald-800 bg-[#07110f]">
             <MapCanvas
               definition={shown}
@@ -90,9 +109,14 @@ export function CaveMap({
                       setWaypoint(point)
                       setAdding(false)
                     }
-                  : undefined
+                  : selectNear
               }
             />
+          </div>
+          <section aria-label="Cave destinations" className="max-h-[30vh] shrink-0 overflow-auto md:max-h-none md:w-72">
+            <h3 className="mb-2 text-sm font-semibold">Travel to</h3>
+            {destinations}
+          </section>
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
             {Object.values(frames).map((f) => (
