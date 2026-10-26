@@ -1,6 +1,7 @@
 import type { Item, MarketListing, RestockPolicy, StandListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
+import type { DeploymentJournal, DeploymentMode } from '@/lib/consoleBuild'
 import { PARTY_ACTION_EVENT, type PartyActionDetail } from '@/data/queryActions'
 import type { EventLimits } from '@/lib/eventPolicy'
 
@@ -878,6 +879,28 @@ export class PartyApiClient {
     return this.postRoot(`console-update/${name}`, value)
   }
 
+  /** GET /console-build (tools/console-build/routes.ts). 503 on a console without managed builds. */
+  async consoleBuilds(): Promise<ApiResult<string>> {
+    return this.getRoot('console-build')
+  }
+
+  /** POST /console-build/deploy {buildId, mode}, the body console-build-control.tsx sends.
+   *  A 409 still carries the running DeploymentJournal as `operation`. */
+  async deployConsoleBuild(buildId: string, mode: DeploymentMode): Promise<{ operation?: DeploymentJournal; error?: string }> {
+    const toastId = beginActionToast()
+    try {
+      const response = await timedFetch(this.rootUrl('console-build/deploy'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildId, mode }) })
+      const result = (await response.json().catch(() => ({}))) as DeploymentJournal & { error?: string; operation?: DeploymentJournal }
+      const operation = response.status === 409 && result.operation ? result.operation : response.ok ? result : undefined
+      const error = operation ? undefined : result.error || `HTTP ${response.status}`
+      resolveActionToast(toastId, operation && response.ok ? 'sent' : 'failed', error ?? (response.ok ? undefined : result.error))
+      return { operation, error }
+    } catch (error) {
+      resolveActionToast(toastId, 'failed', errorMessage(error))
+      return { error: errorMessage(error) }
+    }
+  }
+
   /** GET /console-debug and POST /console-debug/{start,stop}. */
   async consoleDebug(): Promise<ApiResult<string>> {
     return this.getRoot('console-debug')
@@ -998,12 +1021,18 @@ export class PartyApiClient {
 
   // The console fork's Ponty and Ron shop (http/npc-shop-routes.ts).
 
-  /** POST /party-api/npc-shop/orders. A "count" order buys `quantity`; "all" buys every copy at or under maxUnitPrice. */
-  async createNpcShopOrder(order: { npc: 'ponty' | 'ron'; item: string; level: number; mode: 'count' | 'all'; quantity: number; maxUnitPrice: number }): Promise<ApiResult<CommandResult>> {
+  /** POST /party-api/npc-shop/orders. A watch buys new copies in its level range up to `quantity`, or until
+   *  stopped when `quantity` is null; `spendCap` caps its total gold. A "now" order needs a quantity. */
+  async createNpcShopOrder(order: import('@/lib/npcShop').NpcShopOrderRequest): Promise<ApiResult<CommandResult>> {
     return this.post('npc-shop/orders', order)
   }
 
-  /** POST /party-api/npc-shop/stop {id}. 404 for an unknown order. */
+  /** POST /party-api/npc-shop/resume {id}. 409 unless the watch is paused. */
+  async resumeNpcShopOrder(id: string): Promise<ApiResult<CommandResult>> {
+    return this.post('npc-shop/resume', { id })
+  }
+
+  /** POST /party-api/npc-shop/stop {id}: a watch pauses, a buy-now order stops. 404 for an unknown order. */
   async stopNpcShopOrder(id: string): Promise<ApiResult<CommandResult>> {
     return this.post('npc-shop/stop', { id })
   }

@@ -31,6 +31,10 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { StandListingForm } from '@/components/StandListingForm'
 import { WtbDialog } from '@/components/Wtb'
+import { MarketFilterBar } from '@/components/MarketFilterBar'
+import { latestSeen, marketRowFor, useStoredMarketFilter } from '@/lib/marketRows'
+import { WatchListSheet, type WatchPrefill } from '@/components/NpcShopSheet'
+import { filterMarket, realmName, serverOptions } from '@/lib/marketFilter'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
@@ -96,6 +100,8 @@ export function MarketScreen() {
   const now = useClock()
   const [tab, setTab] = useState<Tab>('wts')
   const [query, setQuery] = useState('')
+  const [marketFilter, setMarketFilter] = useStoredMarketFilter(tab)
+  const [watchPrefill, setWatchPrefill] = useState<WatchPrefill | null>(null)
   const [showDealsOnly, setShowDealsOnly] = useState(false)
   const [hideBadDeals, setHideBadDeals] = useState(false)
   const [hideUnaffordable, setHideUnaffordable] = useState(false)
@@ -143,25 +149,46 @@ export function MarketScreen() {
   const listingValue = (entry: AlDataListing) => values.get(entry.item.name) || 1
   // stand-sheet.tsx drops stale rows before grouping; ignored items go after.
   const grouped = useMemo(() => groupAlData(allAlData.filter((entry) => !hideStale || marketListingFresh(entry.seenAt, now))), [allAlData, hideStale, now])
-  const wts = filterAlData(grouped, query, now, nameFor).filter(
-    (entry) =>
-      shown(entry.item, entry.seenAt) &&
-      (!showDealsOnly || entry.price < listingValue(entry) * 0.5) &&
-      (!hideBadDeals || !(entry.price > listingValue(entry) * 2)) &&
-      (!hideUnaffordable || entry.price <= bankGold) &&
-      (!hideBlacklisted || !blacklistRecord(blacklist, !!state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier)),
+  const wts = filterMarket(
+    filterAlData(grouped, query, now, nameFor).filter(
+      (entry) =>
+        shown(entry.item, entry.seenAt) &&
+        (!showDealsOnly || entry.price < listingValue(entry) * 0.5) &&
+        (!hideBadDeals || !(entry.price > listingValue(entry) * 2)) &&
+        (!hideUnaffordable || entry.price <= bankGold) &&
+        (!hideBlacklisted || !blacklistRecord(blacklist, !!state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier)),
+    ),
+    marketFilter,
+    (entry) => marketRowFor(catalogFor(entry.item.name), entry.item, entry.price, latestSeen(entry.groupedListings || [entry]), realmName(entry.serverRegion, entry.serverIdentifier)),
   )
   const owned = ownedCounts(merchantItems, bankPacks)
-  const buyOrders = filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor, forkCommerce)
+  const buyOrders = filterMarket(filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor, forkCommerce), marketFilter, (order) =>
+    marketRowFor(catalogFor(order.item.name), order.item, order.price, latestSeen([order]), realmName(order.serverRegion, order.serverIdentifier)),
+  )
   const bankWtb = buyOrders.filter((order) => owned.has(ownedKey(order.item)))
   const ownOwner = merchantName && diagnostics[merchantName]?.owner != null ? String(diagnostics[merchantName]?.owner) : ''
   const publicTrades = ((aldata.trades ?? []) as AlDataPublicTrade[]).filter((owner) => String(owner.owner) !== ownOwner).flatMap((owner) => (owner.listings || []).map((entry) => ({ owner, listing: entry })))
   // Classifieds have no per-listing time, so their freshness is the feed's last refresh.
-  const classifieds = publicTrades.filter(({ owner, listing: entry }) =>
-    shown(entry, aldata.tradesUpdatedAt) &&
-    `${nameFor(entry.name) || ''} ${entry.name} ${owner.label || ''} ${owner.characters?.join(' ') || ''}`.toLowerCase().includes(query.trim().toLowerCase()),
+  const classifieds = filterMarket(
+    publicTrades.filter(({ owner, listing: entry }) =>
+      shown(entry, aldata.tradesUpdatedAt) &&
+      `${nameFor(entry.name) || ''} ${entry.name} ${owner.label || ''} ${owner.characters?.join(' ') || ''}`.toLowerCase().includes(query.trim().toLowerCase()),
+    ),
+    marketFilter,
+    ({ listing: entry }) => marketRowFor(catalogFor(entry.name), entry, entry.wts?.price ?? null, latestSeen([entry])),
   )
-  const pontyRows = groupPonty(((ponty.listings ?? []) as PontyListing[]).filter((entry) => shown(entry.item, entry.seenAt)), query, now, nameFor)
+  // groupPonty can merge realms into one lot, so the server choice applies to listings before grouping.
+  const pontyListings = ((ponty.listings ?? []) as PontyListing[]).filter(
+    (entry) => shown(entry.item, entry.seenAt) && (marketFilter.server === null || realmName(entry.serverRegion, entry.serverIdentifier) === marketFilter.server),
+  )
+  const pontySeen = new Map(pontyListings.map((entry) => [entry.key, latestSeen([entry])]))
+  const pontyRows = filterMarket(groupPonty(pontyListings, query, now, nameFor), marketFilter, (group) =>
+    marketRowFor(catalogFor(group.item.name), group.item, group.unitPrice, latestSeen((group.keys ?? [group.key]).map((key) => ({ firstSeenAt: pontySeen.get(key) ?? undefined }))), realmName(group.serverRegion, group.serverIdentifier)),
+  )
+
+  const realmsOf = (entries: { serverRegion?: string; serverIdentifier?: string }[]) => serverOptions(entries.map((entry) => ({ server: realmName(entry.serverRegion, entry.serverIdentifier) })))
+  // Classifieds carry no realm, so that tab offers only All.
+  const tabServers = tab === 'wts' ? realmsOf(allAlData) : tab === 'wtb' ? realmsOf(allBuyOrders) : tab === 'ponty' ? realmsOf((ponty.listings ?? []) as PontyListing[]) : []
 
   const run = async (key: string, action: () => Promise<ApiResult<CommandResult> | string | null>) => {
     setBusy(key)
@@ -286,6 +313,8 @@ export function MarketScreen() {
           ))}
         </div>
         <Input aria-label="Search market" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search item, seller, server, or map…" />
+        <MarketFilterBar filter={marketFilter} onChange={setMarketFilter} servers={tabServers} />
+        {watchPrefill && <WatchListSheet prefill={watchPrefill} onClose={() => setWatchPrefill(null)} />}
         <div className="flex flex-wrap gap-2" title="Hide observations older than two minutes; classifieds use the last successful feed refresh.">
           {check('Hide stale listings', hideStale, setHideStale)}
         </div>
@@ -662,6 +691,11 @@ export function MarketScreen() {
         >
           {busy === group.key ? 'Queuing…' : 'Buy'}
         </Button>
+        {consoleFeatures(state).npcShop && (
+          <Button size="sm" variant="outline" aria-label={`Watch ${name}`} onClick={() => setWatchPrefill({ npc: 'ponty', item: group.item.name, level })}>
+            Watch
+          </Button>
+        )}
         {confirming === group.key && (
           <Confirm
             title="Confirm Ponty purchase"

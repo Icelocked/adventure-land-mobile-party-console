@@ -18,6 +18,7 @@ import { pendingCharacters, pendingHelp, pendingLabels, type PendingCharacter } 
 import { RosterPickerSheet } from '@/screens/roster/RosterPickerSheet'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
+import { ConsoleBuildButton } from '@/components/ConsoleBuildButton'
 import { PartyRolesSettings } from '@/screens/PartyRolesSettings'
 import { consoleFeatures, type BestiaryMonster, type CharacterState } from '@/models'
 
@@ -82,6 +83,7 @@ export function CharacterListScreen() {
                 !
               </button>
             )}
+            <ConsoleBuildButton />
           </div>
           {/* Version line */}
           <span className="block font-mono text-[10px] text-muted-foreground">

@@ -1,43 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { npcShopOffers, npcShopRows } from './npcShop'
+import { orderLevels, orderProgress, orderSummary, type NpcShopOrder } from './npcShop'
 
-// Cases follow the console's dashboard/features/party/npc-shop-dialog.tsx
-// (live build 2db4d763). The Ponty listing shape is a live
-// section=market read from 2026-10-22.
+// Labels follow the console fork's dashboard/features/party/npc-shop-dialog.tsx
+// OrderRow (topic15/ponty-ron-buys).
 
-const ponty = (rid: string, name: string, level: number, unitPrice: number, quantity: number, realm = ['US', 'III']) => ({
-  key: `${realm.join(':')}:${rid}`,
-  rid,
-  item: { name, level, rid },
-  serverRegion: realm[0],
-  serverIdentifier: realm[1],
-  quantity,
-  unitPrice,
-  price: unitPrice * quantity,
+const order = (fields: Partial<NpcShopOrder>): NpcShopOrder => ({
+  id: 'npc-order-1', npc: 'ponty', kind: 'watch', item: 'stramulet', levelMin: 0, levelMax: 0, quantity: 300,
+  spendCap: null, bought: 0, spent: 0, status: 'active', ...fields,
 })
 
-describe('npcShopRows', () => {
-  it('groups offers by item and level with the cheapest unit price, sorted by name then level', () => {
-    const rows = npcShopRows([ponty('a', 'wbook0', 0, 500, 2), ponty('b', 'wbook0', 0, 400, 1), ponty('c', 'blade', 7, 9000, 1), ponty('d', 'blade', 0, 50, 3)])
-    expect(rows).toEqual([
-      { key: 'blade@0', name: 'blade', level: 0, copies: 3, low: 50 },
-      { key: 'blade@7', name: 'blade', level: 7, copies: 1, low: 9000 },
-      { key: 'wbook0@0', name: 'wbook0', level: 0, copies: 3, low: 400 },
-    ])
-  })
-})
-
-describe('npcShopOffers', () => {
-  const listings = [ponty('a', 'wbook0', 0, 500, 1), ponty('b', 'wbook0', 0, 400, 1, ['EU', 'I'])]
-  const ronListing = ponty('r', 'ringsj', 0, 2000, 1)
-  const shop = { merchantRealm: 'USIII', ron: { listings: [ronListing] } }
-
-  it('keeps only Ponty listings on the merchant realm', () => {
-    expect(npcShopOffers('ponty', listings, shop).map((offer) => offer.rid)).toEqual(['a'])
+describe('watch labels', () => {
+  it('names one level or a level range', () => {
+    expect(orderLevels(order({}))).toBe('+0')
+    expect(orderLevels(order({ levelMin: 0, levelMax: 2 }))).toBe('+0 to +2')
   })
 
-  it('shows Ron his own last read listings', () => {
-    expect(npcShopOffers('ron', listings, shop)).toEqual([ronListing])
-    expect(npcShopOffers('ron', listings, { merchantRealm: 'USIII', ron: null })).toEqual([])
+  it('summarises the shop, kind and spend cap', () => {
+    expect(orderSummary(order({}), 'Amulet of Strength')).toBe('Amulet of Strength +0 · Ponty · watch')
+    expect(orderSummary(order({ npc: 'ron', kind: 'now', spendCap: 50000 }), 'Ring')).toBe('Ring +0 · Ron · buy now · cap 50,000g')
+  })
+
+  it('shows progress against a target or until stopped, with the last purchase and its realm', () => {
+    expect(orderProgress(order({ bought: 12, spent: 60000 }))).toBe('12/300 bought · 60,000g spent · active')
+    const last = new Date(2026, 9, 22, 9, 30).getTime()
+    expect(orderProgress(order({ quantity: null, bought: 2, spent: 10, status: 'paused', lastBoughtAt: last, lastRealm: 'USIII' }))).toBe(
+      `2 (until stopped) bought · 10g spent · last ${new Date(last).toLocaleTimeString()} on USIII · paused`,
+    )
   })
 })

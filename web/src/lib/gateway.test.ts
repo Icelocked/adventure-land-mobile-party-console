@@ -1,6 +1,6 @@
 import { createServer, request, type IncomingMessage, type Server } from 'node:http'
 import { connect, type AddressInfo } from 'node:net'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
@@ -114,6 +114,16 @@ describe('proxy', () => {
     const headers = seen.at(-1)!
     expect(headers.host).toBe('phone.example:8080')
     expect(headers['x-party-tls']).toBeUndefined()
+  })
+
+  it('forwards managed console builds like the dashboard gateway route (tools/hosting/authorize.ts:82)', async () => {
+    for (const path of ['/console-build', '/console-build/deploy']) {
+      const reply = await get(port, path, { host: 'phone.example:8080' })
+      expect(JSON.parse(reply.body.toString())).toEqual({ url: path })
+      expect(seen.at(-1)!.host).toBe('phone.example:8080')
+    }
+    const nginx = readFileSync(new URL('../../nginx-locations.conf', import.meta.url), 'utf8')
+    expect(nginx).toMatch(/location \/console-build \{[^}]*proxy_pass http:\/\/party-console:3010;[^}]*proxy_set_header Host \$http_host;/)
   })
 
   it('streams events through gzip without holding them back, with its own security headers', async () => {

@@ -1,10 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
-// The console fork's Ponty/Ron shop: dashboard/features/party/npc-shop-dialog.tsx
-// and runtime/coordinator/http/npc-shop-routes.ts in the live build
-// (2db4d763). The npcShop and Ponty listing shapes follow a live
-// section=market read from 2026-10-22.
+// The console fork's Watch list: dashboard/features/party/npc-shop-dialog.tsx
+// and runtime/coordinator/http/npc-shop-routes.ts on topic15/ponty-ron-buys.
+// Prices follow commerce/npc-price.ts (calculate_item_value times 2 for
+// Ponty, 4 for Ron).
 
 function posts(page: Page): { path: string; body: Record<string, unknown> }[] {
   const bodies: { path: string; body: Record<string, unknown> }[] = []
@@ -15,101 +15,90 @@ function posts(page: Page): { path: string; body: Record<string, unknown> }[] {
   return bodies
 }
 
-const listing = (rid: string, name: string, unitPrice: number, quantity: number, realm = ['US', 'III']) => ({
-  key: `${realm.join(':')}:${rid}`,
-  rid,
-  item: { name, level: 0, rid },
-  serverRegion: realm[0],
-  serverIdentifier: realm[1],
-  quantity,
-  unitPrice,
-  price: unitPrice * quantity,
-  seenAt: Date.now(),
-})
-
 function shopServer() {
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
-  server.addCatalogEntry({ id: 'wbook0', name: 'Book of Wizardry' })
-  server.pontyListings = [listing('a', 'wbook0', 500, 2), listing('b', 'wbook0', 400, 1), listing('c', 'blade', 90, 1, ['EU', 'I'])]
+  server.addCatalogEntry({ id: 'wbook0', name: 'Book of Wizardry', value: 1000, upgradeable: true, definition: { upgrade: {} } })
+  server.addCatalogEntry({ id: 'scroll0', name: 'Upgrade Scroll', value: 1000 })
   server.npcShop = { orders: [], settings: { goldReserve: 0, ronDonation: false, ronVisitMinutes: 10 }, ron: null, merchantRealm: 'USIII', spendable: 1_250_000 }
   return server
 }
 
-test('Ponty / Ron is hidden on a console without the fork shop', async ({ page }) => {
+test('Watch list is hidden on a console without the fork shop', async ({ page }) => {
   const server = shopServer()
   server.npcShop = undefined
   await server.install(page)
   await page.goto('/characters/Patinder')
   await expect(page.getByRole('button', { name: 'Buy', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Ponty / Ron' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Watch list' })).toHaveCount(0)
 })
 
-test('Ponty: realm listings, a buy-X order, its progress and Stop, and the gold reserve', async ({ page }) => {
+test('a watch shows prices per level and totals, then Stop and Resume', async ({ page }) => {
   const server = shopServer()
   await server.install(page)
   const bodies = posts(page)
-
   await page.goto('/characters/Patinder')
-  await page.getByRole('button', { name: 'Ponty / Ron' }).click()
-  const shop = page.getByRole('dialog', { name: 'Ponty and Ron' })
-  await expect(shop.getByText("What Ponty and Ron sell on the merchant's realm (USIII).", { exact: false })).toBeVisible()
-  await expect(shop.getByText('Spendable now: 1,250,000g.', { exact: false })).toBeVisible()
-  // The EU listing is on another realm.
-  await expect(shop.getByText('blade')).toHaveCount(0)
-  await expect(shop.getByText('3 available · 400g each')).toBeVisible()
+  await page.getByRole('button', { name: 'Watch list' }).click()
+  const watch = page.getByRole('dialog', { name: 'Watch list' })
+  await expect(watch.getByText('Spendable 1,250,000g')).toBeVisible()
 
-  await shop.getByRole('spinbutton', { name: 'Quantity for Book of Wizardry' }).fill('2')
-  await shop.getByRole('spinbutton', { name: 'Max unit price for Book of Wizardry' }).fill('450')
-  await shop.getByRole('button', { name: 'Buy 2 Book of Wizardry' }).click()
-  await expect.poll(() => bodies[0]).toEqual({ path: 'npc-shop/orders', body: { npc: 'ponty', item: 'wbook0', level: 0, mode: 'count', quantity: 2, maxUnitPrice: 450 } })
-  const orders = shop.getByRole('region', { name: 'Orders' })
-  await expect(orders.getByText('Book of Wizardry · buy 2 ≤ 450g')).toBeVisible()
-  await expect(orders.getByText('0/2 bought · 0g · active')).toBeVisible()
+  await watch.getByRole('combobox', { name: 'Watch item' }).fill('Book of Wizardry')
+  await watch.getByRole('spinbutton', { name: 'Highest level' }).fill('1')
+  await expect(watch.getByText('+0 · Ponty 1,200g · Ron 2,400g')).toBeVisible()
+  await expect(watch.getByText('+1 · Ponty 2,200g · Ron 4,400g')).toBeVisible()
+  await watch.getByRole('spinbutton', { name: 'Quantity' }).fill('300')
+  await expect(watch.getByText('Estimated total 360,000 to 660,000g')).toBeVisible()
+  await watch.getByRole('checkbox', { name: 'Until I stop' }).check()
+  await expect(watch.getByText('1,200 to 2,200g per copy')).toBeVisible()
+  await watch.getByRole('spinbutton', { name: 'Spend cap' }).fill('50000')
+  await watch.getByRole('button', { name: 'Add watch' }).click()
+  await expect.poll(() => bodies[0]).toEqual({ path: 'npc-shop/orders', body: { npc: 'ponty', kind: 'watch', item: 'wbook0', levelMin: 0, levelMax: 1, quantity: null, spendCap: 50000 } })
+  const list = watch.getByRole('region', { name: 'Watches' })
+  await expect(list.getByText('Book of Wizardry +0 to +1 · Ponty · watch · cap 50,000g')).toBeVisible()
+  await expect(list.getByText('0 (until stopped) bought · 0g spent · active')).toBeVisible()
 
-  await orders.getByRole('button', { name: 'Stop Book of Wizardry order' }).click()
-  await expect.poll(() => bodies[1]?.path).toBe('npc-shop/stop')
-  expect(bodies[1].body).toEqual({ id: (server.npcShop!.orders as { id: string }[])[0].id })
-  await expect(orders.getByText('0/2 bought · 0g · stopped')).toBeVisible()
-  await expect(orders.getByRole('button', { name: /^Stop / })).toHaveCount(0)
+  await list.getByRole('button', { name: 'Stop Book of Wizardry watch' }).click()
+  await expect.poll(() => bodies[1]).toEqual({ path: 'npc-shop/stop', body: { id: (server.npcShop!.orders as { id: string }[])[0].id } })
+  await expect(list.getByText('0 (until stopped) bought · 0g spent · paused')).toBeVisible()
+  await list.getByRole('button', { name: 'Resume Book of Wizardry watch' }).click()
+  await expect.poll(() => bodies[2]?.path).toBe('npc-shop/resume')
+  await expect(list.getByText('0 (until stopped) bought · 0g spent · active')).toBeVisible()
 
-  await shop.getByRole('spinbutton', { name: 'Gold reserve' }).fill('5000')
-  await shop.getByRole('button', { name: 'Save reserve' }).click()
-  await expect.poll(() => bodies[2]).toEqual({ path: 'npc-shop/settings', body: { goldReserve: 5000 } })
-  await expect(shop.getByRole('spinbutton', { name: 'Gold reserve' })).toHaveValue('5000')
+  await watch.getByRole('spinbutton', { name: 'Gold reserve' }).fill('5000')
+  await watch.getByRole('button', { name: 'Save reserve' }).click()
+  await expect.poll(() => bodies[3]).toEqual({ path: 'npc-shop/settings', body: { goldReserve: 5000 } })
 })
 
-test('Ron: donation consent, visit interval, Check Ron now, buy all, and a 409 without a merchant', async ({ page }) => {
+test('Ron: consent, interval, Check Ron now, filtered stock, buy now and a 409 without a merchant', async ({ page }) => {
   const server = shopServer()
   await server.install(page)
   const bodies = posts(page)
-
   await page.goto('/characters/Patinder')
-  await page.getByRole('button', { name: 'Ponty / Ron' }).click()
-  const shop = page.getByRole('dialog', { name: 'Ponty and Ron' })
-  await shop.getByRole('tab', { name: 'Ron' }).click()
-  await expect(shop.getByText('Check Ron to read his stock.')).toBeVisible()
-  await expect(shop.getByText('Not read since the console started')).toBeVisible()
+  await page.getByRole('button', { name: 'Watch list' }).click()
+  const watch = page.getByRole('dialog', { name: 'Watch list' })
+  await watch.getByRole('tab', { name: 'Ron' }).click()
+  await expect(watch.getByText('Check Ron to read his stock.')).toBeVisible()
 
-  await shop.getByRole('checkbox', { name: /Allow a 1,000,000 gold donation/ }).check()
+  await watch.getByRole('checkbox', { name: /Allow a 1,000,000 gold donation/ }).check()
   await expect.poll(() => bodies[0]).toEqual({ path: 'npc-shop/settings', body: { ronDonation: true } })
-  await expect(shop.getByRole('checkbox', { name: /Allow a 1,000,000 gold donation/ })).toBeChecked()
-
-  const minutes = shop.getByRole('spinbutton', { name: 'Ron visit minutes' })
+  const minutes = watch.getByRole('spinbutton', { name: 'Ron visit minutes' })
   await minutes.fill('30')
   await minutes.blur()
   await expect.poll(() => bodies[1]).toEqual({ path: 'npc-shop/settings', body: { ronVisitMinutes: 30 } })
 
-  server.npcShop = { ...server.npcShop!, ron: { listings: [listing('r', 'wbook0', 2000, 1)], updatedAt: Date.now(), error: null } }
-  await shop.getByRole('button', { name: 'Check Ron now' }).click()
+  const offer = (rid: string, name: string, unitPrice: number, firstSeenAt: number) => ({ rid, item: { name, level: 0, rid }, quantity: 1, unitPrice, price: unitPrice, firstSeenAt })
+  server.npcShop = { ...server.npcShop!, ron: { listings: [offer('r', 'wbook0', 2400, Date.now() - 5000), offer('s', 'scroll0', 2400, Date.now())], updatedAt: Date.now(), error: null } }
+  await watch.getByRole('button', { name: 'Check Ron now' }).click()
   await expect.poll(() => bodies[2]).toEqual({ path: 'npc-shop/ron-visit', body: {} })
-  await expect(shop.getByText(/^Read \d/)).toBeVisible()
-  await shop.getByRole('button', { name: 'Buy all Book of Wizardry' }).click()
-  await expect.poll(() => bodies[3]).toEqual({ path: 'npc-shop/orders', body: { npc: 'ron', item: 'wbook0', level: 0, mode: 'all', quantity: 1, maxUnitPrice: 2000 } })
-  await expect(shop.getByRole('region', { name: 'Orders' }).getByText('Book of Wizardry · buy all ≤ 2,000g')).toBeVisible()
+  await expect(watch.getByText(/^Visited \d/)).toBeVisible()
+  await expect(watch.getByText('1 available · 2,400g each')).toHaveCount(2)
+  await watch.getByRole('textbox', { name: 'Keywords' }).fill('wizardry')
+  await expect(watch.getByText('1 available · 2,400g each')).toHaveCount(1)
+  await watch.getByRole('button', { name: 'Buy 1 now Book of Wizardry' }).click()
+  await expect.poll(() => bodies[3]).toEqual({ path: 'npc-shop/orders', body: { npc: 'ron', kind: 'now', item: 'wbook0', levelMin: 0, levelMax: 0, quantity: 1, spendCap: null } })
 
   server.merchantCharacter = null
-  await shop.getByRole('button', { name: 'Check Ron now' }).click()
-  await expect(shop.getByRole('alert')).toHaveText('configure a merchant first')
+  await watch.getByRole('button', { name: 'Check Ron now' }).click()
+  await expect(watch.getByRole('alert')).toHaveText('configure a merchant first')
 })

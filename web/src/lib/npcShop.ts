@@ -1,28 +1,31 @@
-/** Ponty and Ron standing buy orders, from the console fork's
- *  dashboard/features/party/npc-shop-dialog.tsx (live build 2db4d763). */
+/** Ponty and Ron watches and buy-now orders, from the console fork's
+ *  dashboard/features/party/npc-shop-dialog.tsx (topic15/ponty-ron-buys). */
 import type { MarketListing } from '@/models'
 
 export type NpcShopNpc = 'ponty' | 'ron'
-/** One NPC stock entry. Ponty's come from market `ponty.listings`, Ron's from `npcShop.ron.listings`. */
+/** One entry of Ron's last-visit stock (`npcShop.ron.listings`). */
 export type NpcShopOffer = Pick<MarketListing, 'item' | 'quantity' | 'price'> & {
-  rid?: string
+  rid: string
   unitPrice: number
-  serverRegion?: string
-  serverIdentifier?: string
+  firstSeenAt?: number
 }
 export interface NpcShopOrder {
   id: string
   npc: NpcShopNpc
+  kind: 'watch' | 'now'
   item: string
-  level: number
-  mode: 'count' | 'all'
-  quantity: number
-  maxUnitPrice: number
+  levelMin: number
+  levelMax: number
+  /** null keeps a watch buying until the user stops it. */
+  quantity: number | null
+  spendCap: number | null
   bought: number
   spent: number
-  status: 'active' | 'done' | 'stopped'
+  status: 'active' | 'paused' | 'done' | 'stopped'
+  lastBoughtAt?: number
+  lastRealm?: string
 }
-/** market `npcShop` (runtime/coordinator/commerce/npc-shop.ts). */
+/** market `npcShop` (runtime/coordinator/commerce/npc-shop.ts npcShopView). */
 export interface NpcShopView {
   orders: NpcShopOrder[]
   settings: { goldReserve: number; ronDonation: boolean; ronVisitMinutes: number }
@@ -31,30 +34,30 @@ export interface NpcShopView {
   merchantRealm: string | null
   spendable: number
 }
-export interface NpcShopRow {
-  key: string
-  name: string
-  level: number
-  copies: number
-  low: number
+/** The body of POST /party-api/npc-shop/orders. */
+export interface NpcShopOrderRequest {
+  npc: NpcShopNpc
+  kind: 'watch' | 'now'
+  item: string
+  levelMin: number
+  levelMax: number
+  quantity: number | null
+  spendCap: number | null
 }
 
-/** Groups one NPC's stock by item and level, with the cheapest unit price. */
-export function npcShopRows(offers: NpcShopOffer[]): NpcShopRow[] {
-  const groups = new Map<string, NpcShopRow>()
-  for (const offer of offers) {
-    const level = Number(offer.item.level) || 0
-    const key = `${offer.item.name}@${level}`
-    const row = groups.get(key) ?? { key, name: offer.item.name, level, copies: 0, low: Infinity }
-    row.copies += offer.quantity
-    row.low = Math.min(row.low, offer.unitPrice)
-    groups.set(key, row)
-  }
-  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name) || a.level - b.level)
+export const gold = (value: number) => `${value.toLocaleString()}g`
+
+export function orderLevels(order: Pick<NpcShopOrder, 'levelMin' | 'levelMax'>): string {
+  return order.levelMin === order.levelMax ? `+${order.levelMin}` : `+${order.levelMin} to +${order.levelMax}`
 }
 
-/** The Ponty tab shows only listings on the merchant's realm (`serverRegion` + `serverIdentifier`, e.g. "USIII"). */
-export function npcShopOffers(npc: NpcShopNpc, pontyListings: NpcShopOffer[], shop: Pick<NpcShopView, 'merchantRealm' | 'ron'> | null | undefined): NpcShopOffer[] {
-  if (npc === 'ron') return shop?.ron?.listings ?? []
-  return pontyListings.filter((entry) => `${entry.serverRegion}${entry.serverIdentifier}` === shop?.merchantRealm)
+export function orderSummary(order: NpcShopOrder, name: string): string {
+  const cap = order.spendCap !== null ? ` · cap ${gold(order.spendCap)}` : ''
+  return `${name} ${orderLevels(order)} · ${order.npc === 'ponty' ? 'Ponty' : 'Ron'} · ${order.kind === 'watch' ? 'watch' : 'buy now'}${cap}`
+}
+
+export function orderProgress(order: NpcShopOrder): string {
+  const target = order.quantity !== null ? `/${order.quantity}` : ' (until stopped)'
+  const last = order.lastBoughtAt ? ` · last ${new Date(order.lastBoughtAt).toLocaleTimeString()}${order.lastRealm ? ` on ${order.lastRealm}` : ''}` : ''
+  return `${order.bought}${target} bought · ${gold(order.spent)} spent${last} · ${order.status}`
 }
