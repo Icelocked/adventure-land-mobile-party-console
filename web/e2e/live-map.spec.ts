@@ -146,3 +146,26 @@ test('Farming-area picker: map preview with the legend, Enlarge map, and the una
   await page.getByRole('button', { name: /cave \(0, 0\)/ }).click()
   await expect(page.getByText('Map preview unavailable. You can still choose this area.')).toBeVisible()
 })
+
+test('Live map: the stream closes while the open map is scrolled off screen and reopens when it returns', async ({ page }) => {
+  // A map stream sends about 100 KB/s; on a slow link the escape latency
+  // probe and the polls queue behind it, so only a map on screen holds one.
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, items: Array.from({ length: 42 }, () => ({ name: 'hpot0', q: 1 })) })
+  await server.install(page)
+  const opened: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/map-stream/')) opened.push(request.url())
+  })
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('button', { name: 'Expand live map' }).click()
+  const clients = () => server.mapStreamClients.get('Ranger1')?.size ?? 0
+  await expect.poll(clients).toBe(1)
+  await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight))
+  await expect.poll(clients).toBe(0)
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await expect.poll(clients).toBe(1)
+  expect(opened.length).toBe(2)
+})

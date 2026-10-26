@@ -75,6 +75,21 @@ export function useMapFrames(character: string, enabled: boolean, listener: List
   }, [settings, character, enabled])
 }
 
+/** Whether [element] overlaps the viewport. An element that is not
+ *  mounted yet counts as off screen. */
+export function useOnScreen(element: Element | null) {
+  const [seen, setSeen] = useState<{ element: Element; onScreen: boolean } | null>(null)
+  const observable = typeof IntersectionObserver !== 'undefined'
+  useEffect(() => {
+    if (!element || !observable) return
+    const observer = new IntersectionObserver(([entry]) => setSeen({ element, onScreen: entry.isIntersecting }))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [element, observable])
+  if (!element) return false
+  return observable ? seen?.element === element && seen.onScreen : true
+}
+
 /** Whether the document is visible. */
 export function useVisible() {
   const [visible, setVisible] = useState(() => typeof document !== 'undefined' && !document.hidden)

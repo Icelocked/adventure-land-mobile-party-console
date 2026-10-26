@@ -5,11 +5,14 @@ import { MapCanvas } from '@/components/map/MapCanvas'
 import { FreshnessBadge } from '@/components/FreshnessBadge'
 import { receiveMapFrame, type MapRenderBuffer } from '@/components/map/mapRendering'
 import type { MapDefinition } from '@/components/map/mapTypes'
-import { useMapDefinition, useMapFrames, useVisible } from '@/data/useMapFrames'
+import { useMapDefinition, useMapFrames, useOnScreen, useVisible } from '@/data/useMapFrames'
 
 /** The collapsible live map under the
  *  character's position, at 20 fps while open and the page is visible,
- *  with a native-size view (names and hit/heal floaters). */
+ *  with a native-size view (names and hit/heal floaters). The map stream
+ *  runs only while the map is on screen or the native-size view is open:
+ *  each feed sends about 100 KB/s, and on a slow link the other requests,
+ *  the escape latency probe among them, queue behind it. */
 export function MapSection({ name, map, x, y }: { name: string; map: string; x: number; y: number }) {
   const caveMap = /^zone_[a-f0-9]+_\d+$/.test(map)
   const mapLabel = caveMap ? 'Cave of Many Dreams' : map
@@ -40,7 +43,9 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
       setLastFrameAt((previous) => (Math.floor(previous / 1000) === Math.floor(at / 1000) ? previous : at))
     },
   }))
-  useMapFrames(name, open && visible, listener)
+  const [frame, setFrame] = useState<HTMLDivElement | null>(null)
+  const onScreen = useOnScreen(frame)
+  useMapFrames(name, open && visible && (onScreen || large), listener)
 
   return (
     <div className="px-3 pt-1">
@@ -64,7 +69,7 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
         </span>
       </div>
       {open ? (
-        <div className="relative mt-2 aspect-[4/3] overflow-hidden rounded-md border border-emerald-800/80 bg-[#07110f]">
+        <div ref={setFrame} className="relative mt-2 aspect-[4/3] overflow-hidden rounded-md border border-emerald-800/80 bg-[#07110f]">
           <MapCanvas definition={definition} frame={null} previous={null} receivedAt={0} buffer={buffer} fps={20} active={open && visible && !large} scale={1 / 3} detailed={false} />
           <button
             type="button"

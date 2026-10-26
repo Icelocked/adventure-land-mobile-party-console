@@ -591,7 +591,8 @@ export class MockPartyServer {
   // keep whatever type the test sets so tests can reproduce the string vs
   // number mismatch with the vitals `target` (useTargetMonsterType.ts).
   private mapFrameEntities = new Map<string, { id: string | number; mtype?: string }[]>()
-  private mapStreamClients = new Map<string, Set<ServerResponse>>()
+  // Open /map-stream responses per character; live-map.spec.ts counts them.
+  mapStreamClients = new Map<string, Set<ServerResponse>>()
 
   // Whole map frames (telemetry/map-stream.ts) for the live map, sent as-is.
   setMapFrame(character: string, frame: Record<string, unknown>): void {
