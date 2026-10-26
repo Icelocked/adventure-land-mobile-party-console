@@ -59,6 +59,8 @@ class FakeConsole : AutoCloseable {
     @Volatile var escape: String? = null
     /** Every escape POST path in order (the e2e mock's escapeActions). */
     val escapeActions = CopyOnWriteArrayList<String>()
+    /** A Cave run or event fight that defers a clean shutdown until forced (the e2e mock's shutdownHold). */
+    @Volatile var shutdownHold: String? = null
     /** Set by [ryanV140]: the fake plays Ryan's v1.4.0, not the stable console fork. */
     @Volatile var ryanV140 = false
 

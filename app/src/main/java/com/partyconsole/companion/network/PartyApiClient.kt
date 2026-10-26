@@ -153,6 +153,12 @@ class PartyApiClient(
     suspend fun setFormationRoles(roles: Map<String, JsonElement>): ApiResult<CommandResult> =
         post("formation", JsonObject(roles))
 
+    /** POST /party-api/console-control/:action. Each action answers the new
+     *  ConsoleControlState; shutdown takes {force: true} to stop during a
+     *  Cave run or event fight (lifecycle/console-control.ts). */
+    suspend fun consoleControl(action: com.partyconsole.companion.model.ConsoleControlAction, force: Boolean = false): ApiResult<CommandResult> =
+        post("console-control/${action.path}", JsonObject(if (force) mapOf("force" to JsonPrimitive(true)) else emptyMap()))
+
     /** POST /party-api/formation {character, follow}. Never sends `leader`:
      *  the server applies any `leader` key it gets. */
     suspend fun setFollow(character: String, follow: Boolean): ApiResult<CommandResult> =

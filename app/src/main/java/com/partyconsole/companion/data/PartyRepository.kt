@@ -151,6 +151,7 @@ class PartyRepository(
     @Volatile private var catalogLoaded = false
     // The referenceRevision the loaded (or loading) catalog belongs to.
     @Volatile private var catalogRevision: String? = null
+    private var coreGeneration = 0L
 
     private fun mergeState(patch: Map<String, JsonElement>) {
         synchronized(stateLock) {
@@ -173,6 +174,7 @@ class PartyRepository(
         val decoded = decodeState(merged) ?: return
         _dynamicState.value = decoded.copy(
             stateKeys = merged.keys,
+            coreGeneration = coreGeneration,
             travelPlaces = catalog.travelPlaces,
             monsterChoices = catalog.monsterChoices,
             bestiaryCatalog = catalog.bestiaryCatalog,
@@ -248,6 +250,7 @@ class PartyRepository(
         val patch = value.filterKeys { it !in CORE_ONLY_KEYS }.toMutableMap()
         // Core's aldata is stripped; never let it replace the market's copy.
         marketAldata?.let { patch["aldata"] = it }
+        synchronized(stateLock) { coreGeneration++ }
         mergeState(patch)
         // The catalog is keyed by referenceRevision. A catalog request already
         // under way is not repeated (it is the biggest payload); a newer

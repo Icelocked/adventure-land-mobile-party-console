@@ -40,7 +40,7 @@ private fun FakeConsole.ctype(name: String): String? =
     ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(name) as? JsonObject)?.get("ctype").str()
 
 /** The state keys only the stable console fork sends (model/ConsoleFeatures.kt). */
-private val FORK_KEYS = listOf("designatedTank", "offTank", "pullMode", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
+private val FORK_KEYS = listOf("designatedTank", "offTank", "pullMode", "consoleControl", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
 
 /** Plays Ryan's v1.4.0 instead of the stable console fork: drops every fork
  *  field and the "prim stack" routine, and the auto NPC sale route ignores
@@ -73,6 +73,35 @@ internal fun FakeConsole.installConsole14Routes() {
     // The e2e mock serves the leader scope's Franky routine at the top level.
     put("encounterRoutines", JsonObject(emptyMap()))
     put("merchantRoutinePriorities", JsonObject(mapOf("prim stack" to JsonPrimitive(70)) + field("merchantRoutinePriorities").obj().orEmpty()), "config")
+
+    // Console fork Pause, Play and clean shutdown (lifecycle/console-control.ts status()).
+    put("consoleControl", Json.parseToJsonElement("""{"paused":false,"pausedAt":null,"leaseId":null,"resume":null,"shutdown":null,"log":[]}"""))
+    for (action in listOf("pause", "play", "shutdown", "cancel-shutdown", "cancel-resume")) {
+        // application.ts /party-api/console-control/:action; every action answers status().
+        routes["console-control/$action"] = route@{ body ->
+            if (ryanV140) return@route 404 to """{"error":"not found"}"""
+            val control = field("consoleControl").obj().orEmpty()
+            val now = JsonPrimitive(System.currentTimeMillis())
+            fun shutdown(phase: String) = JsonObject(mapOf(
+                "phase" to JsonPrimitive(phase),
+                "requestedAt" to (control["shutdown"].obj()?.get("requestedAt") ?: now),
+                "hold" to (if (phase == "deferred") shutdownHold?.let { JsonPrimitive(it) } ?: JsonNull else JsonNull),
+                "waiting" to JsonArray(if (phase == "draining") characterNames().map { JsonPrimitive(it) } else emptyList()),
+                "command" to JsonPrimitive("docker compose stop party-console"),
+                "directory" to JsonPrimitive("/opt/party-console"),
+            ))
+            val next = when (action) {
+                "pause" -> control + mapOf("paused" to JsonPrimitive(true), "pausedAt" to now)
+                "play" -> control + mapOf("paused" to JsonPrimitive(false), "pausedAt" to JsonNull, "resume" to JsonNull)
+                "shutdown" -> if (shutdownHold != null && (body["force"] as? JsonPrimitive)?.booleanOrNull != true) control + ("shutdown" to shutdown("deferred"))
+                    else control + mapOf("paused" to JsonPrimitive(true), "pausedAt" to (control["pausedAt"]?.takeIf { it !is JsonNull } ?: now), "shutdown" to shutdown("draining"))
+                "cancel-shutdown" -> control + ("shutdown" to JsonNull)
+                else -> control + ("resume" to JsonNull)
+            }
+            put("consoleControl", JsonObject(next))
+            200 to JsonObject(next).toString()
+        }
+    }
 
     routes["formation"] = route@{ body ->
         // http/formation.ts tankRoles(): `tank`, `offTank` and `pullMode` are

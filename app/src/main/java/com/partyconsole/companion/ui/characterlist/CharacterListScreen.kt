@@ -122,6 +122,8 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                                     contentAlignment = Alignment.Center,
                                 ) { Text("!", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) }
                             }
+                            com.partyconsole.companion.ui.components.ConsoleControls(viewModel)
+                            com.partyconsole.companion.ui.components.ConsolePausedIndicator(viewModel)
                         }
                         // Version line
                         Text(
@@ -157,6 +159,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
             if (!connected) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
             if (sessionLost) item { SessionLostCard(onReconnect) }
             item { DebugBrowserBanner(viewModel) }
+            item { com.partyconsole.companion.ui.components.ConsoleResumeBanner(viewModel) }
             // The dungeon panel heads the party while a visit runs.
             item { com.partyconsole.companion.ui.dungeon.DungeonPanel(viewModel) }
             if (names.isNotEmpty() || pending.isNotEmpty()) item { PartyControls(viewModel) }

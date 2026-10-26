@@ -131,6 +131,8 @@ data class PartyStateDynamic(
     val partyFarmingMode: String? = null,
     val combatRecovery: CombatRecovery? = null,
     val activeConvoy: JsonElement? = null,
+    // Console fork: Pause, Play and the clean shutdown (core section).
+    val consoleControl: ConsoleControlState? = null,
     // Events
     val eventSchedules: List<EventSchedule> = emptyList(),
     val eventSelectionsByCharacter: Map<String, List<String>> = emptyMap(),
@@ -193,6 +195,9 @@ data class PartyStateDynamic(
     // Every top-level key the console sent. ConsoleFeatures.kt reads it to tell
     // a field the console sent from one this model fills with its default.
     @kotlinx.serialization.Transient val stateKeys: Set<String> = emptySet(),
+    // Counts the core polls merged so far. A console-control reply stands in
+    // for consoleControl only until the next one (ConsoleControls.kt).
+    @kotlinx.serialization.Transient val coreGeneration: Long = 0,
 )
 
 @Serializable
