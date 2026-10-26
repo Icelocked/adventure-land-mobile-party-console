@@ -8,7 +8,7 @@ import { CloudOff, Menu, Plus, RefreshCw } from 'lucide-react'
 import { useCharacterDiagnostics, useEscapeError, usePartyApi, useCharacters, useConnected, useDynamicState, useEscapeStatus, useRefreshDynamicStateNow, useServerSettings, useConfigLoaded, useRoster } from '@/data/PartyDataProvider'
 import { AccountMenu } from '@/screens/character-detail/AccountMenu'
 import { classLook } from '@/lib/classLook'
-import { activityLine } from '@/lib/activityLine'
+import { CharacterActivity } from '@/components/CharacterActivity'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
 import { PartyGold } from '@/components/PartyGold'
@@ -20,7 +20,7 @@ import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import { ConsoleBuildButton } from '@/components/ConsoleBuildButton'
 import { ConsoleControls, ConsolePausedIndicator, ConsoleResumeBanner } from '@/components/ConsoleControls'
-import type { BestiaryMonster, CharacterState } from '@/models'
+import type { CharacterState } from '@/models'
 
 /** Party overview: class icon, level/class, HP/MP, one-line activity, gold
  *  carried per character and the account total, and a refresh button. */
@@ -133,7 +133,7 @@ export function CharacterListScreen() {
         // Cards side by side when the screen is wide enough.
         <ul className="grid grid-cols-1 gap-2 p-3 md:grid-cols-2 xl:grid-cols-3">
           {names.filter((name) => !pending.some((entry) => entry.name === name)).map((name) => (
-            <CharacterRow key={name} name={name} state={characters[name]} bestiaryCatalog={dynamicState.bestiaryCatalog} />
+            <CharacterRow key={name} name={name} state={characters[name]} />
           ))}
           {pending.map((entry) => (
             <PendingCharacterCard key={entry.name} entry={entry} />
@@ -266,7 +266,7 @@ function PartyControls() {
   )
 }
 
-function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: CharacterState; bestiaryCatalog: BestiaryMonster[] }) {
+function CharacterRow({ name, state }: { name: string; state: CharacterState }) {
   const vitals = state.vitals
   const { Icon, color } = classLook(vitals?.ctype ?? '')
   const seenAt = Number(useCharacterDiagnostics(name)?.seenAt || 0)
@@ -291,7 +291,7 @@ function CharacterRow({ name, state, bestiaryCatalog }: { name: string; state: C
           </div>
           {vitals ? (
             <>
-              <div className={`truncate text-sm ${vitals.rip ? 'text-destructive' : 'text-muted-foreground'}`}>{activityLine(vitals, bestiaryCatalog)}</div>
+              <CharacterActivity name={name} vitals={vitals} className={`truncate text-sm ${vitals.rip ? '' : 'text-muted-foreground'}`} />
               <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                 <span>
                   HP {vitals.hp}/{vitals.max_hp}

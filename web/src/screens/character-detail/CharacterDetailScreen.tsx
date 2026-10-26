@@ -105,8 +105,6 @@ export function CharacterDetailScreen() {
           <VitalsHeader
             name={name}
             vitals={vitals}
-            bestiaryCatalog={dynamicState.bestiaryCatalog}
-            resolvedTargetType={resolvedTargetType}
             diagnostics={diagnostics[name]}
             slots={state?.inventory?.slots ?? {}}
             online={online}

@@ -32,7 +32,7 @@ test('Character header: doll portrait opens the stats, presence and ping, cave m
   await expect(page.getByLabel('Online')).toBeVisible()
   await expect(page.getByText(/· 87ms/)).toBeVisible()
   await expect(page.getByText(/^Cave of Many Dreams \(/)).toBeVisible()
-  await expect(page.getByText('BANKING')).toBeVisible()
+  await expect(page.getByText('BANKING', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'View Ranger1 stats' }).click()
   const stats = page.getByRole('dialog', { name: 'Ranger1 stats' })

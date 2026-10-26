@@ -3,6 +3,7 @@ import type { Item, InventoryEntry, EquippedEntry } from './item'
 import type { Sprite } from './sprite'
 import type { OfflineCharacter } from './character'
 import type { ConsoleControlState } from './consoleControl'
+import type { ActivityPhases } from './activityPhases'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
 import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
 
@@ -723,6 +724,9 @@ export interface PartyStateDynamic {
   partyLocation?: { map: string; x: number; y: number; [field: string]: unknown } | null
   combatRecovery?: { phase: string; reason?: string; names: string[] } | null
   activeConvoy?: unknown
+  // Console fork: the task phases the activity label reads (core section,
+  // telemetry/activity-phases.ts).
+  activityPhases?: ActivityPhases | null
   // Console fork: Pause, Play and the clean shutdown (core and fast sections).
   consoleControl?: ConsoleControlState | null
   // Upgrades

@@ -145,10 +145,9 @@ test('Character detail: resolves the real monster name from the live map stream,
   // The live map opens it; the target name then resolves from its frames.
   await page.getByRole('button', { name: 'Expand live map' }).click()
   await expect(page.getByText('Fighting Crabxx', { exact: true })).toBeVisible()
-  await expect(page.getByText('fighting Crabxx', { exact: true })).toBeVisible()
 })
 
-test('Character detail: a numeric target does not crash the page (activityLine must never assume target is a string)', async ({ page }) => {
+test('Character detail: a numeric target does not crash the page', async ({ page }) => {
   // vitals.target isn't coerced server-side, so a numeric target must not
   // crash the page (`.trim()` on a number throws).
   const pageErrors: string[] = []
@@ -159,26 +158,40 @@ test('Character detail: a numeric target does not crash the page (activityLine m
   page.on('pageerror', (err) => pageErrors.push(err.message))
 
   await page.goto('/characters/Ranger1')
-  await expect(page.getByText('fighting', { exact: true })).toBeVisible()
+  await expect(page.getByText('Fighting', { exact: true })).toBeVisible()
   expect(pageErrors).toEqual([])
 })
 
-test('Character list and vitals header never show the raw target id - resolved name when it matches the bestiary, plain "fighting" otherwise', async ({ page }) => {
+test('Character list and vitals header show the task phase: travel names its target from the first poll of the trip, never a raw target id', async ({ page }) => {
+  // The labels follow the console fork's character-activity.ts: the Hunt
+  // stage and convoy phase pick the label, the per-second target does not.
   const server = new MockPartyServer()
   server.paired = true
-  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, target: 'crabx' }) // resolvable
-  server.addCharacter({ name: 'Ranger2', ctype: 'ranger', level: 45, target: '2951603' }) // raw per-instance id, like real game data
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, target: 'crabx' })
+  server.addCharacter({ name: 'Ranger2', ctype: 'ranger', level: 45, target: '2951603' })
+  server.leader = 'Ranger1'
   server.bestiaryCatalog = [{ id: 'crabx', name: 'Crabxx', hp: 100, attack: 10, xp: 5, threat: 1, drops: [] }]
+  const party = ['Ranger1', 'Ranger2']
+  const hunt = (stage: string) => ({ stage, participants: party, target: 'crabx', message: 'Monster Hunt: crabx', currentIndex: 0, missions: [{ target: 'crabx', owners: ['Ranger1'] }] })
+  server.monsterHunt = hunt('farming')
   await server.install(page)
 
   await page.goto('/')
-  await expect(page.getByText('fighting Crabxx')).toBeVisible()
-  await expect(page.getByText('fighting', { exact: true })).toBeVisible()
-  await expect(page.getByText('2951603')).not.toBeVisible()
+  const activity = page.locator('[data-character-activity]')
+  await expect(activity).toHaveText(['Fighting Hunt target - Crabxx', 'Fighting Hunt target - Crabxx'])
+  await expect(page.getByText('2951603')).toHaveCount(0)
+
+  // A new trip regroups, then travels; the label changes without any move.
+  const convoy = (phase: string) => ({ id: 'convoy-1', phase, purpose: 'monster-hunt', label: 'Monster Hunt: crabx', participants: party, location: { map: 'main', mapName: 'Mainland', monsterIds: ['crabx'] } })
+  server.monsterHunt = hunt('mission-travel')
+  server.extraState = { activeConvoy: convoy('shared-prepare') }
+  await expect(activity).toHaveText(['Regrouping for travel', 'Regrouping for travel'], { timeout: 12_000 })
+  server.extraState = { activeConvoy: convoy('travel') }
+  await expect(activity).toHaveText(['Travelling to Hunt target - Crabxx', 'Travelling to Hunt target - Crabxx'], { timeout: 12_000 })
 
   await page.goto('/characters/Ranger2')
-  await expect(page.getByText('fighting', { exact: true })).toBeVisible()
-  await expect(page.getByText('2951603')).not.toBeVisible()
+  await expect(page.locator('[data-character-activity]')).toHaveText('Travelling to Hunt target - Crabxx')
+  await expect(page.getByText('2951603')).toHaveCount(0)
 })
 
 test('Selecting Hunt with an existing backup already configured activates it directly - no picker shown', async ({ page }) => {

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { activityLine } from '@/lib/activityLine'
+import { CharacterActivity } from '@/components/CharacterActivity'
 import { CharacterPortrait } from '@/components/CharacterPortrait'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { CharacterStatsSheet } from './CharacterStatsSheet'
-import type { BestiaryMonster, CharacterDiagnostics, CharacterVitals, EquippedEntry, Sprite } from '@/models'
+import type { CharacterDiagnostics, CharacterVitals, EquippedEntry, Sprite } from '@/models'
 
 /** The sticky top of the character detail screen, kept out of the
  *  scrollable body so vitals stay visible while browsing equipment and
@@ -12,8 +12,6 @@ export function VitalsHeader({
   name,
   vitals,
   accountGold,
-  bestiaryCatalog,
-  resolvedTargetType,
   diagnostics = {},
   slots = {},
   online,
@@ -21,8 +19,6 @@ export function VitalsHeader({
   name: string
   vitals: CharacterVitals
   accountGold?: number
-  bestiaryCatalog: BestiaryMonster[]
-  resolvedTargetType?: string | null
   diagnostics?: CharacterDiagnostics
   slots?: Record<string, EquippedEntry | null>
   online: boolean
@@ -99,7 +95,7 @@ export function VitalsHeader({
         {accountGold != null && <span>Account total {accountGold.toLocaleString()}g</span>}
       </div>
 
-      <div className={`text-sm ${vitals.rip ? 'text-destructive' : ''}`}>{activityLine(vitals, bestiaryCatalog, resolvedTargetType)}</div>
+      <CharacterActivity name={name} vitals={vitals} className="text-sm" />
     </div>
   )
 }
