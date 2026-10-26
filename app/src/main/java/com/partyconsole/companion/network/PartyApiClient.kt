@@ -259,6 +259,38 @@ class PartyApiClient(
             digest?.let { put("X-State-Preview", it) }
         })
 
+    /** GET /console-build (tools/console-build/routes.ts). 503 on a console without managed builds. */
+    suspend fun consoleBuilds(): ApiResult<String> = getRoot("console-build")
+
+    /** POST /console-build/deploy {buildId, mode}, the body console-build-control.tsx
+     *  sends. The reply is the DeploymentJournal; a 409 still carries the
+     *  running one as `operation`. Returns the journal, or the error. */
+    suspend fun deployConsoleBuild(buildId: String, mode: String): Pair<JsonObject?, String?> {
+        val toast = ActionToasts.begin()
+        // Only a 2xx reply counts as sent; a 409's running journal still comes back.
+        var sent = false
+        val result: Pair<JsonObject?, String?> = withContext(Dispatchers.IO) {
+            val body = JsonObject(mapOf("buildId" to JsonPrimitive(buildId), "mode" to JsonPrimitive(mode)))
+            val request = Request.Builder()
+                .url(settings.baseUrl.trimEnd('/') + "/console-build/deploy")
+                .post(json.encodeToString(JsonObject.serializer(), body).toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+            try {
+                client.newCall(request).execute().use { response ->
+                    val reply = runCatching { json.parseToJsonElement(response.body?.string().orEmpty()) as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
+                    val operation = if (response.code == 409 && reply["operation"] is JsonObject) reply["operation"] as JsonObject else if (response.isSuccessful) reply else null
+                    val error = if (operation != null) null else (reply["error"] as? JsonPrimitive)?.content ?: "HTTP ${response.code}"
+                    sent = operation != null && response.isSuccessful
+                    operation to error
+                }
+            } catch (e: java.io.IOException) {
+                null to (e.message ?: "network error")
+            }
+        }
+        ActionToasts.resolve(toast, sent)
+        return result
+    }
+
     /** GET /console-debug - the debug instance state. */
     suspend fun consoleDebug(): ApiResult<String> = getRoot("console-debug")
 

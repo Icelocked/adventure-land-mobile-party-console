@@ -120,6 +120,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                                     contentAlignment = Alignment.Center,
                                 ) { Text("!", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) }
                             }
+                            com.partyconsole.companion.ui.components.ConsoleBuildButton(viewModel)
                             com.partyconsole.companion.ui.components.ConsoleControls(viewModel)
                             com.partyconsole.companion.ui.components.ConsolePausedIndicator(viewModel)
                         }
