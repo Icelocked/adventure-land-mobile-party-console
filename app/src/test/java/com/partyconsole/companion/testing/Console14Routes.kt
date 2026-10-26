@@ -40,7 +40,7 @@ private fun FakeConsole.ctype(name: String): String? =
     ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(name) as? JsonObject)?.get("ctype").str()
 
 /** The state keys only the stable console fork sends (model/ConsoleFeatures.kt). */
-private val FORK_KEYS = listOf("designatedTank", "gearSets", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
+private val FORK_KEYS = listOf("designatedTank", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
 
 /** Plays Ryan's v1.4.0 instead of the stable console fork: drops every fork
  *  field and the "prim stack" routine, and the auto NPC sale route ignores
@@ -63,11 +63,10 @@ internal fun FakeConsole.installConsole14Routes() {
     put("bossChase", Json.parseToJsonElement("""{"enabled":false,"minEtaMinutes":15,"trip":null,"returning":null,"retryAt":0,"lastError":null,"checkedAt":0,"sightings":[],"respawns":[]}"""), "config")
     put("realmHopBlacklist", JsonArray(emptyList()), "config")
     put("eventAttendance", JsonObject(emptyMap()), "config")
-    // The rest of the stable fork's initial state: initial-core.ts (designatedTank,
-    // gearSets), merchant/bank-sort.ts (bankSortLayout) and the "prim stack"
-    // routine of merchant/initial-settings.ts.
+    // The rest of the stable fork's initial state: initial-core.ts
+    // (designatedTank), merchant/bank-sort.ts (bankSortLayout) and the "prim
+    // stack" routine of merchant/initial-settings.ts.
     put("designatedTank", JsonNull, "config")
-    put("gearSets", JsonObject(emptyMap()), "config")
     put("bankSortLayout", JsonPrimitive("packed"))
     // The e2e mock serves the leader scope's Franky routine at the top level.
     put("encounterRoutines", JsonObject(emptyMap()))
@@ -132,36 +131,6 @@ internal fun FakeConsole.installConsole14Routes() {
             put("farmingProfiles", JsonObject(profiles + (name to next)), "config")
         }
         ok(""","encounter":"franky"""")
-    }
-
-    // Gear sets: characters/gear-sets.ts. Save captures the character's worn gear.
-    routes["gear-sets"] = route@{ body ->
-        val name = body["character"].str().orEmpty()
-        val set = body["set"].str().orEmpty()
-        if (name !in characterNames()) return@route error(400, "invalid character")
-        if (set !in listOf("luck", "tank", "gold")) return@route error(400, "invalid gear set")
-        val all = field("gearSets").obj().orEmpty()
-        val sets = all[name].obj().orEmpty()
-        val next: JsonObject = when (body["action"].str()) {
-            "clear" -> JsonObject(sets - set)
-            // Equip queues a gear-set-equip command and leaves the saved set as it is.
-            "equip" -> if (set in sets) JsonObject(sets) else return@route error(409, "that gear set is not saved")
-            "save" -> {
-                if (name in staleEquipment) return@route error(409, "no fresh equipment report for $name")
-                val worn = ((sections["inventory"]?.get("characters") as? JsonObject)?.get(name) as? JsonObject)?.get("slots").obj().orEmpty()
-                val slots = buildMap {
-                    for (slot in listOf("mainhand", "offhand", "chest", "pants", "helmet", "gloves", "shoes", "cape", "belt", "orb", "amulet", "ring1", "ring2", "earring1", "earring2", "elixir")) {
-                        val item = worn[slot].obj()?.get("item").obj() ?: continue
-                        put(slot, JsonObject(item.filterKeys { it in setOf("name", "level", "p", "stat_type") }))
-                    }
-                }
-                if (slots.isEmpty()) return@route error(409, "nothing is equipped in the gear set slots")
-                JsonObject(sets + (set to JsonObject(mapOf("slots" to JsonObject(slots), "savedAt" to JsonPrimitive(System.currentTimeMillis())))))
-            }
-            else -> return@route error(400, "invalid gear set action")
-        }
-        put("gearSets", JsonObject(all + (name to next)), "config")
-        ok()
     }
 
     // http/automatic-sales.ts npc(): with `character` a per-player rule, without it

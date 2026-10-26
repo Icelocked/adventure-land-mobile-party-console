@@ -18,9 +18,9 @@ import org.junit.Test
  *
  *  Failure modes:
  *  - A v1.4.0 console unlocks a fork control because the model fills a
- *    missing field with its default (gearSets {}, realmHopBlacklist []).
+ *    missing field with its default (realmHopBlacklist []).
  *  - The stable fork's unset designated tank (null) reads as no tank support.
- *  - gearSets alone unlocks Check, Keep and the other commerce controls.
+ *  - designatedTank alone unlocks Check, Keep and the other commerce controls.
  *  - Owned-first sorting runs on v1.4.0, or not on the fork.
  */
 class ConsoleFeaturesTest {
@@ -31,19 +31,19 @@ class ConsoleFeaturesTest {
     }
 
     private val v140 = """{"leader":"Lead","merchantRoutinePriorities":{"upgrade preview":70},"farmingProfiles":{"Lead":{"farmingPolicy":"auto"}}}"""
-    private val stable = """{"leader":"Lead","designatedTank":null,"gearSets":{},"realmHopBlacklist":[],"bankSortLayout":"packed",
+    private val stable = """{"leader":"Lead","designatedTank":null,"realmHopBlacklist":[],"bankSortLayout":"packed",
         "bossChase":{"enabled":false,"minEtaMinutes":15,"sightings":[],"respawns":[]},
         "merchantRoutinePriorities":{"upgrade preview":70,"prim stack":70},
         "farmingProfiles":{"Lead":{"farmingPolicy":"auto","encounterRoutines":{}}}}"""
 
     @Test
     fun ryanV140SupportsNoForkFeature() {
-        assertEquals(ConsoleFeatures(false, false, false, false, false, false, false, false), state(v140).consoleFeatures)
+        assertEquals(ConsoleFeatures(false, false, false, false, false, false, false), state(v140).consoleFeatures)
     }
 
     @Test
     fun theStableForkSupportsEveryFeatureFromItsInitialStateWithNoTankPicked() {
-        assertEquals(ConsoleFeatures(true, true, true, true, true, true, true, true), state(stable).consoleFeatures)
+        assertEquals(ConsoleFeatures(true, true, true, true, true, true, true), state(stable).consoleFeatures)
     }
 
     @Test
@@ -51,10 +51,10 @@ class ConsoleFeaturesTest {
         assertTrue(state("""{"designatedTank":"Tanky"}""").consoleFeatures.designatedTank)
         assertTrue(state("""{"encounterRoutines":{"franky":"tank"}}""").consoleFeatures.frankyRoutine)
         assertTrue(state("""{"merchantRoutinePriorities":{"prim stack":10}}""").consoleFeatures.primStack)
-        val gearOnly = state("""{"gearSets":{}}""").consoleFeatures
-        assertTrue(gearOnly.gearSets)
+        val tankOnly = state("""{"designatedTank":null}""").consoleFeatures
+        assertTrue(tankOnly.designatedTank)
         // Commerce needs bossChase as well.
-        assertFalse(gearOnly.forkCommerce)
+        assertFalse(tankOnly.forkCommerce)
         assertFalse(state("""{"bossChase":null}""").consoleFeatures.bossChase)
     }
 

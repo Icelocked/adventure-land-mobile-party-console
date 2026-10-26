@@ -102,8 +102,6 @@ fun LeaderFollowerSection(characterName: String, dynamicState: PartyStateDynamic
                 label = { Text("Follow") },
             )
             EventSelectionControl(dynamicState, characterName, viewModel, onOpenAnniversary)
-            // Merchant-class characters get no gear sets (connected-character-card.tsx).
-            if (characters[characterName]?.vitals?.ctype != "merchant" && dynamicState.consoleFeatures.gearSets) GearSetControl(characterName, dynamicState, viewModel)
         }
         ConfigLoadingNote(loaded)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }

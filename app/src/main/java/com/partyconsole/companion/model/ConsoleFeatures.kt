@@ -10,8 +10,6 @@ data class ConsoleFeatures(
     /** POST /formation {tank}. initial-core.ts always sets `designatedTank`,
      *  to null when no tank is picked, and public-state.ts configFields sends it. */
     val designatedTank: Boolean,
-    /** POST /gear-sets (save, equip, clear). initial-core.ts always sets `gearSets`. */
-    val gearSets: Boolean,
     /** POST /encounter-mode. hunt/scopes.ts gives every farming profile an
      *  `encounterRoutines` object. */
     val frankyRoutine: Boolean,
@@ -27,22 +25,22 @@ data class ConsoleFeatures(
     /** ALData Check (check: true), owned WTB offers first, resolving an
      *  unconfirmed WTB purchase, a typed giveaway host and NPC-sale Keep. No
      *  state field marks these, and v1.4.0 drops `keep` and `check` without an
-     *  error, so they gate on the fork's gearSets and bossChase fields both
-     *  being present: those ship in the same stable build. */
+     *  error, so they gate on the fork's designatedTank and bossChase fields
+     *  both being present: those ship in the same stable build. The gate read
+     *  gearSets until the console fork removed gear sets (fdb0147a). */
     val forkCommerce: Boolean,
 )
 
 val PartyStateDynamic.consoleFeatures: ConsoleFeatures get() {
-    val gearSets = "gearSets" in stateKeys
+    val designatedTank = "designatedTank" in stateKeys
     val bossChase = bossChase != null
     return ConsoleFeatures(
-        designatedTank = "designatedTank" in stateKeys,
-        gearSets = gearSets,
+        designatedTank = designatedTank,
         frankyRoutine = "encounterRoutines" in stateKeys || farmingProfiles.values.any { it.encounterRoutines != null },
         bossChase = bossChase,
         realmHopBlacklist = "realmHopBlacklist" in stateKeys,
         gappedBankSort = bankSortLayout != null,
         primStack = "prim stack" in merchantRoutinePriorities,
-        forkCommerce = gearSets && bossChase,
+        forkCommerce = designatedTank && bossChase,
     )
 }

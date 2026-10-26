@@ -1048,14 +1048,6 @@ class PartyApiClient(
         return post("formation", JsonObject(mapOf("character" to JsonPrimitive(character), "eventLimits" to JsonObject(mapOf("event" to JsonPrimitive(event), "limits" to values)))))
     }
 
-    /** POST /party-api/gear-sets {character, set, action}. "save" captures
-     *  the gear the character is wearing and 409s without an equipment
-     *  report from the last 10s; "clear" drops the set; "equip" queues a
-     *  gear-set-equip command and 409s for a set that is not saved
-     *  (characters/gear-sets.ts). */
-    suspend fun gearSet(character: String, set: String, action: String): ApiResult<CommandResult> =
-        post("gear-sets", JsonObject(mapOf("character" to JsonPrimitive(character), "set" to JsonPrimitive(set), "action" to JsonPrimitive(action))))
-
     /** POST /party-api/encounter-mode {character, encounter, mode}: "auto",
      *  "offtank" or "tank" (console 1.4 Franky routine). */
     suspend fun setEncounterMode(character: String, encounter: String, mode: String): ApiResult<CommandResult> =

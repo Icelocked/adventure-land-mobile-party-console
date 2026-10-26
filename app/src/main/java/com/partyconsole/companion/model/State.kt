@@ -145,9 +145,6 @@ data class PartyStateDynamic(
     val encounterRoutines: Map<String, String> = emptyMap(),
     val encounterAutoDeathLimits: Map<String, Int> = emptyMap(),
     val encounterAutoDeaths: Map<String, Int> = emptyMap(),
-    // Console 1.4 gear sets per character, then by set ("luck", "tank" or
-    // the server-only "gold"), saved from worn gear (characters/gear-sets.ts).
-    val gearSets: Map<String, Map<String, GearSet>> = emptyMap(),
     // The stable console fork's designated tank (POST /formation {tank}),
     // null when none is picked; see ConsoleFeatures.kt.
     val designatedTank: String? = null,
@@ -520,13 +517,6 @@ data class EventSchedule(
 /** A hidden market item; an omitted level saves as +0 (runtime/market-preferences.ts). */
 @Serializable
 data class MarketIgnoredItem(val name: String, val level: Int = 0)
-
-/** A saved gear set: equip slot -> the item that belongs there. */
-@Serializable
-data class GearSet(val slots: Map<String, GearSetItem> = emptyMap(), val savedAt: Long = 0)
-
-@Serializable
-data class GearSetItem(val name: String, val level: Int? = null, val p: String? = null, @kotlinx.serialization.SerialName("stat_type") val statType: String? = null)
 
 /** One event's attendance limits; null means unlimited. */
 @Serializable
