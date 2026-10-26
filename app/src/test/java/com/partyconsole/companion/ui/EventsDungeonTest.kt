@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.partyconsole.companion.domain.eventPolicy
 import com.partyconsole.companion.domain.selectedEvents
+import com.partyconsole.companion.model.CavePoint
 import com.partyconsole.companion.model.PartyStateDynamic
 import com.partyconsole.companion.testing.FakeConsole
 import com.partyconsole.companion.testing.eventually
@@ -25,6 +26,8 @@ import com.partyconsole.companion.ui.account.AnniversaryScreen
 import com.partyconsole.companion.ui.characterdetail.sections.LeaderFollowerSection
 import com.partyconsole.companion.ui.dungeon.CaveEventRow
 import com.partyconsole.companion.ui.dungeon.DungeonPanel
+import com.partyconsole.companion.ui.dungeon.nearestCavePoint
+import com.partyconsole.companion.ui.map.MapPoint
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -135,6 +138,33 @@ class EventsDungeonTest {
         assertEquals(listOf("move", "p1", "ab12"), listOf(move.text("action"), move.text("target"), move.text("run")))
         assertEquals(listOf("progress", "true"), listOf(progress.text("action"), progress.text("enabled")))
         assertEquals("exit", exit.text("action"))
+    }
+
+    @Test
+    fun theFullMapCarriesTheDestinationListAndATapNearAPinPicksThatRoom() {
+        console.dailyDungeon = activeCave()
+        val viewModel = PartyViewModel(console.settings)
+        compose.setContent { DungeonPanel(viewModel) }
+        eventually { viewModel.dungeons.view.value != null }
+        compose.waitForIdle()
+        // The open map redraws every frame: drive the clock by hand from here (MapTest.kt).
+        compose.mainClock.autoAdvance = false
+        fun frames(condition: () -> Boolean) = compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); condition() }
+        compose.onNodeWithText("View full map").performClick()
+        frames { compose.onAllNodes(hasContentDescription("Cave destinations")).fetchSemanticsNodes().isNotEmpty() }
+        // One list: the open map holds it, so the panel's copy is gone.
+        val inMap = androidx.compose.ui.test.hasAnyAncestor(hasContentDescription("Cave destinations"))
+        assertEquals(1, compose.onAllNodes(hasText("Fountain")).fetchSemanticsNodes().size)
+        compose.onNode(hasText("Library — complete") and inMap).assertIsNotEnabled()
+        compose.onNode(hasText("Fountain") and inMap).assertIsEnabled().performClick()
+        frames { posts("daily-dungeons").size == 1 }
+        val move = posts("daily-dungeons")[0]
+        assertEquals(listOf("move", "p1", "ab12"), listOf(move.text("action"), move.text("target"), move.text("run")))
+        // A tap within 80 map units of a room or stairs pin picks the nearest one.
+        val points = listOf(CavePoint(id = "p1", label = "Fountain", map = "zone_ab12_1", x = 0.0, y = 0.0), CavePoint(id = "p2", label = "Library", map = "zone_ab12_1", x = 100.0, y = 0.0))
+        assertEquals("p1", nearestCavePoint(points, MapPoint(30.0, 40.0))?.id)
+        assertEquals("p2", nearestCavePoint(points, MapPoint(70.0, 0.0))?.id)
+        assertEquals(null, nearestCavePoint(points, MapPoint(50.0, 70.0)))
     }
 
     @Test

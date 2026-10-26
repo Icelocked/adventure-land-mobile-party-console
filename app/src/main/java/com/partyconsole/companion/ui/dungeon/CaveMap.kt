@@ -4,6 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -36,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.partyconsole.companion.model.CavePoint
 import com.partyconsole.companion.model.CaveState
 import com.partyconsole.companion.model.MapFrame
 import com.partyconsole.companion.network.MapStreamEvent
@@ -47,12 +54,30 @@ import com.partyconsole.companion.ui.map.MapProps
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
+/** The room or stairs pin within 80 map units of a tap, nearest first. */
+internal fun nearestCavePoint(points: List<CavePoint>, tap: MapPoint): CavePoint? =
+    points.map { it to kotlin.math.hypot(it.x - tap.x, it.y - tap.y) }.filter { it.second <= 80 }.minByOrNull { it.second }?.first
+
 /** The full Cave floor map with party, room and waypoint pins, opened from
- *  the dungeon panel full-screen; every participant's map stream feeds it. */
+ *  the dungeon panel full-screen; every participant's map stream feeds it.
+ *  DungeonPanel owns the open state and hands in its destination list,
+ *  which sits under the map on a phone and beside it on a wide screen. A tap
+ *  within 80 map units of a room or stairs pin selects that destination.
+ *  PWA: CaveMap.tsx; console: cave-map.tsx (34092356). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CaveMap(viewModel: PartyViewModel, participants: List<String>, cave: CaveState, error: String, onAction: suspend (Map<String, Any?>) -> Boolean) {
-    var open by remember { mutableStateOf(false) }
+fun CaveMap(
+    viewModel: PartyViewModel,
+    participants: List<String>,
+    cave: CaveState,
+    error: String,
+    open: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    destinations: @Composable () -> Unit,
+    onSelectPoint: (CavePoint) -> Unit,
+    onAction: suspend (Map<String, Any?>) -> Boolean,
+) {
+    val setOpen = onOpenChange
     var adding by remember { mutableStateOf(false) }
     var waypoint by remember { mutableStateOf<MapPoint?>(null) }
     val frames = remember { mutableStateMapOf<String, MapFrame>() }
@@ -67,42 +92,63 @@ fun CaveMap(viewModel: PartyViewModel, participants: List<String>, cave: CaveSta
         }
     }
     val frame = frames[participants.firstOrNull()]?.takeIf { it.definition != null } ?: frames.values.find { it.definition?.name == map }
-    val pins = cave.points.filter { it.map == map && !it.exit }.map {
+    val floorPoints = cave.points.filter { it.map == map && !it.exit }
+    val selectNear = { point: MapPoint -> nearestCavePoint(floorPoints, point)?.let(onSelectPoint); Unit }
+    val pins = floorPoints.map {
         MapPin(it.x, it.y, it.label, if (it.done) 0xFF4ADE80.toInt() else if (it.required) 0xFFFB923C.toInt() else 0xFFFACC15.toInt())
     } + frames.values.map { MapPin(it.x, it.y, it.name, 0xFF67E8F9.toInt()) } +
         listOfNotNull(waypoint?.let { MapPin(it.x, it.y, "Waypoint", 0xFFF472B6.toInt()) })
 
-    DungeonButton("View full map", modifier = Modifier.padding(top = 8.dp)) { open = true }
+    DungeonButton("View full map", modifier = Modifier.padding(top = 8.dp)) { setOpen(true) }
     if (!open) return
-    Dialog(onDismissRequest = { open = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = { setOpen(false) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxSize().semantics { contentDescription = "Cave map" }, color = Color(0xFF081713)) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Cave of Many Dreams — Floor ${cave.floor + 1}", fontWeight = FontWeight.SemiBold, color = Emerald50)
-                        Text("Cyan: party · Orange: required · Green: complete · Yellow: events · Pink: waypoint", color = Slate300, style = MaterialTheme.typography.labelSmall)
+                        Text("Cyan: party · Orange: required · Green: complete · Yellow: events · Pink: waypoint. Tap a room on the map or in the list to travel there.", color = Slate300, style = MaterialTheme.typography.labelSmall)
                     }
-                    IconButton(onClick = { open = false }, modifier = Modifier.semantics { contentDescription = "Close cave map" }) {
+                    IconButton(onClick = { setOpen(false) }, modifier = Modifier.semantics { contentDescription = "Close cave map" }) {
                         Icon(Icons.Filled.Close, contentDescription = null, tint = Emerald50)
                     }
                 }
-                Box(modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFF065F46), RoundedCornerShape(4.dp)).background(Color(0xFF07110F))) {
-                    val entities = frames.values.flatMap { it.entities }.associateBy { it.id }.values.toList()
-                    MapCanvas(
-                        MapProps(
-                            definition = frame?.definition,
-                            frame = frame?.copy(entities = entities),
-                            previous = null,
-                            receivedAt = 0,
-                            scale = 1.0,
-                            detailed = true,
-                            fullMap = !nativeSize,
-                            pins = pins,
-                        ),
-                        fps = 15,
-                        active = open,
-                        onWaypoint = if (adding) { point -> waypoint = point; adding = false } else null,
-                    )
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    val wide = maxWidth >= 768.dp
+                    val listHeight = maxHeight * 0.3f
+                    val mapBox: @Composable (Modifier) -> Unit = { modifier ->
+                        Box(modifier = modifier.border(1.dp, Color(0xFF065F46), RoundedCornerShape(4.dp)).background(Color(0xFF07110F))) {
+                            val entities = frames.values.flatMap { it.entities }.associateBy { it.id }.values.toList()
+                            MapCanvas(
+                                MapProps(
+                                    definition = frame?.definition,
+                                    frame = frame?.copy(entities = entities),
+                                    previous = null,
+                                    receivedAt = 0,
+                                    scale = 1.0,
+                                    detailed = true,
+                                    fullMap = !nativeSize,
+                                    pins = pins,
+                                ),
+                                fps = 15,
+                                active = open,
+                                onWaypoint = if (adding) { point -> waypoint = point; adding = false } else selectNear,
+                            )
+                        }
+                    }
+                    val list: @Composable (Modifier) -> Unit = { modifier ->
+                        Column(modifier = modifier.verticalScroll(rememberScrollState()).semantics { contentDescription = "Cave destinations" }) {
+                            Text("Travel to", fontWeight = FontWeight.SemiBold, color = Emerald50, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                            destinations()
+                        }
+                    }
+                    if (wide) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                        mapBox(Modifier.weight(1f).fillMaxHeight())
+                        list(Modifier.width(288.dp).fillMaxHeight())
+                    } else Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                        mapBox(Modifier.fillMaxWidth().weight(1f))
+                        list(Modifier.fillMaxWidth().heightIn(max = listHeight))
+                    }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     for (f in frames.values) Text(f.name, color = Emerald50, style = MaterialTheme.typography.bodySmall)
@@ -115,7 +161,7 @@ fun CaveMap(viewModel: PartyViewModel, participants: List<String>, cave: CaveSta
                         scope.launch {
                             busy = true
                             try {
-                                if (onAction(mapOf("action" to "waypoint", "map" to map, "x" to point.x, "y" to point.y))) open = false
+                                if (onAction(mapOf("action" to "waypoint", "map" to map, "x" to point.x, "y" to point.y))) setOpen(false)
                             } finally {
                                 busy = false
                             }

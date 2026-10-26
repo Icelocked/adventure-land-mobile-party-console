@@ -42,6 +42,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.partyconsole.companion.data.dungeonCountdown
 import com.partyconsole.companion.model.CaveChoice
+import com.partyconsole.companion.model.CavePoint
 import com.partyconsole.companion.model.CaveState
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.components.rememberClock
@@ -99,6 +100,8 @@ fun DungeonPanel(viewModel: PartyViewModel) {
     var requestedRoom by remember { mutableStateOf<String?>(null) }
     var exitConfirm by remember { mutableStateOf(false) }
     var itemInspection by remember { mutableStateOf<String?>(null) }
+    // The open map belongs to one run and floor; a new floor closes it.
+    var mapOpenFloor by remember { mutableStateOf<String?>(null) }
     val current = view ?: return
     if (current.state.phase in setOf("idle", "held")) return
     val cave = current.members.find { it.fresh && it.observation?.cave != null }?.observation?.cave
@@ -114,6 +117,36 @@ fun DungeonPanel(viewModel: PartyViewModel) {
     val travelling = current.state.progress?.enabled == true || current.state.travel != null || current.state.commands.values.any { it.action == "move" }
     val choiceOpen = choice != null && (!choice.resolved || inspectedChoice == choice.id || (choice.shop?.nearby == true && requestedRoom == choice.shop.room))
     val anyDead = current.members.any { it.observation?.alive == false }
+    val mapFloor = cave?.let { "${it.run}:${it.floor}" }
+    val mapOpen = mapFloor != null && mapOpenFloor == mapFloor
+    fun selectable(p: CavePoint) = cave != null && !busy && !cave.paused && !p.locked && !p.done && current.state.phase == "active"
+    fun selectPoint(p: CavePoint) {
+        if (!selectable(p)) return
+        requestedRoom = p.room
+        if (choice?.shop?.nearby == true && p.room == choice.shop.room) inspectedChoice = choice.id
+        else action("action" to "move", "target" to p.id)
+    }
+    // One list: under the panel while the map is closed, in the map view while it is open.
+    // The map view's list is one column beside the map on a wide screen (CaveMap.kt).
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 768
+    val destinations: @Composable () -> Unit = {
+        val perRow = if (mapOpen && wide) 1 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            cave?.points?.filter { !it.exit }?.chunked(perRow)?.forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (p in row) {
+                        DungeonButton(
+                            p.label + (if (p.map != "zone_${cave.run}_${cave.floor}") " — different floor" else "") + (if (p.locked) " — locked" else if (p.done) " — complete" else ""),
+                            enabled = selectable(p),
+                            border = if (p.done) Green else if (p.required) Orange else Color(0xFF64748B),
+                            modifier = Modifier.weight(1f),
+                        ) { selectPoint(p) }
+                    }
+                    if (row.size < perRow) Box(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
 
     @Composable
     fun ExitControls() {
@@ -156,7 +189,13 @@ fun DungeonPanel(viewModel: PartyViewModel) {
         )
         Text(current.members.joinToString(" · ") { it.name + if (it.fresh) "" else " — awaiting connection" }, color = Slate300, style = MaterialTheme.typography.bodySmall)
         if (cave != null) androidx.compose.runtime.key(cave.run + ":" + cave.floor) {
-            CaveMap(viewModel, current.state.participants, cave, actionError) { body -> query.action(mapOf("run" to cave.run) + body) }
+            CaveMap(
+                viewModel, current.state.participants, cave, actionError,
+                open = mapOpen,
+                onOpenChange = { mapOpenFloor = if (it) mapFloor else null },
+                destinations = destinations,
+                onSelectPoint = { selectPoint(it) },
+            ) { body -> query.action(mapOf("run" to cave.run) + body) }
         }
         if (current.state.phase == "active") {
             Text(current.state.progress?.message ?: "Continue through the cave toward the next floor.", color = Color(0xFFE2E8F0), style = MaterialTheme.typography.bodySmall)
@@ -170,23 +209,7 @@ fun DungeonPanel(viewModel: PartyViewModel) {
         if (anyDead) {
             DungeonButton("Call Nera — revival choices", enabled = !busy && current.state.phase == "active" && !recoveryBusy && (choice == null || choice.resolved)) { action("action" to "revival") }
         }
-        cave?.points?.filter { !it.exit }?.chunked(2)?.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (p in row) {
-                    DungeonButton(
-                        p.label + (if (p.map != "zone_${cave.run}_${cave.floor}") " — different floor" else "") + (if (p.locked) " — locked" else if (p.done) " — complete" else ""),
-                        enabled = !busy && !cave.paused && !p.locked && !p.done && current.state.phase == "active",
-                        border = if (p.done) Green else if (p.required) Orange else Color(0xFF64748B),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        requestedRoom = p.room
-                        if (choice?.shop?.nearby == true && p.room == choice.shop.room) inspectedChoice = choice.id
-                        else action("action" to "move", "target" to p.id)
-                    }
-                }
-                if (row.size == 1) Box(modifier = Modifier.weight(1f))
-            }
-        }
+        if (!mapOpen) destinations()
         if (choice?.resolved == true) DungeonButton("View encounter — ${choice.title}") { inspectedChoice = choice.id }
         (actionError.ifEmpty { null } ?: current.state.error)?.let { Text(it, color = Rose200, style = MaterialTheme.typography.bodySmall) }
     }

@@ -209,7 +209,12 @@ class MapTest {
         val viewModel = PartyViewModel(console.settings)
         val cave = CaveState(run = "ab12", floor = 0, points = listOf(CavePoint(id = "r1", label = "Room 1", map = "zone_ab12_0", x = 10.0, y = 10.0, required = true)))
         val sent = mutableListOf<Map<String, Any?>>()
-        compose.setContent { androidx.compose.foundation.layout.Column { CaveMap(viewModel, listOf("Leada"), cave, "") { body -> sent += body; true } } }
+        val open = androidx.compose.runtime.mutableStateOf(false)
+        compose.setContent {
+            androidx.compose.foundation.layout.Column {
+                CaveMap(viewModel, listOf("Leada"), cave, "", open.value, { open.value = it }, destinations = { Text("Room 1") }, onSelectPoint = {}) { body -> sent += body; true }
+            }
+        }
         compose.mainClock.autoAdvance = false
         compose.onNodeWithText("View full map").performClick()
         frames { compose.onAllNodes(androidx.compose.ui.test.hasText("Cave of Many Dreams — Floor 1")).fetchSemanticsNodes().isNotEmpty() }
