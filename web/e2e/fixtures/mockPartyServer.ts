@@ -105,8 +105,8 @@ const CONFIG_FIELDS = [
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
   // Console 1.4 events and realms.
   'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
-  // Console 1.4 combat and party: designated tank.
-  'designatedTank',
+  // Console 1.4 combat and party: designated tank; the console fork's off tank and pull mode.
+  'designatedTank', 'offTank', 'pullMode',
   // Console 1.5: each account character's last saved observation.
   'characterSnapshots',
 ] as const
@@ -289,6 +289,9 @@ export class MockPartyServer {
 
   // Console 1.4 combat and party: designated tank, Franky routine, escape.
   designatedTank: string | null = null
+  // Console fork formation fields (initial-core.ts defaults).
+  offTank: string | null = null
+  pullMode = false
   // The leader scope's routine; other scopes keep theirs in farmingProfiles (navigation/initial-focus.ts defaults {}).
   encounterRoutines: Record<string, string> = {}
   encounterAutoDeathLimits: Record<string, number> = {}
@@ -330,7 +333,7 @@ export class MockPartyServer {
   private dynamicState(): Record<string, unknown> {
     const state = this.forkState()
     if (this.consoleKind === 'stable') return state
-    for (const key of ['designatedTank', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
+    for (const key of ['designatedTank', 'offTank', 'pullMode', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
     const { 'prim stack': _prim, ...priorities } = state.merchantRoutinePriorities as Record<string, number>
     const profiles = Object.fromEntries(
       Object.entries(state.farmingProfiles as Record<string, Record<string, unknown>>).map(([name, profile]) => {
@@ -407,6 +410,8 @@ export class MockPartyServer {
       realmHopBlacklist: this.realmHopBlacklist,
       // Console 1.4 combat and party: designated tank, Franky routine.
       designatedTank: this.designatedTank,
+      offTank: this.offTank,
+      pullMode: this.pullMode,
       encounterRoutines: this.encounterRoutines,
       encounterAutoDeathLimits: this.encounterAutoDeathLimits,
       encounterAutoDeaths: this.encounterAutoDeaths,
@@ -682,11 +687,17 @@ export class MockPartyServer {
       delete this.failOnceBody[path]
       return { status: 409, json: { ok: false, error, ...extra } }
     }
-    // Console 1.4 designated tank: http/formation.ts assigns `tank` after
-    // `leader` and before the character fields; null clears it.
-    if (path === 'formation' && body.tank !== undefined) {
-      if (body.tank !== null && !this.characters.some((c) => c.name === body.tank)) return { status: 400, json: { error: 'unknown tank' } }
-      this.designatedTank = body.tank === null ? null : String(body.tank)
+    // http/formation.ts tankRoles(): `tank`, `offTank` and `pullMode` are
+    // checked together after `leader` and before the character fields; null
+    // clears a role.
+    if (path === 'formation' && (body.tank !== undefined || body.offTank !== undefined || body.pullMode !== undefined)) {
+      const managed = (value: unknown) => value === null || this.characters.some((c) => c.name === value)
+      if (body.tank !== undefined && !managed(body.tank)) return { status: 400, json: { error: 'unknown tank' } }
+      if (body.offTank !== undefined && !managed(body.offTank)) return { status: 400, json: { error: 'unknown off tank' } }
+      if (body.pullMode !== undefined && typeof body.pullMode !== 'boolean') return { status: 400, json: { error: 'invalid pull mode' } }
+      if (body.tank !== undefined) this.designatedTank = body.tank === null ? null : String(body.tank)
+      if (body.offTank !== undefined) this.offTank = body.offTank === null ? null : String(body.offTank)
+      if (typeof body.pullMode === 'boolean') this.pullMode = body.pullMode
     }
     // Console 1.4 Franky routine: http/encounter-mode.ts behind the
     // farming-scope.ts wrapper, which refuses followers and merchants.
@@ -756,7 +767,7 @@ export class MockPartyServer {
         const current = (this.extraState.eventSelectionsByCharacter as Record<string, string[]> | undefined) ?? {}
         this.extraState = { ...this.extraState, eventSelectionsByCharacter: { ...current, [name]: [...new Set(body.eventSelections as string[])] } }
       }
-      return { status: 200, json: { ok: true, leader: this.leader, tank: this.designatedTank, followers: this.followers } }
+      return { status: 200, json: { ok: true, leader: this.leader, tank: this.designatedTank, offTank: this.offTank, pullMode: this.pullMode, followers: this.followers } }
     }
     if (path.startsWith('npc-shop/') && this.npcShop) {
       // http/npc-shop-routes.ts over commerce/npc-shop.ts create/stop/resume/settings/visitRon

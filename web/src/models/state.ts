@@ -731,6 +731,11 @@ export interface PartyStateDynamic {
   // Console 1.4 combat and party: designated tank, Franky routine.
   // Set by POST /formation {tank} (http/formation.ts); its role is described in party-roles-settings.tsx.
   designatedTank?: string | null
+  // Console fork: the member that takes the tank's attackers while the tank
+  // is in danger, and whether the longest-range member pulls one monster at
+  // a time (http/formation.ts tankRoles).
+  offTank?: string | null
+  pullMode?: boolean
   // The leader scope's encounter settings; other scopes use farmingProfiles (see resolveEncounterRoutine).
   encounterRoutines?: Record<string, string>
   encounterAutoDeathLimits?: Record<string, number>

@@ -19,8 +19,7 @@ import { RosterPickerSheet } from '@/screens/roster/RosterPickerSheet'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import { ConsoleBuildButton } from '@/components/ConsoleBuildButton'
-import { PartyRolesSettings } from '@/screens/PartyRolesSettings'
-import { consoleFeatures, type BestiaryMonster, type CharacterState } from '@/models'
+import type { BestiaryMonster, CharacterState } from '@/models'
 
 /** Party overview: class icon, level/class, HP/MP, one-line activity, gold
  *  carried per character and the account total, and a refresh button. */
@@ -109,7 +108,6 @@ export function CharacterListScreen() {
       {/* The dungeon panel heads the party while a visit runs. */}
       <DungeonPanel />
       {(names.length > 0 || pending.length > 0) && <PartyControls />}
-      {(names.length > 0 || pending.length > 0) && consoleFeatures(dynamicState).designatedTank && <PartyRolesSettings tank={dynamicState.designatedTank || null} characters={names} />}
 
       {names.length === 0 && !pending.length ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">

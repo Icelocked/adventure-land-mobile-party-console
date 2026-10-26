@@ -30,12 +30,12 @@ function partyServer() {
   return server
 }
 
-test('v1.4.0: the party list has no designated tank', async ({ page }) => {
+test('v1.4.0: Farming settings has no party roles', async ({ page }) => {
   await partyServer().install(page)
-  await page.goto('/')
-  await expect(page.getByText('Folla').first()).toBeVisible()
+  await page.goto('/characters/Folla/hunt-settings')
+  await expect(page.getByText('Relocate to different spawn if competing')).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Party roles' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /^Tank:/ })).toHaveCount(0)
-  await expect(page.getByText('Holds melee range for the party regardless of class')).toHaveCount(0)
 })
 
 test('v1.4.0: Franky event settings have no routine', async ({ page }) => {

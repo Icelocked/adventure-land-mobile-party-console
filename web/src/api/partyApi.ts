@@ -13,6 +13,9 @@ export interface CommandResult {
   data?: Record<string, unknown>
 }
 
+/** Console party-roles-settings.tsx PartyRoles.formation body. */
+export type FormationRoles = { tank?: string | null; offTank?: string | null; pullMode?: boolean }
+
 /** Console: wtb-preferences.tsx WTBOptions. */
 export type WtbOptions = {
   editField?: 'price' | 'quantity' | 'priorityOverride'
@@ -1058,10 +1061,11 @@ export class PartyApiClient {
   }
 
   // Console 1.4 combat and party: designated tank, Franky routine, escape resume.
-  /** POST /party-api/formation {tank}. null clears the designated tank
-   *  (http/formation.ts assignManaged). */
-  async setDesignatedTank(tank: string | null): Promise<ApiResult<CommandResult>> {
-    return this.post('formation', { tank })
+  /** POST /party-api/formation with any of {tank, offTank, pullMode}. null
+   *  clears a role (http/formation.ts tankRoles), and the console 400s an
+   *  unknown name or a non-boolean pullMode. */
+  async setFormationRoles(roles: FormationRoles): Promise<ApiResult<CommandResult>> {
+    return this.post('formation', roles)
   }
 
   /** POST /party-api/encounter-mode {character, encounter, mode}. */

@@ -9,6 +9,9 @@ export interface ConsoleFeatures {
   /** POST /formation {tank}. initial-core.ts always sets `designatedTank`, to
    *  null when no tank is picked, and public-state.ts configFields sends it. */
   designatedTank: boolean
+  /** POST /formation {offTank, pullMode}. initial-core.ts always sets
+   *  `pullMode`, and public-state.ts configFields sends it. */
+  tankRoles: boolean
   /** POST /encounter-mode. hunt/scopes.ts gives every farming profile an
    *  `encounterRoutines` object. */
   frankyRoutine: boolean
@@ -40,6 +43,7 @@ export function consoleFeatures(state: PartyStateDynamic): ConsoleFeatures {
   const bossChase = isObject(state.bossChase)
   return {
     designatedTank,
+    tankRoles: typeof state.pullMode === 'boolean',
     frankyRoutine: isObject(state.encounterRoutines) || Object.values(state.farmingProfiles ?? {}).some((profile) => isObject(profile?.encounterRoutines)),
     bossChase,
     realmHopBlacklist: Array.isArray(state.realmHopBlacklist),

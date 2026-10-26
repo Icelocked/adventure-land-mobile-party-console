@@ -16,6 +16,8 @@ const v140State = (): PartyStateDynamic => ({
 const stableState = (): PartyStateDynamic => ({
   ...v140State(),
   designatedTank: null,
+  offTank: null,
+  pullMode: false,
   bossChase: { enabled: false, minEtaMinutes: 15, trip: null, sightings: [], respawns: [] } as unknown as PartyStateDynamic['bossChase'],
   realmHopBlacklist: [],
   bankSortLayout: 'packed',
@@ -32,6 +34,7 @@ describe('consoleFeatures', () => {
   it('the stable fork supports every feature from its initial state, an unset tank included', () => {
     expect(consoleFeatures(stableState())).toEqual({
       designatedTank: true,
+      tankRoles: true,
       frankyRoutine: true,
       bossChase: true,
       realmHopBlacklist: true,
@@ -45,6 +48,7 @@ describe('consoleFeatures', () => {
   it('reads each signal on its own', () => {
     const base = v140State()
     expect(consoleFeatures({ ...base, designatedTank: 'Tanky' }).designatedTank).toBe(true)
+    expect(consoleFeatures({ ...base, pullMode: false }).tankRoles).toBe(true)
     expect(consoleFeatures({ ...base, encounterRoutines: { franky: 'tank' } }).frankyRoutine).toBe(true)
     expect(consoleFeatures({ ...base, merchantRoutinePriorities: { 'prim stack': 10 } }).primStack).toBe(true)
     // designatedTank alone is not the fork's commerce build; bossChase must come with it.

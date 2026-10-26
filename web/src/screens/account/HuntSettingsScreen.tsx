@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
+import { useCharacters, useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { resolveFarmingContext, type BestiaryMonster, type HuntSettings } from '@/models'
+import { consoleFeatures, resolveFarmingContext, type BestiaryMonster, type HuntSettings, type PartyStateDynamic } from '@/models'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { MonsterDetail } from '@/components/MonsterDetail'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
@@ -13,6 +13,7 @@ import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type MonsterChoiceEntry } from './HuntExtras'
 import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
 import { AchievementHuntSettingsBlock } from './AchievementHuntSettings'
+import { PartyRolesSettings } from '@/screens/PartyRolesSettings'
 
 // Server defaults (runtime/coordinator/hunt/settings.ts).
 const DEFAULT_HUNT_SETTINGS: HuntSettings = {
@@ -23,7 +24,17 @@ const DEFAULT_HUNT_SETTINGS: HuntSettings = {
   expirationThreshold: 1,
 }
 
-/** Farming settings for one character: Hunt settings and blacklist, then
+/** The connected party in slot order, bankbois left out: the console's
+ *  role pickers list every connected card (party-workspace.tsx chars). */
+function partyNames(state: PartyStateDynamic, connected: string[]): string[] {
+  const bankbois = new Set(state.bankbois.map((bankboi) => bankboi.name))
+  const slotted = state.activeSlots
+    ? [...state.activeSlots].sort((a, b) => a.index - b.index).map((slot) => slot.character).filter((name): name is string => !!name && connected.includes(name))
+    : connected
+  return slotted.filter((name) => !bankbois.has(name))
+}
+
+/** Farming settings for one character: the party roles, Hunt settings and blacklist, then
  *  Achievement Hunt when the console has it. Every control saves its
  *  own field as soon as it changes (thresholds on blur), always scoped with
  *  `character`; a character following the leader sees the leader's settings
@@ -40,6 +51,8 @@ export function HuntSettingsScreen() {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
+  const characters = useCharacters()
+  const features = consoleFeatures(dynamicState)
   // Monster names/sprites live in the bestiary catalog, not the item
   // catalog (useCatalogLookup), where a monster id like "booboo" never resolves.
   const monsterFor = useMemo(() => {
@@ -117,6 +130,16 @@ export function HuntSettingsScreen() {
 
   return (
     <AccountScreenScaffold title={`Farming settings · ${context.owner}`} onRefresh={() => void refreshNow()}>
+      {/* Party-wide, so a follower edits them too; console farming-mode-control.tsx puts them first. */}
+      {features.designatedTank && (
+        <PartyRolesSettings
+          tank={dynamicState.designatedTank || null}
+          offTank={dynamicState.offTank || null}
+          pullMode={!!dynamicState.pullMode}
+          pull={features.tankRoles}
+          characters={partyNames(dynamicState, Object.keys(characters))}
+        />
+      )}
       <fieldset disabled={!editable || busy} className="flex flex-col gap-3 p-3">
         <p className="text-xs text-muted-foreground">Configure Hunt relocation and automatic blacklisting. Blacklisted quests are skipped until you clear the entry. Normal farming selections are unaffected.</p>
         {inherited && <p className="text-xs text-muted-foreground">Settings inherited from the leader ({context.owner}).</p>}
