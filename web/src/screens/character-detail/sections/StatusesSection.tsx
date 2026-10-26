@@ -8,9 +8,11 @@ import { durationStat } from '@/lib/itemFormulas'
 import { displayValue, durationSignature, reconcileDurations, statusRemaining, type StatusDuration } from '@/lib/statusDuration'
 import type { Condition } from '@/models'
 
-/** A collapsed "Active status" with the count; open,
- *  each status shows its sprite, a ticking countdown over a depleting bar,
- *  and stacks, and opens its Condition details. Shown for every class. */
+/** A collapsed "Active status" with the count and one row of status
+ *  icons, as the console's status-icon-row.tsx shows them under the XP bar;
+ *  open, each status shows its sprite, a ticking countdown over a depleting
+ *  bar, and stacks. Every icon and row opens its Condition details. Shown
+ *  for every class. */
 export function StatusesSection({ characterName, conditions }: { characterName: string; conditions: Condition[] }) {
   const [open, setOpen] = useSectionOpen('character:Active status', false)
   const [selected, setSelected] = useState<Condition | null>(null)
@@ -31,6 +33,27 @@ export function StatusesSection({ characterName, conditions }: { characterName: 
         </span>
         <span className="font-mono text-[10px] text-muted-foreground">{conditions.length}</span>
       </button>
+      {!open && conditions.length ? (
+        <div data-status-row className="mt-2 flex flex-wrap gap-1">
+          {conditions.map((condition) => {
+            const remaining = statusRemaining(durations[condition.id], now) ?? condition.remainingMs
+            const stacks = condition.stacks !== null && condition.stacks !== undefined ? ` · ${condition.stacks} stacks` : ''
+            return (
+              <button
+                key={condition.id}
+                type="button"
+                data-status={condition.id}
+                aria-label={`${condition.name}, ${durationLabel(remaining)}${stacks}`}
+                title={`${condition.name} · ${durationLabel(remaining)}${stacks}`}
+                onClick={() => setSelected(condition)}
+                className="relative size-6 shrink-0 overflow-hidden rounded-[2px] border border-cyan-800 bg-black"
+              >
+                {condition.sprite && <SpriteIcon sprite={condition.sprite} size={22} />}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
       {open && conditions.length ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {conditions.map((condition) => {

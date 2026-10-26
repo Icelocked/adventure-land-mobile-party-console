@@ -70,3 +70,29 @@ test('Active status: shown for merchants too, counts, stacks, and the condition 
   await expect(details.getByText('luck', { exact: true })).toBeVisible()
   await expect(details.getByText('25', { exact: true })).toBeVisible()
 })
+
+test('Active status: the collapsed section shows one icon per status that opens its details (status-icon-row.tsx)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({
+    name: 'Rangy',
+    ctype: 'ranger',
+    level: 50,
+    conditions: [
+      { id: 'mluck', name: "Merchant's Luck", remainingMs: 3_600_000, explanation: 'Feeling lucky' } as never,
+      { id: 'stack', name: 'Stacked', stacks: 3 } as never,
+    ],
+  })
+  await server.install(page)
+
+  await page.goto('/characters/Rangy')
+  const row = page.getByRole('region', { name: 'Active status' }).locator('[data-status-row]')
+  await expect(row.getByRole('button')).toHaveCount(2)
+  await expect(row.locator('[data-status="stack"]')).toHaveAccessibleName(/^Stacked, .* · 3 stacks$/)
+  await row.getByRole('button', { name: /^Merchant's Luck, / }).click()
+  await expect(page.getByRole('dialog', { name: 'Condition details' }).getByText('Feeling lucky')).toBeVisible()
+  await page.keyboard.press('Escape')
+  // Opening the list replaces the icon row.
+  await page.getByRole('region', { name: 'Active status' }).getByRole('button', { name: /Active status/ }).click()
+  await expect(row).toHaveCount(0)
+})
