@@ -191,7 +191,6 @@ export function CharacterDetailScreen() {
               }}
               onLuckySlotData={() => setLuckySlotOpen(true)}
               localLucky={vitals.luckySlotTracking}
-              reservedInventory={vitals.reservedInventory}
             />
             <RestockSection characterName={name} serverPolicy={dynamicState.restockPolicies[name] ?? defaultRestockPolicy()} />
             {/* After restock, as on the dashboard's character card. */}

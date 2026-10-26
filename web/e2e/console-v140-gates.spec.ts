@@ -38,11 +38,10 @@ test('v1.4.0: the party list has no designated tank', async ({ page }) => {
   await expect(page.getByText('Holds melee range for the party regardless of class')).toHaveCount(0)
 })
 
-test('v1.4.0: a combat character has no gear sets, and Franky event settings have no routine', async ({ page }) => {
+test('v1.4.0: Franky event settings have no routine', async ({ page }) => {
   await partyServer().install(page)
   await page.goto('/characters/Folla')
   await expect(page.getByRole('button', { name: 'Follow' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Gear sets/ })).toHaveCount(0)
   await page.getByRole('button', { name: /^Events \(\d+\) ▾$/ }).click()
   await page.getByRole('button', { name: 'Franky settings' }).click()
   await expect(page.getByRole('button', { name: 'Franky settings' })).toHaveAttribute('aria-expanded', 'true')

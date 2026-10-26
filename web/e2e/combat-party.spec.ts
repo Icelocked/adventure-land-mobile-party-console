@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
-// Console 1.4 combat and party features: designated tank, gear sets, the
-// Franky routine and the escape hold's Resume automation.
+// Console 1.4 combat and party features: designated tank, the Franky
+// routine and the escape hold's Resume automation.
 
 function postBodies(page: Page, path: string): Record<string, unknown>[] {
   const bodies: Record<string, unknown>[] = []
@@ -60,95 +60,6 @@ test('Designated tank: the party list picks a tank, None clears it, and a refusa
   await page.getByRole('button', { name: 'Tank: None ▾' }).click()
   await choices.getByRole('button', { name: 'Leada' }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'unknown tank' })).toBeVisible()
-})
-
-test('Gear sets: saving captures the worn gear, shows worn/bag/missing pieces, clears, and shows a 409', async ({ page }) => {
-  const server = partyServer()
-  // Folla's tank set has one worn piece, one in the bag and one missing.
-  server.characters[1].slots = { helmet: { item: { name: 'helmet', level: 5 } } }
-  server.characters[1].items = [{ name: 'gloves', level: 4 }]
-  server.gearSets = {
-    Folla: {
-      tank: { slots: { helmet: { name: 'helmet', level: 5 }, gloves: { name: 'gloves', level: 4 }, shoes: { name: 'shoes', level: 6 } }, savedAt: 1 },
-    },
-  }
-  await server.install(page)
-  const bodies = postBodies(page, 'gear-sets')
-
-  await page.goto('/characters/Leada')
-  await page.getByRole('button', { name: 'Gear sets (0) ▾' }).click()
-  const luck = page.getByRole('region', { name: 'Luck gear set' })
-  await expect(luck).toContainText('Worn by the designated tank right before a kill')
-  await expect(luck).toContainText('Not saved')
-  await luck.getByRole('button', { name: 'Save current gear as Luck' }).click()
-  await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ character: 'Leada', set: 'luck', action: 'save' })
-  expect(server.gearSets.Leada.luck.slots).toEqual({ chest: { name: 'coat', level: 7 }, ring1: { name: 'ringsj', level: 3 } })
-  await expect(luck).toContainText('2/2 pieces available (2 worn, 0 in bag)')
-  await expect(page.getByRole('button', { name: 'Gear sets (1) ▾' })).toBeVisible()
-
-  await luck.getByRole('button', { name: 'Clear' }).click()
-  await expect.poll(() => bodies.length).toBe(2)
-  expect(bodies[1]).toEqual({ character: 'Leada', set: 'luck', action: 'clear' })
-  await expect(luck).toContainText('Not saved')
-
-  // gear-sets.ts refuses a save without an equipment report from the last 10s.
-  server.staleEquipment = ['Leada']
-  await page.getByRole('region', { name: 'Tank gear set' }).getByRole('button', { name: 'Save current gear as Tank' }).click()
-  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveText('no fresh equipment report for Leada')
-  expect(server.gearSets.Leada.tank).toBeUndefined()
-
-  await page.goto('/characters/Folla')
-  await page.getByRole('button', { name: 'Gear sets (1) ▾' }).click()
-  await expect(page.getByRole('region', { name: 'Tank gear set' })).toContainText('2/3 pieces available (1 worn, 1 in bag) · missing shoes')
-
-  // Merchant-class characters have no gear sets.
-  await page.goto('/characters/Merchy')
-  await expect(page.getByRole('button', { name: 'Leader', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Gear sets/ })).toHaveCount(0)
-})
-
-test('Gear sets: Equip shows only for a saved set, posts action equip, and shows a 409', async ({ page }) => {
-  const server = partyServer()
-  server.gearSets = { Leada: { tank: { slots: { chest: { name: 'coat', level: 7 } }, savedAt: 1 } } }
-  await server.install(page)
-  const bodies = postBodies(page, 'gear-sets')
-
-  await page.goto('/characters/Leada')
-  await page.getByRole('button', { name: 'Gear sets (1) ▾' }).click()
-  await expect(page.getByRole('group', { name: 'Gear sets' })).toContainText('Equip wears a saved set from the bag (never the elixir)')
-  await expect(page.getByRole('region', { name: 'Luck gear set' }).getByRole('button', { name: 'Equip Luck' })).toHaveCount(0)
-  const tank = page.getByRole('region', { name: 'Tank gear set' })
-  await tank.getByRole('button', { name: 'Equip Tank' }).click()
-  await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ character: 'Leada', set: 'tank', action: 'equip' })
-  // Equipping leaves the saved set in place.
-  expect(server.gearSets.Leada.tank.slots).toEqual({ chest: { name: 'coat', level: 7 } })
-  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveCount(0)
-
-  server.failOnce['gear-sets'] = 'that gear set is not saved'
-  await tank.getByRole('button', { name: 'Equip Tank' }).click()
-  await expect(page.getByRole('group', { name: 'Gear sets' }).getByRole('alert')).toHaveText('that gear set is not saved')
-})
-
-test('Gear sets: reserved bag slots read "Luck set" or "Swapped-out gear" over automatic rules', async ({ page }) => {
-  const server = partyServer()
-  const leada = server.characters[0]
-  leada.items = [{ name: 'ringsj', level: 3 }, { name: 'coat', level: 2 }, { name: 'hpot0', q: 50 }]
-  leada.reservedInventory = [
-    { slot: 0, item: { name: 'ringsj', level: 3 } },
-    { slot: 1, item: { name: 'coat', level: 2 } },
-  ]
-  server.gearSets = { Leada: { luck: { slots: { ring1: { name: 'ringsj', level: 3 } }, savedAt: 1 } } }
-  // An automatic bank rule on the ring is exempt while the set holds it.
-  server.extraState = { autoItemMarks: { Leada: { 'ringsj@+3': 'bank' } } }
-  await server.install(page)
-
-  await page.goto('/characters/Leada')
-  const inventory = page.getByRole('region', { name: 'Inventory' })
-  await expect(inventory.getByTestId('inventory-slot-0').locator('[data-item-action-banner]')).toHaveText('Luck set')
-  await expect(inventory.getByTestId('inventory-slot-1').locator('[data-item-action-banner]')).toHaveText('Swapped-out gear')
-  await expect(inventory.getByTestId('inventory-slot-2').locator('[data-item-action-banner]')).toHaveCount(0)
 })
 
 test("Franky routine: Franky's event settings open the routine; mode and death limit post per character", async ({ page }) => {

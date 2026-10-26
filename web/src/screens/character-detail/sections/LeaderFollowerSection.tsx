@@ -24,7 +24,6 @@ import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
-import { GearSetControl } from './GearSetControl'
 import { FrankyRoutineControl } from './FrankyRoutineControl'
 import { consoleFeatures, type PartyStateDynamic } from '@/models'
 import { CipherControls } from '@/components/CipherControls'
@@ -42,7 +41,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
   const isLeader = dynamicState.leader === characterName
   const isFollowing = dynamicState.followers[characterName] === true
   const [formationError, setFormationError] = useState<string | null>(null)
-  // Merchant-class characters get neither gear sets nor a Franky routine (connected-character-card.tsx).
+  // Merchant-class characters get no Franky routine (connected-character-card.tsx).
   const combat = useCharacters()[characterName]?.vitals?.ctype !== 'merchant'
 
   return (
@@ -74,7 +73,6 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
           Follow
         </Chip>
         <EventSelectionControl state={dynamicState} name={characterName} combat={combat} />
-        {combat && consoleFeatures(dynamicState).gearSets && <GearSetControl name={characterName} state={dynamicState} />}
       </div>
       <ConfigLoadingNote />
       {formationError && (

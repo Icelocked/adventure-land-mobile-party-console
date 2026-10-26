@@ -1057,19 +1057,11 @@ export class PartyApiClient {
     return this.post('realm/hop-blacklist', { realms })
   }
 
-  // Console 1.4 combat and party: designated tank, gear sets, Franky routine, escape resume.
+  // Console 1.4 combat and party: designated tank, Franky routine, escape resume.
   /** POST /party-api/formation {tank}. null clears the designated tank
    *  (http/formation.ts assignManaged). */
   async setDesignatedTank(tank: string | null): Promise<ApiResult<CommandResult>> {
     return this.post('formation', { tank })
-  }
-
-  /** POST /party-api/gear-sets. "save" captures the gear the character is
-   *  wearing and 409s without an equipment report from the last 10s
-   *  (characters/gear-sets.ts). "equip" queues a gear-set-equip command and
-   *  409s for a set that is not saved. */
-  async gearSet(character: string, set: 'luck' | 'tank', action: 'save' | 'clear' | 'equip'): Promise<ApiResult<CommandResult>> {
-    return this.post('gear-sets', { character, set, action })
   }
 
   /** POST /party-api/encounter-mode {character, encounter, mode}. */

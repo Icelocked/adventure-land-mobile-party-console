@@ -16,7 +16,6 @@ const v140State = (): PartyStateDynamic => ({
 const stableState = (): PartyStateDynamic => ({
   ...v140State(),
   designatedTank: null,
-  gearSets: {},
   bossChase: { enabled: false, minEtaMinutes: 15, trip: null, sightings: [], respawns: [] } as unknown as PartyStateDynamic['bossChase'],
   realmHopBlacklist: [],
   bankSortLayout: 'packed',
@@ -33,7 +32,6 @@ describe('consoleFeatures', () => {
   it('the stable fork supports every feature from its initial state, an unset tank included', () => {
     expect(consoleFeatures(stableState())).toEqual({
       designatedTank: true,
-      gearSets: true,
       frankyRoutine: true,
       bossChase: true,
       realmHopBlacklist: true,
@@ -49,10 +47,10 @@ describe('consoleFeatures', () => {
     expect(consoleFeatures({ ...base, designatedTank: 'Tanky' }).designatedTank).toBe(true)
     expect(consoleFeatures({ ...base, encounterRoutines: { franky: 'tank' } }).frankyRoutine).toBe(true)
     expect(consoleFeatures({ ...base, merchantRoutinePriorities: { 'prim stack': 10 } }).primStack).toBe(true)
-    // gearSets alone is not the fork's commerce build; bossChase must come with it.
-    const gearOnly = consoleFeatures({ ...base, gearSets: {} })
-    expect(gearOnly.gearSets).toBe(true)
-    expect(gearOnly.forkCommerce).toBe(false)
+    // designatedTank alone is not the fork's commerce build; bossChase must come with it.
+    const tankOnly = consoleFeatures({ ...base, designatedTank: null })
+    expect(tankOnly.designatedTank).toBe(true)
+    expect(tankOnly.forkCommerce).toBe(false)
     expect(consoleFeatures({ ...base, bossChase: null }).bossChase).toBe(false)
     // The market section carries npcShop; before it loads the gate stays off.
     expect(consoleFeatures({ ...base, npcShop: stableState().npcShop }).npcShop).toBe(true)

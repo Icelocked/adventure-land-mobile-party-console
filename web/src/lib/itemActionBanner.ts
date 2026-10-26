@@ -1,8 +1,8 @@
 /** The one banner an item tile shows, by priority: rule conflict, manual
- *  marks, automatic rules, delivery, bank, merchant, merchant weapon, gear-set hold.
+ *  marks, automatic rules, delivery, bank, merchant, merchant weapon.
  *  Console: item-action-banner.ts. */
 export type ItemActionBanner = { label: string; colors: string; border: string; title?: string }
-type Action = 'conflict' | 'upgrade' | 'compound' | 'npc' | 'stand' | 'exchange' | 'deconstruction' | 'delivery' | 'bank' | 'merchant' | 'weapon' | 'stat' | 'held'
+type Action = 'conflict' | 'upgrade' | 'compound' | 'npc' | 'stand' | 'exchange' | 'deconstruction' | 'delivery' | 'bank' | 'merchant' | 'weapon' | 'stat'
 export type BannerCandidate = { action: Action; label: string; automatic?: boolean; title?: string }
 const palette: Record<Action, [string, string]> = {
   conflict: ['bg-red-950 text-red-100', 'border-red-400'],
@@ -17,18 +17,14 @@ const palette: Record<Action, [string, string]> = {
   merchant: ['bg-purple-950 text-purple-200', 'border-purple-400'],
   weapon: ['bg-emerald-950 text-emerald-200', 'border-emerald-400'],
   stat: ['bg-sky-950 text-sky-200', 'border-sky-400'],
-  held: ['bg-teal-950 text-teal-100', 'border-teal-300'],
 }
 function priority(candidate: BannerCandidate): number {
-  const fixed: Partial<Record<Action, number>> = { conflict: 0, delivery: 3, bank: 4, merchant: 5, weapon: 6, held: 7 }
+  const fixed: Partial<Record<Action, number>> = { conflict: 0, delivery: 3, bank: 4, merchant: 5, weapon: 6 }
   return fixed[candidate.action] ?? (candidate.automatic ? 2 : 1)
 }
 /** Collection/storage are supporting intents, never additional banners. */
 export function itemActionBanner(candidates: (BannerCandidate | false | null | undefined)[], merchant: boolean): ItemActionBanner | null {
-  const present = candidates.filter((value): value is BannerCandidate => !!value && !(merchant && value.action === 'merchant'))
-  // Gear-set items are skipped by every automatic rule, so only manual marks still compete with the hold.
-  const held = present.some((value) => value.action === 'held')
-  const actions = held ? present.filter((value) => !value.automatic) : present
+  const actions = candidates.filter((value): value is BannerCandidate => !!value && !(merchant && value.action === 'merchant'))
   const automatic = new Set(
     actions
       .filter((value) => value.automatic)

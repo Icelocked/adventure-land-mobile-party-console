@@ -53,8 +53,6 @@ export interface MockCharacter {
   // This character's Hunt quest (state.statuses[name].monsterHunt), served in
   // characterDetails by section=core&dashboard=1.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
-  // Console 1.4: live vitals.reservedInventory, the bag slots a gear set holds (inventory/swap-reservations.ts).
-  reservedInventory?: { slot: number; item: MockItem | null }[]
   // Further live status fields (cc, donationLevelXp, ...) sent in both fast and the stream's vitals.
   vitalsExtra?: Record<string, unknown>
 }
@@ -107,8 +105,8 @@ const CONFIG_FIELDS = [
   'restockPolicies', 'merchantCharacter', 'merchantForceStand', 'merchantStandLocation', 'merchantWeapon',
   // Console 1.4 events and realms.
   'eventPrioritiesByCharacter', 'eventLimitsByCharacter', 'eventAttendance', 'bossChase', 'realmHopBlacklist',
-  // Console 1.4 combat and party: designated tank and gear sets.
-  'designatedTank', 'gearSets',
+  // Console 1.4 combat and party: designated tank.
+  'designatedTank',
   // Console 1.5: each account character's last saved observation.
   'characterSnapshots',
 ] as const
@@ -289,11 +287,8 @@ export class MockPartyServer {
 
   paired = false
 
-  // Console 1.4 combat and party: designated tank, gear sets, Franky routine, escape.
+  // Console 1.4 combat and party: designated tank, Franky routine, escape.
   designatedTank: string | null = null
-  gearSets: Record<string, Record<string, { slots: Record<string, MockItem & { p?: string }>; savedAt: number }>> = {}
-  // Characters whose equipment report is older than gear-sets.ts's 10s freshness window.
-  staleEquipment: string[] = []
   // The leader scope's routine; other scopes keep theirs in farmingProfiles (navigation/initial-focus.ts defaults {}).
   encounterRoutines: Record<string, string> = {}
   encounterAutoDeathLimits: Record<string, number> = {}
@@ -335,7 +330,7 @@ export class MockPartyServer {
   private dynamicState(): Record<string, unknown> {
     const state = this.forkState()
     if (this.consoleKind === 'stable') return state
-    for (const key of ['designatedTank', 'gearSets', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
+    for (const key of ['designatedTank', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
     const { 'prim stack': _prim, ...priorities } = state.merchantRoutinePriorities as Record<string, number>
     const profiles = Object.fromEntries(
       Object.entries(state.farmingProfiles as Record<string, Record<string, unknown>>).map(([name, profile]) => {
@@ -410,9 +405,8 @@ export class MockPartyServer {
       eventAttendance: this.eventAttendance,
       bossChase: this.bossChase,
       realmHopBlacklist: this.realmHopBlacklist,
-      // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
+      // Console 1.4 combat and party: designated tank, Franky routine.
       designatedTank: this.designatedTank,
-      gearSets: this.gearSets,
       encounterRoutines: this.encounterRoutines,
       encounterAutoDeathLimits: this.encounterAutoDeathLimits,
       encounterAutoDeaths: this.encounterAutoDeaths,
@@ -483,7 +477,7 @@ export class MockPartyServer {
       return {
         characters: Object.fromEntries(
           // fastCharacters: the whole status minus items/slots and other omitted fields.
-          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}), ...c.vitalsExtra }]),
+          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...c.vitalsExtra }]),
         ),
       }
     if (section === 'inventory')
@@ -548,7 +542,6 @@ export class MockPartyServer {
           inventorySize: (c.items ?? []).length,
           ...(c.target ? { target: c.target } : {}),
           ...(c.conditions ? { conditions: c.conditions } : {}),
-          ...(c.reservedInventory ? { reservedInventory: c.reservedInventory } : {}),
           ...c.vitalsExtra,
         },
         items,
@@ -694,32 +687,6 @@ export class MockPartyServer {
     if (path === 'formation' && body.tank !== undefined) {
       if (body.tank !== null && !this.characters.some((c) => c.name === body.tank)) return { status: 400, json: { error: 'unknown tank' } }
       this.designatedTank = body.tank === null ? null : String(body.tank)
-    }
-    // Console 1.4 gear sets: characters/gear-sets.ts.
-    if (path === 'gear-sets') {
-      const name = String(body.character ?? '')
-      const set = String(body.set ?? '')
-      const member = this.characters.find((c) => c.name === name)
-      if (!member) return { status: 400, json: { error: 'invalid character' } }
-      if (!['luck', 'tank', 'gold'].includes(set)) return { status: 400, json: { error: 'invalid gear set' } }
-      const sets = (this.gearSets[name] ||= {})
-      if (body.action === 'clear') delete sets[set]
-      else if (body.action === 'equip') {
-        // The server queues a gear-set-equip command and leaves the saved sets unchanged.
-        if (!sets[set]) return { status: 409, json: { error: 'that gear set is not saved' } }
-        return { status: 200, json: { ok: true } }
-      } else if (body.action === 'save') {
-        if (!member.slots || this.staleEquipment.includes(name)) return { status: 409, json: { error: 'no fresh equipment report for ' + name } }
-        const slots: Record<string, MockItem & { p?: string }> = {}
-        for (const slot of ['mainhand', 'offhand', 'chest', 'pants', 'helmet', 'gloves', 'shoes', 'cape', 'belt', 'orb', 'amulet', 'ring1', 'ring2', 'earring1', 'earring2', 'elixir']) {
-          const item = member.slots[slot]?.item as (MockItem & { p?: string }) | undefined
-          if (item?.name)
-            slots[slot] = { name: item.name, ...(item.level !== undefined ? { level: item.level } : {}), ...(item.p ? { p: item.p } : {}), ...(item.stat_type ? { stat_type: item.stat_type } : {}) }
-        }
-        if (!Object.keys(slots).length) return { status: 409, json: { error: 'nothing is equipped in the gear set slots' } }
-        sets[set] = { slots, savedAt: Date.now() }
-      } else return { status: 400, json: { error: 'invalid gear set action' } }
-      return { status: 200, json: { ok: true, gearSets: this.gearSets[name] } }
     }
     // Console 1.4 Franky routine: http/encounter-mode.ts behind the
     // farming-scope.ts wrapper, which refuses followers and merchants.

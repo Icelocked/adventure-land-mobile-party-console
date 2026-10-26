@@ -728,11 +728,9 @@ export interface PartyStateDynamic {
   eventAttendance?: Record<string, Record<string, EventAttendanceInstance>>
   bossChase?: BossChaseState | null
   realmHopBlacklist?: string[]
-  // Console 1.4 combat and party: designated tank, gear sets, Franky routine.
+  // Console 1.4 combat and party: designated tank, Franky routine.
   // Set by POST /formation {tank} (http/formation.ts); its role is described in party-roles-settings.tsx.
   designatedTank?: string | null
-  // Per character, saved from worn gear (characters/gear-sets.ts).
-  gearSets?: Record<string, Partial<Record<GearSetName, GearSet>>>
   // The leader scope's encounter settings; other scopes use farmingProfiles (see resolveEncounterRoutine).
   encounterRoutines?: Record<string, string>
   encounterAutoDeathLimits?: Record<string, number>
@@ -909,16 +907,7 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
   }
 }
 
-// Console 1.4 combat and party: gear sets and the Franky routine.
-/** Console characters/gear-sets.ts. "gold" exists server-side; the
- *  dashboard's Gear sets control offers only luck and tank. */
-export type GearSetName = 'luck' | 'tank' | 'gold'
-export type GearSetItem = { name: string; level?: number; p?: string; stat_type?: string }
-export interface GearSet {
-  slots: Record<string, GearSetItem>
-  savedAt: number
-}
-
+// Console 1.4 combat and party: the Franky routine.
 /** The Franky routine of the scope a character farms in: a follower shows
  *  (and can't edit) its leader's. Defaults: auto, a death limit of 3.
  *  Console: farming-context.ts frankyRoutine/frankyAutoDeathLimit/frankyAutoDeaths. */

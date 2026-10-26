@@ -8,7 +8,7 @@ import { compactInventory, itemActionBanner, physicalInventory, statBadgeClass, 
 import { aggregateSlotTracking, luckySlotSearch, normalizeSlotTracking } from '@/lib/luckySlot'
 import { TapRow } from '@/screens/itempanel/ItemActionPanel'
 import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
-import type { CatalogItem, CharacterVitals, InventoryEntry, Item, PartyStateDynamic } from '@/models'
+import type { CatalogItem, InventoryEntry, Item, PartyStateDynamic } from '@/models'
 
 type Mark = { slot?: number; item?: Item } | Item
 const markedIn = (list: Mark[], entry: InventoryEntry) =>
@@ -39,7 +39,6 @@ export function InventorySection({
   onItemTap,
   onLuckySlotData,
   localLucky,
-  reservedInventory,
 }: {
   characterName: string
   isMerchant: boolean
@@ -51,7 +50,6 @@ export function InventorySection({
   onItemTap: (entry: InventoryEntry, lucky: boolean) => void
   onLuckySlotData: () => void
   localLucky?: unknown
-  reservedInventory?: CharacterVitals['reservedInventory']
 }) {
   const [open, setOpen] = useSectionOpen('character:Inventory')
   const [details, setDetails] = useState<TileDetails | null>(null)
@@ -93,16 +91,6 @@ export function InventorySection({
     : validLuckySlot(luckyUpgradeSlot) && !luckySlotResuming
       ? 'Verified lucky upgrade slot'
       : 'Next upgrade will test for lucky upgrade'
-  // Console connected-inventory.tsx heldSlots: a reserved slot names the
-  // first saved set with a matching member, by name and level only.
-  const gearSets = state.gearSets?.[characterName]
-  const heldSlots: Record<number, string> = {}
-  for (const { slot, item } of reservedInventory ?? []) {
-    const set = (['luck', 'tank', 'gold'] as const).find((id) =>
-      Object.values(gearSets?.[id]?.slots ?? {}).some((member) => member.name === item?.name && (member.level ?? 0) === (item?.level ?? 0)),
-    )
-    heldSlots[slot] = set ? `${set[0].toUpperCase()}${set.slice(1)} set` : 'Swapped-out gear'
-  }
 
   return (
     <section aria-label="Inventory" className="mx-3 my-1.5 rounded-lg border border-border bg-card p-4">
@@ -172,10 +160,8 @@ export function InventorySection({
             const autoStandMarked = isMerchant && state.autoStandMarks[automaticSaleKey]
             const upgradeLevel = Number(upgradeMark?.item.level || 0)
             const upgradeTarget = upgradeLevel + Number(upgradeMark?.tiers || 1)
-            const held = heldSlots[entry.slot]
             const banner = itemActionBanner(
               [
-                !!held && { action: 'held', label: held, title: `${held}: automatic bank, merchant, compound, upgrade, sale and deconstruction rules skip this item` },
                 !!deconstruction && { action: 'deconstruction', label: 'Deconstruction' },
                 !!npcSale && { action: 'npc', label: npcSale.auto ? 'Auto NPC' : 'NPC sale', automatic: !!npcSale.auto, title: npcSaleDetails || undefined },
                 !!inventoryStatScrollMark && { action: 'stat', label: 'Stat scroll' },
