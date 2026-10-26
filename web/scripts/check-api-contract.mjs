@@ -87,6 +87,26 @@ async function main() {
     check(`autoNpcSales["${key}"].item.name is a string`, typeof rule?.item?.name === 'string')
   }
 
+  // The console fork's sections: Pause/Play and the activity phases in
+  // core (console-controls.tsx, characterActivity.ts), the tank roles in
+  // config (PartyRolesSettings.tsx). A console without them sends none.
+  const core = await getJson('/party-api/state?catalog=0&dashboard=1&section=core')
+  if ('consoleControl' in core) {
+    const control = core.consoleControl
+    check('core.consoleControl has paused (boolean), resume and shutdown', isObject(control) && typeof control.paused === 'boolean' && 'resume' in control && 'shutdown' in control)
+  }
+  if ('activityPhases' in core) {
+    const phases = core.activityPhases
+    check('core.activityPhases has profiles, attendance and characters objects', isObject(phases) && isObject(phases.profiles) && isObject(phases.attendance) && isObject(phases.characters))
+    for (const [name, profile] of Object.entries(phases?.profiles ?? {}))
+      check(`activityPhases.profiles["${name}"] carries monsterHunt and activeConvoy`, isObject(profile) && 'monsterHunt' in profile && 'activeConvoy' in profile)
+  }
+  const config = await getJson('/party-api/state?catalog=0&dashboard=1&section=config')
+  if ('pullMode' in config) {
+    check('config.pullMode is a boolean', typeof config.pullMode === 'boolean')
+    check('config.offTank is a string or null', config.offTank === null || typeof config.offTank === 'string')
+  }
+
   const mail = await getJson('/party-api/mail')
   check('mail.messages is an array', Array.isArray(mail.messages))
   check('mail.count is a number', typeof mail.count === 'number')
