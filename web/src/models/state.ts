@@ -2,6 +2,7 @@ import type { StandPriceHistory } from '@/lib/suggestedItemValue'
 import type { Item, InventoryEntry, EquippedEntry } from './item'
 import type { Sprite } from './sprite'
 import type { OfflineCharacter } from './character'
+import type { ConsoleControlState } from './consoleControl'
 import type { CraftMaterial, ItemMeta, MerchantExchangeItem } from './itemDetail'
 import type { Catalog as MonsterLocationCatalog } from '@/lib/farmingZones'
 
@@ -722,6 +723,8 @@ export interface PartyStateDynamic {
   partyLocation?: { map: string; x: number; y: number; [field: string]: unknown } | null
   combatRecovery?: { phase: string; reason?: string; names: string[] } | null
   activeConvoy?: unknown
+  // Console fork: Pause, Play and the clean shutdown (core and fast sections).
+  consoleControl?: ConsoleControlState | null
   // Upgrades
   upgradeOfferingStock?: Partial<Record<UpgradeOffering, number>>
   // Console 1.4 events and realms: per-instance event attendance, boss chase, realm hop blacklist.

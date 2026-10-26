@@ -292,6 +292,19 @@ export class MockPartyServer {
   // Console fork formation fields (initial-core.ts defaults).
   offTank: string | null = null
   pullMode = false
+  // Console fork Pause, Play and clean shutdown (lifecycle/console-control.ts
+  // status()), and every POST /console-control/:action body in order.
+  consoleControl: {
+    paused: boolean
+    pausedAt: number | null
+    leaseId: string | null
+    resume: { since: number; waiting: string[] } | null
+    shutdown: { phase: 'deferred' | 'draining' | 'safe'; requestedAt: number; hold: string | null; waiting: string[]; command: string; directory: string } | null
+    log: { at: number; message: string }[]
+  } = { paused: false, pausedAt: null, leaseId: null, resume: null, shutdown: null, log: [] }
+  consoleControlActions: { action: string; body: Record<string, unknown> }[] = []
+  // A Cave run or event fight that defers a clean shutdown until forced.
+  shutdownHold: string | null = null
   // The leader scope's routine; other scopes keep theirs in farmingProfiles (navigation/initial-focus.ts defaults {}).
   encounterRoutines: Record<string, string> = {}
   encounterAutoDeathLimits: Record<string, number> = {}
@@ -333,7 +346,7 @@ export class MockPartyServer {
   private dynamicState(): Record<string, unknown> {
     const state = this.forkState()
     if (this.consoleKind === 'stable') return state
-    for (const key of ['designatedTank', 'offTank', 'pullMode', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
+    for (const key of ['designatedTank', 'offTank', 'pullMode', 'consoleControl', 'encounterRoutines', 'encounterAutoDeathLimits', 'encounterAutoDeaths', 'bossChase', 'realmHopBlacklist', 'bankSortLayout']) delete state[key]
     const { 'prim stack': _prim, ...priorities } = state.merchantRoutinePriorities as Record<string, number>
     const profiles = Object.fromEntries(
       Object.entries(state.farmingProfiles as Record<string, Record<string, unknown>>).map(([name, profile]) => {
@@ -412,6 +425,7 @@ export class MockPartyServer {
       designatedTank: this.designatedTank,
       offTank: this.offTank,
       pullMode: this.pullMode,
+      consoleControl: this.consoleControl,
       encounterRoutines: this.encounterRoutines,
       encounterAutoDeathLimits: this.encounterAutoDeathLimits,
       encounterAutoDeaths: this.encounterAutoDeaths,
@@ -686,6 +700,27 @@ export class MockPartyServer {
       const extra = this.failOnceBody[path] ?? {}
       delete this.failOnceBody[path]
       return { status: 409, json: { ok: false, error, ...extra } }
+    }
+    // application.ts /party-api/console-control/:action over
+    // lifecycle/console-control.ts; every action answers status().
+    const controlAction = path.match(/^console-control\/([^/]+)$/)?.[1]
+    if (controlAction && this.consoleKind === 'stable') {
+      this.consoleControlActions.push({ action: controlAction, body })
+      const control = this.consoleControl
+      const now = Date.now()
+      const shutdown = (phase: 'deferred' | 'draining' | 'safe') => ({ phase, requestedAt: control.shutdown?.requestedAt ?? now, hold: phase === 'deferred' ? this.shutdownHold : null,
+        waiting: phase === 'draining' ? this.characters.map((c) => c.name) : [], command: 'docker compose stop party-console', directory: '/opt/party-console' })
+      switch (controlAction) {
+        case 'pause': this.consoleControl = { ...control, paused: true, pausedAt: now }; break
+        case 'play': this.consoleControl = { ...control, paused: false, pausedAt: null, resume: null }; break
+        case 'shutdown': this.consoleControl = this.shutdownHold && body.force !== true
+          ? { ...control, shutdown: shutdown('deferred') }
+          : { ...control, paused: true, pausedAt: control.pausedAt ?? now, shutdown: shutdown('draining') }; break
+        case 'cancel-shutdown': this.consoleControl = { ...control, shutdown: null }; break
+        case 'cancel-resume': this.consoleControl = { ...control, resume: null }; break
+        default: return { status: 404, json: { error: 'Unknown console control action' } }
+      }
+      return { status: 200, json: this.consoleControl }
     }
     // http/formation.ts tankRoles(): `tank`, `offTank` and `pullMode` are
     // checked together after `leader` and before the character fields; null

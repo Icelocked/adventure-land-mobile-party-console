@@ -1,4 +1,4 @@
-import type { Item, MarketListing, RestockPolicy, StandListing } from '@/models'
+import type { ConsoleControlAction, Item, MarketListing, RestockPolicy, StandListing } from '@/models'
 import { apiBase, type ServerSettings } from '@/config/serverConfig'
 import { beginActionToast, resolveActionToast } from '@/lib/actionToast'
 import type { DeploymentJournal, DeploymentMode } from '@/lib/consoleBuild'
@@ -1082,6 +1082,13 @@ export class PartyApiClient {
    *  leaves at `complete` or `failed-hold`; answers {escape}. */
   async resumeEscape(): Promise<ApiResult<CommandResult>> {
     return this.post('escape/resume', {})
+  }
+
+  /** POST /party-api/console-control/:action. Each action answers the new
+   *  ConsoleControlState; shutdown takes {force: true} to stop during a
+   *  Cave run or event fight (lifecycle/console-control.ts). */
+  async consoleControl(action: ConsoleControlAction, body: { force?: boolean } = {}): Promise<ApiResult<CommandResult>> {
+    return this.post(`console-control/${action}`, body)
   }
 
   // Bank sort layout and cosmetics (console 1.4).

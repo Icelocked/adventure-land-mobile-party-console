@@ -19,6 +19,7 @@ import { RosterPickerSheet } from '@/screens/roster/RosterPickerSheet'
 import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import { ConsoleBuildButton } from '@/components/ConsoleBuildButton'
+import { ConsoleControls, ConsolePausedIndicator, ConsoleResumeBanner } from '@/components/ConsoleControls'
 import type { BestiaryMonster, CharacterState } from '@/models'
 
 /** Party overview: class icon, level/class, HP/MP, one-line activity, gold
@@ -83,6 +84,8 @@ export function CharacterListScreen() {
               </button>
             )}
             <ConsoleBuildButton />
+            <ConsoleControls />
+            <ConsolePausedIndicator />
           </div>
           {/* Version line */}
           <span className="block font-mono text-[10px] text-muted-foreground">
@@ -104,6 +107,7 @@ export function CharacterListScreen() {
 
       {!connected && <div className="h-0.5 w-full animate-pulse bg-primary/60" />}
       <DebugBrowserBanner />
+      <ConsoleResumeBanner />
 
       {/* The dungeon panel heads the party while a visit runs. */}
       <DungeonPanel />
