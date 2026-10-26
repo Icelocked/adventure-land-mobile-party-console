@@ -161,6 +161,8 @@ data class PartyStateDynamic(
     val realmHopBlacklist: List<String> = emptyList(),
     // Console 1.4 market items hidden from every market tab (http/market-ignored-items.ts).
     val marketIgnoredItems: List<MarketIgnoredItem> = emptyList(),
+    // The fork's Ponty and Ron watches and Ron's last-visit stock, from section=market.
+    val npcShop: com.partyconsole.companion.domain.NpcShopView? = null,
     val anniversary: JsonElement? = null,
     // Bankbois, slots, session
     val bankbois: List<Bankboi> = emptyList(),

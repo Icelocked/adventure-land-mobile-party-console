@@ -111,10 +111,11 @@ fun MerchantControlsSection(viewModel: PartyViewModel, onOpenCommerce: (String) 
     }
 
     SectionCard(title = "Merchant controls") {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick = { onOpenCommerce("buy") }) { Text("Buy") }
             OutlinedButton(onClick = { onOpenCommerce("craft") }) { Text("Craft") }
             OutlinedButton(onClick = { onOpenCommerce("exchange") }) { Text("Exchange") }
+            if (state.consoleFeatures.npcShop) com.partyconsole.companion.ui.components.NpcShopButton(viewModel)
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
             FilterChip(selected = state.merchantForceStand, enabled = loaded, onClick = { run { viewModel.api.setForceStand(!state.merchantForceStand) } }, label = { Text("Force stand · ${if (state.merchantForceStand) "On" else "Off"}") })

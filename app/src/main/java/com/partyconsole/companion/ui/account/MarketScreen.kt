@@ -55,6 +55,12 @@ import com.partyconsole.companion.domain.alDataPublicTrade
 import com.partyconsole.companion.domain.blacklistRecord
 import com.partyconsole.companion.domain.dealValuesByItem
 import com.partyconsole.companion.domain.filterAlData
+import com.partyconsole.companion.domain.filterMarket
+import com.partyconsole.companion.domain.firstSeenAt
+import com.partyconsole.companion.domain.latestSeen
+import com.partyconsole.companion.domain.marketRowFor
+import com.partyconsole.companion.domain.realmName
+import com.partyconsole.companion.domain.serverOptions
 import com.partyconsole.companion.domain.filterBuyOrders
 import com.partyconsole.companion.domain.groupAlData
 import com.partyconsole.companion.domain.groupPonty
@@ -130,6 +136,8 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     val now = rememberClock()
     var tab by remember { mutableStateOf("wts") }
     var query by remember { mutableStateOf("") }
+    val (marketFilter, setMarketFilter) = com.partyconsole.companion.ui.components.rememberStoredMarketFilter(tab)
+    var watchPrefill by remember { mutableStateOf<com.partyconsole.companion.ui.components.WatchPrefill?>(null) }
     var showDealsOnly by remember { mutableStateOf(false) }
     var hideBadDeals by remember { mutableStateOf(false) }
     var hideUnaffordable by remember { mutableStateOf(false) }
@@ -174,26 +182,47 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
     fun shown(item: Item, seenAt: Long?) = marketItemKey(item.name, item.level) !in ignoredKeys && (!hideStale || marketListingFresh(seenAt, now))
     // stand-sheet.tsx drops stale rows before grouping; ignored items go after.
     val grouped = groupAlData(allAlData.filter { !hideStale || marketListingFresh(it.seenAt, now) })
-    val wts = filterAlData(grouped, query, now, nameFor).filter { entry ->
-        shown(entry.item, entry.seenAt) &&
-        (!showDealsOnly || entry.price < listingValue(entry) * 0.5) &&
-            (!hideBadDeals || entry.price <= listingValue(entry) * 2) &&
-            (!hideUnaffordable || entry.price <= bankGold) &&
-            (!hideBlacklisted || blacklistRecord(blacklist, state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier) == null)
-    }
+    val wts = filterMarket(
+        filterAlData(grouped, query, now, nameFor).filter { entry ->
+            shown(entry.item, entry.seenAt) &&
+                (!showDealsOnly || entry.price < listingValue(entry) * 0.5) &&
+                (!hideBadDeals || entry.price <= listingValue(entry) * 2) &&
+                (!hideUnaffordable || entry.price <= bankGold) &&
+                (!hideBlacklisted || blacklistRecord(blacklist, state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier) == null)
+        },
+        marketFilter,
+    ) { entry -> marketRowFor(catalogFor(entry.item.name), entry.item.name, entry.item.level, entry.price.toDouble(), latestSeen((entry.groupedListings ?: listOf(entry)).map { firstSeenAt(it.raw) }), realmName(entry.serverRegion, entry.serverIdentifier)) }
     val owned = ownedCounts(merchantItems, bankPacks)
     // Check and owned-first WTB offers need the stable console fork (ConsoleFeatures.kt forkCommerce).
     val forkCommerce = state.consoleFeatures.forkCommerce
-    val buyOrders = filterBuyOrders(allBuyOrders.filter { shown(it.item, it.seenAt) }, query, now, hideUnowned, owned, nameFor, ownedFirst = forkCommerce)
+    val buyOrders = filterMarket(filterBuyOrders(allBuyOrders.filter { shown(it.item, it.seenAt) }, query, now, hideUnowned, owned, nameFor, ownedFirst = forkCommerce), marketFilter) { order ->
+        marketRowFor(catalogFor(order.item.name), order.item.name, order.item.level, order.price.toDouble(), latestSeen(listOf(firstSeenAt(order.raw))), realmName(order.serverRegion, order.serverIdentifier))
+    }
     val bankWtb = buyOrders.filter { owned.containsKey(ownedKey(it.item)) }
     val ownOwner = merchantName?.let { diagnostics[it]?.owner }?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.toString() }.orEmpty()
     val publicTrades = aldata?.trades.orEmpty().map(::alDataPublicTrade).filter { it.owner != ownOwner }.flatMap { owner -> owner.listings.map { owner to it } }
     // Classifieds have no per-listing time, so their freshness is the feed's last refresh.
-    val classifieds = publicTrades.filter { (owner, entry) ->
-        shown(Item(name = entry.name, level = entry.level), aldata?.tradesUpdatedAt) &&
-        "${nameFor(entry.name).orEmpty()} ${entry.name} ${owner.label.orEmpty()} ${owner.characters.joinToString(" ")}".lowercase().contains(query.trim().lowercase())
+    val classifieds = filterMarket(
+        publicTrades.filter { (owner, entry) ->
+            shown(Item(name = entry.name, level = entry.level), aldata?.tradesUpdatedAt) &&
+                "${nameFor(entry.name).orEmpty()} ${entry.name} ${owner.label.orEmpty()} ${owner.characters.joinToString(" ")}".lowercase().contains(query.trim().lowercase())
+        },
+        marketFilter,
+    ) { (_, entry) -> marketRowFor(catalogFor(entry.name), entry.name, entry.level, entry.wts?.price?.toDouble(), latestSeen(listOf(entry.firstSeenAt))) }
+    // groupPonty can merge realms into one lot, so the server choice applies to listings before grouping.
+    val allPonty = ponty?.listings.orEmpty().map(::pontyListing)
+    val pontyListings = allPonty.filter { shown(it.item, it.seenAt) && (marketFilter.server == null || realmName(it.serverRegion, it.serverIdentifier) == marketFilter.server) }
+    val pontySeen = pontyListings.associate { it.key to it.firstSeenAt }
+    val pontyRows = filterMarket(groupPonty(pontyListings, query, now, nameFor), marketFilter) { group ->
+        marketRowFor(catalogFor(group.item.name), group.item.name, group.item.level, group.unitPrice.toDouble(), latestSeen(group.keys.map { pontySeen[it] }), realmName(group.serverRegion, group.serverIdentifier))
     }
-    val pontyRows = groupPonty(ponty?.listings.orEmpty().map(::pontyListing).filter { shown(it.item, it.seenAt) }, query, now, nameFor)
+    // Classifieds carry no realm, so that tab offers only All.
+    val tabServers = when (tab) {
+        "wts" -> serverOptions(allAlData.map { realmName(it.serverRegion, it.serverIdentifier) })
+        "wtb" -> serverOptions(allBuyOrders.map { realmName(it.serverRegion, it.serverIdentifier) })
+        "ponty" -> serverOptions(allPonty.map { realmName(it.serverRegion, it.serverIdentifier) })
+        else -> emptyList()
+    }
 
     fun run(key: String, action: suspend () -> String?) = scope.launch {
         busy = key
@@ -326,6 +355,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search market" },
             )
+            com.partyconsole.companion.ui.components.MarketFilterBar(marketFilter, setMarketFilter, tabServers)
             // Hides observations older than two minutes; classifieds use the last successful feed refresh.
             Check("Hide stale listings", hideStale) { setHideStale(it) }
             if (ignoreError.isNotEmpty()) Text(ignoreError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -532,6 +562,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
                         onConfirm = { rowError = null; confirming = group.key },
                         onCancel = { confirming = null },
                         onBuy = { requested -> run(group.key) { api.buyPonty(group.keys, requested, group.unitPrice).message() } },
+                        onWatch = if (state.consoleFeatures.npcShop) ({ watchPrefill = com.partyconsole.companion.ui.components.WatchPrefill("ponty", group.item.name, group.item.level ?: 0) }) else null,
                     )
                 }
             }
@@ -545,6 +576,7 @@ fun MarketScreen(viewModel: PartyViewModel, onBack: () -> Unit, onOpenWtb: () ->
             }
         }
     }
+    watchPrefill?.let { prefill -> com.partyconsole.companion.ui.components.WatchListSheet(viewModel, prefill) { watchPrefill = null } }
     wtbItem?.let { item ->
         WtbDialog(viewModel, item, catalogFor(item.name)?.meta, catalogFor, state.merchantCatalog?.buyable.orEmpty(), state.standPriceHistory[item.name], state.standBids[item.name], onClose = { wtbItem = null })
     }
@@ -567,6 +599,7 @@ private fun PontyRow(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     onBuy: (Int) -> Unit,
+    onWatch: (() -> Unit)? = null,
 ) {
     val state by viewModel.dynamicState.collectAsState()
     val item = catalogFor(group.item.name)
@@ -609,6 +642,7 @@ private fun PontyRow(
             onClick = onConfirm,
             contentPadding = PaddingValues(horizontal = 16.dp),
         ) { Text(if (busy == group.key) "Queuing…" else "Buy") }
+        onWatch?.let { OutlinedButton(onClick = it, modifier = Modifier.semantics { contentDescription = "Watch $name" }) { Text("Watch") } }
         if (confirming == group.key) {
             Confirm(
                 "Confirm Ponty purchase",

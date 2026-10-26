@@ -32,6 +32,9 @@ data class ConsoleFeatures(
      *  both being present: those ship in the same stable build. The gate read
      *  gearSets until the console fork removed gear sets (fdb0147a). */
     val forkCommerce: Boolean,
+    /** The POST /npc-shop routes (Ponty and Ron watches). The fork's market section
+     *  always sends `npcShop` (commerce/npc-shop.ts). */
+    val npcShop: Boolean,
 )
 
 val PartyStateDynamic.consoleFeatures: ConsoleFeatures get() {
@@ -46,5 +49,6 @@ val PartyStateDynamic.consoleFeatures: ConsoleFeatures get() {
         gappedBankSort = bankSortLayout != null,
         primStack = "prim stack" in merchantRoutinePriorities,
         forkCommerce = designatedTank && bossChase,
+        npcShop = npcShop != null,
     )
 }

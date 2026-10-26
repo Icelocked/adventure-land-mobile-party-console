@@ -58,6 +58,12 @@ val ACTION_DOMAINS: Map<String, List<Domain>> = mapOf(
     "/merchant/aldata-order" to COMMERCE,
     "/merchant/aldata-sale" to COMMERCE,
     "/merchant/ponty-order" to COMMERCE,
+    // dashboard query-actions.ts: settings change only the market section.
+    "/npc-shop/orders" to listOf(Domain.MARKET, Domain.CORE),
+    "/npc-shop/stop" to listOf(Domain.MARKET, Domain.CORE),
+    "/npc-shop/resume" to listOf(Domain.MARKET, Domain.CORE),
+    "/npc-shop/settings" to listOf(Domain.MARKET),
+    "/npc-shop/ron-visit" to listOf(Domain.MARKET, Domain.CORE),
     "/merchant/donate" to INVENTORY,
     "/merchant/join-giveaway" to INVENTORY,
     "/merchant/send-mail" to COMMERCE + Domain.MAIL,

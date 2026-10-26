@@ -40,7 +40,7 @@ private fun FakeConsole.ctype(name: String): String? =
     ((sections["core"]?.get("characterDetails") as? JsonObject)?.get(name) as? JsonObject)?.get("ctype").str()
 
 /** The state keys only the stable console fork sends (model/ConsoleFeatures.kt). */
-private val FORK_KEYS = listOf("designatedTank", "offTank", "pullMode", "consoleControl", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
+private val FORK_KEYS = listOf("designatedTank", "offTank", "pullMode", "consoleControl", "npcShop", "bossChase", "realmHopBlacklist", "bankSortLayout", "encounterRoutines", "encounterAutoDeathLimits", "encounterAutoDeaths")
 
 /** Plays Ryan's v1.4.0 instead of the stable console fork: drops every fork
  *  field and the "prim stack" routine, and the auto NPC sale route ignores
@@ -101,6 +101,65 @@ internal fun FakeConsole.installConsole14Routes() {
             put("consoleControl", JsonObject(next))
             200 to JsonObject(next).toString()
         }
+    }
+
+    // The fork's Ponty and Ron shop: http/npc-shop-routes.ts over commerce/npc-shop.ts, as the
+    // e2e mock answers them. The routes answer only while the market section carries npcShop.
+    fun whole(value: JsonElement?, min: Long): Long? = (value as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull?.takeIf { it == Math.floor(it) && it >= min }?.toLong()
+    fun shop() = sections["market"]?.get("npcShop").obj()
+    fun saveShop(next: JsonObject) = put("npcShop", next, "market")
+    fun orders() = (shop()?.get("orders") as? JsonArray).orEmpty().mapNotNull { it.obj() }
+    fun merchant() = field("merchantCharacter").str() ?: characterNames().firstOrNull { ctype(it) == "merchant" }
+    routes["npc-shop/orders"] = route@{ body ->
+        val shop = shop() ?: return@route null
+        if (merchant() == null) return@route error(400, "configure a merchant first")
+        val npc = body["npc"].str()?.takeIf { it in listOf("ponty", "ron") }
+        val kind = body["kind"].str()?.takeIf { it in listOf("watch", "now") }
+        val item = body["item"].str()?.trim().orEmpty()
+        val levelMin = whole(body["levelMin"] ?: JsonPrimitive(0), 0)
+        val levelMax = whole(body["levelMax"] ?: body["levelMin"] ?: JsonPrimitive(0), 0)
+        val quantity = body["quantity"].takeIf { it != null && it !is JsonNull }?.let { whole(it, 1) }
+        val badCount = (body["quantity"] != null && body["quantity"] !is JsonNull && quantity == null) || (kind == "now" && quantity == null)
+        if (npc == null || kind == null || item.isEmpty() || levelMin == null || levelMax == null || levelMin > levelMax || badCount) return@route error(400, "invalid order")
+        val order = JsonObject(mapOf(
+            "id" to JsonPrimitive("npc-order-${System.nanoTime()}"), "npc" to JsonPrimitive(npc), "kind" to JsonPrimitive(kind), "item" to JsonPrimitive(item),
+            "levelMin" to JsonPrimitive(levelMin), "levelMax" to JsonPrimitive(levelMax), "quantity" to (quantity?.let { JsonPrimitive(it) } ?: JsonNull),
+            "spendCap" to (body["spendCap"] ?: JsonNull), "bought" to JsonPrimitive(0), "spent" to JsonPrimitive(0), "status" to JsonPrimitive("active"),
+        ))
+        saveShop(JsonObject(shop + ("orders" to JsonArray(orders() + order))))
+        ok()
+    }
+    routes["npc-shop/stop"] = route@{ body ->
+        val shop = shop() ?: return@route null
+        val id = body["id"].str()
+        if (orders().none { it["id"].str() == id }) return@route error(404, "unknown order")
+        // A watch pauses; a buy-now order stops.
+        val next = orders().map { if (it["id"].str() == id && it["status"].str() == "active") JsonObject(it + ("status" to JsonPrimitive(if (it["kind"].str() == "watch") "paused" else "stopped"))) else it }
+        saveShop(JsonObject(shop + ("orders" to JsonArray(next))))
+        ok()
+    }
+    routes["npc-shop/resume"] = route@{ body ->
+        val shop = shop() ?: return@route null
+        val id = body["id"].str()
+        if (orders().none { it["id"].str() == id && it["status"].str() == "paused" }) return@route error(409, "only a paused watch can resume")
+        saveShop(JsonObject(shop + ("orders" to JsonArray(orders().map { if (it["id"].str() == id) JsonObject(it + ("status" to JsonPrimitive("active"))) else it }))))
+        ok()
+    }
+    routes["npc-shop/settings"] = route@{ body ->
+        val shop = shop() ?: return@route null
+        val settings = shop["settings"].obj().orEmpty()
+        val reserve = if ("goldReserve" in body) whole(body["goldReserve"], 0) else settings["goldReserve"]?.let { whole(it, 0) }
+        val minutes = if ("ronVisitMinutes" in body) whole(body["ronVisitMinutes"], 1) else settings["ronVisitMinutes"]?.let { whole(it, 1) }
+        if (reserve == null) return@route error(400, "enter a whole-number gold reserve")
+        if (minutes == null || minutes > 1440) return@route error(400, "enter a Ron visit interval from 1 to 1440 minutes")
+        val donation = (body["ronDonation"] as? JsonPrimitive)?.booleanOrNull ?: (settings["ronDonation"] as? JsonPrimitive)?.booleanOrNull ?: false
+        saveShop(JsonObject(shop + ("settings" to JsonObject(mapOf("goldReserve" to JsonPrimitive(reserve), "ronVisitMinutes" to JsonPrimitive(minutes), "ronDonation" to JsonPrimitive(donation))))))
+        ok()
+    }
+    routes["npc-shop/ron-visit"] = route@{ _ ->
+        shop() ?: return@route null
+        if (merchant() == null) return@route error(409, "configure a merchant first")
+        ok(",\"jobId\":\"merchant-1\"")
     }
 
     routes["formation"] = route@{ body ->

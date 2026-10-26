@@ -33,17 +33,18 @@ class ConsoleFeaturesTest {
     private val v140 = """{"leader":"Lead","merchantRoutinePriorities":{"upgrade preview":70},"farmingProfiles":{"Lead":{"farmingPolicy":"auto"}}}"""
     private val stable = """{"leader":"Lead","designatedTank":null,"offTank":null,"pullMode":false,"realmHopBlacklist":[],"bankSortLayout":"packed",
         "bossChase":{"enabled":false,"minEtaMinutes":15,"sightings":[],"respawns":[]},
+        "npcShop":{"orders":[],"settings":{"goldReserve":0,"ronDonation":false,"ronVisitMinutes":10},"ron":null,"merchantRealm":null,"spendable":0},
         "merchantRoutinePriorities":{"upgrade preview":70,"prim stack":70},
         "farmingProfiles":{"Lead":{"farmingPolicy":"auto","encounterRoutines":{}}}}"""
 
     @Test
     fun ryanV140SupportsNoForkFeature() {
-        assertEquals(ConsoleFeatures(false, false, false, false, false, false, false, false), state(v140).consoleFeatures)
+        assertEquals(ConsoleFeatures(false, false, false, false, false, false, false, false, false), state(v140).consoleFeatures)
     }
 
     @Test
     fun theStableForkSupportsEveryFeatureFromItsInitialStateWithNoTankPicked() {
-        assertEquals(ConsoleFeatures(true, true, true, true, true, true, true, true), state(stable).consoleFeatures)
+        assertEquals(ConsoleFeatures(true, true, true, true, true, true, true, true, true), state(stable).consoleFeatures)
     }
 
     @Test
@@ -57,6 +58,9 @@ class ConsoleFeaturesTest {
         // Commerce needs bossChase as well.
         assertFalse(tankOnly.forkCommerce)
         assertFalse(state("""{"bossChase":null}""").consoleFeatures.bossChase)
+        // The market section carries npcShop; before it loads the gate stays off.
+        assertTrue(state("""{"npcShop":{"orders":[]}}""").consoleFeatures.npcShop)
+        assertFalse(state("""{"npcShop":null}""").consoleFeatures.npcShop)
     }
 
     @Test

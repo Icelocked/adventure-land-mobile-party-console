@@ -281,10 +281,13 @@ class PartyRepository(
     // afterwards the market section.
     private suspend fun fetchMarket() {
         if (lastReferenceRevision == null) {
-            val value = (getObject("aldata/market") as? ApiResult.Success)?.value ?: return
-            marketAldata = value
-            mergeState(mapOf("aldata" to value))
-            return
+            (getObject("aldata/market") as? ApiResult.Success)?.value?.let { value ->
+                marketAldata = value
+                mergeState(mapOf("aldata" to value))
+            }
+            // Core's first revision often lands during that read; the section
+            // follows at once so the fork's npcShop gate appears without a 60s wait.
+            if (lastReferenceRevision == null) return
         }
         val value = (section("market") as? ApiResult.Success)?.value ?: return
         value["aldata"]?.takeIf { it !is JsonNull }?.let { marketAldata = it }

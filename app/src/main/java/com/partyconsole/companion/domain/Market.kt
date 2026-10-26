@@ -82,6 +82,8 @@ data class PontyListing(
     val serverRegion: String?,
     val serverIdentifier: String?,
     val seenAt: Long?,
+    // When the coordinator first saw the lot (the market filter's newest sort).
+    val firstSeenAt: Double? = null,
 )
 
 fun pontyListing(raw: JsonObject) = PontyListing(
@@ -93,11 +95,12 @@ fun pontyListing(raw: JsonObject) = PontyListing(
     serverRegion = raw.str("serverRegion"),
     serverIdentifier = raw.str("serverIdentifier"),
     seenAt = raw.num("seenAt")?.toLong(),
+    firstSeenAt = firstSeenAt(raw),
 )
 
 /** One owner's published ALData trade intentions. */
 data class TradeIntention(val price: Long?, val quantity: Int?)
-data class PublicTradeListing(val name: String, val level: Int, val p: String?, val note: String?, val wts: TradeIntention?, val wtb: TradeIntention?)
+data class PublicTradeListing(val name: String, val level: Int, val p: String?, val note: String?, val wts: TradeIntention?, val wtb: TradeIntention?, val firstSeenAt: Double? = null)
 data class AlDataPublicTrade(val owner: String, val label: String?, val characters: List<String>, val listings: List<PublicTradeListing>)
 
 fun alDataPublicTrade(raw: JsonObject): AlDataPublicTrade {
@@ -107,7 +110,7 @@ fun alDataPublicTrade(raw: JsonObject): AlDataPublicTrade {
         label = raw.str("label"),
         characters = (raw["characters"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty(),
         listings = (raw["listings"] as? JsonArray)?.mapNotNull { it as? JsonObject }?.map {
-            PublicTradeListing(it.str("name").orEmpty(), it.num("level")?.toInt() ?: 0, it.str("p"), it.str("note"), intention(it["wts"]), intention(it["wtb"]))
+            PublicTradeListing(it.str("name").orEmpty(), it.num("level")?.toInt() ?: 0, it.str("p"), it.str("note"), intention(it["wts"]), intention(it["wtb"]), firstSeenAt(it))
         }.orEmpty(),
     )
 }
@@ -227,6 +230,9 @@ data class PontyGroup(
     val keys: List<String>,
     val realms: Set<String>,
     val minimumLot: Int,
+    // The first listing's realm, as the PWA's spread keeps it.
+    val serverRegion: String? = null,
+    val serverIdentifier: String? = null,
 )
 
 /** Ponty listings (no PVP) grouped by groupKey and freshness: quantities
@@ -252,7 +258,7 @@ fun groupPonty(listings: List<PontyListing>, query: String, now: Long, nameFor: 
                 seenAt = max(existing.seenAt ?: 0, listing.seenAt ?: 0),
             )
         } else {
-            PontyGroup(key, listing.item, listing.quantity, listing.unitPrice, listing.seenAt, stale, listOf(listing.key), setOf(realm), listing.quantity)
+            PontyGroup(key, listing.item, listing.quantity, listing.unitPrice, listing.seenAt, stale, listOf(listing.key), setOf(realm), listing.quantity, listing.serverRegion, listing.serverIdentifier)
         }
     }
     return groups.values.toList()

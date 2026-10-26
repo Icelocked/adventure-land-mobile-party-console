@@ -1179,6 +1179,26 @@ class PartyApiClient(
             put("level", JsonPrimitive(level ?: 0))
         }))
 
+    // The console fork's Ponty and Ron shop (http/npc-shop-routes.ts).
+
+    /** POST /party-api/npc-shop/orders. A watch buys new copies in its level
+     *  range up to `quantity`, or until stopped when `quantity` is null;
+     *  `spendCap` caps its total gold. A "now" order needs a quantity
+     *  (domain/NpcShop.kt npcShopOrderBody). */
+    suspend fun createNpcShopOrder(order: JsonObject): ApiResult<CommandResult> = post("npc-shop/orders", order)
+
+    /** POST /party-api/npc-shop/resume {id}. 409 unless the watch is paused. */
+    suspend fun resumeNpcShopOrder(id: String): ApiResult<CommandResult> = post("npc-shop/resume", JsonObject(mapOf("id" to JsonPrimitive(id))))
+
+    /** POST /party-api/npc-shop/stop {id}: a watch pauses, a buy-now order stops. 404 for an unknown order. */
+    suspend fun stopNpcShopOrder(id: String): ApiResult<CommandResult> = post("npc-shop/stop", JsonObject(mapOf("id" to JsonPrimitive(id))))
+
+    /** POST /party-api/npc-shop/settings with any of goldReserve, ronDonation or ronVisitMinutes (1-1440). */
+    suspend fun saveNpcShopSettings(settings: Map<String, JsonElement>): ApiResult<CommandResult> = post("npc-shop/settings", JsonObject(settings))
+
+    /** POST /party-api/npc-shop/ron-visit {}. 409 when no merchant is configured. */
+    suspend fun visitRon(): ApiResult<CommandResult> = post("npc-shop/ron-visit", JsonObject(emptyMap()))
+
     /** POST /party-api/merchant/ponty-order - every listing key of the
      *  grouped lot. */
     suspend fun buyPonty(keys: List<String>, quantity: Int, unitPrice: Long): ApiResult<CommandResult> {
