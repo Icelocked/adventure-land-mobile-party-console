@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -60,7 +62,10 @@ private val MapBackground = Color(0xFF07110F)
 
 /** The collapsible live map under the character's header, at 20 fps while
  *  open and the app is visible, with a native-size view (names and hit/heal
- *  floaters). Caves send their definition on the stream. */
+ *  floaters). Caves send their definition on the stream. The map stream
+ *  runs only while the map is on screen or the native-size view is open:
+ *  each feed sends about 100 KB/s, and on a slow link the other requests,
+ *  the escape latency probe among them, queue behind it. PWA: MapSection.tsx. */
 @Composable
 fun MapSection(viewModel: PartyViewModel, name: String, map: String, x: Double, y: Double) {
     val cave = caveMap.matches(map)
@@ -75,7 +80,9 @@ fun MapSection(viewModel: PartyViewModel, name: String, map: String, x: Double, 
     var streamState by remember { mutableStateOf("loading") }
     var lastFrameAt by remember { mutableLongStateOf(0L) }
     val currentMap by rememberUpdatedState(map)
-    MapFrames(viewModel, name, open && visible) { event ->
+    // The frame counts as off screen until it is laid out, and once it scrolls fully out of view.
+    var onScreen by remember { mutableStateOf(false) }
+    MapFrames(viewModel, name, open && visible && (onScreen || large)) { event ->
         when (event) {
             is MapStreamEvent.State -> streamState = event.state
             is MapStreamEvent.Frame -> {
@@ -97,6 +104,7 @@ fun MapSection(viewModel: PartyViewModel, name: String, map: String, x: Double, 
                 onClick = {
                     if (!open) { buffer.clear(); lastFrameAt = 0 }
                     open = !open
+                    if (!open) onScreen = false
                 },
                 modifier = Modifier.size(28.dp).semantics { contentDescription = if (open) "Collapse live map" else "Expand live map" },
             ) {
@@ -108,6 +116,7 @@ fun MapSection(viewModel: PartyViewModel, name: String, map: String, x: Double, 
             Box(
                 modifier = Modifier.padding(top = 8.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(RoundedCornerShape(6.dp))
                     .border(1.dp, Color(0xCC065F46), RoundedCornerShape(6.dp)).background(MapBackground)
+                    .onGloballyPositioned { coordinates -> coordinates.boundsInWindow().let { onScreen = it.width > 0f && it.height > 0f } }
                     .semantics { contentDescription = "Live map" },
             ) {
                 MapCanvas(props, buffer = buffer, fps = 20, active = open && visible && !large)

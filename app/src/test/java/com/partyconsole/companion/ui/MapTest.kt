@@ -11,6 +11,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.partyconsole.companion.domain.Area
 import com.partyconsole.companion.model.CavePoint
@@ -159,6 +162,32 @@ class MapTest {
         frames { compose.onAllNodes(androidx.compose.ui.test.hasText("Leada — main")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Close native-size map").performClick()
         frames { compose.onAllNodes(androidx.compose.ui.test.hasText("Leada — main")).fetchSemanticsNodes().isEmpty() }
+    }
+
+    @Test
+    fun theStreamClosesWhileTheOpenMapIsScrolledOffScreenAndReopensWhenItReturns() {
+        // A map stream sends about 100 KB/s; on a slow link the escape latency
+        // probe and the polls queue behind it, so only a map on screen holds one.
+        console.gets["/party-api/maps/main"] = definition("main")
+        console.mapFrames["Leada"] = listOf(frame("Leada", "main"))
+        val viewModel = PartyViewModel(console.settings)
+        val scroll = androidx.compose.foundation.ScrollState(0)
+        compose.setContent {
+            androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.verticalScroll(scroll)) {
+                MapSection(viewModel, "Leada", "main", 12.4, 80.6)
+                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.height(2_000.dp))
+            }
+        }
+        fun opened() = console.requests.count { it.path.startsWith("/party-api/map-stream/") }
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithContentDescription("Expand live map").performClick()
+        frames { opened() == 1 }
+        // The open map redraws every frame, so the test scrolls the state directly instead of waiting for idle.
+        compose.runOnUiThread { scroll.dispatchRawDelta(scroll.maxValue.toFloat()) }
+        frames { scroll.value == scroll.maxValue }
+        repeat(30) { compose.mainClock.advanceTimeByFrame() }
+        compose.runOnUiThread { scroll.dispatchRawDelta(-scroll.maxValue.toFloat()) }
+        frames { opened() == 2 }
     }
 
     @Test
