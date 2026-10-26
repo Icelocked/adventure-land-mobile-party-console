@@ -37,7 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.partyconsole.companion.model.CharacterVitals
-import com.partyconsole.companion.ui.activityLine
 
 /** Class icon + color badge. Falls back to a generic person icon for any
  *  ctype not in this list - new classes or typos should degrade, not crash.
@@ -65,8 +64,8 @@ fun VitalsHeader(
     name: String,
     vitals: CharacterVitals,
     accountGold: Long? = null,
-    bestiaryCatalog: List<com.partyconsole.companion.model.BestiaryMonster> = emptyList(),
-    resolvedTargetType: String? = null,
+    // The activity label (ui/ActivityLine.kt rememberCharacterActivity).
+    activity: String = "",
     diagnostics: com.partyconsole.companion.model.CharacterDiagnostics? = null,
     slots: Map<String, com.partyconsole.companion.model.EquippedEntry?> = emptyMap(),
     online: Boolean = true,
@@ -150,7 +149,7 @@ fun VitalsHeader(
             accountGold?.let { Text("Account total ${"%,d".format(it)}g", style = MaterialTheme.typography.labelSmall) }
         }
         Text(
-            activityLine(vitals, bestiaryCatalog, resolvedTargetType),
+            activity,
             style = MaterialTheme.typography.bodyMedium,
             color = if (vitals.rip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
         )

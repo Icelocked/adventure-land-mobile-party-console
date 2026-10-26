@@ -152,9 +152,13 @@ class PartyRepository(
     // The referenceRevision the loaded (or loading) catalog belongs to.
     @Volatile private var catalogRevision: String? = null
     private var coreGeneration = 0L
+    // The activity label's fields as the console sent them, kept even when the
+    // typed model rejects one (domain/CharacterActivity.kt decodes them itself).
+    private var activityRaw = JsonObject(emptyMap())
 
     private fun mergeState(patch: Map<String, JsonElement>) {
         synchronized(stateLock) {
+            activityRaw = JsonObject(activityRaw + patch.filterKeys { it in com.partyconsole.companion.domain.ACTIVITY_STATE_KEYS })
             val candidate = JsonObject(merged + patch)
             if (decodeState(candidate) != null) {
                 merged = candidate
@@ -175,6 +179,7 @@ class PartyRepository(
         _dynamicState.value = decoded.copy(
             stateKeys = merged.keys,
             coreGeneration = coreGeneration,
+            activitySource = activityRaw,
             travelPlaces = catalog.travelPlaces,
             monsterChoices = catalog.monsterChoices,
             bestiaryCatalog = catalog.bestiaryCatalog,
@@ -509,6 +514,7 @@ class PartyRepository(
     private fun resetAccount() {
         synchronized(stateLock) {
             merged = JsonObject(emptyMap())
+            activityRaw = JsonObject(emptyMap())
             catalog = CatalogSection()
             marketAldata = null
             lastReferenceRevision = null
@@ -575,7 +581,7 @@ class PartyRepository(
             json.decodeFromJsonElement(CharacterVitals.serializer(), JsonObject(record.vitals + ("name" to JsonPrimitive(name))))
         }.getOrNull()
         val member = _roster.value[name]
-        val vitals = if (decoded != null && member != null) decoded.copy(ctype = member.ctype, level = member.level, server = member.server) else decoded
+        val vitals = if (decoded != null && member != null) decoded.copy(ctype = member.ctype, level = member.level, server = member.server, raw = record.vitals) else decoded?.copy(raw = record.vitals)
         val slots = record.slots.mapValues { (_, value) ->
             runCatching { json.decodeFromJsonElement(EquippedEntry.serializer(), value) }.getOrNull()
         }

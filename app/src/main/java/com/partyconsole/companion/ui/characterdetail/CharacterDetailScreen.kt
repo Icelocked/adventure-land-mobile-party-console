@@ -117,6 +117,7 @@ fun CharacterDetailScreen(
         val isMerchant = characterName == dynamicState.merchantCharacter
         val farming = dynamicState.farmingContext(characterName)
         val resolvedTargetType = com.partyconsole.companion.ui.map.rememberTargetMonsterType(viewModel, characterName, vitals.targetId)
+        val activity = com.partyconsole.companion.ui.rememberCharacterActivity(viewModel, characterName, vitals)
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CharacterSwitcherRow(characters, characterName, onSwitchCharacter)
@@ -125,8 +126,7 @@ fun CharacterDetailScreen(
                     name = characterName,
                     vitals = vitals,
                     accountGold = accountGold,
-                    bestiaryCatalog = dynamicState.bestiaryCatalog,
-                    resolvedTargetType = resolvedTargetType,
+                    activity = activity,
                     diagnostics = diagnostics[characterName],
                     slots = state.inventory?.slots.orEmpty(),
                     online = diagnostics[characterName]?.online(now) == true,

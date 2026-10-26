@@ -58,14 +58,12 @@ import com.partyconsole.companion.domain.PendingCharacter
 import com.partyconsole.companion.domain.orderCharacters
 import com.partyconsole.companion.domain.pendingCharacters
 import com.partyconsole.companion.domain.pendingHelp
-import com.partyconsole.companion.model.BestiaryMonster
 import com.partyconsole.companion.model.CharacterState
 import com.partyconsole.companion.model.Sprite
 import com.partyconsole.companion.network.ApiResult
 import com.partyconsole.companion.ui.AccountMenuSheet
 import com.partyconsole.companion.ui.PartyViewModel
 import com.partyconsole.companion.ui.Routes
-import com.partyconsole.companion.ui.activityLine
 import com.partyconsole.companion.ui.characterdetail.sections.classLook
 import com.partyconsole.companion.ui.components.CharacterPortrait
 import com.partyconsole.companion.ui.components.FreshnessBadge
@@ -184,7 +182,7 @@ fun CharacterListScreen(viewModel: PartyViewModel, onSelectCharacter: (String) -
                 items(names.filter { it !in pendingNames }.chunked(perRow), key = { it.joinToString("|") }) { row ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                         for (name in row) {
-                            Box(Modifier.weight(1f)) { characters[name]?.let { CharacterRow(viewModel, name, it, state.bestiaryCatalog) { onSelectCharacter(name) } } }
+                            Box(Modifier.weight(1f)) { characters[name]?.let { CharacterRow(viewModel, name, it) { onSelectCharacter(name) } } }
                         }
                         repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
                     }
@@ -331,7 +329,7 @@ private fun PartyControls(viewModel: PartyViewModel) {
 }
 
 @Composable
-private fun CharacterRow(viewModel: PartyViewModel, name: String, state: CharacterState, bestiary: List<BestiaryMonster>, onClick: () -> Unit) {
+private fun CharacterRow(viewModel: PartyViewModel, name: String, state: CharacterState, onClick: () -> Unit) {
     val details by viewModel.characterDetails.collectAsState()
     val seenAt = details[name]?.seenAt ?: 0L
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -351,7 +349,7 @@ private fun CharacterRow(viewModel: PartyViewModel, name: String, state: Charact
                     Text("awaiting status", style = MaterialTheme.typography.bodySmall)
                 } else {
                     Text(
-                        activityLine(vitals, bestiary),
+                        com.partyconsole.companion.ui.rememberCharacterActivity(viewModel, name, vitals),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         color = if (vitals.rip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,

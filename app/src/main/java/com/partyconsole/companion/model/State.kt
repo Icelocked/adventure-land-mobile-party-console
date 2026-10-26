@@ -2,6 +2,7 @@ package com.partyconsole.companion.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 // PWA: web/src/models/state.ts. Every field is optional with a default: the
 // console omits empty fields, and one missing key must never fail a decode.
@@ -198,6 +199,8 @@ data class PartyStateDynamic(
     // Counts the core polls merged so far. A console-control reply stands in
     // for consoleControl only until the next one (ConsoleControls.kt).
     @kotlinx.serialization.Transient val coreGeneration: Long = 0,
+    // The raw fields the activity label reads (domain/CharacterActivity.kt ACTIVITY_STATE_KEYS).
+    @kotlinx.serialization.Transient val activitySource: JsonObject = JsonObject(emptyMap()),
 )
 
 @Serializable

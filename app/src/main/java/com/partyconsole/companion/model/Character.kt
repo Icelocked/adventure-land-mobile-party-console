@@ -40,6 +40,8 @@ data class CharacterVitals(
     val farmingMode: String? = null,
     val conditions: List<Condition> = emptyList(),
     val inventorySize: Int? = null,
+    // The whole live record, for fields only the activity label reads (CharacterActivity.kt).
+    @kotlinx.serialization.Transient val raw: kotlinx.serialization.json.JsonObject? = null,
 ) {
     val targetId: String? get() = (target as? kotlinx.serialization.json.JsonPrimitive)?.content
 }

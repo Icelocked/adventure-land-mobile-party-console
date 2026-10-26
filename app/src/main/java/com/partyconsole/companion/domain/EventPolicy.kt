@@ -18,6 +18,7 @@ val EVENT_DISPLAY_NAMES = mapOf(
     "anniversary" to "Anniversary", "abtesting" to "A/B Testing", "goobrawl" to "Goobrawl",
     "crabxx" to "Crabxx", "franky" to "Franky", "icegolem" to "Ice Golem", "snowman" to "Snowman",
     "slenderman" to "Slenderman", "mrgreen" to "Mr. Green", "mrpumpkin" to "Mr. Pumpkin",
+    "horseman" to "Headless Horseman", "graveyard" to "Graveyard Rising", "trickortreat" to "Trick or Treat", "witchcipher" to "Witch's Cipher",
 )
 
 /** A death limit is a whole number >= 0; a time limit is a positive number of minutes. */
