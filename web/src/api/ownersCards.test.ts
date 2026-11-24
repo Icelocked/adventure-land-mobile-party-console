@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyPartyStateDynamic, type PartyStateDynamic } from '@/models'
-import { cardLine, handControl, handControlBody, handControlWord, standFull, standSlots } from './ownersCards'
+import { cardLine, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
 
 // OWNERS-PORT-MAP.md B16 with A24, as the owners release's card reads its fields.
 
@@ -45,5 +45,35 @@ describe('stand slots (B16)', () => {
     expect(standFull(state({ standSlots: { slots: 20, used: 20, free: 0 } }), () => false)).toBe(true)
     expect(standFull(state({ standSlots: { slots: 20, used: 3, free: 17 } }), () => true)).toBe(false)
     expect(standFull(state({}), () => true)).toBe(true)
+  })
+})
+
+describe('event rows (B9)', () => {
+  const rows = eventListRows({
+    Leada: { goobrawl: { ignored: 'manual travel' }, crabxx: { attending: true }, franky: { ended: true, ignored: 'death limit' } },
+    Folla: { goobrawl: { ignored: 'time limit' } },
+  })
+  it('gives each open occurrence its state, and Rejoin only to a manual leave', () => {
+    expect(rows).toEqual([
+      { member: 'Leada', event: 'goobrawl', state: 'left', reason: 'manual travel', rejoin: true },
+      { member: 'Leada', event: 'crabxx', state: 'attending', reason: null, rejoin: false },
+      { member: 'Folla', event: 'goobrawl', state: 'limit', reason: 'time limit', rejoin: false },
+    ])
+  })
+  it("shows the member's own skip first and never its source's manual leave", () => {
+    expect(eventSkip(rows, 'Leada', 'Leada', 'goobrawl')).toEqual({ reason: 'manual travel', rejoin: true })
+    expect(eventSkip(rows, 'Folla', 'Leada', 'goobrawl')).toEqual({ reason: 'time limit', rejoin: false })
+    expect(eventSkip(rows, 'Other', 'Leada', 'goobrawl')).toEqual({ reason: null, rejoin: false })
+    expect(eventRejoinBody('Leada', 'goobrawl')).toEqual({ character: 'Leada', event: 'goobrawl' })
+  })
+  it('reads the knock counts, and only the limits while the schedule is stale', () => {
+    const counts = { day: 'd', observedAt: 0, characterRemaining: 0, characterLimit: 7, accountRemainingUpperBound: 0, accountLimit: 14 }
+    expect(knocksLabel(counts, false)).toBe('Knocks left · Character: 0/7 · Account: 0/14')
+    expect(knocksLabel(counts, true)).toBe('Knocks left · Character: —/7 · Account: —/14')
+    expect(knocksLabel(undefined, false)).toBe('Knocks left · Character: —/— · Account: —/—')
+  })
+  it('counts down to the next 00:00 UTC on the server clock', () => {
+    expect(dailyResetLabel(Date.UTC(2026, 9, 30, 22, 30, 15))).toMatch(/\(1h 29m 45s\)$/)
+    expect(dailyResetLabel(Date.UTC(2026, 9, 30, 22, 30, 15), 3600_000)).toMatch(/\(0h 29m 45s\)$/)
   })
 })

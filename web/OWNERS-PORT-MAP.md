@@ -143,3 +143,9 @@ the item's `src` changes reverted.
   the three Manual switches, sending `POST /formation {character, handControl}` with the changed
   keys. The stand count and the full check read core `standSlots`. Not ported: the top bar's
   "N characters on Manual" count, which sits in the party header (set 1).
+- **B9 - done.** The event rows follow the release's `eventListRows`: a member's own skip shows,
+  and its source's unless the source left by a manual move. An occurrence the member left by a
+  manual move offers Rejoin, which posts `POST /event-rejoin {character, event}`
+  (`e2e/owners-events.spec.ts`). Trick or Treat shows the knocks left from the schedule's
+  `trickOrTreat.characters[name]`, the next daily reset and the daily note, which the fork had
+  not ported either.

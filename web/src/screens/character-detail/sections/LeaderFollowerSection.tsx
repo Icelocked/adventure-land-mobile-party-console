@@ -26,7 +26,18 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FrankyRoutineControl } from './FrankyRoutineControl'
 import { consoleFeatures, type PartyStateDynamic } from '@/models'
-import { handControl, handControlBody, handControlWord, type HandControl } from '@/api/ownersCards'
+import {
+  dailyResetLabel,
+  eventListRows,
+  eventRejoinBody,
+  eventSkip,
+  handControl,
+  handControlBody,
+  handControlWord,
+  knocksLabel,
+  trickOrTreatCounts,
+  type HandControl,
+} from '@/api/ownersCards'
 import { CipherControls } from '@/components/CipherControls'
 import { defaultCipherSettings, type CipherSettings, type CipherView } from '@/lib/cipher'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -162,6 +173,14 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
   // Server schedules are observations, not the supported catalog: seasonal
   // bosses stay selectable even when the current feed omits them.
   const schedules = new Map((state.eventSchedules ?? []).map((event) => [event.id, event]))
+  // The events owner's `event-list` rows: each member's open occurrence with its state and the rejoin flag.
+  const listed = eventListRows(state.eventAttendance)
+  const rejoin = async (event: string) => {
+    setError(null)
+    const result = await api.post('event-rejoin', eventRejoinBody(name, event))
+    if (result.kind === 'failure') setError(result.message)
+    else await refreshNow()
+  }
   const rows: EventSchedule[] = [...new Set([...order, ...schedules.keys()])]
     .map((id) => {
       const schedule = schedules.get(id)
@@ -201,9 +220,8 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
             const supported = supportedEvents.includes(event.id)
             const allowed = supported
             // A leader's manual travel skip stays on the leader; followers still attend (attendance-limits.ts).
-            const ignored = [state.eventAttendance?.[name]?.[event.id], state.eventAttendance?.[policy.source]?.[event.id]].find(
-              (entry, index) => entry?.ignored && !entry.ended && (index === 0 || entry.ignored !== 'manual travel'),
-            )?.ignored
+            const skip = eventSkip(listed, name, policy.source, event.id)
+            const ignored = skip.reason
             const index = order.indexOf(event.id)
             return (
               <div key={event.id}>
@@ -250,10 +268,31 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
                           : event.slotAt
                             ? `Next chance: ${eventTimeLabel(event.slotAt, now, event.clockOffsetMs)}`
                             : 'Time not announced'}
+                    {event.id === 'trickortreat' && (
+                      <>
+                        {now > 0 && <span className="block text-cyan-200">Next daily reset: {dailyResetLabel(now, event.clockOffsetMs)}</span>}
+                        <span
+                          className="block text-emerald-200"
+                          title="Character: usable knocks remaining. Account: upper bound from observed door histories; the game does not expose a separate account counter. Other characters or realms may have spent more."
+                        >
+                          {knocksLabel(trickOrTreatCounts(event, name), !!event.stale)}
+                        </span>
+                        <span className="block text-slate-300">Once daily at 00:00 UTC · Available during Halloween</span>
+                      </>
+                    )}
                     {!!event.next && event.realmOffsetHours !== undefined && <span className="block text-slate-300">{realmTimeLabel(event.next, event.realmOffsetHours)}</span>}
                     {event.confirmed && <span className="block text-cyan-200">Realm schedule confirmed</span>}
                     {event.stale ? ' · timing stale' : ''}
                     {ignored && <span className="block text-amber-200">Skipped this instance: {ignored}</span>}
+                    {skip.rejoin && (
+                      <button
+                        type="button"
+                        onClick={() => void rejoin(event.id)}
+                        className="mt-1 block rounded border border-amber-500 px-2 py-0.5 text-amber-100"
+                      >
+                        Rejoin
+                      </button>
+                    )}
                     {!!event.occurrences?.length && (
                       <details className="mt-1 text-slate-300">
                         <summary className="cursor-pointer">Next seven days</summary>

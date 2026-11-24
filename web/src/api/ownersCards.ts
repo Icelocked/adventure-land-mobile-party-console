@@ -82,3 +82,66 @@ export function standFull(state: PartyStateDynamic, ownCount: () => boolean): bo
   const slots = standSlots(state)
   return slots ? slots.free <= 0 : ownCount()
 }
+
+/** runtime/events/rules.ts EventListRow: each member's open occurrence with its state. */
+export interface EventListRow {
+  member: string
+  event: string
+  state: 'waiting' | 'attending' | 'left' | 'limit' | 'refused'
+  reason: string | null
+  rejoin: boolean
+}
+type AttendanceRecords = Record<string, Record<string, { ended?: boolean; ignored?: string; attending?: boolean } | undefined> | undefined>
+/** runtime/events/rules.ts eventListRows. Only an occurrence left by a manual move offers Rejoin. */
+export function eventListRows(attendance: AttendanceRecords | null | undefined): EventListRow[] {
+  return Object.entries(attendance ?? {}).flatMap(([member, records]) =>
+    Object.entries(records ?? {})
+      .filter(([, entry]) => entry && !entry.ended)
+      .map(([event, entry]) => {
+        const reason = entry!.ignored ?? null
+        const state: EventListRow['state'] =
+          reason === 'manual travel' ? 'left' : reason === 'death limit' || reason === 'time limit' ? 'limit' : reason ? 'refused' : entry!.attending ? 'attending' : 'waiting'
+        return { member, event, state, reason, rejoin: state === 'left' }
+      }),
+  )
+}
+/** event-selection-control.tsx: the member's own skip shows, and its source's (the leader whose
+ *  events it uses) unless the source left by a manual move. */
+export function eventSkip(rows: EventListRow[], member: string, source: string, event: string): { reason: string | null; rejoin: boolean } {
+  const own = rows.find((row) => row.member === member && row.event === event && row.reason)
+  const shown = own ?? rows.find((row) => row.member === source && row.event === event && row.reason && !row.rejoin)
+  return { reason: shown?.reason ?? null, rejoin: !!own?.rejoin }
+}
+/** The body event-selection-control.tsx `rejoin` posts to `/event-rejoin`. */
+export function eventRejoinBody(character: string, event: string): { character: string; event: string } {
+  return { character, event }
+}
+
+/** runtime/events/coordinator/occurrences.ts TrickOrTreatCounts, on the trickortreat schedule's
+ *  `trickOrTreat.characters[name]`. */
+export interface TrickOrTreatCounts {
+  day: string
+  observedAt: number
+  characterRemaining: number
+  characterLimit: number
+  accountRemainingUpperBound: number
+  accountLimit: number
+}
+export function trickOrTreatCounts(schedule: unknown, name: string): TrickOrTreatCounts | undefined {
+  const counts = loose(loose(loose(schedule).trickOrTreat).characters)[name]
+  return counts && typeof counts === 'object' ? (counts as TrickOrTreatCounts) : undefined
+}
+/** event-selection-control.tsx knock line. A stale schedule shows only the limits. */
+export function knocksLabel(counts: TrickOrTreatCounts | undefined, stale: boolean): string {
+  const fresh = counts && !stale ? counts : undefined
+  const account = fresh ? `${fresh.accountRemainingUpperBound > 0 ? 'up to ' : ''}${fresh.accountRemainingUpperBound}` : '—'
+  return `Knocks left · Character: ${fresh?.characterRemaining ?? '—'}/${counts?.characterLimit ?? '—'} · Account: ${account}/${counts?.accountLimit ?? '—'}`
+}
+/** event-selection-control.tsx dailyResetLabel: the next 00:00 UTC on the server's clock. */
+export function dailyResetLabel(now: number, clockOffsetMs = 0): string {
+  const serverNow = now + clockOffsetMs
+  const next = (Math.floor(serverNow / 86400000) + 1) * 86400000
+  const seconds = Math.floor((next - serverNow) / 1000)
+  const local = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(next)
+  return `${local} (${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m ${seconds % 60}s)`
+}

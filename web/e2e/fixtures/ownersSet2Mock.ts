@@ -17,6 +17,8 @@ export class OwnersSet2Mock extends MockPartyServer {
   handControlByCharacter: Record<string, MockHandControl> = {}
   /** Every formation body that carried `handControl`, in order. */
   handControlWrites: Record<string, unknown>[] = []
+  /** Every POST /event-rejoin body, in order. */
+  eventRejoins: Record<string, unknown>[] = []
   /** Core standSlots (items owner): unset leaves the field off core. */
   standSlots: { slots: number; used: number; free: number } | undefined
 
@@ -45,6 +47,18 @@ export class OwnersSet2Mock extends MockPartyServer {
       this.handControlWrites.push(body)
       const next = { ...HAND_CONTROL_DEFAULT, ...this.handControlByCharacter[name], ...(body.handControl as Partial<MockHandControl>) }
       this.handControlByCharacter = { ...this.handControlByCharacter, [name]: { on: next.on, usePotions: next.usePotions, combat: next.combat, party: next.party } }
+      return route.fulfill({ json: { ok: true } })
+    })
+    // events/coordinator/routes.ts rejoin: only an occurrence left by a manual move comes back.
+    await page.route('**/party-api/event-rejoin', async (route) => {
+      const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>
+      const name = String(body.character ?? '')
+      const event = String(body.event ?? '')
+      this.eventRejoins.push(body)
+      if (!this.characters.some((c) => c.name === name)) return route.fulfill({ status: 400, json: { error: 'event rejoin requires a party character' } })
+      const entry = this.eventAttendance[name]?.[event]
+      if (!entry || entry.ended || entry.ignored !== 'manual travel') return route.fulfill({ status: 409, json: { error: 'only an event left by a manual move can be rejoined' } })
+      delete entry.ignored
       return route.fulfill({ json: { ok: true } })
     })
   }
