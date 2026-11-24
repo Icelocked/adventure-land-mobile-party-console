@@ -632,6 +632,10 @@ export interface PartyStateDynamic {
   // The leader's farming mode; other characters may have their own in
   // farmingProfiles (see resolveFarmingContext).
   farmingPolicy: string
+  // The leader scope's two slot fields, which the config keeps at the top level (console
+  // hunting/rules.ts slotPair).
+  combatMode?: string
+  targetMode?: string
   monsterFocusByCharacter: Record<string, string[]>
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
@@ -855,6 +859,11 @@ export interface FarmAreaState {
 export interface FarmingProfile {
   farmAreaState?: FarmAreaState
   farmingPolicy?: string
+  // The character's own slot fields (console hunting/saved-fields.ts).
+  combatMode?: string
+  targetMode?: string
+  // Each add-on's scope store, by add-on name (console runtime/hooks/dashboard/slots.tsx addonSections).
+  addonFarming?: Record<string, Record<string, unknown>>
   monsterHunt?: MonsterHuntCycle | null
   huntSettings?: HuntSettings
   huntBlacklist?: Record<string, HuntBlacklistEntry>
@@ -905,6 +914,22 @@ export function consoleHasAchievementHunt(state: Pick<PartyStateDynamic, 'achiev
   return typeof state.achievementHunt === 'object' && state.achievementHunt !== null
 }
 
+// The slot fields' defaults (console hunting/rules.ts DEFAULT_COMBAT_MODE, DEFAULT_TARGET_MODE).
+export const DEFAULT_COMBAT_MODE = 'auto'
+export const DEFAULT_TARGET_MODE = 'farming'
+export interface SlotFields { combatMode?: string; targetMode?: string }
+/** A character's or a scope's resolved slot pair: its own profile's field, else the party
+ *  field the leader's scope keeps at the top level, else the default (console hunting/rules.ts
+ *  slotPair). */
+export function slotPair(own: SlotFields | undefined, party: SlotFields | undefined): Required<SlotFields> {
+  return {
+    combatMode: own?.combatMode || party?.combatMode || DEFAULT_COMBAT_MODE,
+    targetMode: own?.targetMode || party?.targetMode || DEFAULT_TARGET_MODE,
+  }
+}
+/** The pair in the hunting owner's words (console hunting/rules.ts modePair). */
+export const modePair = (target: string, combat: string): string => `${target} (${combat})`
+
 /** A character's effective farming setup. The leader and its followers
  *  use the top-level fields; everyone else uses their farmingProfiles
  *  entry. `savedMode` is what this character selected; `effectiveMode` is
@@ -921,9 +946,18 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
   // Achievement settings stay undefined without the console capability, so
   // every Achievement Hunt control and status gates on it.
   const achievementHunt = consoleHasAchievementHunt(state)
+  // The character's own pair for the pressed buttons and the badge, the scope's for its status
+  // (console farming-context.ts).
+  const own = slotPair(personal, name === state.leader ? state : undefined)
+  const scope = slotPair(effective, legacy ? state : undefined)
   return {
     owner,
     followingLeader,
+    combatMode: own.combatMode,
+    targetMode: own.targetMode,
+    effectiveCombat: scope.combatMode,
+    effectiveTarget: scope.targetMode,
+    addonFarming: effective?.addonFarming ?? {},
     farmArea: live?.farmAreaState || (legacy ? state.farmAreaState : undefined) || null,
     savedMode: personal?.farmingPolicy || (name === state.leader ? state.farmingPolicy : undefined) || 'auto',
     effectiveMode: effective?.farmingPolicy || (legacy ? state.farmingPolicy : undefined) || 'auto',

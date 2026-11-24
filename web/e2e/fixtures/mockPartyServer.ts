@@ -184,6 +184,23 @@ const DEFAULT_MERCHANT_AUTOMATIONS: Record<string, boolean> = {
   'craft fishing tools': false, 'craft mining tools': false,
 }
 
+// The core's slot entries (runtime/hooks/core.ts core:target-modes and core:combat-modes).
+export const CORE_TARGET_MODES = [
+  { mode: 'farming', addon: 'core:target-modes', button: { label: 'Farming', description: 'Farm the monster or spot you picked', color: 'sky' } },
+  { mode: 'hunt', addon: 'core:target-modes', button: { label: 'Hunt', description: 'One quest at a time: leader first, then the next member if its monster is blacklisted', color: 'amber' } },
+]
+export const CORE_COMBAT_MODES = [
+  { mode: 'auto', addon: 'core:combat-modes', button: { label: 'Auto', description: 'Default, switching to scatter when learned conditions allow it', color: 'cyan' } },
+  { mode: 'default', addon: 'core:combat-modes', button: { label: 'Default', description: 'Force the normal party formation', color: 'emerald' } },
+  { mode: 'scatter', addon: 'core:combat-modes', button: { label: 'Scatter', description: 'Force one-shot scatter farming', color: 'violet' } },
+]
+// The Achievement Hunt add-on's target mode entry (runtime/addons/achievement-hunt/index.ts).
+export const ACHIEVEMENT_HUNT_ENTRY = {
+  mode: 'achievement-hunt', addon: 'achievement-hunt',
+  button: { label: 'Achievements', description: 'Farm the selected monsters for their kill achievements, weakest first, one milestone step at a time', color: 'rose' },
+  status: { title: 'Achievement Hunt status', field: 'achievementMessage', idle: 'Choosing the next monster' },
+}
+
 function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
   return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]))
 }
@@ -249,6 +266,13 @@ export class MockPartyServer {
   huntSettings: Record<string, unknown> | null = null
   // The party's root relocation switch (hunting/saved-fields.ts, default on).
   relocateIfCompeting = true
+  // GET /party-api/addons (hooks/http.ts `list`): the installed add-ons and each slot's enabled
+  // entries. `addonsFail` answers the read with a 503.
+  addons: Record<string, unknown>[] = []
+  addonSlots: Record<string, Record<string, unknown>[]> = { 'combat-mode': CORE_COMBAT_MODES, 'target-mode': CORE_TARGET_MODES, 'combat-routine': [], formation: [], 'merchant-routine': [] }
+  addonsFail = false
+  // Every POST /party-api/farming-mode body.
+  farmingModeWrites: Record<string, unknown>[] = []
   // The settings route's basis and every write it took.
   settingsAt = 1
   settingsWrites: { changes: { field: string; value: unknown; character?: string }[]; basis: unknown }[] = []
@@ -720,6 +744,32 @@ export class MockPartyServer {
     this.farmingProfiles = { ...this.farmingProfiles, [name]: { ...(this.farmingProfiles[name] ?? {}), ...patch } }
   }
 
+  /** hunting/coordinator/routes.ts `requestedSlots` and the saved route: each slot field must
+   *  name an entry of its slot, the old `mode` still takes a Hunt backup, and Hunt with no backup
+   *  focus and location answers 409 `backup_required` with the focus. */
+  private farmingMode(body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
+    this.farmingModeWrites.push(body)
+    const character = String(body.character ?? this.leader ?? '')
+    const entry = (slot: string, value: unknown) => value === undefined ? undefined : this.addonSlots[slot]?.some((e) => e.mode === value) ? String(value) : null
+    let combatMode: string | undefined | null, targetMode: string | undefined | null
+    if (body.combatMode === undefined && body.targetMode === undefined) {
+      const mode = String(body.mode ?? '')
+      if (entry('combat-mode', mode)) [combatMode, targetMode] = [mode, 'farming']
+      else [combatMode, targetMode] = [undefined, entry('target-mode', mode) ?? null]
+    } else [combatMode, targetMode] = [entry('combat-mode', body.combatMode), entry('target-mode', body.targetMode)]
+    if (combatMode === null || targetMode === null) return { status: 400, json: { error: 'invalid farming mode' } }
+    const backup = body.backup as { monsterFocus?: string[]; location?: unknown } | undefined
+    const profile = this.farmingProfiles[character] ?? {}
+    const focus = backup?.monsterFocus ?? (profile.monsterFocus as string[] | undefined) ?? this.monsterFocusByCharacter[character] ?? (character === this.leader ? this.monsterFocus : [])
+    const location = backup?.location ?? profile.location ?? (this.extraState.characterLocations as Record<string, unknown> | undefined)?.[character] ?? (character === this.leader ? this.extraState.partyLocation : undefined)
+    const realFocus = (focus ?? []).filter((id) => id !== 'all')
+    if (targetMode === 'hunt' && (!realFocus.length || !location))
+      return { status: backup ? 400 : 409, json: { code: 'backup_required', error: 'Choose valid backup farming monsters and a location before saving Hunt', focus: realFocus } }
+    this.updateProfile(character, { ...(combatMode ? { combatMode } : {}), ...(targetMode ? { targetMode } : {}), ...(backup ? { monsterFocus: realFocus, location } : {}) })
+    const saved = this.farmingProfiles[character]
+    return { status: 200, json: { ok: true, combatMode: saved.combatMode, targetMode: saved.targetMode, savedOnly: true } }
+  }
+
   /** Applies one POST body to /party-api/<path>, mutating mock state where
    *  the console would. Commands the tests don't exercise succeed as no-ops. */
   private applyCommand(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
@@ -790,6 +840,7 @@ export class MockPartyServer {
         json: { ok: true, encounter, mode: routines[encounter], deathLimit: limits[encounter], ...(owner ? { farmingOwner: owner, savedFarmingPolicy: policy(owner), effectiveFarmingPolicy: policy(owner) } : {}) },
       }
     }
+    if (path === 'farming-mode') return this.farmingMode(body)
     if (path === 'settings') {
       // settings/coordinator/writer.ts: a write whose basis is older than the last write is refused.
       const changes = (body.changes ?? []) as { field: string; value: unknown; character?: string }[]
@@ -1599,6 +1650,11 @@ export class MockPartyServer {
       this.revisionReads.push({ section, revision, unchanged: revision === tag })
       if (revision === tag) return route.fulfill({ status: 304, headers: { ETag: `"${tag}"` }, body: '' })
       return route.fulfill({ json: answer, headers: { ETag: `"${tag}"` } })
+    })
+    await page.route('**/party-api/addons', (route) => {
+      if (route.request().method() !== 'GET') return route.fallback()
+      if (this.addonsFail) return route.fulfill({ status: 503, json: { error: 'Add-on registry is starting' } })
+      return route.fulfill({ json: { addons: this.addons, slots: this.addonSlots, rings: [], overlays: {}, refusals: [], reads: { 'passive.rule': {} }, stores: {} } })
     })
     // settings/coordinator/routes/settings.ts: the page's basis and the declared settings.
     await page.route('**/party-api/settings', (route) => {

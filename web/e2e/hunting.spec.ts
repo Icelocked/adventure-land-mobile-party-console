@@ -25,11 +25,12 @@ test('Farming card: Copy leader badge for followers, live mode for the leader, b
     backup: { members: { Warrior1: { target: 'goo', remainingMs: 90_000, ready: false, fresh: true }, Ranger1: { target: null, remainingMs: 0, ready: true, fresh: true } } },
     turnIn: { owner: 'Warrior1', phase: 'claiming' },
   } as never
-  server.extraState = { farmingPolicy: 'hunt' }
+  // The release's saved pair (hunting/rules.ts slotPair): Hunt, with the default Auto combat mode.
+  server.extraState = { targetMode: 'hunt' }
   await server.install(page)
 
   await page.goto('/characters/Warrior1')
-  await expect(page.getByText('hunt · scatter', { exact: true })).toBeVisible()
+  await expect(page.getByText('Hunt (Auto) · scatter', { exact: true })).toBeVisible()
   const hunt = page.getByRole('region', { name: 'Hunt status' })
   await expect(hunt.getByText('Hunt status · waiting')).toBeVisible()
   await expect(hunt.getByText(/^Next batch after every blacklisted quest expires · 1m 30s/)).toBeVisible()

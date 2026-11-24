@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { MockPartyServer } from './fixtures/mockPartyServer'
+import { ACHIEVEMENT_HUNT_ENTRY, CORE_TARGET_MODES, MockPartyServer } from './fixtures/mockPartyServer'
 
 function bodies(page: Page, path: string) {
   const sent: Record<string, unknown>[] = []
@@ -75,16 +75,22 @@ test('Achievement Hunt lives in Farming settings: weakest-first selector, Up to 
   await expect.poll(() => sent.at(-1)).toEqual({ settings: { fillIdle: false }, character: 'Leada' })
 })
 
-test('Achievements is a farming mode on every character, with its status under the chips', async ({ page }) => {
+// On the owners release Achievement Hunt is an add-on: its target mode entry comes from
+// GET /addons, and its status line from the scope's add-on store.
+test('Achievements is a target mode button from the add-on list, with its status line under the rows', async ({ page }) => {
   const server = setup(true)
+  server.addonSlots = { ...server.addonSlots, 'target-mode': [...CORE_TARGET_MODES, ACHIEVEMENT_HUNT_ENTRY] }
+  server.farmingProfiles = { ...server.farmingProfiles, Leada: { targetMode: 'achievement-hunt', addonFarming: { 'achievement-hunt': { achievementMessage: 'Farming goo: 4 / 10 kills (step 1)' } } } }
   await server.install(page)
   const modes = bodies(page, 'farming-mode')
   await page.goto('/characters/Leada')
   const farming = page.getByRole('region', { name: 'Farming' })
   await expect(farming.getByRole('region', { name: 'Achievement Hunt status' })).toContainText('Farming goo: 4 / 10 kills (step 1)')
   await page.goto('/characters/Solo')
-  await farming.getByRole('button', { name: 'Achievements' }).click()
-  await expect.poll(() => modes.at(-1)).toEqual({ mode: 'achievements', character: 'Solo' })
+  await expect(farming.getByRole('region', { name: 'Achievement Hunt status' })).toHaveCount(0)
+  await farming.getByRole('group', { name: 'Target mode' }).getByRole('button', { name: 'Achievements' }).click()
+  await expect.poll(() => modes.at(-1)).toEqual({ targetMode: 'achievement-hunt', character: 'Solo' })
+  await expect(farming.getByRole('region', { name: 'Achievement Hunt status' })).toContainText('Choosing the next monster')
 })
 
 test("An independent character edits its own Achievement Hunt; a follower sees the leader's read-only", async ({ page }) => {

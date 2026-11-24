@@ -706,17 +706,26 @@ export class PartyApiClient {
     return this.post('config', body)
   }
 
-  /** POST /party-api/farming-mode. Always send `character`: the route
-   *  wrapper uses it to scope the edit, and without it the server
-   *  silently edits the account leader. A follower's change is saved as a
-   *  preference rather than applied live. Hunt needs a `backup` (monster
-   *  focus + spawn location) when none is set yet, or the server 409s. */
-  async setFarmingMode(
-    mode: 'auto' | 'default' | 'scatter' | 'hunt' | 'achievements',
+  /** POST /party-api/farming-mode with one slot field: `{character, combatMode}` or
+   *  `{character, targetMode}` (console farming-mode-control.tsx SlotChoice). A Hunt with no
+   *  backup farm answers 409 `code: 'backup_required'` with the `focus` the setup opens on
+   *  (hunting/coordinator/routes.ts). */
+  async setFarmingSlot(character: string, choice: { combatMode: string } | { targetMode: string }): Promise<ApiResult<CommandResult>> {
+    return this.post('farming-mode', { ...choice, character })
+  }
+
+  /** The Hunt setup's save: `{mode: 'hunt', character, backup}` with the backup focus and its
+   *  location (console party-workspace.tsx). */
+  async startHuntWithBackup(
     character: string,
-    backup?: { monsterFocus: string[]; location: { map: string; x: number; y: number } },
+    backup: { monsterFocus: string[]; location: { map: string; x: number; y: number } },
   ): Promise<ApiResult<CommandResult>> {
-    return this.post('farming-mode', backup ? { mode, character, backup } : { mode, character })
+    return this.post('farming-mode', { mode: 'hunt', character, backup })
+  }
+
+  /** GET /party-api/addons: the installed add-ons and each slot's enabled entries. */
+  async getAddons(): Promise<ApiResult<import('@/models').AddonsReply>> {
+    return this.getJsonReportingError('addons')
   }
 
   /** POST /party-api/focus - which monsters a character farms/hunts.

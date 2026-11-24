@@ -218,7 +218,7 @@ test('Selecting Hunt with an existing backup already configured activates it dir
   await expect(page.getByText('Getting ready to hunt')).not.toBeVisible()
   // Without `character` the server edits the leader's profile instead of
   // this character's (http/farming-scope.ts).
-  await expect.poll(() => submittedBody).toEqual({ mode: 'hunt', character: 'Ranger1' })
+  await expect.poll(() => submittedBody).toEqual({ targetMode: 'hunt', character: 'Ranger1' })
 })
 
 test('Hunt backup picker, when the server actually requires one, starts from the character\'s existing monster focus - not blank', async ({ page }) => {
@@ -237,7 +237,8 @@ test('Hunt backup picker, when the server actually requires one, starts from the
   await page.route('**/party-api/farming-mode', async (route) => {
     callCount += 1
     submittedBody = route.request().postDataJSON() as Record<string, unknown>
-    if (callCount === 1) return route.fulfill({ status: 409, json: { error: 'Choose a backup farming location before starting Hunt' } })
+    // hunting/coordinator/routes.ts: the refusal carries the focus the Hunt setup opens on.
+    if (callCount === 1) return route.fulfill({ status: 409, json: { code: 'backup_required', error: 'Choose valid backup farming monsters and a location before saving Hunt', focus: ['phoenix'] } })
     return route.fulfill({ json: { ok: true, farmingPolicy: 'hunt', monsterHunt: null } })
   })
 
@@ -303,7 +304,7 @@ test('Selecting a farming mode sends THIS character, not silently defaulting to 
 
   await page.goto('/characters/Independent1')
   await page.getByRole('button', { name: 'Default', exact: true }).click()
-  await expect.poll(() => submittedBody).toEqual({ mode: 'default', character: 'Independent1' })
+  await expect.poll(() => submittedBody).toEqual({ combatMode: 'default', character: 'Independent1' })
 })
 
 test('An independent character (not the leader, not following) routes via character-travel, not party-monster-travel', async ({ page }) => {
@@ -430,7 +431,7 @@ test('Character detail: a merchant never shows combat/hunt status at all', async
   await expect(page.getByText(/^Fighting /)).not.toBeVisible()
 })
 
-test('Selecting Hunt with no backup location opens the setup picker without posting (use-party-console.tsx setFarmingPolicy)', async ({ page }) => {
+test('Selecting Hunt with no backup location opens the setup picker on the route backup_required answer (use-party-console.tsx setFarmingSlot)', async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
   server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
@@ -439,16 +440,12 @@ test('Selecting Hunt with no backup location opens the setup picker without post
   server.monsterChoices = [{ id: 'phoenix', locations: [{ map: 'main', x: 100, y: 200 }] }, { id: 'tinyp', locations: [{ map: 'main', x: 5, y: 5 }] }]
   server.monsterFocusByCharacter = { Ranger1: ['phoenix'] }
   await server.install(page)
-  let posts = 0
-  await page.route('**/party-api/farming-mode', (route) => {
-    posts++
-    return route.fulfill({ json: { ok: true } })
-  })
 
   await page.goto('/characters/Ranger1')
   await page.getByRole('button', { name: 'Hunt', exact: true }).click()
   await expect(page.getByText('Getting ready to hunt')).toBeVisible()
-  expect(posts).toBe(0)
+  expect(server.farmingModeWrites).toEqual([{ targetMode: 'hunt', character: 'Ranger1' }])
+  await expect(page.locator('label', { hasText: 'Phoenix' }).getByRole('checkbox').first()).toBeChecked()
   // monster-focus-picker.tsx: Fairy is disabled with its explanation; Clear all empties the selection.
   await page.getByRole('button', { name: /· tinyp/ }).click({ force: true })
   await expect(page.getByText('Fairy has no verified regular spawn route. Enable “Passively hunt fairy” to attack on sight.')).toBeVisible()

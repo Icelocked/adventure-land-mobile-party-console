@@ -6,13 +6,14 @@ import { durationLabel } from '@/lib/duration'
 import { canRouteToMonster, FOLLOWER_ROUTE_MESSAGE } from '@/lib/partyRouting'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
-import { Chip } from '@/components/Chip'
+import { FarmingModeControl, type SlotChoice } from '@/components/FarmingModeControl'
+import { useAddons } from '@/data/useAddons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
 import type { Catalog } from '@/lib/farmingZones'
-import { resolveFarmingContext } from '@/models'
+import { addonStatusLines, entryLabel, modePair, resolveFarmingContext } from '@/models'
 import type { BestiaryMonster, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 
 /** Trigger-button label showing the current selection (names, or a count
@@ -23,29 +24,15 @@ function focusSummary(monsterFocus: string[], bestiaryCatalog: BestiaryMonster[]
   return monsterFocus.map((id) => bestiaryCatalog.find((m) => m.id === id)?.name ?? id).join(', ')
 }
 
-type FarmingMode = 'auto' | 'default' | 'scatter' | 'hunt' | 'achievements'
-const MODES: { id: FarmingMode; label: string; description: string }[] = [
-  { id: 'auto', label: 'Auto', description: 'Default, switching to scatter when learned conditions allow it' },
-  { id: 'default', label: 'Default', description: 'Force the normal party formation' },
-  { id: 'scatter', label: 'Scatter', description: 'Force one-shot scatter farming' },
-  { id: 'hunt', label: 'Hunt', description: 'One quest at a time: leader first, then the next member if its monster is blacklisted' },
-]
-// Achievement Hunt needs a console that has it (upstream PR #131; Ryan's
-// v1.4.0 has none). resolveFarmingContext returns achievementSettings only then.
-const ACHIEVEMENTS = { id: 'achievements' as const, label: 'Achievements', description: 'Farm the selected monsters for their kill achievements, weakest first' }
-
-/** The mode selector with effective-mode/follow indicator, hunt status, and
+/** The two farming mode rows with the follow indicator, hunt status, and
  *  this character's monster focus. Hunt settings and the blacklist are
  *  their own screen.
  *
- *  `farmingPolicy`/`monsterHunt`/`huntBlacklist` arrive already resolved
- *  (models/state.ts resolveFarmingContext): /farming-mode is account-wide
- *  and takes no `character`, but an independent character (not leader, not
- *  following) can have a different effective setup. */
+ *  `monsterHunt`/`huntBlacklist` arrive already resolved
+ *  (models/state.ts resolveFarmingContext), since an independent character
+ *  (not leader, not following) can have a different effective setup. */
 export function FarmingSection({
   characterName,
-  farmingPolicy,
-  effectiveMode,
   followingLeader,
   isLeader,
   farmArea,
@@ -68,8 +55,6 @@ export function FarmingSection({
   showModes?: boolean
   showFocus?: boolean
   characterName: string
-  farmingPolicy: string
-  effectiveMode: string
   followingLeader?: string
   /** dynamicState.leader === characterName. Distinct from `!followingLeader`,
    *  which is also true for an independent character: party-monster-travel
@@ -130,30 +115,22 @@ export function FarmingSection({
     setPickingArea(false)
   }, [characterName])
 
-  // Hunt needs a backup focus and location; without both, the setup picker
-  // opens before anything is posted.
-  const achievement = resolveFarmingContext(state, characterName)
-  const modes = achievement.achievementSettings ? [...MODES, ACHIEVEMENTS] : MODES
-  const selectMode = async (mode: FarmingMode) => {
+  const farming = resolveFarmingContext(state, characterName)
+  const addons = useAddons()
+  const combatEntries = addons.slots['combat-mode']
+  const targetEntries = addons.slots['target-mode']
+  // A mode button sends its slot's field only. A Hunt with no backup farm or focus opens the Hunt
+  // setup on the route's `backup_required` answer, with the focus it carries (console
+  // use-party-console.tsx setFarmingSlot).
+  const selectSlot = async (choice: SlotChoice) => {
     setError(null)
-    const profile = (state.farmingProfiles as Record<string, { monsterFocus?: string[]; farmingPolicy?: string; location?: unknown; monsterHunt?: { returnLocation?: unknown } }> | undefined)?.[characterName]
-    const selected = profile?.monsterFocus || state.monsterFocusByCharacter?.[characterName] || (characterName === state.leader ? state.monsterFocus : [])
-    const focus = (Array.isArray(selected) ? selected : []).filter((id) => id !== 'all')
-    const backup =
-      profile?.farmingPolicy === 'hunt'
-        ? profile.monsterHunt?.returnLocation || profile.location
-        : state.characterLocations?.[characterName] || profile?.location || (characterName === state.leader ? state.partyLocation : null)
-    if (mode === 'hunt' && (!backup || !focus.length)) {
-      setBackupFocus(focus)
-      setPickingBackup(true)
-      return
-    }
-    const result = await api.setFarmingMode(mode, characterName)
+    const result = await api.setFarmingSlot(characterName, choice)
     if (result.kind === 'success') {
       await refreshNow()
       return
     }
-    if (mode === 'hunt' && /backup farming/i.test(result.message)) {
+    if (result.code === 'backup_required') {
+      const focus = Array.isArray(result.body?.focus) ? result.body.focus.filter((id): id is string => typeof id === 'string') : []
       setBackupFocus(focus)
       setPickingBackup(true)
       return
@@ -166,22 +143,19 @@ export function FarmingSection({
       <LiveCombatStatus target={target} resolvedTargetType={resolvedTargetType} bestiaryCatalog={bestiaryCatalog} />
       {showModes && (
       <>
-      {/* Badge: "Copy leader" or the saved policy, with the live mode. */}
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase text-muted-foreground">Farming settings</span>
-        <span className="rounded border border-cyan-700 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan-400">
-          {inherited ? 'Copy leader' : farmingPolicy}
-          {!inherited && (farmingPolicy === 'auto' || farmingPolicy === 'hunt' || farmingPolicy === 'achievements') ? ` · ${liveMode}` : ''}
-        </span>
-      </div>
-      {inherited && <p className="mb-1.5 text-xs text-cyan-500">Used when Follow is off.</p>}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {modes.map((mode) => (
-          <Chip key={mode.id} selected={farmingPolicy === mode.id} disabled={!configLoaded || pickingBackup || pickingArea} onClick={() => void selectMode(mode.id)}>
-            {mode.label}
-          </Chip>
-        ))}
-      </div>
+      <FarmingModeControl
+        combatEntries={combatEntries}
+        targetEntries={targetEntries}
+        slotsError={addons.error}
+        combatMode={farming.combatMode}
+        targetMode={farming.targetMode}
+        effectiveTarget={farming.effectiveTarget}
+        effectiveMode={liveMode}
+        followingLeader={followingLeader}
+        addonStatus={addonStatusLines(targetEntries, farming.addonFarming)}
+        disabled={!configLoaded || pickingBackup || pickingArea}
+        onSelect={(choice) => void selectSlot(choice)}
+      />
       <ConfigLoadingNote />
       {!inherited && farmArea?.active && (
         <p className="mt-1.5 text-xs text-muted-foreground">
@@ -190,13 +164,13 @@ export function FarmingSection({
         </p>
       )}
       {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
-      {effectiveMode === 'achievements' && achievement.achievementSettings && (
-        <section aria-label="Achievement Hunt status" className="mt-2 border-t border-rose-900/70 pt-2 font-mono text-[10px] text-rose-400">
-          <p className="font-semibold">Achievement Hunt status</p>
-          <p>{achievement.achievementMessage || 'Choosing the next monster'}</p>
-        </section>
-      )}
-      <HuntStatusBlock effectivePolicy={effectiveMode} hunt={monsterHunt} characterHunt={characterHunt} blacklist={huntBlacklist} />
+      <HuntStatusBlock
+        hunting={farming.effectiveTarget === 'hunt'}
+        currentMode={modePair(entryLabel(targetEntries, farming.effectiveTarget), entryLabel(combatEntries, farming.effectiveCombat))}
+        hunt={monsterHunt}
+        characterHunt={characterHunt}
+        blacklist={huntBlacklist}
+      />
       </>
       )}
 
@@ -214,7 +188,7 @@ export function FarmingSection({
           onStart={async (area) => {
             setBusy(true)
             try {
-              const result = await api.setFarmingMode('hunt', characterName, { monsterFocus: backupFocus, location: { map: area.map, x: area.x, y: area.y } })
+              const result = await api.startHuntWithBackup(characterName, { monsterFocus: backupFocus, location: { map: area.map, x: area.x, y: area.y } })
               if (result.kind === 'failure') setError(result.message)
               else {
                 setPickingBackup(false)
@@ -494,25 +468,29 @@ function MonsterFocusForm({
  *  batch countdown per member (or the quest owner), the Daisy turn-in wait,
  *  the target, and this character's own quest with its blacklist flag. */
 function HuntStatusBlock({
-  effectivePolicy,
+  hunting,
+  currentMode,
   hunt,
   characterHunt,
   blacklist,
 }: {
-  effectivePolicy: string
+  // The scope's target mode is Hunt.
+  hunting: boolean
+  // The scope's pair in the hunting owner's words, such as "Farming (Auto)".
+  currentMode: string
   hunt?: MonsterHuntCycle | null
   characterHunt?: MonsterHuntStatus | null
   blacklist: Record<string, HuntBlacklistEntry>
 }) {
-  if (!(effectivePolicy === 'hunt' || hunt || characterHunt)) return null
+  if (!(hunting || hunt || characterHunt)) return null
   return (
     <section aria-label="Hunt status" className="mt-2 border-t border-amber-900/70 pt-2 font-mono text-[10px] text-amber-500">
       <p className="font-semibold">
-        {effectivePolicy === 'hunt' ? 'Hunt status' : 'Last Hunt status'}
+        {hunting ? 'Hunt status' : 'Last Hunt status'}
         {hunt?.stage ? ` · ${hunt.stage}` : ''}
       </p>
-      <p>{hunt?.message || (effectivePolicy === 'hunt' ? 'Preparing Monster Hunt cycle' : 'Hunt mode is not active')}</p>
-      {effectivePolicy !== 'hunt' ? <p>Current farming mode: {effectivePolicy}. Selecting Hunt rechecks eligible quests; blacklisted quests remain skipped.</p> : null}
+      <p>{hunt?.message || (hunting ? 'Preparing Monster Hunt cycle' : 'Hunt mode is not active')}</p>
+      {!hunting ? <p>Current farming mode: {currentMode}. Selecting Hunt rechecks eligible quests; blacklisted quests remain skipped.</p> : null}
       {hunt?.backup ? (
         <div className="mt-1">
           <p>Next batch after every blacklisted quest expires · {durationLabel(Math.max(0, ...Object.values(hunt.backup.members).map((member) => member.remainingMs)))}</p>

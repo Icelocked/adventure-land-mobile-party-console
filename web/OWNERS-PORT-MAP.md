@@ -126,4 +126,11 @@ Two sets with no file in common:
   `characterDetails.online`, core `farmingLive`, root `relocateIfCompeting`, the settings route,
   ETag revisions for bank, logs and market, heartbeats with `at` and `heartbeatMs`, no `sampledAt`.
   It keeps `fork`'s routes for the fork console's controls.
-- Half B: not started. B1 is first: it lets the console drop interface v1 (A5).
+- Half B set 1 (branch `pwa-owners`):
+  - B1 done. `FarmingModeControl` draws the combat mode and target mode rows from
+    `GET /addons` slots and posts `{character, combatMode}` or `{character, targetMode}`; a
+    `backup_required` refusal opens the Hunt setup with its `focus`. The add-on status line
+    replaces the fork's Achievement Hunt status block. FarmingSection and CharacterDetailScreen
+    (set 2's folder) changed only where the chip row was. Tests: `models/farmingSlots.test.ts`,
+    e2e `farming-mode.spec.ts`; `combat-status`, `achievement-hunt` and `hunting` specs now send
+    and read the slot fields.

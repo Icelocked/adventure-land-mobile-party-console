@@ -125,8 +125,6 @@ export function CharacterDetailScreen() {
                 showModes={vitals.ctype !== 'merchant'}
                 showFocus={name !== dynamicState.merchantCharacter}
                 characterName={name}
-                farmingPolicy={farming.savedMode}
-                effectiveMode={farming.effectiveMode}
                 followingLeader={farming.followingLeader}
                 isLeader={dynamicState.leader === name}
                 farmArea={farming.farmArea}
