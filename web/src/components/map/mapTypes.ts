@@ -40,6 +40,38 @@ export type MapEntity = {
   stand?: string | boolean | null
   standSprite?: Sprite | null
   weapons?: { hand: string; name: string; sprite: Sprite | null }[]
+  // Native sprite layers captured from the game client; they replace the doll, weapons and stand.
+  layers?: MapSpriteLayer[]
+}
+
+// Console: runtime/map-sprites.ts. One atlas cell drawn under a 2D transform.
+export type MapSpriteLayer = {
+  url: string
+  sx: number
+  sy: number
+  sw: number
+  sh: number
+  dx: number
+  dy: number
+  transform: [number, number, number, number, number, number]
+  alpha: number
+  tint: number
+}
+export type MapVisual = { id: string; x: number; y: number; layers: MapSpriteLayer[] }
+export type MapProjectile = {
+  ray?: boolean
+  id: string
+  url: string
+  frames: number
+  frameMillis: number
+  scale: number
+  directional: boolean
+  startedAt: number
+  expiresAt: number
+  x: number
+  y: number
+  targetX: number
+  targetY: number
 }
 
 export type MapEvent = {
@@ -62,6 +94,10 @@ export type MapFrame = {
   queue?: { id: string; map: string; in?: string | number; state?: string; role?: string; server?: string; radius?: number; visible?: boolean }[]
   entities: MapEntity[]
   events?: MapEvent[]
+  // Server clock for projectile timing; `at` stands in when it is absent.
+  projectilesAt?: number
+  projectiles?: MapProjectile[]
+  visuals?: MapVisual[]
 }
 
 export type DollLayer = {
