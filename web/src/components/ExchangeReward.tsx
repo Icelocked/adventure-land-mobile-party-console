@@ -281,7 +281,7 @@ function AutomaticItemActions({
           meta={meta}
           name={String(meta?.definition.name || item.name)}
           onCancel={() => setExpanded(null)}
-          onConfirm={async () => settle(await api.autoNpcSale(undefined, item))}
+          onConfirm={async (keep) => settle(await api.autoNpcSale(undefined, item, false, keep))}
         />
       )}
     </div>

@@ -229,7 +229,7 @@ export class MockPartyServer {
   deconstructionCatalog: Record<string, { compound: boolean; cost?: number; rewards?: unknown[] }> = {}
 
   // Auto-mark state, mutated by POSTed commands (PartyStateDynamic shape).
-  autoNpcSales: Record<string, { item: MockItem; character?: string }> = {}
+  autoNpcSales: Record<string, { item: MockItem; character?: string; keep?: number }> = {}
   // Pending one-time inventory marks (not standing rules), keyed by
   // character (state.upgrades/compounds/statScrolls).
   upgrades: Record<string, { slot?: number | string; item: MockItem; tiers?: number; equipped?: boolean }[]> = {}
@@ -653,8 +653,12 @@ export class MockPartyServer {
       if (typeof item?.name !== 'string') return { status: 400, json: { error: 'invalid automatic NPC sale item' } }
       const ruleKey = JSON.stringify({ name: item.name, level: Math.max(0, Number(item.level) || 0), p: (item as { p?: string }).p || null, stat_type: item.stat_type || null })
       const key = character ? JSON.stringify([character, ruleKey]) : ruleKey
+      // requestedKeep(): blank or absent is 0; a merchant-wide rule takes a whole number >= 0.
+      const keep = body.keep === undefined || body.keep === '' ? 0 : Number(body.keep)
+      if (body.action !== 'remove' && (!Number.isSafeInteger(keep) || keep < 0 || (character && body.keep !== undefined && body.keep !== '')))
+        return { status: 400, json: { error: 'enter a whole number of copies to keep, or leave it blank' } }
       if (body.action === 'remove') delete this.autoNpcSales[key]
-      else this.autoNpcSales[key] = { item, ...(character ? { character } : {}) }
+      else this.autoNpcSales[key] = { item, ...(character ? { character } : { keep }) }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/npc-sale' && body.remove && body.id) {

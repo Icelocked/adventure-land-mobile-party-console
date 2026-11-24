@@ -76,7 +76,8 @@ test('Bank: Auto mark for upgrade, auto sell to NPC and Clear all marks act as t
   await page.getByRole('button', { name: /Iron Ore x5/ }).click()
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await page.getByRole('button', { name: 'Enable auto sale' }).click()
-  await expect.poll(() => bodies.find((b) => b.path === 'merchant/auto-npc-sale')?.body).toMatchObject({ character: 'Patinder', action: 'set' })
+  // party-inventory-panels.tsx onBankAutoNpcSale: a bank item's rule is the merchant-wide one.
+  await expect.poll(() => bodies.find((b) => b.path === 'merchant/auto-npc-sale')?.body).toEqual({ item: { name: 'ironore', q: 5 }, action: 'set', keep: '0' })
 
   await page.getByRole('button', { name: /Iron Ore x5/ }).click()
   await page.getByRole('button', { name: 'Clear all marks' }).click()

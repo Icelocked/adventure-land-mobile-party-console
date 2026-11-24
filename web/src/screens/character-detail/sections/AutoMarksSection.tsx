@@ -79,7 +79,13 @@ export function AutoMarksSection({
   const npc: RuleEntry[] = [
     ...Object.entries(state.autoNpcSales)
       .filter(([, rule]) => !rule.character)
-      .map(([key, rule]) => ({ key, item: rule.item, onRemove: () => api.autoNpcSale(undefined, rule.item, true) })),
+      .map(([key, rule]) => ({
+        key,
+        item: rule.item,
+        // inventory-panel.tsx: the copies kept back from sale.
+        edits: [{ id: 'reserve', value: rule.keep ?? 0, label: `Keep ${rule.keep ?? 0}`, min: 0, max: Number.MAX_SAFE_INTEGER, onSave: (keep: number) => () => api.setAutoNpcSaleKeep(rule.item, keep) }],
+        onRemove: () => api.autoNpcSale(undefined, rule.item, true),
+      })),
     ...state.npcSaleMarks.map((mark) => ({
       key: mark.id,
       item: mark.item,

@@ -108,8 +108,60 @@ test('Auto NPC sale: on the configured merchant the rule is account-wide (no cha
   await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
   await page.getByRole('button', { name: 'Enable auto sale' }).click()
   await expect.poll(() => bodies.length).toBe(1)
-  expect(bodies[0]).toEqual({ item: { name: 'ironore', q: 5 }, action: 'set' })
-  expect(Object.values(server.autoNpcSales)).toEqual([{ item: { name: 'ironore', q: 5 } }])
+  expect(bodies[0]).toEqual({ item: { name: 'ironore', q: 5 }, action: 'set', keep: '0' })
+  expect(Object.values(server.autoNpcSales)).toEqual([{ item: { name: 'ironore', q: 5 }, keep: 0 }])
+})
+
+// Console v1.5.0 stores a merchant-wide rule saved without `keep` as keep 0
+// (http/automatic-sales.ts), so the confirmation prefills the saved reserve
+// (use-party-console.tsx autoNpcSaleKeep) and the rules list edits it in place
+// (inventory-panel.tsx "Keep N").
+test('Auto NPC sale: the merchant-wide rule keeps its saved reserve, and the list edits it', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58, items: [{ name: 'ironore', q: 5 }] })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  const item = { name: 'ironore', q: 5 }
+  server.autoNpcSales = { [JSON.stringify({ name: 'ironore', level: 0, p: null, stat_type: null })]: { item, keep: 2 } }
+  await server.install(page)
+  const bodies = postBodies(page, 'merchant/auto-npc-sale')
+
+  await page.goto('/characters/Patinder')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Update auto sell to NPC…' }).click()
+  const keep = page.getByRole('spinbutton', { name: 'Number to keep reserved' })
+  await expect(keep).toHaveValue('2')
+  await page.getByRole('button', { name: 'Enable auto sale' }).click()
+  await expect.poll(() => bodies.length).toBe(1)
+  expect(bodies[0]).toEqual({ item, action: 'set', keep: '2' })
+  await page.keyboard.press('Escape')
+
+  const section = page.getByRole('region', { name: 'Auto NPC sales' })
+  await section.getByRole('button', { name: /^Auto NPC sales\s*1$/ }).click()
+  await section.getByRole('button', { name: 'Keep 2' }).click()
+  await section.getByLabel('New reserve for Iron Ore').fill('5')
+  await section.getByRole('button', { name: 'Save reserve for Iron Ore' }).click()
+  await expect.poll(() => bodies[1]).toEqual({ item, keep: 5, action: 'set' })
+  await expect(section.getByRole('button', { name: 'Keep 5' })).toBeVisible()
+})
+
+test('Auto NPC sale: with shared rules any character saves the merchant-wide rule', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50, items: [{ name: 'ironore', q: 5 }] })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.extraState = { merchantRules: { version: 1, owner: 'Patinder', members: ['Patinder', 'Ranger1'], conflicts: [] } }
+  await server.install(page)
+  const bodies = postBodies(page, 'merchant/auto-npc-sale')
+
+  await page.goto('/characters/Ranger1')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Auto sell to NPC…' }).click()
+  await page.getByRole('spinbutton', { name: 'Number to keep reserved' }).fill('3')
+  await page.getByRole('button', { name: 'Enable auto sale' }).click()
+  await expect.poll(() => bodies.length).toBe(1)
+  expect(bodies[0]).toEqual({ item: { name: 'ironore', q: 5 }, action: 'set', keep: '3' })
 })
 
 test('Auto NPC sale: on any other character the rule is scoped to that character', async ({ page }) => {

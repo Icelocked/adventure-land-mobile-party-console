@@ -213,6 +213,9 @@ function InventoryActions({
   const merchant = state.merchantCharacter ?? null
   const sharedRules = !!state.merchantRules
   const ruleName = sharedRules ? String(merchant) : characterName
+  // connected-inventory.tsx onAutoNpcSale: shared rules and the merchant use
+  // the merchant-wide rule; any other character gets its own.
+  const npcRuleCharacter = sharedRules || isMerchant ? undefined : characterName
   const equipment = isEquipment(meta?.definition)
   const itemType = String(meta?.definition.type || '')
   const ownSlots = characters[characterName]?.inventory?.slots ?? {}
@@ -470,9 +473,9 @@ function InventoryActions({
               item={item}
               meta={meta}
               name={String(meta?.definition.name || catalogFor(item.name)?.name || item.name)}
-              character={isMerchant ? undefined : characterName}
+              character={npcRuleCharacter}
               onCancel={() => onExpand(null)}
-              onConfirm={() => confirmWith(() => api.autoNpcSale(isMerchant ? undefined : characterName, item))}
+              onConfirm={(keep) => confirmWith(() => api.autoNpcSale(npcRuleCharacter, item, false, keep))}
             />
           )}
         </>

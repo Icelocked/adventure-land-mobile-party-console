@@ -431,6 +431,9 @@ export const itemFromRuleKey = (ruleKey: string): Item => {
 export interface AutoNpcSaleRule {
   item: Item
   character?: string
+  // Copies of a merchant-wide rule kept back from sale across the merchant's
+  // bag, bank and BankBois (console v1.5.0 http/automatic-sales.ts).
+  keep?: number
 }
 
 /** An autoStandMarks entry (merchant-only). */

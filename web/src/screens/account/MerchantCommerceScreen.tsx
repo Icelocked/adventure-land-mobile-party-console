@@ -790,7 +790,8 @@ function ExchangeScreen({
       let result
       if (draft.mode.action === 'bank') result = await api.itemCommand('auto-item-mark', character, item, undefined, { mode: 'bank', action: 'set' })
       else if (draft.mode.action === 'upgrade') result = await api.itemCommand('auto-upgrade-mark', character, item, -1, { tiers: Number(draft.mode.targetLevel) - draft.level })
-      else if (draft.mode.action === 'npc') result = await api.autoNpcSale(undefined, item)
+      // The saved reserve goes back with the rule, or the server resets it to 0.
+      else if (draft.mode.action === 'npc') result = await api.autoNpcSale(undefined, item, false, String(state.autoNpcSales[automaticCommerceRuleKey(item)]?.keep ?? 0))
       else {
         const meta = state.merchantCatalog?.allItems?.find((entry) => entry.id === draft.id)?.meta
         const price = (state.autoStandMarks?.[automaticCommerceRuleKey(item)] as { price?: number } | undefined)?.price || Math.max(1, Number(meta?.definition.g) || 1)

@@ -429,11 +429,19 @@ export class PartyApiClient {
 
   /** POST /party-api/merchant/auto-npc-sale - a standing "always sell
    *  this item type to an NPC" rule. */
-  async autoNpcSale(character: string | undefined, item: Item, remove = false): Promise<ApiResult<CommandResult>> {
+  async autoNpcSale(character: string | undefined, item: Item, remove = false, keep?: string): Promise<ApiResult<CommandResult>> {
     // Omit `character` for the merchant (its rule is the account-wide
     // one); with it, the server stores a per-player rule that never fires
-    // for the merchant.
-    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set' })
+    // for the merchant. The server stores a merchant-wide rule saved without
+    // `keep` as keep 0, so callers pass the reserve as typed; blank sells every
+    // copy (use-party-console.tsx confirmAutoNpcSale).
+    return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set', ...(!character && keep !== undefined && keep.trim() !== '' ? { keep: keep.trim() } : {}) })
+  }
+
+  /** POST /party-api/merchant/auto-npc-sale {item, keep, action: 'set'} - a
+   *  merchant-wide rule's reserve, as connected-inventory.tsx onUpdateNpcReserve sends it. */
+  async setAutoNpcSaleKeep(item: Item, keep: number): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/auto-npc-sale', { item, keep, action: 'set' })
   }
 
   /** POST /party-api/merchant/auto-stand - a standing "always list this

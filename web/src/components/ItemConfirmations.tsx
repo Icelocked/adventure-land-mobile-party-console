@@ -3,7 +3,8 @@ import { PackageOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { npcSaleValue } from '@/lib/itemFormulas'
-import { deconstructionRewards } from '@/models'
+import { useDynamicState } from '@/data/PartyDataProvider'
+import { automaticCommerceRuleKey, deconstructionRewards } from '@/models'
 import type { CatalogItem, DeconstructionCatalog, Item, ItemMeta } from '@/models'
 
 /** Deconstruction confirmation: rewards per item (each row a separate roll),
@@ -92,11 +93,15 @@ export function AutoNpcSaleConfirmation({
   meta: ItemMeta | undefined
   name: string
   character?: string
-  onConfirm: () => Promise<string | null>
+  onConfirm: (keep: string) => Promise<string | null>
   onCancel: () => void
 }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // A merchant-wide rule shows its saved reserve; a new one starts at 0
+  // (use-party-console.tsx autoNpcSaleKeep).
+  const saved = useDynamicState().autoNpcSales[automaticCommerceRuleKey(item)]
+  const [keep, setKeep] = useState(String(!saved || saved.character ? 0 : (saved.keep ?? 0)))
   return (
     <div role="group" aria-label="Automatically sell to NPC?" className="my-1.5 flex flex-col gap-2 rounded-md border border-orange-700/60 bg-orange-950/20 p-2.5 pl-4">
       <p className="text-sm font-medium">Automatically sell to NPC?</p>
@@ -114,6 +119,22 @@ export function AutoNpcSaleConfirmation({
         <p className="mt-1 font-mono text-sm text-amber-200">You will receive {npcSaleValue(item.level ?? 0, !!item.gift, item.expires, meta).toLocaleString()}g per sale.</p>
         <p className="mt-1 text-xs text-muted-foreground">The rule matches this exact +level, stat type, and special property.</p>
       </div>
+      {!character && (
+        <label className="grid gap-1 text-sm">
+          <span>Number to keep reserved</span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            placeholder="Sell every copy"
+            value={keep}
+            onChange={(event) => setKeep(event.target.value)}
+            className="rounded border border-orange-800 bg-background px-2 py-1 font-mono"
+          />
+          <span className="text-xs text-muted-foreground">Copies to keep across the merchant&apos;s bag, bank and BankBois. Only the rest is sold; Enter 0 to sell every copy.</span>
+        </label>
+      )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
@@ -126,7 +147,7 @@ export function AutoNpcSaleConfirmation({
           onClick={async () => {
             setBusy(true)
             setError(null)
-            const failure = await onConfirm()
+            const failure = await onConfirm(keep)
             setBusy(false)
             if (failure) setError(failure || 'Automatic NPC sale failed')
           }}
