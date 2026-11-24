@@ -54,10 +54,9 @@ async function timedFetch(url: string, init: RequestInit = {}, timeoutMs: number
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    // no-cache: never reuse a stored response without asking the server, but
-    // let the browser revalidate if the console ever sends ETags (it currently
-    // marks every response no-store, so each poll is a full download).
-    return await fetch(url, { ...init, cache: 'no-cache', signal: controller.signal })
+    // no-cache: never reuse a stored response without asking the server. A
+    // caller can pass its own cache mode.
+    return await fetch(url, { cache: 'no-cache', ...init, signal: controller.signal })
   } finally {
     clearTimeout(timeout)
   }
@@ -95,6 +94,33 @@ async function getText(url: string, detectAuthLoss = false, serverError = false)
         // A non-JSON body keeps the status message.
       }
     return fail(message, response.status)
+  } catch (error) {
+    return fail(errorMessage(error))
+  }
+}
+
+/** A section read that answers 304 while its body is unchanged: value null means unchanged. */
+export type RevisionRead<T> = { value: T; revision: string | null } | null
+
+/** Console v1.5.0 query-cache.tsx readRevision: `&revision=` carries the last ETag, and a 304
+ *  answer has no body. The request is no-store, as the dashboard's, so the browser never
+ *  revalidates a stored copy itself. */
+async function getRevision<T>(url: string, revision: string | null): Promise<ApiResult<RevisionRead<T>>> {
+  try {
+    const response = await timedFetch(revision ? `${url}&revision=${encodeURIComponent(revision)}` : url, { cache: 'no-store' }, GET_TIMEOUT_MS)
+    if (isAuthLoss(response)) {
+      signalAuthLoss()
+      return fail('Session expired. Reconnect this browser.', 401)
+    }
+    if (revision && response.status === 304) return ok(null)
+    const text = await response.text()
+    if (!response.ok) return fail(`HTTP ${response.status}`, response.status)
+    const tag = response.headers.get('ETag')
+    try {
+      return ok({ value: JSON.parse(text) as T, revision: tag ? tag.replace(/^"|"$/g, '') : null })
+    } catch {
+      return fail('Unexpected non-JSON response')
+    }
   } catch (error) {
     return fail(errorMessage(error))
   }
@@ -196,6 +222,11 @@ export class PartyApiClient {
     } catch {
       return fail('Unexpected non-JSON response')
     }
+  }
+
+  /** getJson for the bank, logs and market sections, which answer 304 for an unchanged revision. */
+  async getJsonRevision<T>(path: string, revision: string | null): Promise<ApiResult<RevisionRead<T>>> {
+    return getRevision<T>(this.url(path), revision)
   }
 
   async getRoot(path: string): Promise<ApiResult<string>> {

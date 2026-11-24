@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { PartyApiClient } from '@/api/partyApi'
+import { PartyApiClient, type ApiResult } from '@/api/partyApi'
 import { connectLive, type LiveEvent } from '@/api/liveConnection'
 import type { LiveRecordWire } from '@/api/liveProtocol'
 import type { ServerSettings } from '@/config/serverConfig'
@@ -128,6 +128,37 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     // dashboard=1 requests the dashboard-shaped payload.
     const section = <T,>(name: string) => api.getJson<T>(`state?catalog=0&dashboard=1&section=${name}`)
 
+    // Console v1.5.0 query-cache.tsx readRevision: the bank, logs and market sections answer 304
+    // while their body is unchanged. A revision belongs to the values it arrived with, so once
+    // the cache no longer holds them (App.tsx clears it when the session is lost) the section reads in
+    // full. `holds` runs right after the merge and keeps the stored values, since setQueryData's
+    // structural sharing copies the patch. It checks only the fields no other section writes:
+    // core also carries bankVaults, bankCurrent and bankQueue.
+    const revisions = new Map<string, { revision: string; held: () => boolean }>()
+    const sectionRevision = async <T,>(name: string, apply: (value: T) => () => boolean): Promise<ApiResult<void>> => {
+      const path = `state?catalog=0&dashboard=1&section=${name}`
+      const last = revisions.get(name)
+      const result = await api.getJsonRevision<T>(path, last?.held() ? last.revision : null)
+      if (result.kind !== 'success') return result
+      if (result.value === null) {
+        if (last?.held()) return { kind: 'success', value: undefined }
+        revisions.delete(name)
+        return sectionRevision(name, apply)
+      }
+      const held = apply(result.value.value)
+      if (result.value.revision) revisions.set(name, { revision: result.value.revision, held })
+      else revisions.delete(name)
+      return { kind: 'success', value: undefined }
+    }
+    const holds = (patch: Partial<PartyStateDynamic>, owned: (keyof PartyStateDynamic)[]) => {
+      const stored = queryClient.getQueryData<PartyStateDynamic>(QK.dynamicState)
+      const kept = owned.filter((key) => key in patch).map((key) => [key, stored?.[key]] as const)
+      return () => {
+        const current = queryClient.getQueryData<PartyStateDynamic>(QK.dynamicState)
+        return !!current && kept.every(([key, value]) => current[key] === value)
+      }
+    }
+
     const core = async () => {
       const sentAt = Date.now()
       const result = await section<CoreWire>('core')
@@ -187,25 +218,30 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
         }
         return
       }
-      const result = await section<Partial<PartyStateDynamic>>('market')
-      if (result.kind !== 'success') return
-      if (result.value.aldata) marketAldata.current = result.value.aldata
-      mergeState(result.value)
+      await sectionRevision<Partial<PartyStateDynamic>>('market', (value) => {
+        if (value.aldata) marketAldata.current = value.aldata
+        mergeState(value)
+        return holds(value, ['aldata', 'ponty', 'standPriceHistory'])
+      })
     }
 
-    const simple = (name: string) => async () => {
-      const result = await section<Partial<PartyStateDynamic>>(name)
-      if (result.kind === 'success') mergeState(result.value)
+    const bank = async () => {
+      await sectionRevision<Partial<PartyStateDynamic>>('bank', (value) => {
+        mergeState(value)
+        return holds(value, ['bank', 'bankbois'])
+      })
     }
 
     const logs = async () => {
-      const result = await section<LogsWire>('logs')
+      const result = await sectionRevision<LogsWire>('logs', ({ combatLogs, merchantActivity, gameLogs }) => {
+        const patch = { ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}) }
+        mergeState(patch)
+        const games = queryClient.setQueryData(QK.gameLogs, gameLogs ?? {})
+        const held = holds(patch, ['combatLogs', 'merchantActivity'])
+        return () => held() && queryClient.getQueryData(QK.gameLogs) === games
+      })
       // A failed refresh keeps the retained logs and flags the error.
       queryClient.setQueryData(QK.logsError, result.kind !== 'success')
-      if (result.kind !== 'success') return
-      const { combatLogs, merchantActivity, gameLogs } = result.value
-      mergeState({ ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}) })
-      queryClient.setQueryData(QK.gameLogs, gameLogs ?? {})
     }
 
     const mail = async () => {
@@ -293,7 +329,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     const triggers = {
       core: singleFlight(core),
       config: singleFlight(config),
-      bank: singleFlight(simple('bank')),
+      bank: singleFlight(bank),
       market: singleFlight(market),
       logs: singleFlight(logs),
       mail: singleFlight(mail),

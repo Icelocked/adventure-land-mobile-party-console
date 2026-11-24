@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { createServer, type Server, type ServerResponse } from 'node:http'
+import { createHash } from 'node:crypto'
 
 /**
  * A stateful in-memory stand-in for party-console's HTTP API, installed via
@@ -441,7 +442,8 @@ export class MockPartyServer {
   configDelayMs = 0
 
   /** Every state GET's `section` (or '' for none), in request order. */
-  stateRequests: { section: string; dashboard: boolean }[] = []
+  // revision: the `revision=` a bank, logs or market read sent; status: what the mock answered.
+  stateRequests: { section: string; dashboard: boolean; revision?: string | null; status?: number }[] = []
 
   /** GET /party-api/state, split by `section` the way the
    *  console does (public-state.ts). */
@@ -1354,13 +1356,25 @@ export class MockPartyServer {
       const url = new URL(route.request().url())
       const section = url.searchParams.get('section') ?? ''
       const dashboard = url.searchParams.get('dashboard') === '1'
-      this.stateRequests.push({ section, dashboard })
+      const request = { section, dashboard }
+      this.stateRequests.push(request)
       if (this.redirectNextStateGet) {
         this.redirectNextStateGet = false
         return route.fulfill({ status: 302, headers: { Location: '/setup' } })
       }
       if (section === 'config' && this.configDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.configDelayMs))
       if (section === 'logs' && this.failLogs) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
+      // telemetry/section-revision.ts sendWithRevision: bank, logs and market carry an ETag of
+      // the body's sha1 and answer 304 when `revision=` matches it.
+      if (['bank', 'logs', 'market'].includes(section)) {
+        const body = JSON.stringify(this.stateSection(section, dashboard))
+        const tag = createHash('sha1').update(body).digest('base64url')
+        const revision = url.searchParams.get('revision')
+        const status = revision === tag ? 304 : 200
+        Object.assign(request, { revision, status })
+        if (status === 304) return route.fulfill({ status, headers: { ETag: `"${tag}"` } })
+        return route.fulfill({ status, headers: { ETag: `"${tag}"`, 'Content-Type': 'application/json; charset=utf-8' }, body })
+      }
       return route.fulfill({ json: this.stateSection(section, dashboard) })
     })
     await page.route('**/party-api/metrics**', (route) => {

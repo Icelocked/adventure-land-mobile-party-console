@@ -53,3 +53,53 @@ test('While the live stream is down, characters still arrive via the fast/invent
   // A live row (vitals), not just a pending card for the slot.
   await expect(page.getByText('HP 100/100')).toBeVisible({ timeout: 10_000 })
 })
+
+// V150-PORT-MAP.md W8: query-cache.tsx readRevision sends the last ETag as `revision=` for the
+// bank, logs and market sections and keeps the cached data when the console answers 304.
+const answered = (server: MockPartyServer, section: string, status: number) =>
+  server.stateRequests.filter((r) => r.section === section && r.status === status)
+
+test('Bank polls send the last revision, keep the bank on 304 and pick up a change', async ({ page }) => {
+  test.setTimeout(60_000)
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.addCatalogEntry({ id: 'bow', name: 'Bow', upgradeable: true })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'bow', level: 2 } }] }
+  await server.install(page)
+
+  await page.goto('/bank')
+  await expect(page.getByRole('button', { name: /Bow \+2/ })).toBeVisible()
+  await expect.poll(() => answered(server, 'bank', 304).length, { timeout: 20_000 }).toBeGreaterThan(0)
+  const [first] = answered(server, 'bank', 200)
+  expect(answered(server, 'bank', 304)[0].revision).toBeTruthy()
+  expect(first.revision).toBeNull()
+  await expect(page.getByRole('button', { name: /Bow \+2/ })).toBeVisible()
+
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'bow', level: 2 } }, { slot: 1, item: { name: 'ironore', q: 5 } }] }
+  await expect(page.getByRole('button', { name: /Iron Ore x5/ })).toBeVisible({ timeout: 15_000 })
+  // The changed body came back in full for a request that sent the old revision.
+  expect(server.stateRequests.some((r) => r.section === 'bank' && r.status === 200 && !!r.revision)).toBe(true)
+})
+
+test('Logs and market polls keep their data on 304', async ({ page }) => {
+  test.setTimeout(60_000)
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.gameLogs = { Patinder: [{ session: 's', seq: 1, at: Date.now() - 2500, message: 'Welcome back', color: '' }] }
+  server.standListings = [{ id: 'l-1', slot: 3, item: { name: 'ironore' }, price: 500, quantity: 1 }]
+  await server.install(page)
+
+  await page.goto('/logs')
+  await expect(page.getByText('Welcome back')).toBeVisible()
+  await expect.poll(() => answered(server, 'logs', 304).length, { timeout: 20_000 }).toBeGreaterThan(0)
+  await expect(page.getByText('Welcome back')).toBeVisible()
+
+  await page.goto('/stand')
+  await expect(page.getByText('Iron Ore')).toBeVisible()
+  await expect.poll(() => answered(server, 'market', 304).length, { timeout: 30_000 }).toBeGreaterThan(0)
+  await expect(page.getByText('Iron Ore')).toBeVisible()
+})
