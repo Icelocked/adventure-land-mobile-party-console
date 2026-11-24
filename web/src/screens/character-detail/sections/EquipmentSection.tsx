@@ -2,6 +2,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { MluckClover } from '@/components/ItemTileParts'
 import { equipmentSlots, itemActionBanner, statBadgeClass } from '@/lib/itemActionBanner'
 import { SectionCard } from '../SectionCard'
+import { formatDurationMs, useClock } from '@/lib/duration'
 import { sameMarkedItem } from '@/models'
 import type { CatalogItem, EquippedEntry, StatScrollMark, UpgradeMark } from '@/models'
 
@@ -66,7 +67,9 @@ export function EquipmentSection({
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded border border-border bg-black">
                 {sprite && <SpriteIcon sprite={sprite} size={40} />}
                 {equipped && (
-                  <span className="absolute bottom-0.5 right-0.5 z-10 min-w-4 rounded bg-black/85 px-1 text-center font-mono text-[10px] leading-4 text-emerald-300">+{equipped.item.level || 0}</span>
+                  <span className="absolute bottom-0.5 right-0.5 z-10 min-w-4 whitespace-nowrap rounded bg-black/85 px-1 text-center font-mono text-[10px] leading-4 text-emerald-300">
+                    {slot === 'elixir' ? <ElixirTimer expires={equipped.item.expires} /> : `+${equipped.item.level || 0}`}
+                  </span>
                 )}
                 {equipped?.item.stat_type ? (
                   <span className={`absolute left-0.5 top-0.5 z-10 rounded px-1 font-mono text-[8px] ring-1 ${statBadgeClass(equipped.item.stat_type)}`}>{equipped.item.stat_type}</span>
@@ -91,4 +94,15 @@ export function EquipmentSection({
       </div>
     </SectionCard>
   )
+}
+
+/** The elixir slot's time left, as the first unit of the duration (equip-slot.tsx:64-80). */
+function ElixirTimer({ expires }: { expires: unknown }) {
+  const expiry = typeof expires === 'string' || typeof expires === 'number' ? new Date(expires).getTime() : 0
+  return expiry ? <ElixirCountdown expiry={expiry} /> : <>Active</>
+}
+
+function ElixirCountdown({ expiry }: { expiry: number }) {
+  const now = useClock()
+  return <>{formatDurationMs(Math.ceil(Math.max(0, expiry - now) / 1000) * 1000).split(' ')[0]}</>
 }
