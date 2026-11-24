@@ -4,6 +4,7 @@ import { useMail, useDynamicState } from '@/data/PartyDataProvider'
 import { occupiedStandSlots } from '@/lib/standInspection'
 import { useStandMerchant } from '@/screens/account/StandScreen'
 import { loadMenuLinks } from '@/lib/menuLinks'
+import { standSlots } from '@/api/ownersCards'
 
 /** The account-wide tools menu behind any character's hamburger icon:
  *  Mail, Catalog, Bestiary, Skills, Inspect Stand, View Market, Inspect
@@ -28,9 +29,12 @@ export function AccountMenu({ onClose }: { onClose: () => void }) {
   // "Mail (N)" while the inbox has messages.
   const mail = useMail()
   const mailCount = mail.count
-  // "Inspect stand · N/16" (occupied stand slots).
+  // "Inspect stand · used/slots": core's standSlots (party-header.tsx Stand button), else the
+  // stand cells the phone counts out of 16.
   const state = useDynamicState()
-  const standCount = occupiedStandSlots(state.standListings, state.nativeStand, useStandMerchant())
+  const ownCount = occupiedStandSlots(state.standListings, state.nativeStand, useStandMerchant())
+  const stand = standSlots(state)
+  const standLabel = stand ? `${stand.used}/${stand.slots}` : `${ownCount}/16`
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="p-4">
@@ -48,7 +52,7 @@ export function AccountMenu({ onClose }: { onClose: () => void }) {
               {item.label}
               {item.path === '/mail' && mailCount > 0 ? ` (${mailCount})` : ''}
               {item.path === '/mail' && (mail.newCount || 0) > 0 && <span aria-label="New mail" className="ml-1 inline-block size-2 rounded-full bg-amber-300" />}
-              {item.path === '/stand' ? ` · ${standCount}/16` : ''}
+              {item.path === '/stand' ? ` · ${standLabel}` : ''}
             </button>
           ))}
           {/* A full page load, so the service worker hands pages outside this app to the server. */}

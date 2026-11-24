@@ -6,6 +6,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { standIsFull } from '@/lib/standInspection'
+import { standFull as ownersStandFull } from '@/api/ownersCards'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { AddUpgradeRule, DestinationOffering, OfferingRows } from '@/components/Offerings'
 import { GearComparisonSheet } from './GearComparisonSheet'
@@ -234,7 +235,7 @@ function InventoryActions({
   const deliveryTarget = isMerchant ? Object.keys(state.merchantDeliveries).find((name) => (state.merchantDeliveries[name] ?? []).some(same)) : undefined
   const standListing = isMerchant ? state.standListings.find((listing) => !listing.bankPack && listing.slot === slot && sameMarkedItem(listing.item, item)) : undefined
   // Sales and buy orders both reserve a stand slot.
-  const standFull = standIsFull(state.standListings, state.standBids)
+  const standFull = ownersStandFull(state, () => standIsFull(state.standListings, state.standBids))
   const merchantWeaponMarked = isMerchant && !!state.merchantWeapon?.item && sameMarkedItem(state.merchantWeapon.item, item)
   const upgradeMark = meta?.upgradeable ? (state.upgrades[characterName] ?? []).find((mark) => !mark.equipped && mark.slot === slot && sameMarkedItem(mark.item, item)) : undefined
   const autoUpgradeRule = (state.autoUpgradeMarks[ruleName] ?? {})[autoRuleKey]

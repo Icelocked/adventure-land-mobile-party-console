@@ -26,6 +26,18 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FrankyRoutineControl } from './FrankyRoutineControl'
 import { consoleFeatures, type PartyStateDynamic } from '@/models'
+import {
+  dailyResetLabel,
+  eventListRows,
+  eventRejoinBody,
+  eventSkip,
+  handControl,
+  handControlBody,
+  handControlWord,
+  knocksLabel,
+  trickOrTreatCounts,
+  type HandControl,
+} from '@/api/ownersCards'
 import { CipherControls } from '@/components/CipherControls'
 import { defaultCipherSettings, type CipherSettings, type CipherView } from '@/lib/cipher'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -72,6 +84,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         >
           Follow
         </Chip>
+        <HandControlToggle name={characterName} state={dynamicState} disabled={!configLoaded} onError={setFormationError} />
         <EventSelectionControl state={dynamicState} name={characterName} combat={combat} />
       </div>
       <ConfigLoadingNote />
@@ -82,6 +95,55 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
       )}
       {!isLeader && dynamicState.leader && <p className="mt-1.5 text-xs text-muted-foreground">Following {dynamicState.leader}</p>}
     </SectionCard>
+  )
+}
+
+/** hand-control.tsx HandControlToggle on POST /party-api/formation
+ *  {character, handControl}, which sends only the changed keys. A Steam
+ *  character reads "Manual" and, while on, shows what the console still
+ *  runs for it; a headless one reads "Pause". */
+function HandControlToggle({ name, state, disabled, onError }: { name: string; state: PartyStateDynamic; disabled: boolean; onError: (message: string | null) => void }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const hand = handControl(state, name)
+  const word = handControlWord(state, name)
+  const send = async (patch: Partial<HandControl>) => {
+    onError(null)
+    const result = await api.post('formation', handControlBody(name, patch))
+    if (result.kind === 'failure') onError(result.message || 'Formation update failed')
+    await refreshNow()
+  }
+  return (
+    <>
+      <Chip selected={hand.on} disabled={disabled} onClick={() => void send({ on: !hand.on })}>
+        {word}
+      </Chip>
+      {word === 'Manual' && hand.on && (
+        <fieldset data-hand-switches className="flex basis-full flex-wrap items-center gap-3 text-xs text-emerald-100/80">
+          <legend className="sr-only">While I play this character, the console still runs</legend>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" className="accent-emerald-500" checked={hand.usePotions} disabled={disabled} onChange={(e) => void send({ usePotions: e.target.checked })} />
+            Use potions
+          </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" className="accent-emerald-500" checked={hand.combat} disabled={disabled} onChange={(e) => void send({ combat: e.target.checked })} />
+            Combat
+          </label>
+          <label className="flex items-center gap-1">
+            While I play this character, the party
+            <select
+              value={hand.party}
+              disabled={disabled}
+              onChange={(e) => void send({ party: e.target.value as HandControl['party'] })}
+              className="rounded border border-border bg-card px-1 py-0.5"
+            >
+              <option value="follows-me">Follows me</option>
+              <option value="carries-on">Carries on</option>
+            </select>
+          </label>
+        </fieldset>
+      )}
+    </>
   )
 }
 
@@ -111,6 +173,14 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
   // Server schedules are observations, not the supported catalog: seasonal
   // bosses stay selectable even when the current feed omits them.
   const schedules = new Map((state.eventSchedules ?? []).map((event) => [event.id, event]))
+  // The events owner's `event-list` rows: each member's open occurrence with its state and the rejoin flag.
+  const listed = eventListRows(state.eventAttendance)
+  const rejoin = async (event: string) => {
+    setError(null)
+    const result = await api.post('event-rejoin', eventRejoinBody(name, event))
+    if (result.kind === 'failure') setError(result.message)
+    else await refreshNow()
+  }
   const rows: EventSchedule[] = [...new Set([...order, ...schedules.keys()])]
     .map((id) => {
       const schedule = schedules.get(id)
@@ -150,9 +220,8 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
             const supported = supportedEvents.includes(event.id)
             const allowed = supported
             // A leader's manual travel skip stays on the leader; followers still attend (attendance-limits.ts).
-            const ignored = [state.eventAttendance?.[name]?.[event.id], state.eventAttendance?.[policy.source]?.[event.id]].find(
-              (entry, index) => entry?.ignored && !entry.ended && (index === 0 || entry.ignored !== 'manual travel'),
-            )?.ignored
+            const skip = eventSkip(listed, name, policy.source, event.id)
+            const ignored = skip.reason
             const index = order.indexOf(event.id)
             return (
               <div key={event.id}>
@@ -199,10 +268,31 @@ function EventSelectionControl({ state, name, combat }: { state: PartyStateDynam
                           : event.slotAt
                             ? `Next chance: ${eventTimeLabel(event.slotAt, now, event.clockOffsetMs)}`
                             : 'Time not announced'}
+                    {event.id === 'trickortreat' && (
+                      <>
+                        {now > 0 && <span className="block text-cyan-200">Next daily reset: {dailyResetLabel(now, event.clockOffsetMs)}</span>}
+                        <span
+                          className="block text-emerald-200"
+                          title="Character: usable knocks remaining. Account: upper bound from observed door histories; the game does not expose a separate account counter. Other characters or realms may have spent more."
+                        >
+                          {knocksLabel(trickOrTreatCounts(event, name), !!event.stale)}
+                        </span>
+                        <span className="block text-slate-300">Once daily at 00:00 UTC · Available during Halloween</span>
+                      </>
+                    )}
                     {!!event.next && event.realmOffsetHours !== undefined && <span className="block text-slate-300">{realmTimeLabel(event.next, event.realmOffsetHours)}</span>}
                     {event.confirmed && <span className="block text-cyan-200">Realm schedule confirmed</span>}
                     {event.stale ? ' · timing stale' : ''}
                     {ignored && <span className="block text-amber-200">Skipped this instance: {ignored}</span>}
+                    {skip.rejoin && (
+                      <button
+                        type="button"
+                        onClick={() => void rejoin(event.id)}
+                        className="mt-1 block rounded border border-amber-500 px-2 py-0.5 text-amber-100"
+                      >
+                        Rejoin
+                      </button>
+                    )}
                     {!!event.occurrences?.length && (
                       <details className="mt-1 text-slate-300">
                         <summary className="cursor-pointer">Next seven days</summary>
