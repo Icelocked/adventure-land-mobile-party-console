@@ -203,6 +203,24 @@ test('Cave map: full floor from the participants’ streams, waypoint placement 
   await expect(map).toHaveCount(0)
 })
 
+test('Cave map: later frames without the definition keep the floor drawn (map-stream.ts sends it once)', async ({ page }) => {
+  const server = partyServer()
+  server.dailyDungeon = activeCave()
+  const definition = { name: 'zone_ab12_1', min_x: -200, min_y: -200, max_x: 200, max_y: 200, default: null, tiles: [], placements: [], groups: [], tilesets: {} }
+  server.setMapFrame('Leada', { name: 'Leada', map: 'zone_ab12_1', at: Date.now(), x: 0, y: 0, definition, entities: [] })
+  await server.install(page)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'View full map' }).click()
+  const map = page.getByRole('group', { name: 'Cave map' })
+  await expect(map.getByRole('button', { name: 'Add waypoint' })).toBeEnabled()
+  server.setMapFrame('Leada', { name: 'Leada', map: 'zone_ab12_1', at: Date.now(), x: 40, y: 0, entities: [] })
+  server.setMapFrame('Folla', { name: 'Folla', map: 'zone_ab12_1', at: Date.now(), x: 10, y: 0, entities: [] })
+  await expect(map.getByText('Folla', { exact: true })).toBeVisible()
+  await expect(map.getByRole('button', { name: 'Add waypoint' })).toBeEnabled()
+  await expect(map.getByRole('button', { name: 'Native-size view' })).toBeEnabled()
+})
+
 test('A dungeon start opens the Party screen once; other screens show a bar back to the controls', async ({ page }) => {
   const server = partyServer()
   server.dailyDungeon = { state: { phase: 'idle', participants: ['Leada', 'Folla'], protectFromEvents: true, commands: {} }, members: [member('Leada'), member('Folla')] }
