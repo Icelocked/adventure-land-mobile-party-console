@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventDisplayNames, eventLimits, eventPolicy, eventPriorityOrder, selectedEvents, supportedEvents } from './eventPolicy'
+import { eventDisplayNames, eventLimits, eventPolicy, eventPriorityOrder, eventTimeLabel, realmTimeLabel, selectedEvents, supportedEvents } from './eventPolicy'
 
 const october = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
 
@@ -36,5 +36,20 @@ describe("eventPolicy the merchant's Witch's Cipher", () => {
     expect(selectedEvents(party, 'Mercer')).toEqual(['anniversary', 'witchcipher'])
     expect(eventPolicy(party, 'Mercer').enabled).toBe(true)
     expect(eventLimits(party, 'Mercer')).toEqual({ goobrawl: { deathLimit: 1, timeLimitMinutes: 5 }, witchcipher: party.eventLimitsByCharacter.Leada.witchcipher })
+  })
+})
+
+describe('event schedule labels (event-selection-control.tsx:17-27)', () => {
+  it('names the weekday and subtracts the realm clock offset from the countdown', () => {
+    const now = Date.UTC(2026, 9, 22, 12, 0, 0)
+    const label = eventTimeLabel(now + 10 * 60000, now, 60000)
+    expect(label).toMatch(/\(9m 0s\)$/)
+    const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(now + 10 * 60000)
+    expect(label.startsWith(weekday)).toBe(true)
+  })
+
+  it('shows the realm time in the realm offset as a UTC label', () => {
+    expect(realmTimeLabel(Date.UTC(2026, 9, 22, 19, 5), -5)).toBe('Realm: 14:05 (UTC\u22125)')
+    expect(realmTimeLabel(Date.UTC(2026, 9, 22, 19, 5) / 1000, 2)).toBe('Realm: 21:05 (UTC+2)')
   })
 })
