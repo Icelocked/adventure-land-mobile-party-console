@@ -99,19 +99,21 @@ Features done (oct commits, checked against v1.5.0's dashboard source):
 - F18: 5f78b87, new: `WtbUnconfirmedPurchase` on each WTB row.
 - F13: 6d1d2a0, new: an Access code field on the pairing screen posts `{code}`.
 
-Left (next session):
+Done this session:
 
-- F6 batch select for inventory, bank and exchange rewards (item-selection.tsx,
-  exchange-item-selection.tsx, the bank and party inventory batch commands). pwa-owners
-  ac4b23d, 385d8d0 and 3ec505a are the guide; check each body against
-  party-inventory-panels.tsx `onBatchCommand`.
-- F16: the Gold line in the character extras (character-stats-dialog.tsx, `goldBonus`), the
-  CX Jar's "Filled with" line (item-card-lines.ts, `item.data`), and the item JSON view
-  (item-card.tsx "Item JSON"; the dashboard opens it with I, so the PWA needs an "Item JSON"
-  entry in the item's options list).
-- W8 parity: send `&revision=` for bank, logs and market and keep the cached data on 304
-  (query-cache.tsx `readRevision`). Optional; the server answers 200 without it.
+- F6: 5226896 (pwa-owners ac4b23d, 385d8d0, 3ec505a, checked against v1.5.0). A Select button
+  turns on select mode for the inventory, the bank and the exchange rewards; the rows and bodies
+  follow item-selection.tsx, connected-inventory.tsx and party-inventory-panels.tsx
+  `onBatchCommand`. Reward tiles register under `id@level:detail` as exchange-item-selection.tsx
+  does, and compound rows stop at +7.
+- F16: 3ef48c2. The Gold line after Luck, the CX Jar's "Filled with" line, and "Item JSON" in the
+  inventory, equipment, bank and exchange reward option lists.
+- W8: 8d58d3f. Bank, logs and market polls send `&revision=` and keep the cached data on 304.
+- bank.spec "Bank parity": f0c984a. The suite served dist/, which `npm run build` rewrites, and
+  reused any server on 4173, where the pwa-owners worktrees serve their builds. It now builds
+  into dist-e2e, never reuses a server, and takes its port from E2E_PORT.
 
-Last full run (after 6d1d2a0): `tsc -b` and the build pass; 144 unit tests pass; e2e 330 of 331
-pass, and the one failure (bank.spec.ts "Bank parity") passes 3 of 3 when rerun alone, so it
-is load timing. oxlint shows 2 warnings, both older than this branch.
+Every row of this map is done.
+
+Last full run (after f0c984a): `tsc -b`, the build and unit tests (148) pass; oxlint exits 0 with
+72 warnings, none in files this session added; e2e passes 339 of 339 in two full runs.
