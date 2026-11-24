@@ -98,10 +98,11 @@ test('Monster detail: achievements, spawns, definition, formatted drops with zon
   await expect(page.getByText('Available for ordinary hunt routing.')).toBeVisible()
   await expect(page.getByText(/^respawn$/i)).toBeVisible()
   await expect(page.getByText('Monster-specific drops (2)')).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Shell 5%$/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Crab Claw 100% ×2 \+ 50%$/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Shell 1\/20$/ })).toBeVisible()
+  // drop-rate.ts caps odds at 1/1.
+  await expect(page.getByRole('button', { name: /^Crab Claw 1\/1$/ })).toBeVisible()
   await expect(page.getByText('Zone & world drops (1)')).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Seashell 0\.1% ×2 Mainland zone drop$/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Seashell 1\/1,000 ×2 Mainland zone drop$/ })).toBeVisible()
 
   await page.getByRole('button', { name: 'Navigate to Crab' }).click()
   const picker = page.getByRole('group', { name: 'Navigate to Crab' })
@@ -112,7 +113,7 @@ test('Monster detail: achievements, spawns, definition, formatted drops with zon
   await expect(page.getByText('G.monsters.crab')).toHaveCount(0)
 
   await page.getByRole('button', { name: /^Crab 100 HP/ }).click()
-  await page.getByRole('button', { name: /^Shell 5%$/ }).click()
+  await page.getByRole('button', { name: /^Shell 1\/20$/ }).click()
   await expect(page.getByText('Shell', { exact: true }).last()).toBeVisible()
   await expect(page.getByText('G.monsters.crab')).toHaveCount(0)
 })
@@ -145,4 +146,39 @@ test('Hunt blacklist: a blacklisted monster opens its details; an unknown one ex
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Inspect ghost' }).click()
   await expect(page.getByRole('alert')).toHaveText('Monster details are not available for ghost yet.')
+})
+
+test('Drop odds: home rewards sit apart from monster drops, and an exchange chain is not a drop (G22)', async ({ page }) => {
+  const server = bestiaryServer()
+  const crab = server.bestiaryCatalog[0] as Record<string, unknown>
+  crab.homeRewards = [{ id: 'reefglass', name: 'Reef Glass', rate: 1, quantity: 3 }]
+  server.addCatalogEntry({ id: 'reefglass', name: 'Reef Glass' })
+  server.addCatalogEntry({
+    id: 'seashell',
+    name: 'Seashell',
+    world: {
+      drops: [
+        { monsterId: 'crab', monsterName: 'Crab', rate: 0.001, quantity: 2, sourceType: 'zone', mapId: 'main', mapName: 'Mainland' },
+        { monsterId: 'crab', monsterName: 'Crab', rate: 0.0005, quantity: 1, sourceType: 'home' },
+        { monsterId: 'goo', monsterName: 'Goo', rate: 0.2, quantity: 1, sourceType: 'monster', acquisitionPath: ['Shell', 'Seashell'] },
+      ],
+    },
+  })
+  await server.install(page)
+  await page.goto('/bestiary')
+
+  await page.getByRole('button', { name: /^Crab 100 HP/ }).click()
+  // bestiary-drops.tsx: home rewards first, with their own note.
+  await expect(page.getByText('Home rewards (1)')).toBeVisible()
+  await expect(page.getByText('Home-server bonus required. These rolls are separate from normal monster drops.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Reef Glass 1\/1 ×3$/ })).toBeVisible()
+
+  await page.getByRole('button', { name: /^Seashell / }).click()
+  await page.getByRole('button', { name: 'Drops', exact: true }).click()
+  const monsterDrops = page.getByRole('region', { name: 'Monster drops' })
+  const homeRewards = page.getByRole('region', { name: 'Home rewards' })
+  await expect(monsterDrops.getByRole('button', { name: /^Crab .*1\/1,000 ×2$/ })).toBeVisible()
+  await expect(homeRewards.getByRole('button', { name: /^Crab .*1\/2,000$/ })).toBeVisible()
+  await expect(homeRewards.getByText('Home-server bonus required; these rewards are separate from normal monster drops.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Goo/ })).toHaveCount(0)
 })

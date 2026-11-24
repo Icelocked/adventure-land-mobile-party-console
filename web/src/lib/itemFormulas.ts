@@ -459,23 +459,66 @@ export function rewardPercentage(chance: number): string {
   return `${toPrecision(chance * 100, 6)}%`
 }
 
-/** A direct monster drop keeps its original chance even when the displayed
- *  rate was capped; a multi-step path (a box that is itself a drop) shows
- *  the actual chance. */
-export function effectiveDropRate(drop: ItemDropSource): number {
-  return drop.sourceType === 'monster' && (drop.acquisitionPath?.length ?? 0) <= 1 ? (drop.originRate ?? drop.rate) : drop.rate
+// Console 1.5 dashboard drop-rate.ts.
+type DropRate = Pick<ItemDropSource, 'rate' | 'quantity' | 'originRate' | 'sourceType' | 'acquisitionPath'>
+
+/** Whether killing the monster yields the item itself. A native "open" step picks the
+ *  reward inside the monster's chest; any other step before the item is a separate
+ *  exchange. A catalog saved before acquisition paths counts as direct. */
+export function isDirectDrop(drop: { acquisitionPath?: string[] }): boolean {
+  return (drop.acquisitionPath || []).slice(0, -1).every((step) => step.startsWith('open ') || step === 'World drop' || step === 'HP-scaled world drop')
 }
 
-/** Rates above 100% split into a guaranteed count plus a remainder chance. */
-export function formatDropRate(drop: ItemDropSource): string {
-  const rate = Math.max(0, effectiveDropRate(drop))
+/** A direct monster or home roll keeps its original chance even when the displayed
+ *  rate was capped; a multi-step path (a box that is itself a drop) shows
+ *  the actual chance. */
+export function effectiveDropRate(drop: DropRate): number {
+  return (drop.sourceType === 'monster' || drop.sourceType === 'home') && (drop.acquisitionPath?.length ?? 0) <= 1 ? (drop.originRate ?? drop.rate) : drop.rate
+}
+
+/** The chance as reduced odds, e.g. "1/1,250 ×2", capped at 1/1. */
+export function formatDropRate(drop: DropRate): string {
+  const rate = Math.min(1, Math.max(0, effectiveDropRate(drop)))
   const quantity = Math.max(1, drop.quantity || 1)
-  const percent = (chance: number) => `${toPrecision(chance * 100, 6)}%`
-  const count = (value: number) => (value > 1 ? ` ×${value.toLocaleString()}` : '')
-  if (rate <= 1) return percent(rate) + count(quantity)
-  const guaranteed = Math.floor(rate)
-  const remainder = rate - guaranteed
-  return `100%${count(guaranteed * quantity)}${remainder > 0 ? ` + ${percent(remainder)}${count(quantity)}` : ''}`
+  const count = quantity > 1 ? ` ×${quantity.toLocaleString('en-US')}` : ''
+  if (!Number.isFinite(rate) || rate <= 0) return `0/1${count}`
+  if (rate >= 1) return `1/1${count}`
+  const [numerator, denominator] = probabilityRatio(rate)
+  return `${numerator.toLocaleString('en-US')}/${denominator.toLocaleString('en-US')}${count}`
+}
+
+/** The reduced ratio for `rate`, from its continued fraction to floating-point precision.
+ *  Native tables hold weighted nested odds such as 15/100000, so the numerator is not
+ *  always 1. A rate past the safe-integer convergents keeps its exact decimal value. */
+function probabilityRatio(rate: number): [bigint, bigint] {
+  let remainder = rate,
+    previousNumerator = 0,
+    numerator = 1,
+    previousDenominator = 1,
+    denominator = 0
+  for (let iteration = 0; iteration < 64; iteration++) {
+    const whole = Math.floor(remainder)
+    const nextNumerator = whole * numerator + previousNumerator
+    const nextDenominator = whole * denominator + previousDenominator
+    if (!Number.isSafeInteger(nextNumerator) || !Number.isSafeInteger(nextDenominator)) break
+    ;[previousNumerator, numerator] = [numerator, nextNumerator]
+    ;[previousDenominator, denominator] = [denominator, nextDenominator]
+    if (denominator && Math.abs(numerator / denominator - rate) <= rate * Number.EPSILON * 4) return [BigInt(numerator), BigInt(denominator)]
+    const fraction = remainder - whole
+    if (!fraction) break
+    remainder = 1 / fraction
+  }
+  const [decimal, exponent = '0'] = rate.toString().split('e')
+  const [integer, fractional = ''] = decimal.split('.')
+  let top = BigInt(integer + fractional),
+    bottom = BigInt(1)
+  const scale = fractional.length - Number(exponent)
+  if (scale >= 0) bottom = BigInt(10) ** BigInt(scale)
+  else top *= BigInt(10) ** BigInt(-scale)
+  let a = top,
+    b = bottom
+  while (b) [a, b] = [b, a % b]
+  return [top / a, bottom / a]
 }
 
 function toPrecision(value: number, sigFigs: number): string {
