@@ -164,3 +164,6 @@ the item's `src` changes reverted.
   The bank grid sits in `src/screens/account/BankScreen.tsx`, a set 1 file, so its batch rows
   (withdraw marks, `exchange-order`, `compound-mark`) are not wired; the commerce screen's reward
   tiles (`MerchantCommerceScreen.tsx`, set 1) need only an `ExchangeSelectionProvider` around them.
+- **B15 - done.** The Cave panel offers "reopen shop", and lets a done room be picked, only for
+  the ids in the daily-dungeons view's `reopenable` list; a console without the list keeps the
+  phone's merchant-room test (`e2e/owners-dungeon.spec.ts`).

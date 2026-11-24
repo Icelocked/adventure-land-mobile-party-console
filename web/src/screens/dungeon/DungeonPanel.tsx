@@ -8,12 +8,12 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { dungeonButton } from './CaveEventRow'
 import { CaveMap } from './CaveMap'
+import { caveReopenable } from '@/api/ownersCards'
 import type { CavePoint } from '@/models/dungeon'
 
 const exitButton = 'rounded border-2 border-red-500 bg-slate-950 px-3 py-2 text-red-100 hover:border-red-300 hover:bg-red-950 disabled:opacity-50'
 
 // A merchant room is done once its encounter resolves; its item can still be bought.
-const merchantRoom = (room?: string) => !!room && /^\d+:shop$/.test(room)
 
 /** The Cave of Many Dreams run controls at the top of
  *  the party screen while a visit is underway. Its dialogs (exit
@@ -61,7 +61,7 @@ export function DungeonPanel() {
   const travelling = view.state.progress?.enabled || !!view.state.travel || Object.values(view.state.commands).some((command) => command.action === 'move')
   const mapFloor = cave ? cave.run + ':' + cave.floor : null
   const mapOpen = !!mapFloor && mapOpenFloor === mapFloor
-  const selectable = (p: CavePoint) => !!cave && !query.busy && !cave.paused && !p.locked && !(p.done && !merchantRoom(p.room)) && view.state.phase === 'active'
+  const selectable = (p: CavePoint) => !!cave && !query.busy && !cave.paused && !p.locked && !(p.done && !caveReopenable(view, p)) && view.state.phase === 'active'
   const selectPoint = (p: CavePoint) => {
     if (!selectable(p)) return
     setRequestedRoom(p.room || null)
@@ -82,7 +82,7 @@ export function DungeonPanel() {
           >
             {p.label}
             {p.map !== 'zone_' + cave.run + '_' + cave.floor ? ' — different floor' : ''}
-            {p.locked ? ' — locked' : p.done && merchantRoom(p.room) ? ' - reopen shop' : p.done ? ' — complete' : ''}
+            {p.locked ? ' — locked' : caveReopenable(view, p) ? ' - reopen shop' : p.done ? ' — complete' : ''}
           </button>
         ))}
     </div>

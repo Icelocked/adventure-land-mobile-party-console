@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyPartyStateDynamic, type PartyStateDynamic } from '@/models'
-import { cardLine, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
+import { caveReopenable, cardLine, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
 
 // OWNERS-PORT-MAP.md B16 with A24, as the owners release's card reads its fields.
 
@@ -75,5 +75,15 @@ describe('event rows (B9)', () => {
   it('counts down to the next 00:00 UTC on the server clock', () => {
     expect(dailyResetLabel(Date.UTC(2026, 9, 30, 22, 30, 15))).toMatch(/\(1h 29m 45s\)$/)
     expect(dailyResetLabel(Date.UTC(2026, 9, 30, 22, 30, 15), 3600_000)).toMatch(/\(0h 29m 45s\)$/)
+  })
+})
+
+describe('Cave reopen (B15)', () => {
+  it("follows the view's reopenable list and keeps any done shop room without it", () => {
+    const shop = { id: 'p6', done: true, room: '3:shop' }
+    expect(caveReopenable({ reopenable: [] }, shop)).toBe(false)
+    expect(caveReopenable({ reopenable: ['p6'] }, shop)).toBe(true)
+    expect(caveReopenable({}, shop)).toBe(true)
+    expect(caveReopenable({}, { id: 'p2', done: true, room: 'r2' })).toBe(false)
   })
 })

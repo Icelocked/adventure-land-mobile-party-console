@@ -151,3 +151,11 @@ export function dailyResetLabel(now: number, clockOffsetMs = 0): string {
 export function ownersRelease(state: PartyStateDynamic): boolean {
   return 'handControlByCharacter' in state || !!standSlots(state)
 }
+
+/** The Cave view's `reopenable` point ids (hunting/coordinator/cave.ts snapshot): done merchant
+ *  rooms of the party's own run. A console without the field reopens any done merchant room. */
+export function caveReopenable(view: unknown, point: { id: string; done?: boolean; room?: string }): boolean {
+  const ids = loose(view).reopenable
+  if (Array.isArray(ids)) return ids.includes(point.id)
+  return !!point.done && !!point.room && /^\d+:shop$/.test(point.room)
+}
