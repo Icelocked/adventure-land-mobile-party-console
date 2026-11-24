@@ -4,7 +4,7 @@
 // (appRoutes.test.ts checks it).
 export const APP_SECTIONS = [
   'anniversary', 'bank', 'bestiary', 'catalog', 'characters', 'logs', 'mail', 'market',
-  'merchant', 'routines', 'settings', 'skills', 'stand', 'wtb',
+  'merchant', 'metrics', 'routines', 'settings', 'skills', 'stand', 'wtb',
 ]
 
 export const APP_NAVIGATION_ALLOWLIST: RegExp[] = [
