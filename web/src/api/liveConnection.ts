@@ -1,51 +1,54 @@
-import { LiveReceiver, type LiveMessage, type LiveRecordWire } from './liveProtocol'
+import { LiveReceiver, serverClockOffset, watchdogMs, type LiveMessage, type LiveRecordWire } from './liveProtocol'
 import { streamUrl, type ServerSettings } from '@/config/serverConfig'
 
-/** A character updated (record === null means it went offline), or the
- *  connection's health changed. */
+/** A character updated (record === null means it went offline), the
+ *  connection's health changed, or a heartbeat measured the server clock. */
 export type LiveEvent =
   | { kind: 'characterUpdated'; name: string; record: LiveRecordWire | null }
   | { kind: 'connectionHealth'; healthy: boolean; error?: string }
+  | { kind: 'serverClock'; offset: number }
 
-const HEARTBEAT_TIMEOUT_MS = 15_000
-const RECONNECT_DELAY_MS = 1_000
 const WATCHDOG_TICK_MS = 1_000
+
+export interface LiveConnection {
+  close(): void
+  /** The data layer calls this after each core poll that answered: a failed stream reconnects then. */
+  coreAnswered(): void
+}
 
 /**
  * Connects to the `/party-api/dashboard-stream` SSE feed and calls
- * [onEvent] per update. Returns a function that closes the connection.
+ * [onEvent] per update.
  *
- * A reconnect starts either on a stream error/bad frame, or from a 1s
- * watchdog that catches a stalled socket that stopped sending heartbeats
- * without erroring (EventSource's own auto-reconnect only reacts to
- * errors). Both go through `scheduleReconnect`, guarded by
- * `reconnectPending` so they never schedule overlapping reconnects.
+ * The stream fails on an error, a bad frame, or silence past three of the
+ * heartbeats it names (watchdogMs), as the dashboard's does
+ * (dashboard-live.tsx). A failed stream waits for the coordinator to answer
+ * the fallback core poll again, which runs while the stream is down, and
+ * reconnects at the next `coreAnswered`.
  *
  * EventSource's `onerror` exposes no status or message, so connection
  * failure messages are necessarily vague.
  */
-export function connectLive(settings: ServerSettings, onEvent: (event: LiveEvent) => void): () => void {
+export function connectLive(settings: ServerSettings, onEvent: (event: LiveEvent) => void): LiveConnection {
   const receiver = new LiveReceiver((name, record) => onEvent({ kind: 'characterUpdated', name, record }))
   let lastHeartbeat = Date.now()
-  let reconnectPending = false
+  let silenceLimit = watchdogMs(undefined)
+  let waiting = false
   let stopped = false
   let currentSource: EventSource | null = null
-  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let watchdogTimer: ReturnType<typeof setInterval> | undefined
 
   const reportHealth = (healthy: boolean, error?: string) => onEvent({ kind: 'connectionHealth', healthy, error })
 
-  const scheduleReconnect = () => {
-    if (stopped || reconnectPending) return
-    reconnectPending = true
-    reconnectTimer = setTimeout(() => {
-      reconnectPending = false
-      if (!stopped) startConnection()
-    }, RECONNECT_DELAY_MS)
+  const fail = (error: string) => {
+    currentSource?.close()
+    reportHealth(false, error)
+    waiting = true
   }
 
   const startConnection = () => {
     if (stopped) return
+    waiting = false
     lastHeartbeat = Date.now()
     const source = new EventSource(streamUrl(settings))
     currentSource = source
@@ -55,7 +58,7 @@ export function connectLive(settings: ServerSettings, onEvent: (event: LiveEvent
     }
 
     source.onmessage = (event) => {
-      if (stopped) return
+      if (stopped || source !== currentSource) return
       let message: LiveMessage | null = null
       try {
         message = JSON.parse(event.data) as LiveMessage
@@ -65,23 +68,22 @@ export function connectLive(settings: ServerSettings, onEvent: (event: LiveEvent
       if (message == null) {
         // After a malformed frame the epoch/sequence state can't be
         // trusted, so start over.
-        source.close()
-        reportHealth(false, 'Received a malformed message from the server')
-        scheduleReconnect()
+        fail('Received a malformed message from the server')
         return
       }
       if (!receiver.accept(message)) return
       // Any accepted message, deltas included, proves the connection is
       // alive; otherwise a busy stream would trip the watchdog.
       lastHeartbeat = Date.now()
+      if (message.heartbeatMs) silenceLimit = watchdogMs(message.heartbeatMs)
+      const offset = serverClockOffset(message, lastHeartbeat)
+      if (offset !== null) onEvent({ kind: 'serverClock', offset })
       if (message.type === 'snapshot') reportHealth(true)
     }
 
     source.onerror = () => {
-      if (stopped) return
-      source.close()
-      reportHealth(false, describeReadyState(source.readyState))
-      scheduleReconnect()
+      if (stopped || source !== currentSource) return
+      fail(describeReadyState(source.readyState))
     }
   }
 
@@ -89,20 +91,19 @@ export function connectLive(settings: ServerSettings, onEvent: (event: LiveEvent
   startConnection()
 
   watchdogTimer = setInterval(() => {
-    if (stopped) return
-    const silentFor = Date.now() - lastHeartbeat
-    if (silentFor > HEARTBEAT_TIMEOUT_MS) {
-      currentSource?.close()
-      reportHealth(false, `No response from the server for over ${HEARTBEAT_TIMEOUT_MS / 1000}s`)
-      scheduleReconnect()
-    }
+    if (stopped || waiting) return
+    if (Date.now() - lastHeartbeat > silenceLimit) fail(`No response from the server for over ${Math.round(silenceLimit / 1000)}s`)
   }, WATCHDOG_TICK_MS)
 
-  return () => {
-    stopped = true
-    currentSource?.close()
-    if (reconnectTimer) clearTimeout(reconnectTimer)
-    if (watchdogTimer) clearInterval(watchdogTimer)
+  return {
+    close() {
+      stopped = true
+      currentSource?.close()
+      if (watchdogTimer) clearInterval(watchdogTimer)
+    },
+    coreAnswered() {
+      if (waiting && !stopped) startConnection()
+    },
   }
 }
 

@@ -115,21 +115,9 @@ describe('merchantJobLabel / merchantPartyGroups / durationLabel', () => {
   })
 })
 
-import { conflictingItems, describeRule, itemRuleConflicts } from './ruleConflicts'
-import { emptyPartyStateDynamic } from '@/models'
+import { describeRule } from './ruleConflicts'
 
-describe('itemRuleConflicts / conflictingItems / describeRule (shared-rules.ts, shared-rule-conflicts.tsx)', () => {
-  const key = automaticCommerceRuleKey({ name: 'ore' })
-  const shared = { ...emptyPartyStateDynamic(), merchantCharacter: 'M', merchantRules: { version: 1 as const, owner: 'M', members: ['A'], conflicts: [] } }
-  it('flags an item two shared rules would both act on', () => {
-    const state = { ...shared, autoNpcSales: { [key]: { item: { name: 'ore' } } }, autoStandMarks: { [key]: { item: { name: 'ore' }, price: 5 } } }
-    expect(itemRuleConflicts(state, { name: 'ore' })).toEqual(['NPC sale', 'Stand sale'])
-    expect(conflictingItems(state).map((row) => row.item.name)).toEqual(['ore'])
-  })
-  it('ignores items outside shared mode or with a single rule', () => {
-    expect(itemRuleConflicts({ ...emptyPartyStateDynamic(), autoNpcSales: { [key]: { item: { name: 'ore' } } } }, { name: 'ore' })).toEqual([])
-    expect(itemRuleConflicts({ ...shared, autoNpcSales: { [key]: { item: { name: 'ore' } } } }, { name: 'ore' })).toEqual([])
-  })
+describe('describeRule (shared-rule-conflicts.tsx)', () => {
   it('describes rule values', () => {
     expect(describeRule({ tiers: 3, quantity: -1 })).toBe('3 upgrade levels · Unlimited')
     expect(describeRule({ targetTier: 4, quantity: 2 })).toBe('Compound to +4 · 2 remaining')

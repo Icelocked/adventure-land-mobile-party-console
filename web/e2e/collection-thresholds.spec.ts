@@ -67,7 +67,9 @@ test('Merchant settings: buy batch size, stand location and trip switches post w
   await expect(page.locator('fieldset', { hasText: 'Maximum number to buy' }).getByRole('button', { name: 'Apply' })).toBeDisabled()
   await batch.fill('5')
   await page.locator('fieldset', { hasText: 'Maximum number to buy' }).getByRole('button', { name: 'Apply' }).click()
-  await expect.poll(() => bodies.find((b) => b.path === 'config')?.body).toEqual({ buyUpgradeBatchSize: 5 })
+  // buy-upgrade-batch-setting.tsx writes through the settings route with the page's basis.
+  await expect.poll(() => bodies.find((b) => b.path === 'settings')?.body).toEqual({ changes: [{ field: 'buyUpgradeBatchSize', value: 5 }], basis: 1 })
+  expect(bodies.some((b) => b.path === 'config')).toBe(false)
 
   await expect(page.getByRole('textbox', { name: 'Stand X' })).toHaveValue('-40')
   await page.getByRole('textbox', { name: 'Stand Y' }).fill('20')

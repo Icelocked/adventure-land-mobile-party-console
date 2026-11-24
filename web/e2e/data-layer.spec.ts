@@ -53,3 +53,17 @@ test('While the live stream is down, characters still arrive via the fast/invent
   // A live row (vitals), not just a pending card for the slot.
   await expect(page.getByText('HP 100/100')).toBeVisible({ timeout: 10_000 })
 })
+
+test('The bank section sends the revision it holds and keeps its data on a 304 (table S)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.bankPacks = { items1: [{ slot: 0, item: { name: 'ironore', level: 0, q: 4 } }] }
+  await server.install(page)
+
+  await page.goto('/bank')
+  await expect(page.getByText('Iron Ore').first()).toBeVisible()
+  await expect.poll(() => server.revisionReads.filter((read) => read.section === 'bank' && read.unchanged).length, { timeout: 15_000 }).toBeGreaterThan(0)
+  await expect(page.getByText('Iron Ore').first()).toBeVisible()
+})

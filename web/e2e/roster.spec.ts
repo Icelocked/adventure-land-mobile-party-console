@@ -105,7 +105,7 @@ test('Pending: a slot whose character has not connected shows a waiting card; a 
       { index: 0, kind: 'native', primary: true, character: 'Ranger1', state: 'online' },
       { index: 1, kind: 'headless', character: 'Mage1', state: 'starting' },
     ],
-    steamSwitch: { from: 'Ranger1', target: 'Mage1', startedAt: Date.now(), timedOut: false, phase: 'failed', error: 'navigate timed out' },
+    steamSwitch: { from: 'Ranger1', target: 'Mage1', startedAt: Date.now(), phase: 'failed', failure: 'navigate', error: 'navigate timed out' },
   }
   await server.install(page)
   const bodies = posts(page)

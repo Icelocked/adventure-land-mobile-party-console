@@ -234,3 +234,16 @@ test('Hunt settings: Clear all requires confirmation before it actually clears t
   await page.getByRole('button', { name: 'Clear all', exact: true }).click()
   await expect(page.getByText('No monsters blacklisted.')).toBeVisible()
 })
+
+test("ItemActionPanel: a failed NPC sale names the merchant bag wait (console U3)", async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30, items: [{ name: 'ironore', level: 0, q: 5 }] })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  // A failed sale keeps the bag signature it failed on and carries no retry time (items/coordinator/market.ts failNpcSales).
+  server.npcSaleMarks = [{ id: 'npc-1', source: 'merchant', slot: 0, item: { name: 'ironore', level: 0 }, quantity: 5, state: 'retrying', error: 'NPC refused' } as never]
+  await server.install(page)
+
+  await page.goto('/characters/Merchantina')
+  await expect(page.getByTestId('inventory-slot-0').getByTitle('NPC sale: retrying · NPC refused · Retries when the merchant bag changes')).toBeVisible()
+})

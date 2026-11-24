@@ -316,7 +316,6 @@ export interface NpcSaleMark {
   quantity: number
   state?: string
   error?: string | null
-  retryAt?: number | null
 }
 
 /** One pending deconstruction mark (also a flat account-wide list).
@@ -637,6 +636,9 @@ export interface PartyStateDynamic {
   monsterSearchRadiusByCharacter: Record<string, number>
   huntBlacklist: Record<string, HuntBlacklistEntry>
   huntSettings?: HuntSettings | null
+  // The party's relocation switch, a root setting the Hunt settings no longer hold (console
+  // hunting/rules.ts HuntSettings).
+  relocateIfCompeting?: boolean
   // Achievement Hunt (upstream console PR #131; Ryan's v1.4.0 has none).
   // See consoleHasAchievementHunt.
   achievementHunt?: AchievementHuntSettings | null
@@ -651,6 +653,11 @@ export interface PartyStateDynamic {
   // Only for characters that neither lead nor follow; the leader and its
   // followers use the top-level fields. See resolveFarmingContext.
   farmingProfiles: Record<string, FarmingProfile>
+  // Core's live controller state per farming scope; config's farmingProfiles keeps the settings
+  // (console status/coordinator/state.ts scopeFields).
+  farmingLive?: Record<string, { monsterHunt?: MonsterHuntCycle | null; farmAreaState?: FarmAreaState | null }>
+  // Core's rows of items with more than one automatic rule (console items/rules.ts incompatibleRuleRows).
+  incompatibleRules?: { item: Item; actions: string[] }[]
   // Standing WTB orders, one per item id, filled up to `price`.
   standBids: Record<string, StandBid>
   // Use an offering instead of scrolls during automatic upgrades within a
@@ -876,11 +883,18 @@ export interface HuntBlacklistEntry {
 export interface HuntSettings {
   // Preferred spawn per monster.
   preferredSpawns?: Record<string, string>
-  relocateIfCompeting: boolean
+  // A save from before the root setting may still carry it; the switch reads the root.
+  relocateIfCompeting?: boolean
   blacklistDeaths: boolean
   deathThreshold: number
   blacklistExpirations: boolean
   expirationThreshold: number
+}
+
+/** Whether the coordinator counts a character online, by its one presence rule
+ *  (status/coordinator/state.ts `online`), which core's characterDetails carries. */
+export function characterOnline(detail: CharacterDiagnostics | undefined): boolean {
+  return detail?.online === true
 }
 
 /** Whether the console runs Achievement Hunt (upstream PR #131). A console
@@ -896,23 +910,26 @@ export function consoleHasAchievementHunt(state: Pick<PartyStateDynamic, 'achiev
  *  entry. `savedMode` is what this character selected; `effectiveMode` is
  *  what is running. Console: farming-context.ts. */
 export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
-  const followingLeader = state.leader && state.leader !== name && state.followers[name] ? state.leader : undefined
+  // The console's scope owner (tasks/rules.ts scopeOwner): the merchant farms in its own scope
+  // even with a saved follower mark.
+  const followingLeader = state.leader && state.leader !== name && name !== state.merchantCharacter && state.followers[name] ? state.leader : undefined
   const owner = followingLeader || name
   const legacy = owner === state.leader
   const personal = state.farmingProfiles[name]
   const effective = state.farmingProfiles[owner]
+  const live = state.farmingLive?.[owner]
   // Achievement settings stay undefined without the console capability, so
   // every Achievement Hunt control and status gates on it.
   const achievementHunt = consoleHasAchievementHunt(state)
   return {
     owner,
     followingLeader,
-    farmArea: effective?.farmAreaState || (legacy ? state.farmAreaState : undefined) || null,
+    farmArea: live?.farmAreaState || (legacy ? state.farmAreaState : undefined) || null,
     savedMode: personal?.farmingPolicy || (name === state.leader ? state.farmingPolicy : undefined) || 'auto',
     effectiveMode: effective?.farmingPolicy || (legacy ? state.farmingPolicy : undefined) || 'auto',
     blacklist: effective?.huntBlacklist || (legacy ? state.huntBlacklist : undefined) || {},
     settings: effective?.huntSettings || (legacy ? state.huntSettings ?? undefined : undefined),
-    hunt: effective?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
+    hunt: live?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
     achievementSettings: achievementHunt ? effective?.achievementHunt || (legacy ? state.achievementHunt : undefined) || undefined : undefined,
     achievementBlacklist: effective?.achievementBlacklist || (legacy ? state.achievementBlacklist : undefined) || {},
     achievementMessage: effective?.achievementMessage ?? (legacy ? state.achievementMessage : undefined) ?? '',
@@ -1012,6 +1029,7 @@ export interface CharacterDiagnostics {
   server?: string
   level?: number
   seenAt?: number
+  online?: boolean
   ping?: number
   owner?: string | number
   skin?: string
@@ -1058,7 +1076,8 @@ export interface SteamSwitch {
   from: string | null
   target: string | null
   startedAt: number
-  timedOut: boolean
+  // Why a failed switch failed, such as "timeout" (console lifecycle/roster/handoff.ts).
+  failure?: string | null
   phase?: 'awaiting-realm-choice' | 'preparing' | 'release' | 'confirm-release' | 'navigate' | 'complete' | 'failed'
   error?: string | null
 }

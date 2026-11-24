@@ -1,3 +1,4 @@
+import { caveVisitCurrent } from '@/lib/caveVisit'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { DungeonView } from '@/models/dungeon'
@@ -58,7 +59,7 @@ export function dungeonCountdown(at: number, now: number) {
 export function dungeonEntryLabel(view: DungeonView | undefined, now: number) {
   const member = view?.members[0],
     visit = member?.observation?.visit
-  if (!member?.fresh || !visit || now - visit.checkedAt > 45000) return 'Availability unknown'
+  if (!member?.fresh || !visit || !caveVisitCurrent(visit, now)) return 'Availability unknown'
   if (visit.available) return 'Available now'
   if (visit.resets > now) return `Next entry: ${dungeonCountdown(visit.resets, now)}`
   return 'Checking availability…'

@@ -17,7 +17,7 @@ export const QK = {
   escape: ['escape'] as const,
   latencyMs: ['latencyMs'] as const,
   configLoadedAt: ['configLoadedAt'] as const,
-  // Core's characterDetails and the server clock offset.
+  // Core's characterDetails, and the server clock offset the live heartbeat measures.
   characterDiagnostics: ['characterDiagnostics'] as const,
   serverOffset: ['serverOffset'] as const,
 }

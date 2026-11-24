@@ -1,3 +1,4 @@
+import { caveVisitCurrent } from '@/lib/caveVisit'
 import { useState } from 'react'
 import { Settings } from 'lucide-react'
 import { useClock } from '@/lib/duration'
@@ -30,7 +31,7 @@ export function CaveEventRow() {
         m.fresh &&
         m.observation?.supported &&
         m.observation.visit &&
-        now - m.observation.visit.checkedAt < 45000 &&
+        caveVisitCurrent(m.observation.visit, now) &&
         (m.observation.visit.available || m.observation.visit.resume),
     )
   return (

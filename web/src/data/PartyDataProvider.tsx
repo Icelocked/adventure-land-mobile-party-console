@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { PartyApiClient } from '@/api/partyApi'
-import { connectLive, type LiveEvent } from '@/api/liveConnection'
+import { PartyApiClient, type ApiResult } from '@/api/partyApi'
+import { connectLive, type LiveConnection, type LiveEvent } from '@/api/liveConnection'
 import type { LiveRecordWire } from '@/api/liveProtocol'
 import type { ServerSettings } from '@/config/serverConfig'
 import type {
@@ -16,7 +16,7 @@ import type {
   PartyStateDynamic,
   RosterMember,
 } from '@/models'
-import { emptyPartyStateDynamic } from '@/models'
+import { characterOnline, emptyPartyStateDynamic } from '@/models'
 import { QK } from './queryKeys'
 import { affectedDomains, PARTY_ACTION_EVENT, type Domain, type PartyActionDetail } from './queryActions'
 
@@ -110,11 +110,14 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   // The market domain's aldata (with listings) - wins over core's stripped copy.
   const marketAldata = useRef<PartyStateDynamic['aldata']>(null)
   const catalogLoaded = useRef(false)
+  // The live stream, told after each core poll that answered (LiveConnection.coreAnswered).
+  const live = useRef<LiveConnection | null>(null)
+  // The ETag of the last body applied per revision section (bank, logs, market).
+  const revisions = useRef<Record<string, string | null>>({})
 
   const fetchers = useMemo(() => {
     type CoreWire = Partial<PartyStateDynamic> & {
       characterDetails?: Record<string, CharacterDiagnostics>
-      serverNow?: number
       characters?: Record<string, Pick<RosterMember, 'name' | 'ctype' | 'level' | 'server'>>
     }
     type LogsWire = {
@@ -126,13 +129,24 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       queryClient.setQueryData<PartyStateDynamic>(QK.dynamicState, (current) => ({ ...emptyPartyStateDynamic(), ...(current ?? {}), ...patch }))
     // dashboard=1 requests the dashboard-shaped payload.
     const section = <T,>(name: string) => api.getJson<T>(`state?catalog=0&dashboard=1&section=${name}`)
+    // A revision section (console rules.ts TABLE_S): unchanged answers 304 and keeps what was applied.
+    const revisionSection = async <T,>(name: 'bank' | 'logs' | 'market'): Promise<ApiResult<T> | null> => {
+      const result = await api.getSection<T>(`state?catalog=0&dashboard=1&section=${name}`, revisions.current[name] ?? null)
+      if (result.kind === 'unchanged') return null
+      if (result.kind === 'failure') {
+        revisions.current[name] = null
+        return result
+      }
+      revisions.current[name] = result.revision
+      return { kind: 'success', value: result.value }
+    }
 
     const core = async () => {
-      const sentAt = Date.now()
       const result = await section<CoreWire>('core')
       if (result.kind !== 'success') return
+      live.current?.coreAnswered()
       // bankbois: core only has item-less summaries; the bank section has the full entries.
-      const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, serverNow, ...patch } = result.value
+      const { characterDetails, bankbois: _bankboiSummaries, characters: summaries, ...patch } = result.value
       // A different account on the same server invalidates everything; reload.
       const accountId = patch.accountId ?? null
       if (accountId && lastAccountId.current && accountId !== lastAccountId.current) {
@@ -140,8 +154,6 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
         return
       }
       if (accountId) lastAccountId.current = accountId
-      // Clock offset, measured against the midpoint of the round trip.
-      if (serverNow) queryClient.setQueryData(QK.serverOffset, serverNow - (sentAt + Date.now()) / 2)
       if (characterDetails) queryClient.setQueryData(QK.characterDiagnostics, characterDetails)
       if (summaries) {
         const roster = { ...rosterRef.current }
@@ -192,22 +204,22 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
         // follows at once so the fork's npcShop gate appears without a 60s wait.
         if (!lastReferenceRevision.current) return
       }
-      const result = await section<Partial<PartyStateDynamic>>('market')
-      if (result.kind !== 'success') return
+      const result = await revisionSection<Partial<PartyStateDynamic>>('market')
+      if (result?.kind !== 'success') return
       if (result.value.aldata) marketAldata.current = result.value.aldata
       mergeState(result.value)
     }
 
-    const simple = (name: string) => async () => {
-      const result = await section<Partial<PartyStateDynamic>>(name)
-      if (result.kind === 'success') mergeState(result.value)
+    const bank = async () => {
+      const result = await revisionSection<Partial<PartyStateDynamic>>('bank')
+      if (result?.kind === 'success') mergeState(result.value)
     }
 
     const logs = async () => {
-      const result = await section<LogsWire>('logs')
+      const result = await revisionSection<LogsWire>('logs')
       // A failed refresh keeps the retained logs and flags the error.
-      queryClient.setQueryData(QK.logsError, result.kind !== 'success')
-      if (result.kind !== 'success') return
+      queryClient.setQueryData(QK.logsError, result?.kind === 'failure')
+      if (result?.kind !== 'success') return
       const { combatLogs, merchantActivity, gameLogs } = result.value
       mergeState({ ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}) })
       queryClient.setQueryData(QK.gameLogs, gameLogs ?? {})
@@ -244,7 +256,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     const applyFallback = (name: string, patch: Partial<LiveRecordWire>) => {
       // A response that lands after the stream recovered is stale.
       if (queryClient.getQueryData<boolean>(QK.connected) !== false) return
-      const previous = fallbackRecords.get(name) ?? { generation: 'poll', sample: 0, sampledAt: Date.now(), vitals: {}, items: {}, slots: {} }
+      const previous = fallbackRecords.get(name) ?? { generation: 'poll', sample: 0, vitals: {}, items: {}, slots: {} }
       const record = { ...previous, ...patch }
       fallbackRecords.set(name, record)
       queryClient.setQueryData<Record<string, CharacterState>>(QK.characters, (current) => ({
@@ -298,7 +310,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     const triggers = {
       core: singleFlight(core),
       config: singleFlight(config),
-      bank: singleFlight(simple('bank')),
+      bank: singleFlight(bank),
       market: singleFlight(market),
       logs: singleFlight(logs),
       mail: singleFlight(mail),
@@ -416,6 +428,10 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
   // Live SSE connection - character vitals/inventory + connection health.
   useEffect(() => {
     const handleEvent = (event: LiveEvent) => {
+      if (event.kind === 'serverClock') {
+        queryClient.setQueryData(QK.serverOffset, event.offset)
+        return
+      }
       if (event.kind === 'connectionHealth') {
         queryClient.setQueryData(QK.connected, event.healthy)
         if (!event.healthy && event.error) queryClient.setQueryData(QK.lastConnectionError, event.error)
@@ -432,8 +448,12 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
         return next
       })
     }
-    const close = connectLive(settings, handleEvent)
-    return close
+    const connection = connectLive(settings, handleEvent)
+    live.current = connection
+    return () => {
+      connection.close()
+      if (live.current === connection) live.current = null
+    }
   }, [settings, queryClient])
 
   const value = useMemo<PartyDataContextValue>(
@@ -497,10 +517,9 @@ export function useCharacterDiagnostics(name: string): CharacterDiagnostics | un
 }
 /** Every character's diagnostics (active slots only). */
 export const useCharacterDiagnosticsMap = (): Record<string, CharacterDiagnostics> => useCachedValue(QK.characterDiagnostics, {})
-/** Seen by the coordinator within the last 10s. */
+/** Online by the coordinator's presence rule, which core's characterDetails carries. */
 export function useCharacterOnline(name: string): boolean {
-  const seenAt = Number(useCharacterDiagnostics(name)?.seenAt || 0)
-  return Date.now() - seenAt < 10_000
+  return characterOnline(useCharacterDiagnostics(name))
 }
 /** Server clock minus this device's clock, in ms. */
 export const useServerOffset = (): number => useCachedValue(QK.serverOffset, 0)

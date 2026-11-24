@@ -143,6 +143,39 @@ function parseCommandResult(text: string): CommandResult {
   }
 }
 
+/** A refusal's words: its JSON `error`, else its own text, else the status line, as the
+ *  dashboard's action client keeps them (query-actions.ts `send`). */
+function refusalMessage(response: Response, text: string, parsed: CommandResult): string {
+  if (parsed.error) return parsed.error
+  if (!parsed.data && text.trim()) return text
+  return `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`
+}
+
+/** One change for the settings route (console settings-write.ts SettingsChange). */
+export interface SettingsChange {
+  field: string
+  value: unknown
+  character?: string
+}
+/** GET /party-api/settings: the page's basis and every declared setting. */
+export interface SettingsPage {
+  settingsAt: number
+  settings: { field: string; label?: string; value?: unknown; min?: number; max?: number }[]
+}
+
+/** The words a refused settings write shows (console settings-write.ts `write`). */
+export function settingsRefusalNotice(status: number | undefined, body: Record<string, unknown> | undefined, message: string): string {
+  if (status === 409 && body?.reason === 'out of date') {
+    const field = String(body.field ?? 'This setting'),
+      who = body.character ? ` for ${String(body.character)}` : ''
+    return `${field}${who} was not saved: the page was out of date, so it now shows the console's current value. Make the change again if you still want it.`
+  }
+  return message
+}
+
+/** A revision section's read: its body and ETag, or unchanged on a 304. */
+export type SectionResult<T> = { kind: 'success'; value: T; revision: string | null } | { kind: 'unchanged' } | { kind: 'failure'; message: string; status?: number }
+
 /** Carries this browser's saved launcher choices (set on the console's
  *  setup page) to the local launcher. Console: steam-client-setup.ts. */
 function steamClientSetup(body: Record<string, unknown>): Record<string, unknown> {
@@ -202,6 +235,38 @@ export class PartyApiClient {
     }
   }
 
+  /** A state section the coordinator answers 304 for while unchanged (console rules.ts TABLE_S
+   *  `revision`: bank, logs, market). `revision` is the ETag of the last body this client
+   *  applied; the dashboard sends it the same way (query-cache.tsx `readRevision`). */
+  async getSection<T>(path: string, revision: string | null): Promise<SectionResult<T>> {
+    const url = this.url(revision ? `${path}&revision=${encodeURIComponent(revision)}` : path)
+    try {
+      const response = await timedFetch(url, {}, GET_TIMEOUT_MS)
+      if (isAuthLoss(response)) {
+        signalAuthLoss()
+        return { kind: 'failure', message: 'Session expired. Reconnect this browser.', status: 401 }
+      }
+      if (response.status === 304) return { kind: 'unchanged' }
+      if (!response.ok) return { kind: 'failure', message: `HTTP ${response.status}`, status: response.status }
+      const tag = response.headers.get('ETag')
+      return { kind: 'success', value: JSON.parse(await response.text()) as T, revision: tag ? tag.replace(/^"|"$/g, '') : null }
+    } catch (error) {
+      return { kind: 'failure', message: error instanceof SyntaxError ? 'Unexpected non-JSON response' : errorMessage(error) }
+    }
+  }
+
+  /** GET /party-api/settings - the basis every settings write sends. */
+  async getSettingsPage(): Promise<ApiResult<SettingsPage>> {
+    return this.getJson<SettingsPage>('settings')
+  }
+
+  /** POST /party-api/settings - a setting with no route of its own, with the page's
+   *  `settingsAt` as its basis (console settings-write.ts). A stale basis answers 409
+   *  `reason: 'out of date'`. */
+  async writeSettings(changes: SettingsChange[], basis: number | undefined): Promise<ApiResult<CommandResult>> {
+    return this.post('settings', { changes, basis })
+  }
+
   async getRoot(path: string): Promise<ApiResult<string>> {
     return getText(this.rootUrl(path))
   }
@@ -243,7 +308,7 @@ export class PartyApiClient {
       const text = await response.text()
       if (!response.ok || response.redirected) {
         const parsed = parseCommandResult(text)
-        const message = parsed.error ?? `HTTP ${response.status}`
+        const message = refusalMessage(response, text, parsed)
         resolveActionToast(toastId, 'failed', message)
         return fail(message, response.status, parsed.data)
       }

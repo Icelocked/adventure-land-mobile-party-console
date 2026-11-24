@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 import { createServer, type Server, type ServerResponse } from 'node:http'
 
 /**
@@ -83,9 +84,10 @@ export interface MockCatalogEntry {
 
 const testSprite = () => ({ url: '/e2e-sprite.png', tileSize: 8, columns: 1, rows: 1, x: 0, y: 0 })
 
-// Console: runtime/coordinator/telemetry/public-state.ts (configFields,
-// configExtraKeys). Keep in sync with console releases: these decide which
-// keys `section=core&dashboard=1` strips and `section=config` serves.
+// Console: runtime/status/coordinator/state.ts configPayload, the settings delivered to
+// `dashboard` (runtime/settings/lists.ts dashboardFields) plus table S's config row. Keep in sync
+// with console releases: these decide which keys `section=core&dashboard=1` strips and
+// `section=config` serves.
 const CONFIG_FIELDS = [
   'characterAppearances', 'merchantRules',
   'bankboiPrefix', 'anniversaryAutoChat', 'farmingProfiles',
@@ -109,7 +111,17 @@ const CONFIG_FIELDS = [
   'designatedTank', 'offTank', 'pullMode',
   // Console 1.5: each account character's last saved observation.
   'characterSnapshots',
+  // The owners release's root and slot settings.
+  'relocateIfCompeting', 'combatMode', 'targetMode',
 ] as const
+// The farming profile fields core's `farmingLive` carries per scope (state.ts scopeFields).
+const FARMING_LIVE_FIELDS = ['monsterHunt', 'farmAreaState'] as const
+// The coordinator's presence window (runtime/protocol/reports.ts REPORT_AGE_DEFAULTS.reportPresenceMs).
+const PRESENCE_MS = 10_000
+// Table S's revision sections (runtime/status/rules.ts TABLE_S), which answer 304 while unchanged.
+const REVISION_SECTIONS = new Set(['bank', 'logs', 'market'])
+// The stream's heartbeat period the mock names (runtime/status/rules.ts streamHeartbeatMs is 5 s).
+const HEARTBEAT_MS = 2000
 // Console 1.5 events and realms: dashboard/lib/event-policy.ts supportedEvents,
 // which /formation's eventPriorities must permute and eventLimits must name.
 const OCTOBER_EVENTS = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
@@ -235,6 +247,15 @@ export class MockPartyServer {
   monsterChoices: { id: string; locations?: { map: string; x: number; y: number; mapName?: string; boundary?: number[] }[] }[] = []
   phoenixRouteOrder: string[] = []
   huntSettings: Record<string, unknown> | null = null
+  // The party's root relocation switch (hunting/saved-fields.ts, default on).
+  relocateIfCompeting = true
+  // The settings route's basis and every write it took.
+  settingsAt = 1
+  settingsWrites: { changes: { field: string; value: unknown; character?: string }[]; basis: unknown }[] = []
+  // Each revision section read, and whether it answered 304.
+  revisionReads: { section: string; revision: string | null; unchanged: boolean }[] = []
+  // How far the coordinator's clock runs ahead of the test machine's, sent in each heartbeat.
+  serverClockAheadMs = 0
   monsterHunt: Record<string, unknown> | null = null
   // resolveFarmingContext (models/state.ts) uses the top-level farmingPolicy/
   // huntBlacklist/monsterHunt only for the leader; every other character
@@ -404,6 +425,7 @@ export class MockPartyServer {
       monsterChoices: this.monsterChoices,
       phoenixRouteOrder: this.phoenixRouteOrder,
       huntSettings: this.huntSettings,
+      relocateIfCompeting: this.relocateIfCompeting,
       monsterHunt: this.monsterHunt,
       leader: this.leader,
       followers: this.followers,
@@ -518,9 +540,16 @@ export class MockPartyServer {
         // public-state.ts bankboiSummaries: no items/slots on core.
         bankbois: ((full.bankbois as Record<string, unknown>[]) ?? []).map((entry) => omit(entry, ['items', 'slots'])),
         // diagnosticCharacters() allowlists monsterHunt (among others).
-        characterDetails: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level, seenAt: Date.now(), monsterHunt: c.monsterHunt ?? null, ...c.diagnostics }])),
+        // diagnosticCharacters(): `online` is the coordinator's presence rule over seenAt.
+        characterDetails: Object.fromEntries(
+          this.characters.map((c) => {
+            const detail = { name: c.name, ctype: c.ctype, level: c.level, seenAt: Date.now(), monsterHunt: c.monsterHunt ?? null, ...c.diagnostics }
+            return [c.name, { ...detail, online: Date.now() - Number(detail.seenAt || 0) < PRESENCE_MS }]
+          }),
+        ),
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
-        serverNow: Date.now(),
+        // state.ts scopeFields(live): each scope's live controller state.
+        farmingLive: Object.fromEntries(Object.entries(this.farmingProfiles).map(([name, profile]) => [name, pick(profile, FARMING_LIVE_FIELDS)])),
         bankGold: this.bankGold,
         // extraState.accountGold (metrics.spec.ts) wins over the computed sum.
         accountGold: this.accountGold ?? (this.extraState.accountGold as typeof this.accountGold) ?? (() => {
@@ -547,7 +576,6 @@ export class MockPartyServer {
       characters[c.name] = {
         generation: 'g1',
         sample: 1,
-        sampledAt: Date.now(),
         vitals: {
           hp: c.hp ?? 100,
           max_hp: c.max_hp ?? 100,
@@ -657,15 +685,15 @@ export class MockPartyServer {
       server.listen(0, '127.0.0.1', () => {
         const address = server.address()
         const port = typeof address === 'object' && address ? address.port : 0
-        // Heartbeat well inside liveConnection.ts's 15s watchdog.
-        setInterval(() => this.broadcastHeartbeat(), 2000).unref()
+        // The app fails the stream after three missed heartbeats (liveProtocol.ts watchdogMs).
+        setInterval(() => this.broadcastHeartbeat(), HEARTBEAT_MS).unref()
         resolve(`http://127.0.0.1:${port}`)
       })
     })
   }
 
   private broadcastHeartbeat() {
-    const frame = `data: ${JSON.stringify({ type: 'heartbeat', epoch: 'e1', sequence: this.sseSequence++ })}\n\n`
+    const frame = `data: ${JSON.stringify({ type: 'heartbeat', epoch: 'e1', sequence: this.sseSequence++, at: Date.now() + this.serverClockAheadMs, heartbeatMs: HEARTBEAT_MS })}\n\n`
     for (const client of this.sseClients) client.write(frame)
   }
 
@@ -761,6 +789,18 @@ export class MockPartyServer {
         status: 200,
         json: { ok: true, encounter, mode: routines[encounter], deathLimit: limits[encounter], ...(owner ? { farmingOwner: owner, savedFarmingPolicy: policy(owner), effectiveFarmingPolicy: policy(owner) } : {}) },
       }
+    }
+    if (path === 'settings') {
+      // settings/coordinator/writer.ts: a write whose basis is older than the last write is refused.
+      const changes = (body.changes ?? []) as { field: string; value: unknown; character?: string }[]
+      this.settingsWrites.push({ changes, basis: body.basis })
+      if (body.basis !== this.settingsAt) return { status: 409, json: { error: 'out of date', reason: 'out of date', field: changes[0]?.field } }
+      for (const change of changes) {
+        if (change.field === 'relocateIfCompeting') this.relocateIfCompeting = change.value === true
+        else this.extraState = { ...this.extraState, [change.field]: change.value }
+      }
+      this.settingsAt += 1
+      return { status: 200, json: { ok: true } }
     }
     if (path === 'formation') {
       // http/formation.ts: `leader` is only touched when the key is
@@ -1189,6 +1229,9 @@ export class MockPartyServer {
       if ('error' in scope) return { status: scope.status, json: { error: scope.error } }
       const { character: _character, action, monsterId, ...patch } = body
       if (path === 'hunt-settings') {
+        // hunting/coordinator/routes.ts settings(): a patch's relocation switch writes the root setting.
+        if (typeof patch.relocateIfCompeting === 'boolean') this.relocateIfCompeting = patch.relocateIfCompeting
+        delete patch.relocateIfCompeting
         if (scope.profile) this.updateProfile(scope.profile, { huntSettings: { ...((this.farmingProfiles[scope.profile]?.huntSettings as object) ?? {}), ...patch } })
         else this.huntSettings = { ...(this.huntSettings ?? {}), ...patch }
         return { status: 200, json: { ok: true } }
@@ -1548,7 +1591,19 @@ export class MockPartyServer {
       }
       if (section === 'config' && this.configDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.configDelayMs))
       if (section === 'logs' && this.failLogs) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
-      return route.fulfill({ json: this.stateSection(section, dashboard) })
+      const answer = this.stateSection(section, dashboard)
+      if (!REVISION_SECTIONS.has(section)) return route.fulfill({ json: answer })
+      // state.ts sendWithRevision: the body's hash is its ETag; a matching revision answers 304.
+      const tag = createHash('sha1').update(JSON.stringify(answer)).digest('hex')
+      const revision = url.searchParams.get('revision')
+      this.revisionReads.push({ section, revision, unchanged: revision === tag })
+      if (revision === tag) return route.fulfill({ status: 304, headers: { ETag: `"${tag}"` }, body: '' })
+      return route.fulfill({ json: answer, headers: { ETag: `"${tag}"` } })
+    })
+    // settings/coordinator/routes/settings.ts: the page's basis and the declared settings.
+    await page.route('**/party-api/settings', (route) => {
+      if (route.request().method() !== 'GET') return route.fallback()
+      return route.fulfill({ json: { settingsAt: this.settingsAt, settings: [{ field: 'relocateIfCompeting', value: this.relocateIfCompeting }] } })
     })
     await page.route('**/party-api/metrics**', (route) => {
       const request = route.request()

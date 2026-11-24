@@ -1,3 +1,4 @@
+import { npcSaleLine } from '@/lib/npcSaleLine'
 import { useRef, useState, type ReactNode } from 'react'
 import { useSectionOpen } from '@/lib/sectionOpen'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -150,9 +151,7 @@ export function InventorySection({
                 mark.slot === entry.slot &&
                 automaticCommerceRuleKey(mark.item) === automaticSaleKey,
             )
-            const npcSaleDetails = npcSale
-              ? [`NPC sale: ${npcSale.state || 'queued'}`, npcSale.error, npcSale.retryAt ? `Retry after ${new Date(npcSale.retryAt).toLocaleTimeString()}` : null].filter(Boolean).join(' · ')
-              : null
+            const npcSaleDetails = npcSale ? npcSaleLine(npcSale) : null
             const deconstruction = state.deconstructionMarks.find(
               (mark) => mark.owner === characterName && mark.slot === entry.slot && mark.state !== 'complete' && sameMarkedItem(entry.item, mark.item),
             )

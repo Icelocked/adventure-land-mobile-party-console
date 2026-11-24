@@ -14,10 +14,10 @@ import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type Monste
 import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
 import { AchievementHuntSettingsBlock } from './AchievementHuntSettings'
 import { PartyRolesSettings } from '@/screens/PartyRolesSettings'
+import { useSettingsWrite } from '@/data/useSettingsWrite'
 
-// Server defaults (runtime/coordinator/hunt/settings.ts).
+// Server defaults (console hunting/rules.ts defaultHuntSettings).
 const DEFAULT_HUNT_SETTINGS: HuntSettings = {
-  relocateIfCompeting: true,
   blacklistDeaths: true,
   deathThreshold: 1,
   blacklistExpirations: true,
@@ -64,6 +64,10 @@ export function HuntSettingsScreen() {
   const inherited = !!context.followingLeader
   const settings = { ...DEFAULT_HUNT_SETTINGS, ...context.settings }
   const editable = configLoaded && !inherited
+  // The relocation switch is the party's root setting (console hunting/saved-fields.ts, default
+  // on), written through the settings route as farming-settings-section.tsx writes it.
+  const relocation = useSettingsWrite()
+  const relocateIfCompeting = dynamicState.relocateIfCompeting ?? true
 
   const [deaths, setDeaths] = useState(String(settings.deathThreshold))
   const [expirations, setExpirations] = useState(String(settings.expirationThreshold))
@@ -146,13 +150,15 @@ export function HuntSettingsScreen() {
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={settings.relocateIfCompeting}
-            onChange={(e) => void save({ relocateIfCompeting: e.target.checked })}
+            checked={relocateIfCompeting}
+            disabled={!relocation.ready || relocation.pending}
+            onChange={(e) => void relocation.write([{ field: 'relocateIfCompeting', value: e.target.checked }])}
             className="size-4"
           />
           Relocate to different spawn if competing
         </label>
         <p className="-mt-2 text-xs text-muted-foreground">Relocate only when everyone’s hunt radius is empty and a competing farmer is nearby.</p>
+        {relocation.notice && <p role="alert" className="-mt-2 text-xs text-destructive">{relocation.notice}</p>}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={settings.blacklistDeaths} onChange={(e) => void save({ blacklistDeaths: e.target.checked })} className="size-4" />
           Blacklist hunts after

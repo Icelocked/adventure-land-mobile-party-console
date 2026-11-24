@@ -76,3 +76,40 @@ test('Hunt settings: an invalid threshold shows an error and saves nothing', asy
   await expect(page.getByText('Thresholds must be positive whole numbers.')).toBeVisible()
   expect(bodies).toHaveLength(0)
 })
+
+test("Hunt settings: the relocation switch shows the party's root setting and writes it through the settings route", async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
+  server.leader = 'MainLeader'
+  // The owners release keeps the switch at the root; a save's Hunt settings copy no longer counts.
+  server.relocateIfCompeting = false
+  server.huntSettings = { blacklistDeaths: true, deathThreshold: 2, blacklistExpirations: true, expirationThreshold: 1 }
+  server.settingsAt = 7
+  await server.install(page)
+
+  await page.goto('/characters/MainLeader/hunt-settings')
+  const relocate = page.getByRole('checkbox', { name: 'Relocate to different spawn if competing' })
+  await expect(relocate).not.toBeChecked()
+  await expect(relocate).toBeEnabled()
+  await relocate.click()
+  await expect.poll(() => server.settingsWrites).toEqual([{ changes: [{ field: 'relocateIfCompeting', value: true }], basis: 7 }])
+  await expect(relocate).toBeChecked()
+})
+
+test("Hunt settings: an out-of-date relocation write shows the console's notice", async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'MainLeader', ctype: 'warrior', level: 60 })
+  server.leader = 'MainLeader'
+  await server.install(page)
+
+  await page.goto('/characters/MainLeader/hunt-settings')
+  const relocate = page.getByRole('checkbox', { name: 'Relocate to different spawn if competing' })
+  await expect(relocate).toBeEnabled()
+  // Another browser saved a setting since this page read its basis.
+  server.settingsAt = 2
+  await relocate.click()
+  await expect(page.getByRole('alert')).toContainText('relocateIfCompeting was not saved: the page was out of date')
+  await expect(relocate).toBeChecked()
+})

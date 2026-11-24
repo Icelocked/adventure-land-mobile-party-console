@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSettingsWrite } from '@/data/useSettingsWrite'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -82,11 +83,13 @@ function BankSortSetting() {
 }
 
 function BuyUpgradeBatchSetting() {
-  const api = usePartyApi()
   const value = useDynamicState().buyUpgradeBatchSize ?? 1
   const [draft, setDraft] = useState(String(value))
   useEffect(() => setDraft(String(value)), [value])
-  const { busy, error, run } = useSetting()
+  // Written through the settings route, as buy-upgrade-batch-setting.tsx writes it.
+  const settings = useSettingsWrite()
+  const busy = !settings.ready || settings.pending
+  const error = settings.notice
   const count = Number(draft)
   const valid = Number.isSafeInteger(count) && count >= 1 && count <= 42
   return (
@@ -98,7 +101,7 @@ function BuyUpgradeBatchSetting() {
       </p>
       <div className="flex gap-2">
         <Input id="buy-upgrade-batch" inputMode="numeric" value={draft} onChange={(e) => setDraft(e.target.value)} />
-        <Button size="sm" disabled={!valid} onClick={() => void run(() => api.post('config', { buyUpgradeBatchSize: count }))}>
+        <Button size="sm" disabled={!valid} onClick={() => void settings.write([{ field: 'buyUpgradeBatchSize', value: count }])}>
           Apply
         </Button>
       </div>
