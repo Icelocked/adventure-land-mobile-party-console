@@ -271,6 +271,8 @@ export class MockPartyServer {
   addons: Record<string, unknown>[] = []
   addonSlots: Record<string, Record<string, unknown>[]> = { 'combat-mode': CORE_COMBAT_MODES, 'target-mode': CORE_TARGET_MODES, 'combat-routine': [], formation: [], 'merchant-routine': [] }
   addonsFail = false
+  // status/coordinator/apps.ts: each app key record (public fields) and the issued key count.
+  appKeys: { name: string; scopes: string[]; ownCommands: boolean; issuedAt: number; lastUsedAt: number | null; revokedAt: number | null }[] = []
   // Every POST /party-api/farming-mode body.
   farmingModeWrites: Record<string, unknown>[] = []
   // The declared settings the settings route lists beside the relocation switch, each with its
@@ -284,6 +286,7 @@ export class MockPartyServer {
     { field: 'reflectMagicByCharacter', label: "Don't hit with magic" },
     { field: 'reflectPhysicalByCharacter', label: "Don't hit with physical" },
     { field: 'routines', label: 'Routines' },
+    { field: 'appLocks', label: 'App locks' },
   ]
   // The settings route's basis and every write it took.
   settingsAt = 1
@@ -782,6 +785,27 @@ export class MockPartyServer {
     return { status: 200, json: { ok: true, combatMode: saved.combatMode, targetMode: saved.targetMode, savedOnly: true } }
   }
 
+  /** status/coordinator/apps.ts: issue, revoke and the own-commands switch. */
+  private appsCommand(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
+    const live = (name: string) => this.appKeys.find((key) => key.name === name && key.revokedAt === null)
+    if (path === 'apps') {
+      const name = String(body.name ?? '').trim()
+      const scopes = (Array.isArray(body.scopes) ? body.scopes : []).filter((scope) => ['read', 'command', 'settings', 'spend'].includes(String(scope))).map(String)
+      if (!/^(?!\d+$)\w+$/.test(name)) return { status: 400, json: { error: 'Name the app as the game names a character: letters, digits or _, not only digits' } }
+      if (live(name)) return { status: 409, json: { error: `${name} already has a key; revoke it first` } }
+      if (!scopes.length) return { status: 400, json: { error: 'Tick at least one scope' } }
+      const record = { name, scopes, ownCommands: body.ownCommands === true, issuedAt: Date.now(), lastUsedAt: null, revokedAt: null }
+      this.appKeys = [...this.appKeys.filter((key) => key.name !== name), record]
+      return { status: 200, json: { key: `key-${name}`, app: record } }
+    }
+    const [, name, verb] = path.split('/')
+    const key = live(decodeURIComponent(name))
+    if (!key) return { status: 404, json: { error: 'No live key has that name' } }
+    if (verb === 'revoke') key.revokedAt = Date.now()
+    else key.ownCommands = body.ownCommands === true
+    return { status: 200, json: { app: key } }
+  }
+
   /** Applies one POST body to /party-api/<path>, mutating mock state where
    *  the console would. Commands the tests don't exercise succeed as no-ops. */
   private applyCommand(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
@@ -853,6 +877,7 @@ export class MockPartyServer {
       }
     }
     if (path === 'farming-mode') return this.farmingMode(body)
+    if (path === 'apps' || path.startsWith('apps/')) return this.appsCommand(path, body)
     if (path === 'settings') {
       // settings/coordinator/writer.ts: a write whose basis is older than the last write is refused.
       const changes = (body.changes ?? []) as { field: string; value: unknown; character?: string }[]
@@ -1668,6 +1693,10 @@ export class MockPartyServer {
       this.revisionReads.push({ section, revision, unchanged: revision === tag })
       if (revision === tag) return route.fulfill({ status: 304, headers: { ETag: `"${tag}"` }, body: '' })
       return route.fulfill({ json: answer, headers: { ETag: `"${tag}"` } })
+    })
+    await page.route('**/party-api/apps', (route) => {
+      if (route.request().method() !== 'GET') return route.fallback()
+      return route.fulfill({ json: { apps: this.appKeys, scopes: ['read', 'command', 'settings', 'spend'] } })
     })
     await page.route('**/party-api/addons', (route) => {
       if (route.request().method() !== 'GET') return route.fallback()

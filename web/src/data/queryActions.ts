@@ -79,6 +79,10 @@ export const actionDomains = {
   // Console 1.4 combat and party: Franky routine, escape resume.
   '/encounter-mode': core,
   '/escape/resume': core,
+  // The owners release: the app keys screen and the add-on manager reload their own reads
+  // (dashboard query-actions.ts).
+  '/apps': [],
+  '/addons': [],
 } satisfies Record<string, readonly Domain[]>
 
 export function affectedDomains(path: string, body?: unknown): readonly Domain[] {
@@ -90,6 +94,7 @@ export function affectedDomains(path: string, body?: unknown): readonly Domain[]
   if (/^\/slots\/\d+\/(spawn|logout)$/.test(path)) return inventory
   if (/^\/bankbois\/[^/]+\/delete$/.test(path)) return ['core', 'config', 'bank']
   if (/^\/combat-log\/[^/]+\/clear$/.test(path)) return ['logs']
+  if (/^\/apps\/[^/]+\/(revoke|own-commands)$/.test(path)) return []
   // Routes not mapped above fall back to core + config.
   return actionDomains[path as keyof typeof actionDomains] ?? core
 }

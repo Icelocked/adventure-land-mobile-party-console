@@ -49,5 +49,8 @@ export function useSettingsWrite() {
   const declared = (field: string) => page.data?.settings.find((entry) => entry.field === field)
   const value = (field: string): unknown => declared(field)?.value
 
-  return { ready: configLoaded && page.data !== undefined, write, notice, pending, value, declared }
+  // Every declared setting the page lists, for the app lock list.
+  const fields = page.data?.settings ?? []
+
+  return { ready: configLoaded && page.data !== undefined, write, notice, pending, value, declared, fields }
 }

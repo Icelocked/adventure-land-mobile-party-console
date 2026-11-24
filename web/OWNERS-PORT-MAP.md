@@ -145,3 +145,7 @@ Two sets with no file in common:
     lists, add-on routine picks), home realm, merchant realm blacklist, the settings lock; the
     trip switches take merchant-trip-setting.tsx's words. `useSettingsWrite` adds `value` and
     `declared`. Tests: `lib/settingsTarget.test.ts`, e2e `settings-menu.spec.ts`.
+  - B18 done (before B5 and B10, which are larger). Account > Apps (`AppKeysSettings.tsx`)
+    issues, switches and revokes keys over `/apps` and locks settings through `appLocks`;
+    `/apps` and `/addons` posts refresh no state section. Tests: `data/appKeysDomains.test.ts`,
+    e2e `app-keys.spec.ts`.

@@ -23,6 +23,7 @@ import { MerchantSettings } from '@/screens/merchant/MerchantSettings'
 import { RestockSection } from '@/screens/character-detail/sections/RestockSection'
 import { LeaderFollowerSection } from '@/screens/character-detail/sections/LeaderFollowerSection'
 import { DungeonPanel } from '@/screens/dungeon/DungeonPanel'
+import { AppKeysSettings } from './AppKeysSettings'
 import { CombatSettingsSection } from './CombatSettingsSection'
 import { HomeRealmSetting } from './RealmSettings'
 import { SettingsLock } from './SettingsLock'
@@ -126,6 +127,7 @@ function Body({ target, current }: { target: SettingsTarget; current: string }):
               <About />
             </>
           )
+        case 'apps': return <AppKeysSettings />
         case 'hosting': return <HostingSettings />
         case 'console': return <ConsoleUpdateSettings />
       }
