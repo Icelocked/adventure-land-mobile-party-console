@@ -643,6 +643,8 @@ export interface PartyStateDynamic {
   // The party's relocation switch, a root setting the Hunt settings no longer hold (console
   // hunting/rules.ts HuntSettings).
   relocateIfCompeting?: boolean
+  // The realm list automatic merchant work skips (console merchant-realm-blacklist-setting.tsx).
+  merchantRealmBlacklist?: string[]
   // Achievement Hunt (upstream console PR #131; Ryan's v1.4.0 has none).
   // See consoleHasAchievementHunt.
   achievementHunt?: AchievementHuntSettings | null

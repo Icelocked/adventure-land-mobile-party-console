@@ -4,6 +4,7 @@ import { usePartyApi, useDynamicState, useRefreshDynamicStateNow } from '@/data/
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { consoleFeatures } from '@/models'
+import { MerchantRealmBlacklistSetting } from '@/screens/settings-menu/RealmSettings'
 
 type Result = { kind: string; message?: string }
 
@@ -29,8 +30,8 @@ const box = 'flex flex-col gap-2 rounded-md border border-border p-3 text-sm'
 const help = 'text-xs text-muted-foreground'
 
 /** "Merchant settings": bank sorting, replacement gathering tools,
- *  upgrade buy batch, stand location, delivery/withdrawal trips, and the
- *  gold and item collection thresholds. */
+ *  upgrade buy batch, stand location, delivery/withdrawal trips, the realm
+ *  blacklist, and the gold and item collection thresholds. */
 export function MerchantSettings() {
   return (
     <div className="flex flex-col gap-3 py-1 pl-3">
@@ -40,6 +41,7 @@ export function MerchantSettings() {
       <StandLocationSetting />
       <TripSetting kind="deliveries" />
       <TripSetting kind="withdrawals" />
+      <MerchantRealmBlacklistSetting />
       <ThresholdSettings />
     </div>
   )
@@ -169,7 +171,26 @@ function GatheringToolSetting() {
   )
 }
 
-function TripSetting({ kind }: { kind: 'deliveries' | 'withdrawals' }) {
+// The two "always create merchant jobs" switches (console merchant-trip-setting.tsx). Each shows
+// the value you asked for until its save settles, then the saved value.
+const TRIPS = {
+  deliveries: {
+    label: 'Marked deliveries always create merchant jobs',
+    help:
+      'When disabled, the merchant completes marked deliveries when visiting the party for another reason, ' +
+      'such as item collection. It will not make a trip for deliveries alone unless you use Send to party ' +
+      'or send the merchant to a specific character.',
+  },
+  withdrawals: {
+    label: 'Marked withdrawals always create merchant jobs',
+    help:
+      'When disabled, marked withdrawals create a collection trip at the automatic item collection threshold, ' +
+      'or wait for another bank visit below that threshold. ' +
+      'When enabled, pending withdrawal marks create a bank trip at the Marked withdrawals routine priority.',
+  },
+} as const
+
+function TripSetting({ kind }: { kind: keyof typeof TRIPS }) {
   const api = usePartyApi()
   const enabled = useDynamicState().merchantAutomations[kind] !== false
   const [pendingChecked, setPendingChecked] = useState<boolean | null>(null)
@@ -179,22 +200,19 @@ function TripSetting({ kind }: { kind: 'deliveries' | 'withdrawals' }) {
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
-          checked={kind === 'withdrawals' ? (pendingChecked ?? enabled) : enabled}
+          checked={pendingChecked ?? enabled}
+          aria-describedby={`${kind}-trip-help`}
           onChange={async (event) => {
             const checked = event.target.checked
-            if (kind === 'withdrawals') setPendingChecked(checked)
+            setPendingChecked(checked)
             await run(() => api.saveRoutinePriorities({}, { [kind]: checked }))
             setPendingChecked(null)
           }}
           className="size-4"
         />
-        {kind === 'deliveries' ? 'Marked deliveries create merchant jobs' : 'Marked withdrawals create merchant jobs'}
+        {TRIPS[kind].label}
       </label>
-      <p className={help}>
-        {kind === 'deliveries'
-          ? 'When disabled, the merchant completes marked deliveries when visiting the party for another reason, such as item collection. It will not make a trip for deliveries alone unless you use Send to party or send the merchant to a specific character.'
-          : 'When disabled, marked withdrawals wait until the merchant visits the bank for another reason. When enabled, pending withdrawal marks create a bank trip at the Marked withdrawals routine priority.'}
-      </p>
+      <p id={`${kind}-trip-help`} className={help}>{TRIPS[kind].help}</p>
       {error && <p role="alert" className="text-destructive">{error}</p>}
     </fieldset>
   )

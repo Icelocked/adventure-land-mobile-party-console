@@ -31,6 +31,7 @@ import { clearRecoveryHistory } from '@/lib/dashboardRecovery'
 import { AlDataAuthWatcher } from '@/components/AlDataAuthWatcher'
 import { DungeonNavigator } from '@/components/DungeonNavigator'
 import { AnniversaryScreen } from '@/screens/account/AnniversaryScreen'
+import { SettingsMenuScreen } from '@/screens/settings-menu/SettingsMenuScreen'
 import { SettingsScreen } from '@/screens/account/SettingsScreen'
 
 const queryClient = new QueryClient()
@@ -93,6 +94,7 @@ export default function App() {
                 <Route path="/logs" element={<LogsScreen />} />
                 <Route path="/metrics" element={<MetricsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/settings/menu" element={<SettingsMenuScreen />} />
                 <Route path="/anniversary" element={<AnniversaryScreen />} />
               </Routes>
               </ErrorBoundary>

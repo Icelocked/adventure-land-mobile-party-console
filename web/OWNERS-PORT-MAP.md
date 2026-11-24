@@ -134,3 +134,14 @@ Two sets with no file in common:
     (set 2's folder) changed only where the chip row was. Tests: `models/farmingSlots.test.ts`,
     e2e `farming-mode.spec.ts`; `combat-status`, `achievement-hunt` and `hunting` specs now send
     and read the slot fields.
+  - B2 and B3 done. `/settings/menu` (`screens/settings-menu/`) is the tabbed menu: pinned
+    Account/Events/Addons/character tabs over each tab's sections, with the target in the address
+    (`lib/settingsTarget.ts`). Sections reuse the PWA's screens; an `EmbeddedInMenu` scaffold
+    drops their title bar. Account > Display holds the PWA's own settings in place of the
+    dashboard's pin switch; Events shows the Cave panel and each character's event section; Apps
+    and Addons wait for B18 and B10. The Farming card's gear and the Interface settings screen's
+    "Settings menu" button open it; the account menu's Settings item still opens Interface
+    settings (AccountMenu.tsx is set 2's). New: Combat section (heal and potion lines, reflect
+    lists, add-on routine picks), home realm, merchant realm blacklist, the settings lock; the
+    trip switches take merchant-trip-setting.tsx's words. `useSettingsWrite` adds `value` and
+    `declared`. Tests: `lib/settingsTarget.test.ts`, e2e `settings-menu.spec.ts`.

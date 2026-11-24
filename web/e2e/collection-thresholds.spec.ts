@@ -76,6 +76,6 @@ test('Merchant settings: buy batch size, stand location and trip switches post w
   await page.getByRole('button', { name: 'Save stand location' }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'merchant/stand-location')?.body).toEqual({ map: 'main', x: -40, y: 20 })
 
-  await page.getByRole('checkbox', { name: 'Marked withdrawals create merchant jobs' }).click()
+  await page.getByRole('checkbox', { name: 'Marked withdrawals always create merchant jobs' }).click()
   await expect.poll(() => bodies.find((b) => b.path === 'merchant/routine-priorities')?.body).toEqual({ priorities: {}, enabled: { withdrawals: false } })
 })

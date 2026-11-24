@@ -39,8 +39,10 @@ function partyNames(state: PartyStateDynamic, connected: string[]): string[] {
  *  own field as soon as it changes (thresholds on blur), always scoped with
  *  `character`; a character following the leader sees the leader's settings
  *  read-only. */
-export function HuntSettingsScreen() {
-  const { name = '' } = useParams()
+/** `name` names the character when the settings menu draws this screen; the route gives it otherwise. */
+export function HuntSettingsScreen({ name: given }: { name?: string } = {}) {
+  const params = useParams()
+  const name = given ?? params.name ?? ''
   const dynamicState = useDynamicState()
   const [inspecting, setInspecting] = useState<BestiaryMonster | null>(null)
   const [inspectError, setInspectError] = useState<string | null>(null)

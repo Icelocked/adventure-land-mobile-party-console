@@ -160,7 +160,7 @@ export interface SettingsChange {
 /** GET /party-api/settings: the page's basis and every declared setting. */
 export interface SettingsPage {
   settingsAt: number
-  settings: { field: string; label?: string; value?: unknown; min?: number; max?: number }[]
+  settings: { field: string; label?: string; kind?: string; scope?: string; choices?: string[]; value?: unknown; min?: number; max?: number }[]
 }
 
 /** The words a refused settings write shows (console settings-write.ts `write`). */

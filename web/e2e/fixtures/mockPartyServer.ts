@@ -112,7 +112,7 @@ const CONFIG_FIELDS = [
   // Console 1.5: each account character's last saved observation.
   'characterSnapshots',
   // The owners release's root and slot settings.
-  'relocateIfCompeting', 'combatMode', 'targetMode',
+  'relocateIfCompeting', 'combatMode', 'targetMode', 'homeRealm', 'merchantRealmBlacklist',
 ] as const
 // The farming profile fields core's `farmingLive` carries per scope (state.ts scopeFields).
 const FARMING_LIVE_FIELDS = ['monsterHunt', 'farmAreaState'] as const
@@ -273,6 +273,18 @@ export class MockPartyServer {
   addonsFail = false
   // Every POST /party-api/farming-mode body.
   farmingModeWrites: Record<string, unknown>[] = []
+  // The declared settings the settings route lists beside the relocation switch, each with its
+  // label (the owners' saved-fields.ts); a value is the extraState field of that name.
+  declaredSettings: { field: string; label: string }[] = [
+    { field: 'homeRealm', label: 'Home realm' },
+    { field: 'merchantRealmBlacklist', label: 'Merchant realm blacklist' },
+    { field: 'healFirstBelow', label: 'Heal first below (% HP)' },
+    { field: 'hpPotionBelow', label: 'HP potion below (% HP)' },
+    { field: 'mpPotionBelow', label: 'MP potion below (% MP)' },
+    { field: 'reflectMagicByCharacter', label: "Don't hit with magic" },
+    { field: 'reflectPhysicalByCharacter', label: "Don't hit with physical" },
+    { field: 'routines', label: 'Routines' },
+  ]
   // The settings route's basis and every write it took.
   settingsAt = 1
   settingsWrites: { changes: { field: string; value: unknown; character?: string }[]; basis: unknown }[] = []
@@ -848,7 +860,13 @@ export class MockPartyServer {
       if (body.basis !== this.settingsAt) return { status: 409, json: { error: 'out of date', reason: 'out of date', field: changes[0]?.field } }
       for (const change of changes) {
         if (change.field === 'relocateIfCompeting') this.relocateIfCompeting = change.value === true
-        else this.extraState = { ...this.extraState, [change.field]: change.value }
+        else if (change.character !== undefined) {
+          // A per-character change sets the character's entry; null removes it.
+          const map = { ...(this.extraState[change.field] as Record<string, unknown> | undefined) }
+          if (change.value === null) delete map[change.character]
+          else map[change.character] = change.value
+          this.extraState = { ...this.extraState, [change.field]: map }
+        } else this.extraState = { ...this.extraState, [change.field]: change.value }
       }
       this.settingsAt += 1
       return { status: 200, json: { ok: true } }
@@ -1659,7 +1677,8 @@ export class MockPartyServer {
     // settings/coordinator/routes/settings.ts: the page's basis and the declared settings.
     await page.route('**/party-api/settings', (route) => {
       if (route.request().method() !== 'GET') return route.fallback()
-      return route.fulfill({ json: { settingsAt: this.settingsAt, settings: [{ field: 'relocateIfCompeting', value: this.relocateIfCompeting }] } })
+      return route.fulfill({ json: { settingsAt: this.settingsAt, settings: [{ field: 'relocateIfCompeting', value: this.relocateIfCompeting },
+        ...this.declaredSettings.map((entry) => ({ ...entry, value: this.extraState[entry.field] }))] } })
     })
     await page.route('**/party-api/metrics**', (route) => {
       const request = route.request()

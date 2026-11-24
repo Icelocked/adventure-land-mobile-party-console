@@ -1,14 +1,19 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LatencyBadge } from '@/components/LatencyBadge'
+
+// The settings menu draws a screen as one of its sections, under its own pinned tab rows, so a
+// screen inside it shows only its body.
+export const EmbeddedInMenu = createContext(false)
 
 /** Shared shell for every account-wide screen (mail/bestiary/skills/
  *  stand/market/bank/logs/settings/catalog): title bar, back and an optional
  *  refresh button, so each screen only supplies its content body. */
 export function AccountScreenScaffold({ title, onRefresh, children }: { title: string; onRefresh?: () => void; children: ReactNode }) {
   const navigate = useNavigate()
+  if (useContext(EmbeddedInMenu)) return <div className="pb-6">{children}</div>
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-5xl">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">

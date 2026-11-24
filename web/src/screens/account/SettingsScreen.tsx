@@ -21,6 +21,7 @@ import { AccountScreenScaffold } from './AccountScreenScaffold'
 import { RealmSection } from './RealmSection'
 import { BossChaseSetting, RealmHopBlacklistSetting } from './RealmChaseSettings'
 import { consoleFeatures } from '@/models'
+import { SETTINGS_MENU_PATH } from '@/lib/settingsTarget'
 
 /** Interface settings, in the console's order: state import/export, realm, characters (create, member grid,
  *  bankboi name), ALData, hosting, console updates and debugging - then
@@ -32,6 +33,7 @@ export function SettingsScreen() {
   const refreshNow = useRefreshDynamicStateNow()
   const configLoaded = useConfigLoaded()
   const openServerSettings = useOpenServerSettings()
+  const navigate = useNavigate()
   const [bankboiPrefix, setBankboiPrefix] = useState<string | null>(null)
   const [prefixStatus, setPrefixStatus] = useState<{ saved: true } | { error: string } | null>(null)
   const [creating, setCreating] = useState(false)
@@ -64,6 +66,10 @@ export function SettingsScreen() {
       {/* Wide screens: sections flow into two columns. */}
       <div className="flex flex-col gap-3 p-3 md:block md:columns-2 md:gap-3 md:*:mb-3 md:*:break-inside-avoid">
         <p className="text-xs text-muted-foreground">Manage saved dashboard state, character connections, and market access.</p>
+        {/* The console's tabbed settings menu: account, events, add-ons and each character. */}
+        <Button variant="outline" onClick={() => navigate(SETTINGS_MENU_PATH)}>
+          Settings menu
+        </Button>
         <DashboardStateImport />
         <RealmSection control={dynamicState.realmControl ?? { split: false, characters: [], realms: [] }}>
           {features.bossChase && <BossChaseSetting chase={dynamicState.bossChase} />}
@@ -162,7 +168,7 @@ export function SettingsScreen() {
 /** ALData key management: generate/reveal/copy the publishing key, check auth status, and
  *  "Prepare mail", which fills the earthiverse/aldata_auth mail for the user to review and
  *  send. It never auto-sends, since each message costs real gold. */
-function ALDataSection() {
+export function ALDataSection() {
   const api = usePartyApi()
   const dynamicState = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()

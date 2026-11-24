@@ -44,5 +44,10 @@ export function useSettingsWrite() {
     }
   }
 
-  return { ready: configLoaded && page.data !== undefined, write, notice, pending }
+  // A declared setting from the page's read, with its label and value, for a field with no config
+  // field of its own (console settings-write.ts `value`, `declared`).
+  const declared = (field: string) => page.data?.settings.find((entry) => entry.field === field)
+  const value = (field: string): unknown => declared(field)?.value
+
+  return { ready: configLoaded && page.data !== undefined, write, notice, pending, value, declared }
 }

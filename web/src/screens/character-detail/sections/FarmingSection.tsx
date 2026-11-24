@@ -8,6 +8,7 @@ import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { FarmingModeControl, type SlotChoice } from '@/components/FarmingModeControl'
 import { useAddons } from '@/data/useAddons'
+import { settingsMenuPath } from '@/lib/settingsTarget'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
@@ -155,6 +156,7 @@ export function FarmingSection({
         addonStatus={addonStatusLines(targetEntries, farming.addonFarming)}
         disabled={!configLoaded || pickingBackup || pickingArea}
         onSelect={(choice) => void selectSlot(choice)}
+        onSettings={() => navigate(settingsMenuPath({ tab: 'character', character: characterName, section: 'farming' }))}
       />
       <ConfigLoadingNote />
       {!inherited && farmArea?.active && (
