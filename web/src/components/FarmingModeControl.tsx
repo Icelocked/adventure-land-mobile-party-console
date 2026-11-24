@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { entryLabel, modePair, type SlotColor, type SlotEntry } from '@/models'
@@ -32,6 +33,7 @@ export function FarmingModeControl({
   disabled,
   onSelect,
   onSettings,
+  farmingLine,
 }: {
   combatEntries: readonly SlotEntry[]
   targetEntries: readonly SlotEntry[]
@@ -50,6 +52,8 @@ export function FarmingModeControl({
   onSelect: (choice: SlotChoice) => void
   // Opens the settings menu at this character's Farming section.
   onSettings?: () => void
+  // The add-on pieces under the two rows (console farming-mode-control.tsx `farming-line` slot).
+  farmingLine?: ReactNode
 }) {
   const inherited = !!followingLeader
   const rows: { name: string; entries: readonly SlotEntry[]; pressed: string; choose(mode: string): SlotChoice }[] = [
@@ -96,6 +100,7 @@ export function FarmingModeControl({
           ))}
         </div>
       ))}
+      {farmingLine}
       {addonLine && (
         <section aria-label={addonLine.title} className={cn('mt-2 border-t pt-2 font-mono text-[10px]', SLOT_CLASSES[addonLine.color]?.block)}>
           <p className="font-semibold">{addonLine.title}</p>

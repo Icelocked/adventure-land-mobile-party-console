@@ -44,6 +44,8 @@ export interface AddonsReply {
   overlays?: Record<string, string>
   refusals?: { name: string; message: string }[]
   stores?: Record<string, Record<string, Record<string, unknown>>>
+  // The published reads an add-on's pieces ask, answered with the list: `passive.rule` per monster.
+  reads?: { 'passive.rule'?: Record<string, { corePriority?: boolean } | null | undefined> }
 }
 
 export const emptySlots = (): Record<SlotName, SlotEntry[]> => ({ 'combat-mode': [], 'target-mode': [], 'combat-routine': [], formation: [], 'merchant-routine': [] })

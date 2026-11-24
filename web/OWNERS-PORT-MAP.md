@@ -164,11 +164,35 @@ Two sets with no file in common:
     since the PWA has no old address to keep. `/diagnostics/bounds` and `POST /diagnostics/caps`
     serve the bound record and the dashboard's own cap counts, not the button, so the PWA sends
     neither. Tests: `models/diagnostics.test.ts`, e2e `diagnostics.spec.ts`.
-  - Stopped at the context budget. Left for set 1:
-    - B10 not started: `useAddons` (data/useAddons.ts) already reads `GET /addons`; the manager
-      (`POST /addons {name, enabled?, settings?}`, hooks/http.ts `save`), the add-on sections
-      (`/addon-farming`, `/addon-command`, `/addon-read`) and the shipped add-ons' PWA pieces
-      remain. The settings menu's Addons tab lists the installed add-ons and draws nothing yet.
+  - B10 done. Wire: `saveAddon` (`POST /addons {name, enabled?, settings?}`), `addonFarming`
+    (`POST /addon-farming {name, character, ...body}`), `addonCommand`
+    (`POST /addon-command {name, character?, body}`), `addonStore` (the `store` verb with `key` and
+    `patch`) and `addonRead` (`GET /addon-read?name=&args=`); `useAddonWrites` reloads the add-on
+    list after a switch, setting or store write, as slots.tsx `reloadAddons` does. The settings
+    menu's Addons tab is the manager (`settings-menu/AddonSettings.tsx`, settings-page.tsx's
+    controls per add-on kind, a records table that scrolls sideways). The shipped add-ons' pieces
+    live in `src/addons/` and show only while their add-on is on:
+    - Achievement Hunt: the Farming settings section reads the scope's `addonFarming` store and
+      posts `/addon-farming`; `lib/achievementHunt.ts` takes the boss cut-off from the add-on's
+      `bossSpawns` and `bossHp` and the rares from the list's `passive.rule` reads; "Leave the
+      target when a boss attacks" is new. The fork's `POST /achievement-hunt` client and
+      `state.achievementHunt` reads are gone, since the release has neither (A21).
+    - Tank Hold: the line under the Farming card's mode rows (`TankHoldLine.tsx`) writes the
+      `scope:<owner>` store and shows the character's `addonReports['tank-hold']` role line.
+    - Cosmetics: a Cosmetics card on the character screen (`CosmeticsPanel.tsx`) over
+      `addonReports.cosmetics` and the party store's last press.
+    - NPC Orders: a "Ponty / Ron" button with the merchant's shop buttons opens the orders sheet
+      (`NpcOrders.tsx`, `npcOrderRules.ts`), the PWA's place for the dashboard's top-bar button.
+    - Market Filters: the add-on's bar replaces the fork's on every Market tab
+      (`MarketFiltersBar.tsx`, `marketFilters.ts`), with the price shorthand, the item grade as
+      tier, `seenAt` for Newest first, and each tab's value kept on the device. The fork's
+      `NpcShopSheet` keeps the old bar; it shows only on the fork console.
+    The PWA draws only these five add-ons' pieces; any other add-on gets its switch and settings
+    in the manager. Set 2 files touched for mounts only: `FarmingSection.tsx` (the farming line),
+    `CharacterDetailScreen.tsx` (the Cosmetics card), `MerchantControlsSection.tsx` (the button).
+    Tests: `addons/addons.test.ts`, `lib/achievementHunt.test.ts` (in place of the fork's
+    `models/state.test.ts`), e2e `addons.spec.ts`, `achievement-hunt.spec.ts`, `market-filter.spec.ts`.
+  - Set 1 is closed.
   - Runs: unit, `tsc -b`, `vite build` and the full e2e suite pass at each commit. E2e ran on
     port 4181 through an untracked `playwright.set1.config.ts` copy, so a preview server another
-    worktree holds on 4173 is never reused; delete that file when set 1 closes.
+    worktree holds on 4173 is never reused; the copy is deleted now that set 1 is closed.

@@ -1,6 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useDynamicState, useCharacters, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { AddonSettings } from './AddonSettings'
 import { useAddons } from '@/data/useAddons'
 import { addonTitle, consoleFeatures } from '@/models'
 import { ACCOUNT_SECTIONS, characterSections, parseSettingsTarget, settingsMenuPath, type SettingsTarget } from '@/lib/settingsTarget'
@@ -136,7 +137,7 @@ function Body({ target, current }: { target: SettingsTarget; current: string }):
       if (current === 'cave') return <DungeonPanel />
       return <LeaderFollowerSection key={current} characterName={current} dynamicState={state} />
     case 'addons':
-      return null
+      return <AddonSettings only={current === 'all' ? undefined : current} />
     case 'character': {
       const name = target.character
       switch (current) {

@@ -31,10 +31,12 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { StandListingForm } from '@/components/StandListingForm'
 import { WtbDialog } from '@/components/Wtb'
-import { MarketFilterBar } from '@/components/MarketFilterBar'
-import { latestSeen, marketRowFor, useStoredMarketFilter } from '@/lib/marketRows'
+import { MarketFiltersBar } from '@/addons/MarketFiltersBar'
+import { MARKET_FILTERS, filterRows, grades, servers, useMarketFilterValue, type MarketRow as FilterRow } from '@/addons/marketFilters'
+import { useAddonEnabled } from '@/data/useAddons'
+import { itemGrade } from '@/lib/itemCardLines'
 import { WatchListSheet, type WatchPrefill } from '@/components/NpcShopSheet'
-import { filterMarket, realmName, serverOptions } from '@/lib/marketFilter'
+import { realmName } from '@/lib/marketFilter'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
@@ -100,7 +102,10 @@ export function MarketScreen() {
   const now = useClock()
   const [tab, setTab] = useState<Tab>('wts')
   const [query, setQuery] = useState('')
-  const [marketFilter, setMarketFilter] = useStoredMarketFilter(tab)
+  // The Market Filters add-on's bar and row test apply only while the add-on is on.
+  const filtersOn = useAddonEnabled(MARKET_FILTERS)
+  const [storedFilter, setMarketFilter] = useMarketFilterValue(tab)
+  const marketFilter = filtersOn ? storedFilter : undefined
   const [watchPrefill, setWatchPrefill] = useState<WatchPrefill | null>(null)
   const [showDealsOnly, setShowDealsOnly] = useState(false)
   const [hideBadDeals, setHideBadDeals] = useState(false)
@@ -149,7 +154,19 @@ export function MarketScreen() {
   const listingValue = (entry: AlDataListing) => values.get(entry.item.name) || 1
   // stand-sheet.tsx drops stale rows before grouping; ignored items go after.
   const grouped = useMemo(() => groupAlData(allAlData.filter((entry) => !hideStale || marketListingFresh(entry.seenAt, now))), [allAlData, hideStale, now])
-  const wts = filterMarket(
+  // Each tab's rows as the Market Filters add-on reads them (stand-sheet.tsx wtsRow, wtbRow,
+  // classifiedsRow, pontyRow): the grade from the catalog's flags and grades, the time each row was
+  // last seen and its realm.
+  const marketItem = (item: { name: string; level?: number | null }) => {
+    const known = catalogFor(item.name)
+    const definition = (known?.meta?.definition ?? {}) as Record<string, unknown>
+    const level = typeof item.level === 'number' ? item.level : undefined
+    return { level, grade: itemGrade({ upgrade: known?.upgradeable || known?.meta?.upgradeable, compound: known?.compoundable || known?.meta?.compoundable, grades: definition.grades }, level ?? 0) }
+  }
+  const realmOf = (entry: { serverRegion?: string; serverIdentifier?: string }) => realmName(entry.serverRegion, entry.serverIdentifier) ?? undefined
+  const listingRow = (entry: { item: { name: string; level?: number | null }; seenAt?: number; serverRegion?: string; serverIdentifier?: string }, price: number | undefined): FilterRow =>
+    ({ ...marketItem(entry.item), price, seen: entry.seenAt, realm: realmOf(entry) })
+  const wts = filterRows(
     filterAlData(grouped, query, now, nameFor).filter(
       (entry) =>
         shown(entry.item, entry.seenAt) &&
@@ -159,36 +176,41 @@ export function MarketScreen() {
         (!hideBlacklisted || !blacklistRecord(blacklist, !!state.autoBlacklistMerchants, now, entry.seller, entry.serverRegion, entry.serverIdentifier)),
     ),
     marketFilter,
-    (entry) => marketRowFor(catalogFor(entry.item.name), entry.item, entry.price, latestSeen(entry.groupedListings || [entry]), realmName(entry.serverRegion, entry.serverIdentifier)),
+    (entry) => listingRow(entry, entry.price),
   )
   const owned = ownedCounts(merchantItems, bankPacks)
-  const buyOrders = filterMarket(filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor, forkCommerce), marketFilter, (order) =>
-    marketRowFor(catalogFor(order.item.name), order.item, order.price, latestSeen([order]), realmName(order.serverRegion, order.serverIdentifier)),
+  const buyOrders = filterRows(filterBuyOrders(allBuyOrders.filter((order) => shown(order.item, order.seenAt)), query, now, hideUnowned, owned, nameFor, forkCommerce), marketFilter, (order) =>
+    listingRow(order, order.price),
   )
   const bankWtb = buyOrders.filter((order) => owned.has(ownedKey(order.item)))
   const ownOwner = merchantName && diagnostics[merchantName]?.owner != null ? String(diagnostics[merchantName]?.owner) : ''
   const publicTrades = ((aldata.trades ?? []) as AlDataPublicTrade[]).filter((owner) => String(owner.owner) !== ownOwner).flatMap((owner) => (owner.listings || []).map((entry) => ({ owner, listing: entry })))
-  // Classifieds have no per-listing time, so their freshness is the feed's last refresh.
-  const classifieds = filterMarket(
+  // Classifieds have no per-listing time, so their freshness and their seen time are the feed's last refresh.
+  const classifiedRow = ({ listing: entry }: (typeof publicTrades)[number]): FilterRow => ({ ...marketItem(entry), price: entry.wts?.price ?? entry.wtb?.price, seen: aldata.tradesUpdatedAt })
+  const classifieds = filterRows(
     publicTrades.filter(({ owner, listing: entry }) =>
       shown(entry, aldata.tradesUpdatedAt) &&
       `${nameFor(entry.name) || ''} ${entry.name} ${owner.label || ''} ${owner.characters?.join(' ') || ''}`.toLowerCase().includes(query.trim().toLowerCase()),
     ),
     marketFilter,
-    ({ listing: entry }) => marketRowFor(catalogFor(entry.name), entry, entry.wts?.price ?? null, latestSeen([entry])),
+    classifiedRow,
   )
-  // groupPonty can merge realms into one lot, so the server choice applies to listings before grouping.
-  const pontyListings = ((ponty.listings ?? []) as PontyListing[]).filter(
-    (entry) => shown(entry.item, entry.seenAt) && (marketFilter.server === null || realmName(entry.serverRegion, entry.serverIdentifier) === marketFilter.server),
-  )
-  const pontySeen = new Map(pontyListings.map((entry) => [entry.key, latestSeen([entry])]))
-  const pontyRows = filterMarket(groupPonty(pontyListings, query, now, nameFor), marketFilter, (group) =>
-    marketRowFor(catalogFor(group.item.name), group.item, group.unitPrice, latestSeen((group.keys ?? [group.key]).map((key) => ({ firstSeenAt: pontySeen.get(key) ?? undefined }))), realmName(group.serverRegion, group.serverIdentifier)),
-  )
+  // groupPonty can merge realms into one lot, so the add-on's row test applies to listings before
+  // grouping, and Newest first orders each lot by its newest listing.
+  const pontyFilterRow = (entry: PontyListing): FilterRow => listingRow(entry, entry.unitPrice)
+  const pontyListings = ((ponty.listings ?? []) as PontyListing[]).filter((entry) => shown(entry.item, entry.seenAt))
+  const pontyKept = filterRows(pontyListings, marketFilter, pontyFilterRow)
+  const pontySeen = new Map(pontyKept.map((entry) => [entry.key, entry.seenAt]))
+  const pontyRows = filterRows(groupPonty(pontyKept, query, now, nameFor), marketFilter && { newest: marketFilter.newest }, (group) => ({
+    seen: Math.max(...(group.keys ?? [group.key]).map((key) => pontySeen.get(key) ?? -Infinity)),
+  }))
 
-  const realmsOf = (entries: { serverRegion?: string; serverIdentifier?: string }[]) => serverOptions(entries.map((entry) => ({ server: realmName(entry.serverRegion, entry.serverIdentifier) })))
-  // Classifieds carry no realm, so that tab offers only All.
-  const tabServers = tab === 'wts' ? realmsOf(allAlData) : tab === 'wtb' ? realmsOf(allBuyOrders) : tab === 'ponty' ? realmsOf((ponty.listings ?? []) as PontyListing[]) : []
+  // The bar's server and tier choices come from the tab's own rows.
+  const tabRows: FilterRow[] =
+    tab === 'wts' ? allAlData.map((entry) => listingRow(entry, entry.price))
+    : tab === 'wtb' ? allBuyOrders.map((order) => listingRow(order, order.price))
+    : tab === 'ponty' ? ((ponty.listings ?? []) as PontyListing[]).map(pontyFilterRow)
+    : publicTrades.map(classifiedRow)
 
   const run = async (key: string, action: () => Promise<ApiResult<CommandResult> | string | null>) => {
     setBusy(key)
@@ -313,7 +335,7 @@ export function MarketScreen() {
           ))}
         </div>
         <Input aria-label="Search market" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search item, seller, server, or map…" />
-        <MarketFilterBar filter={marketFilter} onChange={setMarketFilter} servers={tabServers} />
+        {filtersOn && <MarketFiltersBar key={tab} value={storedFilter} set={setMarketFilter} realms={servers(tabRows)} tiers={grades(tabRows)} />}
         {watchPrefill && <WatchListSheet prefill={watchPrefill} onClose={() => setWatchPrefill(null)} />}
         <div className="flex flex-wrap gap-2" title="Hide observations older than two minutes; classifieds use the last successful feed refresh.">
           {check('Hide stale listings', hideStale, setHideStale)}

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useDynamicState, usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { useCallback, useMemo, useState } from 'react'
+import { useDynamicState } from '@/data/PartyDataProvider'
+import { useAddons, useAddonWrites } from '@/data/useAddons'
 import { useMonsterAchievements } from '@/data/useMonsterAchievements'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Button } from '@/components/ui/button'
@@ -8,47 +9,64 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { achievementMonsters, nextStep, type AchievementMonster } from '@/lib/achievementHunt'
 import type { AchievementBlacklistEntry, AchievementHuntSettings } from '@/models'
 
-// Server defaults (runtime/coordinator/hunt/achievement-settings.ts).
-const DEFAULT_SETTINGS: AchievementHuntSettings = { monsters: [], blacklistDeaths: true, deathThreshold: 6, fillIdle: true, fillSelectedOnly: true, bossRecheckMinutes: 10 }
+export const ACHIEVEMENT_HUNT = 'achievement-hunt'
+// The add-on's defaults (console runtime/addons/achievement-hunt/settings.ts).
+const DEFAULT_SETTINGS: Required<AchievementHuntSettings> = {
+  monsters: [], blacklistDeaths: true, deathThreshold: 6, fillIdle: true, fillSelectedOnly: true, leaveOnBossAttack: true, bossRecheckMinutes: 10,
+}
+const DEATH_THRESHOLD_RANGE = { min: 1, max: 100 }
+const RECHECK_MINUTES_RANGE = { min: 1, max: 120 }
+const inRange = (value: number, range: { min: number; max: number }) => Number.isSafeInteger(value) && value >= range.min && value <= range.max
 
 function progress(monster: AchievementMonster, kills: number): string {
   const step = nextStep(monster.ladder, kills)
   return step < 0 ? `${Math.floor(kills).toLocaleString()} kills · complete` : `${Math.floor(kills).toLocaleString()} / ${monster.ladder[step].toLocaleString()} · step ${step + 1}`
 }
 
-/** Achievement Hunt settings for one farming scope, on the Farming settings
- *  screen below Hunt. The console needs Achievement Hunt (upstream PR #131,
- *  docs/achievement-hunt.md); Ryan's v1.4.0 has none. Every request carries
- *  `character`; a follower sees the leader's settings read-only. */
+/** The Achievement Hunt add-on's section in Farming settings, for one farming scope (console
+ *  runtime/addons/achievement-hunt/dashboard.tsx). It reads the scope's add-on store and saves
+ *  through POST /addon-farming; a follower sees the leader's store with no save. */
 export function AchievementHuntSettingsBlock({
   character,
-  value,
-  blacklist,
+  store,
   editable,
   onInspect,
 }: {
   character: string
-  value: AchievementHuntSettings
-  blacklist: Record<string, AchievementBlacklistEntry>
+  store: Record<string, unknown>
   editable: boolean
   onInspect: (id: string) => void
 }) {
   const dynamicState = useDynamicState()
-  const api = usePartyApi()
-  const refreshNow = useRefreshDynamicStateNow()
+  const addons = useAddons()
+  const writes = useAddonWrites()
   const achievements = useMonsterAchievements()
-  const settings = { ...DEFAULT_SETTINGS, ...value }
+  const settings = { ...DEFAULT_SETTINGS, ...(store.achievementHunt as AchievementHuntSettings | undefined) }
+  const blacklist = (store.achievementBlacklist ?? {}) as Record<string, AchievementBlacklistEntry>
+  const declared = addons.addons.find((addon) => addon.name === ACHIEVEMENT_HUNT)?.settings ?? {}
+  const cutSpawns = Number(declared.bossSpawns?.value)
+  const cutHp = Number(declared.bossHp?.value)
+  const passive = addons.reads['passive.rule']
+  const corePriority = useCallback((id: string) => !!passive?.[id]?.corePriority, [passive])
   const [choosing, setChoosing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A saved value that changes elsewhere resets its field during render.
   const [deaths, setDeaths] = useState(String(settings.deathThreshold))
-  useEffect(() => setDeaths(String(settings.deathThreshold)), [settings.deathThreshold])
-  // A draft only while typing; otherwise the field shows the saved value.
-  const [recheckDraft, setRecheck] = useState<string | null>(null)
-  const recheck = recheckDraft ?? String(settings.bossRecheckMinutes)
+  const [savedDeaths, setSavedDeaths] = useState(settings.deathThreshold)
+  if (savedDeaths !== settings.deathThreshold) {
+    setSavedDeaths(settings.deathThreshold)
+    setDeaths(String(settings.deathThreshold))
+  }
+  const [recheck, setRecheck] = useState(String(settings.bossRecheckMinutes))
+  const [savedRecheck, setSavedRecheck] = useState(settings.bossRecheckMinutes)
+  if (savedRecheck !== settings.bossRecheckMinutes) {
+    setSavedRecheck(settings.bossRecheckMinutes)
+    setRecheck(String(settings.bossRecheckMinutes))
+  }
   const monsters = useMemo(
-    () => achievementMonsters(dynamicState.bestiaryCatalog || [], dynamicState.monsterChoices || []),
-    [dynamicState.bestiaryCatalog, dynamicState.monsterChoices],
+    () => achievementMonsters(dynamicState.bestiaryCatalog || [], dynamicState.monsterChoices || [], { spawns: cutSpawns, hp: cutHp }, corePriority),
+    [dynamicState.bestiaryCatalog, dynamicState.monsterChoices, cutSpawns, cutHp, corePriority],
   )
   const sprite = useMemo(() => {
     const byId = new Map(dynamicState.bestiaryCatalog.map((m) => [m.id, m.sprite]))
@@ -60,29 +78,34 @@ export function AchievementHuntSettingsBlock({
   const kills = (id: string) => Number(achievements[id]?.score) || 0
   const entries = Object.values(blacklist).sort((a, b) => a.monsterId.localeCompare(b.monsterId))
 
-  const run = async (body: Parameters<typeof api.achievementHunt>[1]) => {
+  const run = async (body: Record<string, unknown>) => {
     if (!editable || busy) return
     setBusy(true)
     setError(null)
-    const result = await api.achievementHunt(character, body)
-    setBusy(false)
-    if (result.kind === 'failure') return setError(result.message || 'Could not save Achievement Hunt settings')
-    await refreshNow()
+    try {
+      await writes.farming(ACHIEVEMENT_HUNT, character, body)
+    } catch (failure) {
+      setError((failure as Error).message || 'Could not save Achievement Hunt settings')
+    } finally {
+      setBusy(false)
+    }
   }
-  const choose = (ids: string[]) => run({ settings: { monsters: ids } })
+  const save = (patch: Partial<AchievementHuntSettings>) => run({ settings: patch })
+  const choose = (ids: string[]) => save({ monsters: ids })
   const toggle = (id: string) => choose(selected.has(id) ? settings.monsters.filter((x) => x !== id) : [...settings.monsters, id])
   // Every regular monster from the weakest through this one; special picks are kept.
   const upTo = (index: number) => choose([...regular.slice(0, index + 1).map((m) => m.id), ...special.filter((m) => selected.has(m.id)).map((m) => m.id)])
   const threshold = () => {
     const n = Number(deaths)
-    if (!deaths.trim() || !Number.isSafeInteger(n) || n < 1 || n > 100) return setError('The death threshold must be a whole number from 1 to 100.')
-    if (n !== settings.deathThreshold) void run({ settings: { deathThreshold: n } })
+    if (!deaths.trim() || !inRange(n, DEATH_THRESHOLD_RANGE))
+      return setError(`The death threshold must be a whole number from ${DEATH_THRESHOLD_RANGE.min} to ${DEATH_THRESHOLD_RANGE.max}.`)
+    if (n !== settings.deathThreshold) void save({ deathThreshold: n })
   }
   const recheckMinutes = () => {
     const n = Number(recheck)
-    if (!recheck.trim() || !Number.isSafeInteger(n) || n < 1 || n > 120) return setError('The boss recheck time must be a whole number of minutes from 1 to 120.')
-    setRecheck(null)
-    if (n !== settings.bossRecheckMinutes) void run({ settings: { bossRecheckMinutes: n } })
+    if (!recheck.trim() || !inRange(n, RECHECK_MINUTES_RANGE))
+      return setError(`The boss recheck time must be a whole number of minutes from ${RECHECK_MINUTES_RANGE.min} to ${RECHECK_MINUTES_RANGE.max}.`)
+    if (n !== settings.bossRecheckMinutes) void save({ bossRecheckMinutes: n })
   }
 
   const row = (monster: AchievementMonster, index: number | null) => (
@@ -118,7 +141,14 @@ export function AchievementHuntSettingsBlock({
     <section aria-label="Achievement Hunt settings" className="flex flex-col gap-3 px-3 pb-4 pt-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Achievement Hunt</h2>
-        <Button size="sm" variant="outline" onClick={() => setChoosing(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setError(null)
+            setChoosing(true)
+          }}
+        >
           Monsters ({selected.size})
         </Button>
       </div>
@@ -126,13 +156,7 @@ export function AchievementHuntSettingsBlock({
         Farms the selected monsters for their kill achievements, weakest first. Every selected monster reaches its next milestone before any moves on to the one after. Selected rares, such as Phoenix or Dracul, are never a target: passive hunting fights them when a character sees one.
       </p>
       <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={settings.blacklistDeaths}
-          disabled={!editable || busy}
-          onChange={(e) => void run({ settings: { blacklistDeaths: e.target.checked } })}
-          className="size-4"
-        />
+        <input type="checkbox" checked={settings.blacklistDeaths} disabled={!editable || busy} onChange={(e) => void save({ blacklistDeaths: e.target.checked })} className="size-4" />
         Blacklist monsters after
         <Input
           aria-label="Achievement Hunt deaths before blacklisting"
@@ -147,21 +171,15 @@ export function AchievementHuntSettingsBlock({
         deaths
       </label>
       <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={settings.fillIdle !== false}
-          disabled={!editable || busy}
-          onChange={(e) => void run({ settings: { fillIdle: e.target.checked } })}
-          className="size-4"
-        />
+        <input type="checkbox" checked={settings.fillIdle} disabled={!editable || busy} onChange={(e) => void save({ fillIdle: e.target.checked })} className="size-4" />
         Fill respawn waits with nearby monsters
       </label>
       <label className="-mt-1 flex items-center gap-2 pl-6 text-sm">
         <input
           type="checkbox"
-          checked={settings.fillSelectedOnly !== false}
-          disabled={!editable || busy || settings.fillIdle === false}
-          onChange={(e) => void run({ settings: { fillSelectedOnly: e.target.checked } })}
+          checked={settings.fillSelectedOnly}
+          disabled={!editable || busy || !settings.fillIdle}
+          onChange={(e) => void save({ fillSelectedOnly: e.target.checked })}
           className="size-4"
         />
         Only selected monsters
@@ -169,22 +187,36 @@ export function AchievementHuntSettingsBlock({
       <p className="-mt-2 text-xs text-muted-foreground">
         While the target respawns, the party fights weaker monsters that share its spawn ground: only the ones selected here, unless you turn that off. The target always comes first.
       </p>
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        When a boss attacks, farm another target and check back after
-        <Input
-          aria-label="Minutes before checking a boss-held target again"
-          inputMode="numeric"
-          value={recheck}
-          disabled={!editable || busy}
-          onChange={(e) => setRecheck(e.target.value)}
-          onBlur={recheckMinutes}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-          className="w-16"
-        />
-        minutes
-      </label>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            aria-label="Leave the target when a boss attacks"
+            checked={settings.leaveOnBossAttack}
+            disabled={!editable || busy}
+            onChange={(e) => void save({ leaveOnBossAttack: e.target.checked })}
+            className="size-4"
+          />
+          {settings.leaveOnBossAttack ? 'When a boss attacks, farm another target and check back after' : 'When a boss attacks, farm another target'}
+        </label>
+        {settings.leaveOnBossAttack && (
+          <>
+            <Input
+              aria-label="Minutes before checking a boss-held target again"
+              inputMode="numeric"
+              value={recheck}
+              disabled={!editable || busy}
+              onChange={(e) => setRecheck(e.target.value)}
+              onBlur={recheckMinutes}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              className="w-16"
+            />
+            minutes
+          </>
+        )}
+      </div>
       <p className="-mt-2 text-xs text-muted-foreground">
-        Fighters keep new pulls away from a boss on the target's ground. A boss stays until someone kills it, so a shorter wait checks more often at the cost of more trips.
+        Fighters keep new pulls away from a boss on the target's ground and never attack it. Off, the party keeps farming the target when the boss attacks. A boss stays until someone kills it, so a shorter wait checks more often at the cost of more trips.
       </p>
       {entries.length > 0 && (
         <div aria-label="Achievement Hunt blacklist" className="flex flex-col gap-1.5">
@@ -217,7 +249,11 @@ export function AchievementHuntSettingsBlock({
           ))}
         </div>
       )}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       {choosing && (
         <Sheet open onOpenChange={(open) => !open && setChoosing(false)}>
           <SheetContent side="bottom" className="max-h-[85vh] gap-2 overflow-hidden p-4" aria-label="Achievement Hunt monsters">
@@ -243,7 +279,11 @@ export function AchievementHuntSettingsBlock({
                 {special.map((m) => row(m, null))}
               </section>
             </div>
-            {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+            {error && (
+              <p role="alert" className="text-xs text-destructive">
+                {error}
+              </p>
+            )}
           </SheetContent>
         </Sheet>
       )}

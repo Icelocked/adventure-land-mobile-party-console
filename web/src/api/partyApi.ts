@@ -728,6 +728,36 @@ export class PartyApiClient {
     return this.getJsonReportingError('addons')
   }
 
+  /** POST /party-api/addons {name, enabled?, settings?}: an add-on's switch or settings
+   *  (console runtime/hooks/http.ts `save`). A per-character setting posts a map by character. */
+  async saveAddon(name: string, body: { enabled?: boolean; settings?: Record<string, unknown> }): Promise<ApiResult<CommandResult>> {
+    return this.post('addons', { name, ...body })
+  }
+
+  /** POST /party-api/addon-farming {name, character, ...body}: a target mode add-on's own settings
+   *  for the character's farming scope (console tasks/coordinator/slots.ts `route`). */
+  async addonFarming(name: string, character: string, body: Record<string, unknown>): Promise<ApiResult<CommandResult>> {
+    return this.post('addon-farming', { name, character, ...body })
+  }
+
+  /** POST /party-api/addon-command {name, character?, body}: an enabled add-on's own command
+   *  (console runtime/hooks/http.ts `command`). */
+  async addonCommand(name: string, character: string | undefined, body: unknown): Promise<ApiResult<CommandResult>> {
+    return this.post('addon-command', { name, ...(character ? { character } : {}), body })
+  }
+
+  /** POST /party-api/addon-command {name, verb: 'store', key, patch}: writes one of an add-on's
+   *  stores, `party`, `scope:<owner>` or `character:<name>`. */
+  async addonStore(name: string, key: string, patch: Record<string, unknown>): Promise<ApiResult<CommandResult>> {
+    return this.post('addon-command', { name, verb: 'store', key, patch })
+  }
+
+  /** GET /party-api/addon-read?name=&args=: one coordinator read an add-on may ask, its arguments
+   *  as a JSON array; the answer is `{value}`. */
+  async addonRead<T>(name: string, args: readonly unknown[]): Promise<ApiResult<{ value: T | null }>> {
+    return this.getJsonReportingError(`addon-read?name=${encodeURIComponent(name)}&args=${encodeURIComponent(JSON.stringify(args))}`)
+  }
+
   /** POST /party-api/focus - which monsters a character farms/hunts.
    *  Omitted priorities/radius are left unchanged server-side. */
   async setFocus(character: string, monsterFocus: string[], monsterSearchRadius?: number, monsterPriorities?: Record<string, number>): Promise<ApiResult<CommandResult>> {
@@ -776,19 +806,6 @@ export class PartyApiClient {
     const body: Record<string, unknown> = { action, character }
     if (monsterId !== undefined) body.monsterId = monsterId
     return this.post('hunt-blacklist', body)
-  }
-
-  /** POST /party-api/achievement-hunt - one character's settings patch and/or
-   *  blacklist change. Only a console with Achievement Hunt (upstream PR #131)
-   *  has the route; Ryan's v1.4.0 has none. */
-  async achievementHunt(
-    character: string,
-    body: {
-      settings?: Partial<{ monsters: string[]; blacklistDeaths: boolean; deathThreshold: number; fillIdle: boolean; fillSelectedOnly: boolean; bossRecheckMinutes: number }>
-      blacklist?: { action: 'add' | 'remove' | 'clear'; monsterId?: string }
-    },
-  ): Promise<ApiResult<CommandResult>> {
-    return this.post('achievement-hunt', { ...body, character })
   }
 
   /** POST /party-api/hunt-settings - a partial patch; the server merges. */

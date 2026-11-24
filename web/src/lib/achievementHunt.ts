@@ -2,7 +2,8 @@ import type { BestiaryMonster } from '@/models'
 import type { Catalog as MonsterLocationCatalog } from './farmingZones'
 import { achievementMilestones } from './monsterAchievements'
 
-// Console: runtime/hunt/achievement-policy.ts (achievementMonsters, nextStep).
+// The Achievement Hunt add-on's monster order (console runtime/addons/achievement-hunt/policy.ts
+// achievementMonsters, nextStep).
 
 export interface AchievementMonster {
   id: string
@@ -12,16 +13,19 @@ export interface AchievementMonster {
   threat: number
   hp: number
   special: boolean
+  /** Flagged special by the game, or boss-like: a monster the party keeps away from. */
+  boss: boolean
   /** A random respawn or one of passive hunting's rares: the console fights it when seen and never makes it the target. */
   rare: boolean
-  monster: BestiaryMonster
 }
 
-// Passive hunting's own rares (console runtime/coordinator/navigation/passive-settings.ts legacyPriorities).
-const PASSIVE_RARES = new Set(['tinyp', 'phoenix', 'goldenbat', 'cutebee', 'hen', 'rooster'])
-// Boss-like monsters the game does not flag (console docs/achievement-hunt.md § 23).
-const BOSS_SPAWNS = 2
-const BOSS_HP = 50_000
+/** The boss cut-off, the add-on's declared `bossSpawns` and `bossHp` settings. No game field marks a boss. */
+export interface BossCut {
+  spawns: number
+  hp: number
+}
+/** Whether passive hunting knows a monster by name: `passive.rule(id).corePriority` from the add-on list's reads. */
+export type CorePriority = (id: string) => boolean
 
 type SpawnChoice = { spawnRecords?: { count?: number; restrictions?: string[]; stype?: string }[] } | undefined
 
@@ -38,20 +42,22 @@ function worldSpawns(choice: SpawnChoice): number {
 /** Every monster with achievements, weakest first: by XP (the game scales it with HP, damage and
  *  defenses), then threat, HP and name. Threat alone misranks: a Vampire Rat hits harder than a
  *  Fire Spirit but has a ninth of its HP. Special: unlisted (training dummies, Cave of Many Dreams), bosses,
- *  event, cooperative and random-respawn monsters, and any without a regular spawn. */
-export function achievementMonsters(catalog: BestiaryMonster[], choices: MonsterLocationCatalog): AchievementMonster[] {
+ *  event, cooperative and random-respawn monsters, passive hunting's rares, and any without a regular spawn. */
+export function achievementMonsters(catalog: BestiaryMonster[], choices: MonsterLocationCatalog, cut: BossCut, corePriority: CorePriority): AchievementMonster[] {
   const routable = new Set(choices.filter((choice) => (choice.locations || []).length > 0).map((choice) => choice.id))
+  const choiceOf = (id: string) => choices.find((choice) => choice.id === id) as SpawnChoice
   // Never respawns, or is a big single spawn: Stompy, Skeletor, the crypt bosses.
   const bossLike = (monster: BestiaryMonster, definition: Record<string, unknown>) => {
     const respawn = Number(definition.respawn)
     if (Number.isFinite(respawn) && respawn < 0) return true
-    const spawns = worldSpawns(choices.find((choice) => choice.id === monster.id) as SpawnChoice)
-    return spawns > 0 && spawns <= BOSS_SPAWNS && (Number(monster.hp) || 0) >= BOSS_HP
+    const spawns = worldSpawns(choiceOf(monster.id))
+    return spawns > 0 && spawns <= cut.spawns && (Number(monster.hp) || 0) >= cut.hp
   }
   const monsters = catalog
     .map((monster) => {
       const definition = (monster.definition || {}) as Record<string, unknown>
-      const rare = PASSIVE_RARES.has(monster.id) || randomRespawn(choices.find((choice) => choice.id === monster.id) as SpawnChoice)
+      const rare = randomRespawn(choiceOf(monster.id)) || corePriority(monster.id)
+      const boss = !!definition.special || bossLike(monster, definition)
       return {
         id: monster.id,
         name: monster.name || monster.id,
@@ -59,9 +65,9 @@ export function achievementMonsters(catalog: BestiaryMonster[], choices: Monster
         xp: Number(monster.xp) || 0,
         threat: Number(monster.threat) || 0,
         hp: Number(monster.hp) || 0,
-        special: !!definition.special || !!definition.cooperative || !!definition.unlist || rare || !routable.has(monster.id) || bossLike(monster, definition),
+        special: boss || !!definition.cooperative || !!definition.unlist || rare || !routable.has(monster.id),
+        boss,
         rare,
-        monster,
       }
     })
     .filter((monster) => monster.ladder.length > 0)

@@ -647,12 +647,6 @@ export interface PartyStateDynamic {
   settingsChanges?: SettingsChangeLine[]
   // The realm list automatic merchant work skips (console merchant-realm-blacklist-setting.tsx).
   merchantRealmBlacklist?: string[]
-  // Achievement Hunt (upstream console PR #131; Ryan's v1.4.0 has none).
-  // See consoleHasAchievementHunt.
-  achievementHunt?: AchievementHuntSettings | null
-  achievementBlacklist?: Record<string, AchievementBlacklistEntry> | null
-  achievementTarget?: { id: string; step: number; milestone: number; startedAt: number; deaths: number } | null
-  achievementMessage?: string | null
   // The party's current Hunt quest: which monster, for which member.
   monsterHunt?: MonsterHuntCycle | null
   // Per-character Hunt quest assignment, keyed by character name.
@@ -697,6 +691,8 @@ export interface PartyStateDynamic {
   referenceRevision?: string
   // Core's bank gold (null until the bank has been seen).
   bankGold?: number | null
+  // The gold the merchant keeps back from every buy (console goldReserve setting).
+  goldReserve?: number
   // Console 1.5 config characterSnapshots: each account character's last saved observation.
   characterSnapshots?: Record<string, OfflineCharacter>
   // Console 1.5 core accountGold (telemetry/account-gold.ts): bank plus every
@@ -873,9 +869,6 @@ export interface FarmingProfile {
   monsterHunt?: MonsterHuntCycle | null
   huntSettings?: HuntSettings
   huntBlacklist?: Record<string, HuntBlacklistEntry>
-  achievementHunt?: AchievementHuntSettings | null
-  achievementBlacklist?: Record<string, AchievementBlacklistEntry>
-  achievementMessage?: string
   monsterFocus?: string[]
   // Console 1.4 Franky routine, per farming scope.
   encounterRoutines?: Record<string, string>
@@ -910,14 +903,6 @@ export interface HuntSettings {
  *  (status/coordinator/state.ts `online`), which core's characterDetails carries. */
 export function characterOnline(detail: CharacterDiagnostics | undefined): boolean {
   return detail?.online === true
-}
-
-/** Whether the console runs Achievement Hunt (upstream PR #131). A console
- *  with it always sends a top-level `achievementHunt` settings object in the
- *  config section (telemetry/public-state.ts configFields, filled from
- *  defaultAchievementHuntSettings); Ryan's v1.4.0 never sends the field. */
-export function consoleHasAchievementHunt(state: Pick<PartyStateDynamic, 'achievementHunt'>): boolean {
-  return typeof state.achievementHunt === 'object' && state.achievementHunt !== null
 }
 
 /** One settings audit line: a field, or an add-on's setting `key`, changed from `old` to `new` by
@@ -958,9 +943,6 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
   const personal = state.farmingProfiles[name]
   const effective = state.farmingProfiles[owner]
   const live = state.farmingLive?.[owner]
-  // Achievement settings stay undefined without the console capability, so
-  // every Achievement Hunt control and status gates on it.
-  const achievementHunt = consoleHasAchievementHunt(state)
   // The character's own pair for the pressed buttons and the badge, the scope's for its status
   // (console farming-context.ts).
   const own = slotPair(personal, name === state.leader ? state : undefined)
@@ -979,9 +961,6 @@ export function resolveFarmingContext(state: PartyStateDynamic, name: string) {
     blacklist: effective?.huntBlacklist || (legacy ? state.huntBlacklist : undefined) || {},
     settings: effective?.huntSettings || (legacy ? state.huntSettings ?? undefined : undefined),
     hunt: live?.monsterHunt ?? (legacy ? state.monsterHunt : null) ?? null,
-    achievementSettings: achievementHunt ? effective?.achievementHunt || (legacy ? state.achievementHunt : undefined) || undefined : undefined,
-    achievementBlacklist: effective?.achievementBlacklist || (legacy ? state.achievementBlacklist : undefined) || {},
-    achievementMessage: effective?.achievementMessage ?? (legacy ? state.achievementMessage : undefined) ?? '',
   }
 }
 
@@ -1073,6 +1052,8 @@ export interface PartyStateGameLogs {
 /** One character's entry in core's `characterDetails`. Only present for
  *  characters in active slots; a missing field means "unknown", never 0. */
 export interface CharacterDiagnostics {
+  // Each enabled add-on's own report, by add-on name (console runtime/hooks/registry.ts status.report).
+  addonReports?: Record<string, unknown>
   name?: string
   ctype?: string
   server?: string
@@ -1148,13 +1129,14 @@ export interface AppearanceChoice {
   layers?: unknown[]
 }
 
-/** Console runtime/coordinator/hunt/achievement-settings.ts. */
+/** Console runtime/addons/achievement-hunt/settings.ts. */
 export interface AchievementHuntSettings {
   monsters: string[]
   blacklistDeaths: boolean
   deathThreshold: number
   fillIdle?: boolean
   fillSelectedOnly?: boolean
+  leaveOnBossAttack?: boolean
   bossRecheckMinutes?: number
 }
 export interface AchievementBlacklistEntry {

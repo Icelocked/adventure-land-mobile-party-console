@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { MockPartyServer } from './fixtures/mockPartyServer'
 
-// The console fork's market filter and Watch action (topic15/ponty-ron-buys):
-// dashboard/features/party/market-filter-bar.tsx over market-filter.ts, and
-// commerce/npc-shop.ts stamping firstSeenAt on Ponty and ALData listings.
+// OWNERS-PORT-MAP.md B10: the Market Filters add-on's bar on each Market tab
+// (runtime/addons/market-filters), and the fork's Watch action.
 
 const now = Date.now()
 const ponty = (rid: string, name: string, level: number, unitPrice: number, firstSeenAt: number) => ({
@@ -28,6 +27,7 @@ function server() {
   mock.addCatalogEntry({ id: 'coat', name: 'Coat', value: 1000, upgradeable: true, definition: { upgrade: {}, tier: 1 } })
   mock.addCatalogEntry({ id: 'ringsj', name: 'Ring of Small Joys', value: 2000 })
   mock.pontyListings = [ponty('a', 'coat', 0, 1200, now - 60_000), ponty('b', 'stramulet', 1, 9000, now - 10_000), ponty('c', 'ringsj', 0, 2400, now - 30_000)]
+  mock.enableAddon('market-filters')
   mock.npcShop = { orders: [], settings: { goldReserve: 0, ronDonation: false, ronVisitMinutes: 10 }, ron: null, merchantRealm: 'USIII', spendable: 1_000_000 }
   return mock
 }
@@ -35,35 +35,47 @@ function server() {
 const rowNames = (page: import('@playwright/test').Page) =>
   page.getByRole('group', { name: /^Ponty / }).evaluateAll((rows) => rows.map((row) => row.getAttribute('aria-label')))
 
-test('Ponty lists newest first and every filter bound narrows it', async ({ page }) => {
-  await server().install(page)
+test('Ponty keeps its own order, Newest first sorts by last seen, and every bound narrows it', async ({ page }) => {
+  const mock = server()
+  mock.pontyListings = mock.pontyListings.map((entry, index) => ({ ...entry, seenAt: now - [60_000, 10_000, 30_000][index] }))
+  await mock.install(page)
   await page.goto('/market')
   await page.getByRole('tab', { name: /^Ponty \(/ }).click()
+  const own = await rowNames(page)
+  await page.getByRole('button', { name: 'Newest first' }).click()
   await expect.poll(() => rowNames(page)).toEqual(['Ponty Amulet of Strength', 'Ponty Ring of Small Joys', 'Ponty Coat'])
+  await page.getByRole('button', { name: 'Newest first' }).click()
+  await expect.poll(() => rowNames(page)).toEqual(own)
 
-  await page.getByRole('combobox', { name: 'Sort market' }).selectOption('price')
-  await expect.poll(() => rowNames(page)).toEqual(['Ponty Coat', 'Ponty Ring of Small Joys', 'Ponty Amulet of Strength'])
-  await page.getByRole('combobox', { name: 'Sort market' }).selectOption('level')
-  await expect.poll(() => rowNames(page)).toEqual(['Ponty Amulet of Strength', 'Ponty Coat', 'Ponty Ring of Small Joys'])
-
-  await page.getByRole('spinbutton', { name: 'Minimum level' }).fill('1')
+  await page.getByRole('textbox', { name: 'Lowest level' }).fill('1')
   await expect.poll(() => rowNames(page)).toEqual(['Ponty Amulet of Strength'])
-  await page.getByRole('spinbutton', { name: 'Minimum level' }).fill('')
-  await page.getByRole('spinbutton', { name: 'Maximum price' }).fill('2400')
-  await expect.poll(() => rowNames(page)).toEqual(['Ponty Coat', 'Ponty Ring of Small Joys'])
-  await page.getByRole('spinbutton', { name: 'Minimum tier' }).fill('1')
-  // Ring of Small Joys has no tier, so a tier bound drops it.
-  await expect.poll(() => rowNames(page)).toEqual(['Ponty Coat'])
-  await page.getByRole('button', { name: 'Clear filter' }).click()
-  await page.getByRole('textbox', { name: 'Keywords' }).fill('amulet STR')
-  await expect.poll(() => rowNames(page)).toEqual(['Ponty Amulet of Strength'])
+  await page.getByRole('textbox', { name: 'Lowest level' }).fill('')
+  // The price boxes read the Market's shorthand.
+  await page.getByRole('textbox', { name: 'Highest price, such as 250k or 1.5m' }).fill('2.4k')
+  await expect.poll(() => rowNames(page)).toEqual(own.filter((name) => name !== 'Ponty Amulet of Strength'))
+  // The tier choice lists the grades the tab's rows carry: an unupgraded item is Normal.
+  await expect(page.getByRole('combobox', { name: 'Tier' }).locator('option')).toHaveText(['Any tier', 'Normal'])
+  await page.getByRole('button', { name: 'Clear' }).click()
+  await expect.poll(() => rowNames(page)).toEqual(own)
 
-  // The filter persists per tab in browser storage.
+  // The value persists per tab on this device.
+  await page.getByRole('textbox', { name: 'Lowest level' }).fill('1')
   await page.reload()
   await page.getByRole('tab', { name: /^Ponty \(/ }).click()
-  await expect(page.getByRole('textbox', { name: 'Keywords' })).toHaveValue('amulet STR')
+  await expect(page.getByRole('textbox', { name: 'Lowest level' })).toHaveValue('1')
   await page.getByRole('tab', { name: /^Live WTS/ }).click()
-  await expect(page.getByRole('textbox', { name: 'Keywords' })).toHaveValue('')
+  await expect(page.getByRole('textbox', { name: 'Lowest level' })).toHaveValue('')
+})
+
+test('the bar shows only while the Market Filters add-on is on', async ({ page }) => {
+  const mock = server()
+  mock.addons = []
+  await mock.install(page)
+  await page.goto('/market')
+  await page.getByRole('tab', { name: /^Ponty \(/ }).click()
+  await expect(page.getByRole('group', { name: /^Ponty / })).toHaveCount(3)
+  await expect(page.getByRole('textbox', { name: 'Lowest level' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Newest first' })).toHaveCount(0)
 })
 
 test('a Ponty row Watch action opens the watch list prefilled', async ({ page }) => {
@@ -77,7 +89,7 @@ test('a Ponty row Watch action opens the watch list prefilled', async ({ page })
   await expect(watch.getByRole('spinbutton', { name: 'Highest level' })).toHaveValue('1')
 })
 
-test('every market tab has the filter bar, and the server choice lists only realms in that tab', async ({ page }) => {
+test('every market tab has the add-on bar, and the server choice lists only realms in that tab', async ({ page }) => {
   const mock = server()
   const sale = (key: string, region: string, identifier: string, level: number) => ({
     key, source: 'aldata', seller: `Seller-${key}`, buyer: `Buyer-${key}`, serverRegion: region, serverIdentifier: identifier, map: 'main',
@@ -96,25 +108,25 @@ test('every market tab has the filter bar, and the server choice lists only real
     await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click()
     const rows = page.getByRole('group', { name: new RegExp(`^${prefix}`) })
     await expect(rows).toHaveCount(3)
-    await expect.poll(servers).toEqual(['All servers', 'EU I', 'US III'])
+    await expect.poll(servers).toEqual(['Any server', 'EU I', 'US III'])
     await page.getByRole('combobox', { name: 'Server' }).selectOption('EU I')
     await expect(rows).toHaveCount(1)
-    await page.getByRole('spinbutton', { name: 'Minimum level' }).fill('2')
+    await page.getByRole('textbox', { name: 'Lowest level' }).fill('2')
     await expect(rows).toHaveCount(0)
-    await page.getByRole('button', { name: 'Clear filter' }).click()
+    await page.getByRole('button', { name: 'Clear' }).click()
     await expect(rows).toHaveCount(3)
   }
   await page.getByRole('tab', { name: /^Classifieds/ }).click()
   const classifieds = page.getByRole('group', { name: /^Classified / })
   await expect(classifieds).toHaveCount(2)
-  // Classifieds carry no realm, so only All is offered.
-  await expect.poll(servers).toEqual(['All servers'])
-  await page.getByRole('spinbutton', { name: 'Minimum level' }).fill('1')
+  // Classifieds carry no realm, so the bar draws no server choice.
+  await expect(page.getByRole('combobox', { name: 'Server' })).toHaveCount(0)
+  await page.getByRole('textbox', { name: 'Lowest level' }).fill('1')
   await expect(classifieds).toHaveCount(1)
   await page.getByRole('tab', { name: /^Ponty \(/ }).click()
   const ponties = page.getByRole('group', { name: /^Ponty / })
   await expect(ponties).toHaveCount(4)
-  await expect.poll(servers).toEqual(['All servers', 'EU I', 'US III'])
+  await expect.poll(servers).toEqual(['Any server', 'EU I', 'US III'])
   await page.getByRole('combobox', { name: 'Server' }).selectOption('EU I')
   await expect(ponties).toHaveCount(1)
   // Each tab keeps its own server choice.

@@ -3,8 +3,7 @@ import type { PartyStateDynamic } from './state'
 /** The stable console fork's features (party-console branch `stable`:
  *  Ryan's v1.4.0 plus Thefonze74065's features) that Ryan's v1.4.0
  *  (b4443e47) lacks. The console has no capabilities route, so each flag
- *  reads a state field only a console with that feature sends. Achievement
- *  Hunt has its own check, consoleHasAchievementHunt in state.ts. */
+ *  reads a state field only a console with that feature sends. */
 export interface ConsoleFeatures {
   /** POST /formation {tank}. initial-core.ts always sets `designatedTank`, to
    *  null when no tank is picked, and public-state.ts configFields sends it. */

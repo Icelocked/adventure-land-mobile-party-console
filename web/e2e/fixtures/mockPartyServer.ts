@@ -201,6 +201,29 @@ export const ACHIEVEMENT_HUNT_ENTRY = {
   status: { title: 'Achievement Hunt status', field: 'achievementMessage', idle: 'Choosing the next monster' },
 }
 
+// The shipped add-ons as GET /addons lists them (runtime/addons/*/index.ts `registration`), each
+// switched off with its declared defaults. A test turns one on with `enableAddon`.
+export const SHIPPED_ADDONS: Record<string, unknown>[] = [
+  { name: 'achievement-hunt', author: 'Icelocked', summary: 'Farms the selected monsters for their kill achievements, weakest first.', enabled: false,
+    settings: {
+      bossSpawns: { label: 'A boss has at most this many spawns', kind: 'number', min: 1, default: 2, value: 2 },
+      bossHp: { label: 'A boss has at least this much HP', kind: 'number', min: 1, default: 50_000, value: 50_000 },
+    } },
+  { name: 'cosmetics', author: 'Icelocked', summary: 'Shows the looks, CX jars and emotes of each character under Equipped.', enabled: false, settings: {} },
+  { name: 'market-filters', author: 'Icelocked', summary: 'Adds one filter bar to each Market tab: level, price and server bounds beside the Market search box.', enabled: false, settings: {} },
+  { name: 'npc-orders', author: 'Icelocked', summary: 'Standing buy orders from Ponty and Ron: buy X copies or every new copy of an item, under a unit price cap and above the gold reserve.', enabled: false,
+    settings: {
+      orders: { label: 'Orders (the Ponty / Ron dialog places them)', kind: 'records', default: [], value: [],
+        fields: { id: { label: 'Id', kind: 'text' }, npc: { label: 'NPC', kind: 'choice', choices: ['ponty', 'ron'] }, item: { label: 'Item', kind: 'text' },
+          level: { label: 'Level', kind: 'number', min: 0 }, count: { label: 'Copies (0 buys every copy)', kind: 'number', min: 0 },
+          maxPrice: { label: 'Max unit price', kind: 'number', min: 1 }, stopped: { label: 'Stopped', kind: 'boolean' } } },
+      ronDonate: { label: 'Donate to Ron to see his list', kind: 'boolean', default: false, value: false },
+      ronDonation: { label: 'Gold donated on each Ron visit', kind: 'number', min: 1, default: 100_000, value: 100_000 },
+    } },
+  { name: 'tank-hold', author: 'Icelocked', summary: 'Names a tank that holds the monsters, an off tank that takes them while the tank is in danger, and a pull mode.', enabled: false,
+    settings: { dangerHp: { label: 'The tank is in danger below this share of its HP (%)', kind: 'number', min: 1, max: 99, default: 50, value: 50 } } },
+]
+
 function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
   return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]))
 }
@@ -271,6 +294,13 @@ export class MockPartyServer {
   addons: Record<string, unknown>[] = []
   addonSlots: Record<string, Record<string, unknown>[]> = { 'combat-mode': CORE_COMBAT_MODES, 'target-mode': CORE_TARGET_MODES, 'combat-routine': [], formation: [], 'merchant-routine': [] }
   addonsFail = false
+  // GET /addons `stores` (each add-on's stores by store key) and `reads` (`passive.rule` per monster).
+  addonStores: Record<string, Record<string, Record<string, unknown>>> = {}
+  addonReads: Record<string, unknown> = {}
+  // GET /addon-read answers by read name; a read absent here answers 404.
+  addonReadAnswers: Record<string, unknown> = {}
+  // Every POST /addons, /addon-farming and /addon-command body, by path.
+  addonWrites: { path: string; body: Record<string, unknown> }[] = []
   // status/coordinator/apps.ts: each app key record (public fields) and the issued key count.
   appKeys: { name: string; scopes: string[]; ownCommands: boolean; issuedAt: number; lastUsedAt: number | null; revokedAt: number | null }[] = []
   // status/coordinator/routes.ts diagnostics: the saved alerts, each alert's report by id, and each
@@ -798,6 +828,54 @@ export class MockPartyServer {
     return { status: 200, json: { ok: true, combatMode: saved.combatMode, targetMode: saved.targetMode, savedOnly: true } }
   }
 
+  /** Turns one shipped add-on on (from SHIPPED_ADDONS when the list does not hold it yet). */
+  enableAddon(name: string, settings: Record<string, unknown> = {}) {
+    const shipped = SHIPPED_ADDONS.find((addon) => addon.name === name)
+    const listing = (this.addons.find((addon) => addon.name === name) ?? (shipped && structuredClone(shipped))) as Record<string, unknown> | undefined
+    if (!listing) throw new Error(`no shipped add-on ${name}`)
+    const declared = listing.settings as Record<string, Record<string, unknown>>
+    for (const [key, value] of Object.entries(settings)) declared[key] = { ...declared[key], value }
+    this.addons = [...this.addons.filter((addon) => addon.name !== name), { ...listing, enabled: true }]
+  }
+
+  /** hooks/http.ts `save` and `command`, and tasks/coordinator/slots.ts `route`. */
+  private addonWrite(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
+    this.addonWrites.push({ path, body })
+    const name = String(body.name ?? '')
+    const listing = this.addons.find((addon) => addon.name === name) as { enabled: boolean; settings: Record<string, Record<string, unknown>> } | undefined
+    if (path === 'addons') {
+      if (!listing) return { status: 404, json: { error: 'No installed add-on named ' + JSON.stringify(name) } }
+      for (const [key, value] of Object.entries((body.settings ?? {}) as Record<string, unknown>)) {
+        const setting = listing.settings[key]
+        if (!setting) return { status: 400, json: { error: `${name} has no setting ${key}` } }
+        setting.value = setting.kind === 'per-character' ? { ...(setting.value as Record<string, unknown>), ...(value as Record<string, unknown>) } : value
+      }
+      if (typeof body.enabled === 'boolean') listing.enabled = body.enabled
+      return { status: 200, json: { ok: true, name, enabled: listing.enabled } }
+    }
+    if (!listing?.enabled) return { status: 404, json: { error: 'No enabled add-on named ' + JSON.stringify(name) } }
+    if (path === 'addon-command' && body.verb === 'store') {
+      const stores = (this.addonStores[name] ??= {})
+      const key = String(body.key ?? '')
+      stores[key] = { ...stores[key], ...(body.patch as Record<string, unknown>) }
+      return { status: 200, json: { ok: true } }
+    }
+    if (path === 'addon-command') return { status: 200, json: { ok: true } }
+    // achievement-hunt index.ts `target.settings` on the scope's store: the leader's scope for a
+    // follower, else the character's own.
+    const character = String(body.character ?? this.leader ?? '')
+    const owner = this.leader && this.leader !== character && this.followers[character] ? this.leader : character
+    const farming = { ...((this.farmingProfiles[owner]?.addonFarming as Record<string, Record<string, unknown>>) ?? {}) }
+    const store = { ...(farming[name] ?? {}) }
+    if (body.settings) store.achievementHunt = { ...(store.achievementHunt as Record<string, unknown>), ...(body.settings as Record<string, unknown>) }
+    const change = body.blacklist as { action?: string; monsterId?: string } | undefined
+    if (change?.action === 'clear') store.achievementBlacklist = {}
+    if (change?.action === 'remove')
+      store.achievementBlacklist = Object.fromEntries(Object.entries((store.achievementBlacklist as Record<string, unknown>) ?? {}).filter(([id]) => id !== change.monsterId))
+    this.updateProfile(owner, { addonFarming: { ...farming, [name]: store } })
+    return { status: 200, json: { ok: true } }
+  }
+
   /** status/coordinator/apps.ts: issue, revoke and the own-commands switch. */
   private appsCommand(path: string, body: Record<string, unknown>): { status: number; json: Record<string, unknown> } {
     const live = (name: string) => this.appKeys.find((key) => key.name === name && key.revokedAt === null)
@@ -891,6 +969,7 @@ export class MockPartyServer {
     }
     if (path === 'farming-mode') return this.farmingMode(body)
     if (path === 'apps' || path.startsWith('apps/')) return this.appsCommand(path, body)
+    if (path === 'addons' || path === 'addon-farming' || path === 'addon-command') return this.addonWrite(path, body)
     if (path === 'settings') {
       // settings/coordinator/writer.ts: a write whose basis is older than the last write is refused.
       const changes = (body.changes ?? []) as { field: string; value: unknown; character?: string }[]
@@ -1717,7 +1796,13 @@ export class MockPartyServer {
     await page.route('**/party-api/addons', (route) => {
       if (route.request().method() !== 'GET') return route.fallback()
       if (this.addonsFail) return route.fulfill({ status: 503, json: { error: 'Add-on registry is starting' } })
-      return route.fulfill({ json: { addons: this.addons, slots: this.addonSlots, rings: [], overlays: {}, refusals: [], reads: { 'passive.rule': {} }, stores: {} } })
+      return route.fulfill({ json: { addons: this.addons, slots: this.addonSlots, rings: [], overlays: {}, refusals: [], reads: { 'passive.rule': {}, ...this.addonReads }, stores: this.addonStores } })
+    })
+    // hooks/http.ts `read`: one coordinator read an add-on may ask, its arguments a JSON array.
+    await page.route('**/party-api/addon-read**', (route) => {
+      const name = new URL(route.request().url()).searchParams.get('name') ?? ''
+      if (!(name in this.addonReadAnswers)) return route.fulfill({ status: 404, json: { error: JSON.stringify(name) + ' is not a read an add-on may ask' } })
+      return route.fulfill({ json: { value: this.addonReadAnswers[name] ?? null } })
     })
     await page.route('**/party-api/diagnostics/**', (route) => {
       const request = route.request()

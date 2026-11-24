@@ -83,6 +83,8 @@ export const actionDomains = {
   // (dashboard query-actions.ts).
   '/apps': [],
   '/addons': [],
+  '/addon-farming': core,
+  '/addon-command': core,
 } satisfies Record<string, readonly Domain[]>
 
 export function affectedDomains(path: string, body?: unknown): readonly Domain[] {

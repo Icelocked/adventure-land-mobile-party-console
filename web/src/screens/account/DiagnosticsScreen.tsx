@@ -239,7 +239,7 @@ function RecordTable({ caption, records }: { caption: string; records: readonly 
 /** "Show all records": each ring's whole live log, read through the diagnostics lease while it shows. */
 function RingLogs({ characters, ring }: { characters: string[]; ring: string }) {
   const api = usePartyApi()
-  const addonRings = useAddons().rings ?? []
+  const addonRings = useAddons().rings
   const label = addonRings.find((entry) => entry.ring === ring)?.label ?? DIAGNOSTICS_RINGS.find((row) => row.ring === ring)?.label ?? ring
   const [replies, setReplies] = useState<Record<string, DiagnosticsRecordsReply>>({})
   // The last failed read per character, shown in place of its records until a later read answers.

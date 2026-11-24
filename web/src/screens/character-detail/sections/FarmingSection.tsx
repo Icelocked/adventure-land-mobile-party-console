@@ -7,6 +7,7 @@ import { canRouteToMonster, FOLLOWER_ROUTE_MESSAGE } from '@/lib/partyRouting'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { FarmingModeControl, type SlotChoice } from '@/components/FarmingModeControl'
+import { TankHoldLine } from '@/addons/TankHoldLine'
 import { useAddons } from '@/data/useAddons'
 import { settingsMenuPath } from '@/lib/settingsTarget'
 import { Button } from '@/components/ui/button'
@@ -157,6 +158,7 @@ export function FarmingSection({
         disabled={!configLoaded || pickingBackup || pickingArea}
         onSelect={(choice) => void selectSlot(choice)}
         onSettings={() => navigate(settingsMenuPath({ tab: 'character', character: characterName, section: 'farming' }))}
+        farmingLine={<TankHoldLine character={characterName} scope={farming.owner} />}
       />
       <ConfigLoadingNote />
       {!inherited && farmArea?.active && (

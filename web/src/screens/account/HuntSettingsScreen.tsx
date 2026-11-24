@@ -12,7 +12,8 @@ import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { HuntBlacklistPicker, HuntSpawnSettings, PassiveHuntingMenu, type MonsterChoiceEntry } from './HuntExtras'
 import { huntBlacklistLabel, migratePassiveSettings, type PassiveSettings } from '@/lib/hunting'
-import { AchievementHuntSettingsBlock } from './AchievementHuntSettings'
+import { ACHIEVEMENT_HUNT, AchievementHuntSettingsBlock } from './AchievementHuntSettings'
+import { useAddonEnabled } from '@/data/useAddons'
 import { PartyRolesSettings } from '@/screens/PartyRolesSettings'
 import { useSettingsWrite } from '@/data/useSettingsWrite'
 
@@ -66,6 +67,8 @@ export function HuntSettingsScreen({ name: given }: { name?: string } = {}) {
   const inherited = !!context.followingLeader
   const settings = { ...DEFAULT_HUNT_SETTINGS, ...context.settings }
   const editable = configLoaded && !inherited
+  // Each enabled add-on with a Farming settings section draws it (console slots.tsx addonSections).
+  const achievementHunt = useAddonEnabled(ACHIEVEMENT_HUNT)
   // The relocation switch is the party's root setting (console hunting/saved-fields.ts, default
   // on), written through the settings route as farming-settings-section.tsx writes it.
   const relocation = useSettingsWrite()
@@ -277,14 +280,8 @@ export function HuntSettingsScreen({ name: given }: { name?: string } = {}) {
           ))}
         </div>
       )}
-      {context.achievementSettings && (
-        <AchievementHuntSettingsBlock
-          character={name}
-          value={context.achievementSettings}
-          blacklist={context.achievementBlacklist}
-          editable={editable}
-          onInspect={inspectMonster}
-        />
+      {achievementHunt && (
+        <AchievementHuntSettingsBlock character={name} store={context.addonFarming[ACHIEVEMENT_HUNT] ?? {}} editable={editable} onInspect={inspectMonster} />
       )}
       {inspectError && (
         <p role="alert" className="px-3 pb-3 text-sm text-destructive">

@@ -1,5 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
-import { ACHIEVEMENT_HUNT_ENTRY, CORE_TARGET_MODES, MockPartyServer } from './fixtures/mockPartyServer'
+import { ACHIEVEMENT_HUNT_ENTRY, CORE_TARGET_MODES, MockPartyServer, SHIPPED_ADDONS } from './fixtures/mockPartyServer'
+
+// Achievement Hunt is an add-on on the owners release (runtime/addons/achievement-hunt): its
+// Farming settings section reads the scope's add-on store and saves through POST /addon-farming.
 
 function bodies(page: Page, path: string) {
   const sent: Record<string, unknown>[] = []
@@ -10,9 +13,12 @@ function bodies(page: Page, path: string) {
 }
 const ladder = (...counts: number[]) => counts.map((count) => [count, 'stat', 'hp', 10])
 const at = [{ map: 'main', x: 0, y: 0 }]
-const selection = { monsters: ['goo'], blacklistDeaths: true, deathThreshold: 3 }
+const store = {
+  achievementHunt: { monsters: ['goo'], blacklistDeaths: true, deathThreshold: 3 },
+  achievementBlacklist: { bee: { monsterId: 'bee', at: 1, reason: '3 deaths while farming for achievements' } },
+}
 
-function setup(withAchievements: boolean) {
+function setup(enabled: boolean) {
   const server = new MockPartyServer()
   server.paired = true
   server.leader = 'Leada'
@@ -27,23 +33,22 @@ function setup(withAchievements: boolean) {
     { id: 'dragold', name: 'Dragold', hp: 25600000, threat: 800, definition: { achievements: ladder(1, 10), special: true } },
     { id: 'phoenix', name: 'Phoenix', hp: 36000, threat: 300, definition: { achievements: ladder(1, 10) } },
   ]
-  server.monsterChoices = [{ id: 'goo', locations: at }, { id: 'bee', locations: at }, { id: 'wolf', locations: at }]
-  if (withAchievements) {
-    server.extraState = {
-      farmingPolicy: 'achievements',
-      achievementHunt: selection,
-      achievementBlacklist: { bee: { monsterId: 'bee', at: 1, reason: '3 deaths while farming for achievements' } },
-      achievementMessage: 'Farming goo: 4 / 10 kills (step 1)',
-    }
-    server.farmingProfiles = { Solo: { achievementHunt: { monsters: [], blacklistDeaths: false, deathThreshold: 5 }, achievementBlacklist: {} } }
+  server.monsterChoices = [{ id: 'goo', locations: at }, { id: 'bee', locations: at }, { id: 'wolf', locations: at }, { id: 'phoenix', locations: at }]
+  // Passive hunting knows Phoenix by name (the add-on list's `passive.rule` reads).
+  server.addonReads = { 'passive.rule': { phoenix: { corePriority: true } } }
+  server.addons = SHIPPED_ADDONS.filter((addon) => addon.name === 'achievement-hunt').map((addon) => structuredClone(addon))
+  if (enabled) server.enableAddon('achievement-hunt')
+  server.farmingProfiles = {
+    Leada: { addonFarming: { 'achievement-hunt': store } },
+    Solo: { addonFarming: { 'achievement-hunt': { achievementHunt: { monsters: [], blacklistDeaths: false, deathThreshold: 5 } } } },
   }
   return server
 }
 
-test('Achievement Hunt lives in Farming settings: weakest-first selector, Up to here, blacklist and threshold', async ({ page }) => {
+test('Achievement Hunt lives in Farming settings: weakest-first selector, Up to here, blacklist, threshold and boss leave', async ({ page }) => {
   const server = setup(true)
   await server.install(page)
-  const sent = bodies(page, 'achievement-hunt')
+  const sent = bodies(page, 'addon-farming')
   await page.goto('/characters/Leada/hunt-settings')
   const section = page.getByRole('region', { name: 'Achievement Hunt settings' })
   await expect(section.getByText('3 deaths while farming for achievements', { exact: false })).toBeVisible()
@@ -53,30 +58,37 @@ test('Achievement Hunt lives in Farming settings: weakest-first selector, Up to 
   await expect(regular.getByRole('checkbox')).toHaveCount(3)
   const names = await regular.locator('p.font-medium').allTextContents()
   expect(names).toEqual(['Goo', 'Bee', 'White Wolf'])
-  // Dragold is special. Phoenix is a rare: listed as special and fought when seen, never a target.
+  // Dragold is special. Phoenix is a passive rare: listed as special and fought when seen, never a target.
   const special = page.getByRole('region', { name: 'Special monsters' })
   await expect(special.getByText('Dragold')).toBeVisible()
   await expect(special.getByText('Phoenix')).toBeVisible()
   await expect(special.getByText(/fought when seen/)).toBeVisible()
   await regular.getByRole('button', { name: 'Up to here' }).nth(1).click()
-  await expect.poll(() => sent.at(-1)).toEqual({ settings: { monsters: ['goo', 'bee'] }, character: 'Leada' })
+  await expect.poll(() => sent.at(-1)).toEqual({ name: 'achievement-hunt', character: 'Leada', settings: { monsters: ['goo', 'bee'] } })
   await page.keyboard.press('Escape')
+  await expect(section.getByRole('button', { name: 'Monsters (2)' })).toBeVisible()
 
   await section.getByRole('button', { name: 'Clear', exact: true }).click()
-  await expect.poll(() => sent.at(-1)).toEqual({ blacklist: { action: 'remove', monsterId: 'bee' }, character: 'Leada' })
+  await expect.poll(() => sent.at(-1)).toEqual({ name: 'achievement-hunt', character: 'Leada', blacklist: { action: 'remove', monsterId: 'bee' } })
+  await expect(section.getByRole('button', { name: 'Clear', exact: true })).toHaveCount(0)
   const deaths = section.getByRole('textbox', { name: 'Achievement Hunt deaths before blacklisting' })
   await deaths.fill('5')
   await deaths.blur()
-  await expect.poll(() => sent.at(-1)).toEqual({ settings: { deathThreshold: 5 }, character: 'Leada' })
+  await expect.poll(() => sent.at(-1)).toEqual({ name: 'achievement-hunt', character: 'Leada', settings: { deathThreshold: 5 } })
   // Fill respawn waits is on unless a console saved it off.
   const fill = section.getByRole('checkbox', { name: 'Fill respawn waits with nearby monsters' })
   await expect(fill).toBeChecked()
   await fill.click()
-  await expect.poll(() => sent.at(-1)).toEqual({ settings: { fillIdle: false }, character: 'Leada' })
+  await expect.poll(() => sent.at(-1)).toEqual({ name: 'achievement-hunt', character: 'Leada', settings: { fillIdle: false } })
+  const leave = section.getByRole('checkbox', { name: 'Leave the target when a boss attacks' })
+  await expect(section.getByRole('textbox', { name: 'Minutes before checking a boss-held target again' })).toHaveValue('10')
+  await leave.click()
+  await expect.poll(() => sent.at(-1)).toEqual({ name: 'achievement-hunt', character: 'Leada', settings: { leaveOnBossAttack: false } })
+  await expect(section.getByText('When a boss attacks, farm another target', { exact: true })).toBeVisible()
+  await expect(section.getByRole('textbox', { name: 'Minutes before checking a boss-held target again' })).toHaveCount(0)
 })
 
-// On the owners release Achievement Hunt is an add-on: its target mode entry comes from
-// GET /addons, and its status line from the scope's add-on store.
+// Its target mode entry comes from GET /addons, and its status line from the scope's add-on store.
 test('Achievements is a target mode button from the add-on list, with its status line under the rows', async ({ page }) => {
   const server = setup(true)
   server.addonSlots = { ...server.addonSlots, 'target-mode': [...CORE_TARGET_MODES, ACHIEVEMENT_HUNT_ENTRY] }
@@ -96,12 +108,12 @@ test('Achievements is a target mode button from the add-on list, with its status
 test("An independent character edits its own Achievement Hunt; a follower sees the leader's read-only", async ({ page }) => {
   const server = setup(true)
   await server.install(page)
-  const sent = bodies(page, 'achievement-hunt')
+  const sent = bodies(page, 'addon-farming')
   await page.goto('/characters/Solo/hunt-settings')
   const section = page.getByRole('region', { name: 'Achievement Hunt settings' })
   await expect(section.getByRole('button', { name: 'Monsters (0)' })).toBeVisible()
   await section.getByRole('checkbox').first().click()
-  await expect.poll(() => sent.at(-1)).toEqual({ settings: { blacklistDeaths: true }, character: 'Solo' })
+  await expect.poll(() => sent.at(-1)).toEqual({ name: 'achievement-hunt', character: 'Solo', settings: { blacklistDeaths: true } })
 
   await page.goto('/characters/Folla/hunt-settings')
   await expect(page.getByText('Farming settings · Leada')).toBeVisible()
@@ -109,31 +121,13 @@ test("An independent character edits its own Achievement Hunt; a follower sees t
   await expect(section.getByRole('textbox', { name: 'Achievement Hunt deaths before blacklisting' })).toBeDisabled()
 })
 
-// Ryan's v1.4.0 (no upstream PR #131) sends no achievementHunt field at all.
-test('Achievement Hunt is absent on a console without it', async ({ page }) => {
+test('Achievement Hunt shows nothing while its add-on is off', async ({ page }) => {
   const server = setup(false)
   await server.install(page)
   await page.goto('/characters/Leada')
-  await expect(page.getByRole('region', { name: 'Formation' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Farming' }).getByRole('button', { name: 'Hunt', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Farming' }).getByRole('button', { name: 'Achievements' })).toHaveCount(0)
   await page.goto('/characters/Leada/hunt-settings')
   await expect(page.getByText('Farming settings · Leada')).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Achievement Hunt settings' })).toHaveCount(0)
-})
-
-// consoleHasAchievementHunt reads only the top-level achievementHunt object,
-// so profile data without it shows nothing.
-test('A farming profile with Achievement Hunt data but no top-level achievementHunt shows no Achievement Hunt', async ({ page }) => {
-  const server = setup(false)
-  server.farmingProfiles = { Solo: { farmingPolicy: 'achievements', achievementHunt: selection, achievementBlacklist: {}, achievementMessage: 'Farming goo: 4 / 10 kills (step 1)' } }
-  await server.install(page)
-  await page.goto('/characters/Solo')
-  const farming = page.getByRole('region', { name: 'Farming' })
-  await expect(farming.getByRole('button', { name: 'Hunt', exact: true })).toBeVisible()
-  await expect(farming.getByRole('button', { name: 'Achievements' })).toHaveCount(0)
-  await expect(farming.getByRole('region', { name: 'Achievement Hunt status' })).toHaveCount(0)
-  await page.goto('/characters/Solo/hunt-settings')
-  await expect(page.getByText('Farming settings · Solo')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Achievement Hunt settings' })).toHaveCount(0)
 })
