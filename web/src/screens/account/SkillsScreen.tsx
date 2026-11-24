@@ -9,8 +9,8 @@ import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import type { SkillEntry } from '@/models'
 import { skillRangeLabel } from '@/lib/skillRange'
 
-/** Skills: search across class and skill, a sprite
- *  grid per class, and the selected skill's game card and extras in a sheet. */
+/** Skills and conditions: search across class and skill, a sprite
+ *  grid per catalog group (console 1.5 adds a "conditions" group), and the selected skill's game card and extras in a sheet. */
 export function SkillsScreen() {
   const dynamicState = useDynamicState()
   const refreshNow = useRefreshDynamicStateNow()
@@ -22,12 +22,12 @@ export function SkillsScreen() {
     .filter((entry) => entry.skills.length)
 
   return (
-    <AccountScreenScaffold title="Class skills" onRefresh={() => void refreshNow()}>
+    <AccountScreenScaffold title="Class skills and conditions" onRefresh={() => void refreshNow()}>
       {dynamicState.skillCatalog.length === 0 ? (
         <EmptyState message="No skill data yet." />
       ) : (
         <div className="flex flex-col gap-3 p-3">
-          <p className="text-xs text-muted-foreground">Browse every class-bound skill and the shared game actions. Click any skill for its complete definition.</p>
+          <p className="text-xs text-muted-foreground">Browse every class-bound skill, shared game action and condition. Click an entry for its complete definition.</p>
           <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search classes or skills…" />
           {filteredClasses.map((entry) => (
             <section key={entry.id} aria-label={entry.name}>
