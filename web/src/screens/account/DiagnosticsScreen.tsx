@@ -29,7 +29,9 @@ export function DiagnosticsScreen() {
   const { id, ring: ringParam } = useParams()
   const characters = Object.keys(useCharacters())
   const alerts = useDiagnosticsAlerts()
-  const ring = ringParam && isLeasedRing(ringParam) ? ringParam : null
+  // diagnostics-dialog.tsx readHash: the movement tab was the alerts list before the alerts covered
+  // every ring, so /diagnostics/movement still opens the alerts list.
+  const ring = ringParam && ringParam !== 'movement' && isLeasedRing(ringParam) ? ringParam : null
   // "Show all records" starts off each time the screen opens, unless the address names a ring.
   const routeKey = `${id ?? ''}/${ring ?? ''}`
   const [showAll, setShowAll] = useState(ring !== null)

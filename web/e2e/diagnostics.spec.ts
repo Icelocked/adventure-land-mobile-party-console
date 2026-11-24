@@ -126,3 +126,12 @@ test('Show all records reads each character\'s ring through the lease, per ring 
   await expect(rings.getByText('Leada: the character could not read its turns ring (ring missing).')).toBeVisible()
   await expect.poll(() => server.diagnosticsReads).toContain('records?character=Healy&rings=turns')
 })
+
+test("/diagnostics/movement opens the alerts list, as the dashboard's #diagnostics/movement does", async ({ page }) => {
+  const server = partyWithAlerts()
+  await server.install(page)
+  await page.goto('/diagnostics/movement')
+  await expect(page.getByRole('checkbox', { name: 'Show all records' })).not.toBeChecked()
+  await expect(page.locator('[data-area="diagnostics-alert"]')).toHaveCount(2)
+  await expect(page.locator('[data-area="diagnostics-rings"]')).toHaveCount(0)
+})
