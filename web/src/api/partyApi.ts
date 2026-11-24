@@ -310,9 +310,9 @@ export class PartyApiClient {
   }
 
   /** POST /party-api/restock - one character's HP/MP auto-potion policy,
-   *  potion item included. */
+   *  potion item included, and its elixir policy when it has one. */
   async saveRestock(character: string, policy: RestockPolicy): Promise<ApiResult<CommandResult>> {
-    return this.post('restock', { character, hp: policy.hp, mp: policy.mp })
+    return this.post('restock', { character, hp: policy.hp, mp: policy.mp, ...(policy.elixir ? { elixir: policy.elixir } : {}) })
   }
 
   /** Command "withdraw" - pulls one item from bank `pack`/`slot` into a

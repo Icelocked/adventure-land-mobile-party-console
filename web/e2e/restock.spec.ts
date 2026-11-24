@@ -33,6 +33,24 @@ test('Restock: editing one field keeps the other real values (and the potion ite
   })
 })
 
+test('Restock: a save keeps the saved elixir policy (console 1.5 http/restock.ts drops an unsent elixir)', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Ranger1', ctype: 'ranger', level: 50 })
+  const elixir = { item: 'elixirluck', min: 1, max: 3, autoConsume: true, autoAcquire: false }
+  server.extraState = {
+    restockPolicies: { Ranger1: { hp: { min: 100, max: 300, item: 'hpot1' }, mp: { min: 50, max: 200, item: 'mpot1' }, elixir } },
+  }
+  await server.install(page)
+  const bodies = restockBodies(page)
+
+  await page.goto('/characters/Ranger1')
+  await page.getByRole('textbox', { name: 'HP max' }).fill('400')
+  await page.getByRole('region', { name: 'Restock' }).getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => bodies.length).toBe(1)
+  expect(bodies[0]).toEqual({ character: 'Ranger1', hp: { min: 100, max: 400, item: 'hpot1' }, mp: { min: 50, max: 200, item: 'mpot1' }, elixir })
+})
+
 test("Restock: a character without a policy starts from the dashboard's defaults", async ({ page }) => {
   const server = new MockPartyServer()
   server.paired = true
