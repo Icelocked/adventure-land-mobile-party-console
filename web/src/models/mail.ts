@@ -7,6 +7,22 @@ export interface MailSnapshot {
   count: number
   error?: string
   updatedAt?: number
+  // Console 1.5 commerce/mailbox.ts: automation settings, the sent-mail
+  // record, and how many listed messages the mailbox has not marked seen.
+  settings?: { autoCollect: boolean; autoDelete: boolean }
+  outbox?: SentMail[]
+  newCount?: number
+}
+
+/** A sent-mail record. Deleting one does not recall the message. */
+export interface SentMail {
+  id: string
+  recipient: string
+  subject: string
+  message: string
+  sent: string
+  item?: Item
+  quantity?: number
 }
 
 export interface ReceivedMail {
