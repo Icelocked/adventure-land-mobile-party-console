@@ -69,5 +69,49 @@ but the dashboard now does it differently; **feature** = new in v1.5.0, missing 
 
 ## State
 
-Written as each item lands. Counts: breaks W1-W6 and F20 (7), features F1-F7, F9-F19, F21
-(19), parity W7, W8.
+Totals: 7 breaks (W1-W6, F20), 19 features (F1-F7, F9-F19, F21), 2 parity rows (W7, W8).
+
+Breaks, all done:
+
+- W1, W2: 9b6e600. `lib/itemCatalogMeta.ts` ports item-catalog-meta.ts; `useCharacters` and
+  `useDynamicState` join the catalog onto inventory, slot, bank and BankBoi entries. The mock
+  serves the compacted meta (`compactEntry`). Tests: `itemCatalogMeta.test.ts`,
+  `item-meta-join.spec.ts`; the character card e2e also failed on the compacted mock.
+- W3: 8542888 (oct 49d286b). W6 with W7: cb84fe6 (oct b535be3 plus the merchant's Cipher).
+  W4: aac3524 (oct 590042e). F20: 1b3cda2 (oct eb6bc9e).
+- W5 with F12: 1df39c5. The confirmation shows "Number to keep reserved" for a merchant-wide
+  rule and posts it as typed; the Auto NPC sales list edits "Keep N"; bank items and shared
+  rules save the merchant-wide rule; the commerce screen's batch save sends the saved keep.
+
+Features done (oct commits, checked against v1.5.0's dashboard source):
+
+- F9: adcce16 (a4fa7af). F10 countdown: 3c3c241 (461ca29). F21: 12f9114 (38a647f).
+- F2 schedules and realm time: de57c34 (3b24b60, 7735951). F17 event-only: 6249a66 (fe06bcf).
+- F14: fc6ca46 (b41dff4). F15: 969037a (0c589eb). F11: 48904f2 (9a2eb99). F4: 0f0b4c2
+  (62a63db). F10 restock UI: b2ad590 (d14ffbb). F7: 2b7fd34 (9ec573d). F17 odds and home
+  rewards: bb46da9 (149fdf6). F5: a4af5ab (7193d0d, cdc7479).
+- F1, F2 Cipher and Graveyard settings: b67b693 (371b0b9, ff78d7e), without the fork's gear
+  sets, tank, Franky, boss chase and hop blacklist calls. The oct port read console
+  2db4d763; v1.5.0 differs there only by the Franky button (removed) and the Trick or Treat
+  knocks, which 6483d05 adds (knocks left, next daily reset, daily note).
+- F19: d32a3e8 (38a85b1). F3: 688f997 (b863f3b); its spec sets `server.accountGold`, since
+  the mock now serves core `accountGold`.
+- F18: 5f78b87, new: `WtbUnconfirmedPurchase` on each WTB row.
+- F13: 6d1d2a0, new: an Access code field on the pairing screen posts `{code}`.
+
+Left (next session):
+
+- F6 batch select for inventory, bank and exchange rewards (item-selection.tsx,
+  exchange-item-selection.tsx, the bank and party inventory batch commands). pwa-owners
+  ac4b23d, 385d8d0 and 3ec505a are the guide; check each body against
+  party-inventory-panels.tsx `onBatchCommand`.
+- F16: the Gold line in the character extras (character-stats-dialog.tsx, `goldBonus`), the
+  CX Jar's "Filled with" line (item-card-lines.ts, `item.data`), and the item JSON view
+  (item-card.tsx "Item JSON"; the dashboard opens it with I, so the PWA needs an "Item JSON"
+  entry in the item's options list).
+- W8 parity: send `&revision=` for bank, logs and market and keep the cached data on 304
+  (query-cache.tsx `readRevision`). Optional; the server answers 200 without it.
+
+Last full run (after 6d1d2a0): `tsc -b` and the build pass; 144 unit tests pass; e2e 330 of 331
+pass, and the one failure (bank.spec.ts "Bank parity") passes 3 of 3 when rerun alone, so it
+is load timing. oxlint shows 2 warnings, both older than this branch.
