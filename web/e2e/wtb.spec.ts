@@ -81,3 +81,28 @@ test('WTB dialog: presets at the exact level, and a full stand asks which entry 
   await expect.poll(() => bodies[1]).toMatchObject({ itemId: 'ironore', price: 80, priorityOverride: 100, useStandSlot: true, replaceStandEntry: 'listing-9' })
   await expect(page.getByRole('button', { name: 'Edit price for Iron Ore' })).toHaveText('80g')
 })
+
+// Console v1.5.0 wtb-unconfirmed-purchase.tsx: a purchase whose merchant job ended without
+// the merchant's report pauses its WTB until the player answers; native-stand.ts
+// resolvePurchase takes {action: 'resolve-purchase', id, bought}.
+test('WTB list: an unconfirmed purchase asks whether it was bought and posts the answer', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.addCatalogEntry({ id: 'ironore', name: 'Iron Ore' })
+  server.standBids = { ironore: { price: 500, quantity: 10, minimumQuality: 0, revision: 3 } }
+  const id = 'listing-7:Seller1:trade3'
+  server.extraState = { nativeStand: { offers: {}, problems: {}, purchases: { [id]: { item: { name: 'ironore', q: 4, price: 480 }, quantity: 4, jobId: 'job-9' } } } }
+  await server.install(page)
+  const bodies: Record<string, unknown>[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/party-api/merchant/native-stand')) bodies.push(request.postDataJSON() as Record<string, unknown>)
+  })
+
+  await page.goto('/wtb')
+  const pending = page.getByRole('group', { name: 'Unconfirmed purchase of Iron Ore' })
+  await expect(pending).toContainText('Purchase outcome unconfirmed: 4 × Iron Ore at 480 from Seller1.')
+  await pending.getByRole('button', { name: 'It was bought' }).click()
+  await expect.poll(() => bodies[0]).toEqual({ action: 'resolve-purchase', id, bought: true })
+  await expect(pending).toHaveCount(0)
+})

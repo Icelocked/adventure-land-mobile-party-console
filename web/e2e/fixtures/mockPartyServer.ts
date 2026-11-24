@@ -1109,6 +1109,14 @@ export class MockPartyServer {
     }
     if (path === 'merchant/native-stand') {
       if (body.action === 'configure') this.extraState = { ...this.extraState, autoStandBuys: body.enabled === true }
+      // native-stand.ts resolvePurchase(): a missing purchase or a non-boolean answer is 409; either answer clears it.
+      if (body.action === 'resolve-purchase') {
+        const ledger = this.extraState.nativeStand as { purchases?: Record<string, unknown>; problems: Record<string, string> } | undefined
+        if (!ledger?.purchases?.[String(body.id)] || typeof body.bought !== 'boolean') return { status: 409, json: { error: 'That purchase is no longer pending' } }
+        const purchases = { ...ledger.purchases }
+        delete purchases[String(body.id)]
+        this.extraState = { ...this.extraState, nativeStand: { ...ledger, purchases } }
+      }
       return { status: 200, json: { ok: true } }
     }
     if (path === 'merchant/bid') {

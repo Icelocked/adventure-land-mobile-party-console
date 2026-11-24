@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { usePartyApi, useDynamicState, useRefreshDynamicStateNow, useConfigLoaded, useDomainInterest } from '@/data/PartyDataProvider'
 import { ConfigLoadingNote } from '@/components/ConfigLoadingNote'
+import { WtbUnconfirmedPurchase } from '@/components/WtbUnconfirmedPurchase'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -185,6 +186,9 @@ export function WtbScreen() {
                         {problem && <p className="text-xs text-amber-500">{problem}</p>}
                       </div>
                     )}
+                    <div className="order-last w-full">
+                      <WtbUnconfirmedPurchase itemId={itemId} name={name} purchases={state.nativeStand?.purchases} />
+                    </div>
                     <Button size="sm" variant="outline" className="text-rose-500" disabled={!!savingBid} onClick={() => void cancelBid(itemId, bid)}>
                       {savingBid === itemId ? 'Saving…' : confirmCancel === itemId ? 'Really cancel?' : 'Cancel'}
                     </Button>

@@ -459,6 +459,12 @@ export class PartyApiClient {
     return this.post('merchant/auto-npc-sale', { item, character, action: remove ? 'remove' : 'set', ...(!character && keep !== undefined && keep.trim() !== '' ? { keep: keep.trim() } : {}) })
   }
 
+  /** POST /party-api/merchant/native-stand {action: 'resolve-purchase', id, bought}:
+   *  bought counts the reserved quantity toward the WTB, not bought releases it. */
+  async resolveWtbPurchase(id: string, bought: boolean): Promise<ApiResult<CommandResult>> {
+    return this.post('merchant/native-stand', { action: 'resolve-purchase', id, bought })
+  }
+
   /** POST /party-api/merchant/auto-npc-sale {item, keep, action: 'set'} - a
    *  merchant-wide rule's reserve, as connected-inventory.tsx onUpdateNpcReserve sends it. */
   async setAutoNpcSaleKeep(item: Item, keep: number): Promise<ApiResult<CommandResult>> {

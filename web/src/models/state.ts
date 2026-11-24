@@ -684,6 +684,9 @@ export interface PartyStateDynamic {
   nativeStand?: {
     offers: Record<string, { itemId: string; auto: boolean; phase: string; slot: string; level?: number; price?: number; quantity?: number; acknowledged?: number; problem?: string }>
     problems: Record<string, string>
+    // Purchases whose merchant job ended before the merchant reported them,
+    // keyed "<listing>:<seller>:..." (http/native-stand.ts resolvePurchase).
+    purchases?: Record<string, { item: { name: string; q?: number; price?: number }; quantity: number; jobId: string }>
   }
   mluckSchedule?: { target: string; remainingMs: number; leadMs: number; dispatchInMs: number; marginMs: number; status: string } | null
   gatheringCooldowns?: { fishing?: number; mining?: number }
