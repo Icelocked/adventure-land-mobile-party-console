@@ -154,3 +154,13 @@ the item's `src` changes reverted.
   at 0 as party-management-panels.tsx does; the fork console keeps its "Keep in storage" field
   and v1.4.0 none. The merchant's rule list shows a character's own rule with its owner and
   removes it with `{item, character: owner, action: 'remove'}` (`e2e/owners-items.spec.ts`).
+- **B13 - done for the inventory and the item details' exchange rewards; the bank waits for
+  set 1.** `src/components/BatchSelection.tsx` ports item-selection.tsx's selection and
+  BatchItemActions' rows. The phone has no Ctrl or Shift, so a "Select" button turns on select
+  mode, taps add or drop items, and "Actions" opens the rows as an options list once two items
+  are chosen. The inventory posts `/command {character, type, item, ...extra}` per item; the
+  rewards post the merchant's rules at `slot: -1`, with a one-level upgrade sent as
+  `auto-upgrade-mark` (`e2e/owners-items.spec.ts`, `src/components/BatchSelection.test.ts`).
+  The bank grid sits in `src/screens/account/BankScreen.tsx`, a set 1 file, so its batch rows
+  (withdraw marks, `exchange-order`, `compound-mark`) are not wired; the commerce screen's reward
+  tiles (`MerchantCommerceScreen.tsx`, set 1) need only an `ExchangeSelectionProvider` around them.

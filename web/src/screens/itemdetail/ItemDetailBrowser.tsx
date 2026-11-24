@@ -10,7 +10,9 @@ import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { TracktrixBonusList } from '@/components/Tracktrix'
 import { MonsterDetail } from '@/components/MonsterDetail'
-import { ExchangeRewardTile } from '@/components/ExchangeReward'
+import { ExchangeRewardTile, PASSIVE_KINDS } from '@/components/ExchangeReward'
+import { BatchSelectionBar, ExchangeSelectionProvider, useBatchSelection, type BatchEntry, type BatchHandlers } from '@/components/BatchSelection'
+import { useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -686,7 +688,34 @@ const NON_INSPECTABLE_KINDS = new Set(['empty', 'gold', 'shells', 'cx', 'cxbundl
 
 /** Exchange details: price, rewards (as reward tiles) and sources. */
 function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; box: boolean; exchanges: ExchangeSections; onNavigateItem: (id: string, level: number) => void }) {
+  const state = useDynamicState()
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const selection = useBatchSelection()
+  const merchant = state.merchantCharacter
+  // exchange-reward-tile.tsx batch menu: the merchant's automatic rules for prospective rewards
+  // (slot -1), where a one-level upgrade is an auto upgrade rule.
+  const rewardEntries: BatchEntry[] = [
+    ...new Map<string, BatchEntry>(
+      exchanges.rewards
+        .flatMap((entry): (readonly [string, number])[] =>
+          entry.reward ? [exchangeTarget(entry.reward)] : entry.results.filter((result) => !PASSIVE_KINDS.includes(result.kind)).map((result) => [result.id, 0] as const),
+        )
+        .map(([rewardId, level]): [string, BatchEntry] => [
+          `${rewardId}@${level}`,
+          { key: `${rewardId}@${level}`, slot: -1, item: { name: rewardId, level }, meta: state.merchantCatalog?.allItems?.find((candidate) => candidate.id === rewardId)?.meta ?? undefined },
+        ]),
+    ).values(),
+  ]
+  const batchHandlers: BatchHandlers = {
+    onCommand: async (type, entry, extra) => {
+      const result = await api.post('command', { character: merchant, type: type === 'upgrade-mark' ? 'auto-upgrade-mark' : type, item: entry.item, ...extra, slot: -1 })
+      return result.kind === 'failure' ? result.message || 'Command failed' : null
+    },
+    exchangeable: (entry) => !!state.merchantCatalog?.exchangeable?.some((choice) => !choice.reward && choice.id === entry.item.name && choice.level === entry.item.level),
+  }
   return (
+    <ExchangeSelectionProvider selection={selection}>
     <div className="flex flex-col gap-3">
       {exchanges.prices.length > 0 && (
         <div>
@@ -706,7 +735,15 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
       )}
       {exchanges.rewards.length > 0 && (
         <div>
-          <div className="text-sm font-semibold">{box ? 'Rewards' : 'Exchange reward'}</div>
+          <div className="flex items-center justify-between text-sm font-semibold">
+            <span>{box ? 'Rewards' : 'Exchange reward'}</span>
+            {merchant && !selection.active && rewardEntries.length > 1 && (
+              <button type="button" onClick={selection.start} className="rounded-md border border-border px-2 py-1 text-xs font-normal text-muted-foreground">
+                Select
+              </button>
+            )}
+          </div>
+          <BatchSelectionBar selection={selection} entries={rewardEntries} handlers={batchHandlers} onDone={refreshNow} />
           {exchanges.rewards.map((entry) => {
             const [rewardId, rewardLevel] = entry.reward ? exchangeTarget(entry.reward) : [entry.id, 0]
             return (
@@ -763,6 +800,7 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
         </div>
       )}
     </div>
+    </ExchangeSelectionProvider>
   )
 }
 
