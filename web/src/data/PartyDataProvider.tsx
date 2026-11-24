@@ -18,6 +18,7 @@ import type {
 } from '@/models'
 import { emptyPartyStateDynamic } from '@/models'
 import { QK } from './queryKeys'
+import { charactersWithCatalogMeta, stateWithCatalogMeta } from '@/lib/itemCatalogMeta'
 import { affectedDomains, PARTY_ACTION_EVENT, type Domain, type PartyActionDetail } from './queryActions'
 
 /** Owns the live connection and polling for one server and writes
@@ -464,11 +465,18 @@ function useCachedValue<T>(key: readonly unknown[], initial: T): T {
   return (data ?? initial) as T
 }
 
-export const useCharacters = (): Record<string, CharacterState> => useCachedValue(QK.characters, {})
+// Item entries arrive with only their per-copy meta (console v1.5.0
+// public-state-characters.ts compactEntry); these hooks join the catalog's
+// per-type meta back on, as the dashboard's item-catalog-meta.ts does.
+export function useCharacters(): Record<string, CharacterState> {
+  const characters = useCachedValue<Record<string, CharacterState>>(QK.characters, {})
+  const catalog = useCachedValue(QK.dynamicState, emptyPartyStateDynamic()).merchantCatalog
+  return charactersWithCatalogMeta(catalog, characters)
+}
 export const useConnected = (): boolean => useCachedValue(QK.connected, false)
 export const useLastConnectionError = (): string | null => useCachedValue(QK.lastConnectionError, null)
 export const useRoster = (): Record<string, RosterMember> => useCachedValue(QK.roster, {})
-export const useDynamicState = (): PartyStateDynamic => useCachedValue(QK.dynamicState, emptyPartyStateDynamic())
+export const useDynamicState = (): PartyStateDynamic => stateWithCatalogMeta(useCachedValue(QK.dynamicState, emptyPartyStateDynamic()))
 export const useMail = (): MailSnapshot => useCachedValue(QK.mail, { messages: [], count: 0 })
 export const useGameLogs = (): Record<string, GameLogEntry[]> => useCachedValue(QK.gameLogs, {})
 export const useLogsError = (): boolean => useCachedValue(QK.logsError, false)

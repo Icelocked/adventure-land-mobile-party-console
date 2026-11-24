@@ -151,6 +151,10 @@ function omit(source: Record<string, unknown>, keys: readonly string[]): Record<
   return Object.fromEntries(Object.entries(source).filter(([key]) => !drop.has(key)))
 }
 
+// public-state-characters.ts metadataFields: the per-copy part of an item's
+// meta that v1.5.0 keeps on inventory, stream and bank entries.
+const ENTRY_META_FIELDS = ['definition', 'upgradeable', 'compoundable', 'buyable', 'properties', 'scaling', 'maxLevel', 'sprite', 'title'] as const
+
 export class MockPartyServer {
   characters: MockCharacter[] = []
   catalogEntries: Record<string, MockCatalogEntry> = {}
@@ -272,6 +276,24 @@ export class MockPartyServer {
     return [...this.characters.map((c) => ({ name: c.name, ctype: c.ctype, level: c.level, ...(c.server ? { server: c.server } : {}) })), ...this.offlineRoster]
   }
 
+  /** v1.5.0 compactEntry: the catalog's per-type meta joined under the
+   *  entry's own, then cut to ENTRY_META_FIELDS. world, usage and bonuses
+   *  stay in merchantCatalog. */
+  private compactEntry(entry: Record<string, unknown> | null): Record<string, unknown> | null {
+    if (!entry) return entry
+    const catalog = (this.dynamicState().merchantCatalog as { allItems: { id: string; meta: Record<string, unknown> }[] }).allItems
+    const known = catalog.find((candidate) => candidate.id === (entry.item as MockItem | undefined)?.name)?.meta
+    const own = entry.meta as Record<string, unknown> | undefined
+    const joined = known ? { ...known, ...(own ?? {}) } : own
+    // Per-copy meta without a definition waits for the catalog.
+    if (!joined || (!joined.definition && 'properties' in joined)) return { ...entry, meta: null }
+    return { ...entry, meta: pick(joined, ENTRY_META_FIELDS) }
+  }
+
+  private compactCells(cells: Record<string, unknown> | undefined): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(cells ?? {}).map(([key, entry]) => [key, this.compactEntry(entry as Record<string, unknown> | null)]))
+  }
+
   private dynamicState(): Record<string, unknown> {
     return {
       bank: { gold: this.bankGold, packs: this.bankPacks },
@@ -376,8 +398,14 @@ export class MockPartyServer {
         ),
       }
     if (section === 'inventory')
-      return { characters: Object.fromEntries(this.characters.map((c) => [c.name, { items: (c.items ?? []).map((item, slot) => (item ? { slot, item } : null)), slots: c.slots ?? {} }])) }
-    if (section === 'bank') return { ...pick(full, BANK_FIELDS), ...(dashboard ? { bankbois: full.bankbois ?? [] } : {}) }
+      return { characters: Object.fromEntries(this.characters.map((c) => [c.name, { items: (c.items ?? []).map((item, slot) => this.compactEntry(item ? { slot, item } : null)), slots: this.compactCells(c.slots) }])) }
+    // item-meta-projection.ts compactBank / compactBankbois.
+    if (section === 'bank') {
+      const bank = full.bank as { gold: number; packs: Record<string, (Record<string, unknown> | null)[]> }
+      const packs = Object.fromEntries(Object.entries(bank.packs).map(([pack, entries]) => [pack, entries.map((entry) => this.compactEntry(entry))]))
+      const bankbois = ((full.bankbois as { items?: (Record<string, unknown> | null)[] }[] | undefined) ?? []).map((bankboi) => ({ ...bankboi, ...(bankboi.items ? { items: bankboi.items.map((entry) => this.compactEntry(entry)) } : {}) }))
+      return { ...pick(full, BANK_FIELDS), bank: { ...bank, packs }, ...(dashboard ? { bankbois } : {}) }
+    }
     if (section === 'market') return pick(full, MARKET_FIELDS)
     if (section === 'logs') return { gameLogs: this.gameLogs, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }
     if (section === 'core') {
@@ -412,7 +440,7 @@ export class MockPartyServer {
       ;(c.items ?? []).forEach((item, index) => {
         // The wire shape is InventoryEntry ({slot, item}), not the bare item.
         const operation = this.inventoryOperations[c.name]?.[index]
-        if (item) items[String(index)] = { slot: index, item, ...(operation ? { operation } : {}) }
+        if (item) items[String(index)] = this.compactEntry({ slot: index, item, ...(operation ? { operation } : {}) })
       })
       characters[c.name] = {
         generation: 'g1',
@@ -433,7 +461,7 @@ export class MockPartyServer {
           ...(c.conditions ? { conditions: c.conditions } : {}),
         },
         items,
-        slots: c.slots ?? {},
+        slots: this.compactCells(c.slots),
       }
     }
     return { type: 'snapshot', epoch: 'e1', sequence, characters }
