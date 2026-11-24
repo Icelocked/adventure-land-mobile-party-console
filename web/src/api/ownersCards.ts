@@ -62,6 +62,17 @@ export function handControlWord(state: PartyStateDynamic, name: string): 'Manual
   return state.activeSlots?.find((slot) => slot.character === name)?.kind === 'native' ? 'Manual' : 'Pause'
 }
 
+/** hand-control.tsx HandControlCount: "N characters on Manual" (or Pause) while any hold stands,
+ *  with no timer. An empty string means no character is held. */
+export function handControlCount(state: PartyStateDynamic): string {
+  const hands = loose((state as unknown as Loose).handControlByCharacter)
+  const on = Object.entries(hands).filter(([, hand]) => loose(hand).on === true).map(([name]) => handControlWord(state, name))
+  const manual = on.filter((word) => word === 'Manual').length
+  const paused = on.length - manual
+  const count = (n: number, word: string) => (n ? `${n} character${n === 1 ? '' : 's'} on ${word}` : '')
+  return [count(manual, 'Manual'), count(paused, 'Pause')].filter(Boolean).join(', ')
+}
+
 /** The formation body connected-character-card.tsx onHandChange sends: only the changed keys. */
 export function handControlBody(character: string, patch: Partial<HandControl>): { character: string; handControl: Partial<HandControl> } {
   return { character, handControl: patch }

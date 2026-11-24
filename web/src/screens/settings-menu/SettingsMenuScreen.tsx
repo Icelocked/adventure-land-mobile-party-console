@@ -12,6 +12,7 @@ import { ConsoleUpdateSettings, HostingSettings } from '@/screens/account/settin
 import { AccountMembers } from '@/screens/account/settings/AccountMembers'
 import { NotificationsSection } from '@/screens/account/settings/NotificationsSection'
 import { MenuLinksSettings } from '@/screens/account/settings/MenuLinks'
+import { PinTopBarSetting } from './PinTopBarSetting'
 import { PwaUpdateSettings } from '@/screens/account/settings/PwaUpdates'
 import { About } from '@/screens/account/settings/About'
 import { ALDataSection } from '@/screens/account/SettingsScreen'
@@ -118,10 +119,11 @@ function Body({ target, current }: { target: SettingsTarget; current: string }):
         case 'characters': return <AccountMembers />
         case 'aldata': return <ALDataSection />
         case 'marketplace': return <MarketplaceSettingsScreen />
-        // The dashboard's Display section holds its own display switch; the PWA's holds this app's own settings.
+        // The dashboard's Display section holds its pin switch; the PWA's adds this app's own settings under it.
         case 'display':
           return (
             <>
+              <PinTopBarSetting />
               <NotificationsSection />
               <MenuLinksSettings />
               <PwaUpdateSettings />

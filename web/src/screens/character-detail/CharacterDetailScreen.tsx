@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,8 @@ import { CombatLogSection } from './sections/CombatLogSection'
 import { StatusesSection } from './sections/StatusesSection'
 import { LuckySlotSection } from './sections/LuckySlotSection'
 import { MapSection } from './sections/MapSection'
+import { CardNameStrip } from './CardNameStrip'
+import { usePinTopBar } from '@/lib/pinTopBar'
 import { AccountMenu } from './AccountMenu'
 import { SessionControls } from '@/components/SessionControls'
 import { PartyGold } from '@/components/PartyGold'
@@ -53,11 +55,15 @@ export function CharacterDetailScreen() {
   const resolvedTargetType = useTargetMonsterType(name, vitals?.target)
   const farming = resolveFarmingContext(dynamicState, name)
   const others = Object.keys(characters).filter((n) => n !== name)
+  // The card name strip shows only while "Pin top bar" is on (lib/pinTopBar.ts).
+  const [pinned] = usePinTopBar()
+  const bar = useRef<HTMLDivElement>(null)
+  const identity = useRef<HTMLDivElement>(null)
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col md:h-dvh md:min-h-0 md:max-w-6xl">
       {/* The title bar and the character switcher stay in view while the page scrolls. */}
-      <div className="sticky top-0 z-20 bg-background">
+      <div ref={bar} className="sticky top-0 z-20 bg-background">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
         <Button variant="ghost" size="icon-sm" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="size-5" />
@@ -92,6 +98,7 @@ export function CharacterDetailScreen() {
           ))}
         </div>
       )}
+      {pinned && vitals && <CardNameStrip key={name} name={name} vitals={vitals} bar={bar} identity={identity} />}
       </div>
 
       {!vitals ? (
@@ -103,6 +110,7 @@ export function CharacterDetailScreen() {
         // keeps one column in the same order.
         <div className="flex-1 pb-6 md:grid md:min-h-0 md:grid-cols-2 md:pb-0">
           <div className="min-w-0 md:overflow-y-auto md:pb-6">
+          <div ref={identity}>
           <VitalsHeader
             name={name}
             vitals={vitals}
@@ -110,6 +118,7 @@ export function CharacterDetailScreen() {
             slots={state?.inventory?.slots ?? {}}
             online={online}
           />
+          </div>
           {/* The live map sits under the card header. */}
           <MapSection name={name} map={vitals.map} x={vitals.x} y={vitals.y} />
             {/* Statuses sit under HP/MP for every class. */}

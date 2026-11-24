@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { useSectionOpen } from '@/lib/sectionOpen'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useMapLarge, useMapOpen, useStripShown } from '@/components/map/mapDockState'
 import { ChevronDown, ChevronRight, Maximize2, X } from 'lucide-react'
 import { MapCanvas } from '@/components/map/MapCanvas'
 import { FreshnessBadge } from '@/components/FreshnessBadge'
@@ -12,14 +13,23 @@ import { useMapDefinition, useMapFrames, useOnScreen, useVisible } from '@/data/
  *  with a native-size view (names and hit/heal floaters). The map stream
  *  runs only while the map is on screen or the native-size view is open:
  *  each feed sends about 100 KB/s, and on a slow link the other requests,
- *  the escape latency probe among them, queue behind it. */
-export function MapSection({ name, map, x, y }: { name: string; map: string; x: number; y: number }) {
+ *  the escape latency probe among them, queue behind it.
+ *
+ *  `dock` mounts a second copy in the card name strip (console character-map-section.tsx): its
+ *  location row sits in the strip and the map body renders into the strip's dock element. Both
+ *  copies share one open state (mapDockState.ts), and only the copy that holds the body runs the
+ *  stream and the native-size view. */
+export function MapSection({ name, map, x, y, dock }: { name: string; map: string; x: number; y: number; dock?: HTMLElement | null }) {
   const caveMap = /^zone_[a-f0-9]+_\d+$/.test(map)
   const mapLabel = caveMap ? 'Cave of Many Dreams' : map
-  const [open, setOpen] = useSectionOpen('character:Map', false)
-  const [large, setLarge] = useState(false)
+  const docked = dock !== undefined
+  const portal = (body: ReactNode) => (dock ? createPortal(body, dock) : body)
+  const [open, setOpen] = useMapOpen()
+  const stripShown = useStripShown(name)
+  const here = docked ? stripShown && !!dock : !stripShown
+  const [large, setLarge] = useMapLarge(name)
   const [streamDefinition, setStreamDefinition] = useState<MapDefinition | null>(null)
-  const definitionQuery = useMapDefinition(map, open && !caveMap)
+  const definitionQuery = useMapDefinition(map, open && here && !caveMap)
   const definition = caveMap ? (streamDefinition?.name === map ? streamDefinition : null) : definitionQuery.data || null
   const visible = useVisible()
   const buffer = useRef<MapRenderBuffer>({ frame: null, previous: null, receivedAt: 0 })
@@ -45,11 +55,17 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
   }))
   const [frame, setFrame] = useState<HTMLDivElement | null>(null)
   const onScreen = useOnScreen(frame)
-  useMapFrames(name, open && visible && (onScreen || large), listener)
+  useMapFrames(name, open && here && visible && (onScreen || large), listener)
+  // The body starts empty each time it moves into this copy.
+  useEffect(() => {
+    if (!here) return
+    Object.assign(buffer.current, { frame: null, previous: null, receivedAt: 0 })
+    setLastFrameAt(0)
+  }, [here])
 
   return (
-    <div className="px-3 pt-1">
-      <div className="flex items-center gap-1 font-mono text-xs text-cyan-200/65">
+    <div className={docked ? 'flex min-w-0' : 'px-3 pt-1'}>
+      <div className={`flex items-center gap-1 font-mono text-xs text-cyan-200/65${docked ? ' min-w-0' : ''}`}>
         <button
           type="button"
           onClick={() => {
@@ -64,12 +80,19 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
         >
           {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
-        <span>
+        <span className={docked ? 'truncate' : undefined}>
           {mapLabel} [{Math.round(x)}, {Math.round(y)}]
         </span>
       </div>
-      {open ? (
-        <div ref={setFrame} className="relative mt-2 aspect-[4/3] overflow-hidden rounded-md border border-emerald-800/80 bg-[#07110f]">
+      {open && here ? portal(
+        <div
+          ref={setFrame}
+          className={
+            docked
+              ? 'relative h-full overflow-hidden border-b border-emerald-800/80 bg-[#07110f]'
+              : 'relative mt-2 aspect-[4/3] overflow-hidden rounded-md border border-emerald-800/80 bg-[#07110f]'
+          }
+        >
           <MapCanvas definition={definition} frame={null} previous={null} receivedAt={0} buffer={buffer} fps={20} active={open && visible && !large} scale={1 / 3} detailed={false} />
           <button
             type="button"
@@ -86,9 +109,10 @@ export function MapSection({ name, map, x, y }: { name: string; map: string; x: 
               {lastFrameAt > 0 ? <FreshnessBadge at={lastFrameAt} subject="frame" /> : <span className="text-xs text-slate-300">Waiting for the first frame…</span>}
             </span>
           )}
-        </div>
+        </div>,
       ) : null}
-      {large && (
+      {/* Only the copy that holds the map body opens the native-size view. */}
+      {large && here && (
         <div role="group" aria-label="Native-size map" className="fixed inset-0 z-50 flex flex-col bg-[#081713]">
           <div className="flex items-center justify-between border-b border-emerald-800 px-4 py-3">
             <span className="font-medium text-emerald-50">

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { emptyPartyStateDynamic, type PartyStateDynamic } from '@/models'
-import { caveReopenable, cardLine, gatheringJob, marketAge, merchantReadyIds, openMarketWatch, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
+import { caveReopenable, cardLine, gatheringJob, marketAge, merchantReadyIds, openMarketWatch, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlCount, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
 
 // OWNERS-PORT-MAP.md B16 with A24, as the owners release's card reads its fields.
 
@@ -117,5 +117,21 @@ describe('market watch and merchant plan (B17)', () => {
     expect(merchantReadyIds(state({}))).toBeNull()
     expect(gatheringJob({ reason: 'mining', id: 'g2' })).toBe(true)
     expect(gatheringJob({ reason: 'restock', id: 'j1' })).toBe(false)
+  })
+})
+
+describe('top bar hand control count (B16)', () => {
+  const slots = [
+    { index: 0, kind: 'native', character: 'R' },
+    { index: 1, kind: 'headless', character: 'M' },
+    { index: 2, kind: 'headless', character: 'P' },
+  ]
+  it('counts Manual and Pause holds apart, as hand-control.tsx HandControlCount does', () => {
+    expect(handControlCount(state({ activeSlots: slots, handControlByCharacter: { R: { on: true }, M: { on: true }, P: { on: true } } }))).toBe('1 character on Manual, 2 characters on Pause')
+    expect(handControlCount(state({ activeSlots: slots, handControlByCharacter: { R: { on: true }, M: { on: false } } }))).toBe('1 character on Manual')
+  })
+  it('shows nothing while no hold stands', () => {
+    expect(handControlCount(state({ activeSlots: slots, handControlByCharacter: { R: { on: false } } }))).toBe('')
+    expect(handControlCount(state({}))).toBe('')
   })
 })

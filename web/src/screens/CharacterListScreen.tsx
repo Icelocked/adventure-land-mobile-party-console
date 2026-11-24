@@ -21,6 +21,8 @@ import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import { ConsoleBuildButton } from '@/components/ConsoleBuildButton'
 import { ConsoleControls, ConsolePausedIndicator, ConsoleResumeBanner } from '@/components/ConsoleControls'
 import { DiagnosticsButton } from '@/components/DiagnosticsButton'
+import { handControlCount } from '@/api/ownersCards'
+import { usePinTopBar } from '@/lib/pinTopBar'
 import type { CharacterState } from '@/models'
 
 /** Party overview: class icon, level/class, HP/MP, one-line activity, gold
@@ -65,12 +67,14 @@ export function CharacterListScreen() {
   const settings = useServerSettings()
   // Picks between the empty-state messages.
   const configLoaded = useConfigLoaded()
+  // "Pin top bar" keeps the party header in view while the page scrolls (console party-header.tsx).
+  const [pinned] = usePinTopBar()
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col md:max-w-6xl">
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+      <header data-party-header className={`flex items-center justify-between border-b border-border px-4 py-3${pinned ? ' sticky top-0 z-20 bg-background' : ''}`}>
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold">Party</h1>
             {/* Console update indicator */}
             {updates?.available && (
@@ -88,6 +92,11 @@ export function CharacterListScreen() {
             <ConsoleControls />
             <DiagnosticsButton />
             <ConsolePausedIndicator />
+            {handControlCount(dynamicState) && (
+              <output data-hand-control className="rounded border border-sky-400 bg-sky-950 px-2 py-0.5 font-mono text-xs font-semibold text-sky-100">
+                {handControlCount(dynamicState)}
+              </output>
+            )}
           </div>
           {/* Version line */}
           <span className="block font-mono text-[10px] text-muted-foreground">
