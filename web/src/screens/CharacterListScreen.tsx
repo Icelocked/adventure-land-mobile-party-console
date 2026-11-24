@@ -20,6 +20,7 @@ import { CreateCharacterSheet } from '@/screens/roster/CreateCharacterSheet'
 import { useConsoleUpdates } from '@/hooks/useConsoleUpdates'
 import { ConsoleBuildButton } from '@/components/ConsoleBuildButton'
 import { ConsoleControls, ConsolePausedIndicator, ConsoleResumeBanner } from '@/components/ConsoleControls'
+import { DiagnosticsButton } from '@/components/DiagnosticsButton'
 import type { CharacterState } from '@/models'
 
 /** Party overview: class icon, level/class, HP/MP, one-line activity, gold
@@ -85,6 +86,7 @@ export function CharacterListScreen() {
             )}
             <ConsoleBuildButton />
             <ConsoleControls />
+            <DiagnosticsButton />
             <ConsolePausedIndicator />
           </div>
           {/* Version line */}

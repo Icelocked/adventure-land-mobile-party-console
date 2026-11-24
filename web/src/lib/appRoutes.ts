@@ -3,7 +3,7 @@
 // the server hosts there) goes to the network. Keep in sync with the routes in App.tsx
 // (appRoutes.test.ts checks it).
 export const APP_SECTIONS = [
-  'anniversary', 'bank', 'bestiary', 'catalog', 'characters', 'logs', 'mail', 'market',
+  'anniversary', 'bank', 'bestiary', 'catalog', 'characters', 'diagnostics', 'logs', 'mail', 'market',
   'merchant', 'metrics', 'routines', 'settings', 'skills', 'stand', 'wtb',
 ]
 

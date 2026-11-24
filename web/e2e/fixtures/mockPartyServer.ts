@@ -273,6 +273,13 @@ export class MockPartyServer {
   addonsFail = false
   // status/coordinator/apps.ts: each app key record (public fields) and the issued key count.
   appKeys: { name: string; scopes: string[]; ownCommands: boolean; issuedAt: number; lastUsedAt: number | null; revokedAt: number | null }[] = []
+  // status/coordinator/routes.ts diagnostics: the saved alerts, each alert's report by id, and each
+  // character's live post per ring. A report or records entry of `null` answers that read with an error.
+  diagnosticsAlerts: { id: string; subject: string; trigger: string; at: number }[] = []
+  diagnosticsReports: Record<string, Record<string, unknown> | null> = {}
+  diagnosticsRecords: Record<string, Record<string, { at: number; records: unknown; incidents?: unknown[] } | null> | null> = {}
+  // Every GET /party-api/diagnostics/* path with its query, in order.
+  diagnosticsReads: string[] = []
   // Every POST /party-api/farming-mode body.
   farmingModeWrites: Record<string, unknown>[] = []
   // The declared settings the settings route lists beside the relocation switch, each with its
@@ -490,6 +497,8 @@ export class MockPartyServer {
       offTank: this.offTank,
       pullMode: this.pullMode,
       consoleControl: this.consoleControl,
+      // Core's last saved record (status/coordinator/diagnostics.ts `lastSaved`).
+      recordSaved: this.recordSaved,
       encounterRoutines: this.encounterRoutines,
       encounterAutoDeathLimits: this.encounterAutoDeathLimits,
       encounterAutoDeaths: this.encounterAutoDeaths,
@@ -502,6 +511,7 @@ export class MockPartyServer {
   // Console 1.4 events and realms: initial-core.ts defaults (initialBossChase,
   // initialRealmHopBlacklist) until a test or POST changes them.
   eventAttendance: Record<string, Record<string, { ended: boolean; ignored?: string }>> = {}
+  recordSaved: { at: number; ring: string; character: string; record: string } | null = null
   bossChase: Record<string, unknown> = { enabled: false, minEtaMinutes: 15, trip: null, returning: null, retryAt: 0, lastError: null, checkedAt: 0, sightings: [], respawns: [] }
   realmHopBlacklist: string[] = []
 
@@ -1708,6 +1718,30 @@ export class MockPartyServer {
       if (route.request().method() !== 'GET') return route.fallback()
       if (this.addonsFail) return route.fulfill({ status: 503, json: { error: 'Add-on registry is starting' } })
       return route.fulfill({ json: { addons: this.addons, slots: this.addonSlots, rings: [], overlays: {}, refusals: [], reads: { 'passive.rule': {} }, stores: {} } })
+    })
+    await page.route('**/party-api/diagnostics/**', (route) => {
+      const request = route.request()
+      if (request.method() !== 'GET') return route.fallback()
+      const url = new URL(request.url())
+      const path = url.pathname.replace(/^.*\/party-api\/diagnostics\//, '')
+      this.diagnosticsReads.push(path + url.search)
+      if (path === 'alerts') return route.fulfill({ json: { alerts: this.diagnosticsAlerts } })
+      if (path === 'alert') {
+        const id = url.searchParams.get('id') ?? ''
+        const report = this.diagnosticsReports[id]
+        if (report === undefined) return route.fulfill({ status: 404, json: { error: 'no such record' } })
+        if (report === null) return route.fulfill({ status: 503, json: { error: 'record store unavailable' } })
+        return route.fulfill({ json: report })
+      }
+      if (path === 'records') {
+        const name = url.searchParams.get('character') ?? ''
+        const rings = (url.searchParams.get('rings') ?? '').split(',').filter(Boolean)
+        if (!this.characters.some((c) => c.name === name)) return route.fulfill({ status: 400, json: { error: 'unknown character or ring' } })
+        const posts = this.diagnosticsRecords[name]
+        if (posts === null) return route.fulfill({ status: 503, json: { error: 'lease store unavailable' } })
+        return route.fulfill({ json: { character: name, until: Date.now() + 2_000, live: Object.fromEntries(rings.map((ring) => [ring, posts?.[ring] ?? null])), snapshots: [] } })
+      }
+      return route.fallback()
     })
     // settings/coordinator/routes/settings.ts: the page's basis and the declared settings.
     await page.route('**/party-api/settings', (route) => {

@@ -27,6 +27,7 @@ import { HuntSettingsScreen } from '@/screens/account/HuntSettingsScreen'
 import { WtbScreen } from '@/screens/account/WtbScreen'
 import { LogsScreen } from '@/screens/account/LogsScreen'
 import { MetricsScreen } from '@/screens/account/MetricsScreen'
+import { DiagnosticsScreen } from '@/screens/account/DiagnosticsScreen'
 import { clearRecoveryHistory } from '@/lib/dashboardRecovery'
 import { AlDataAuthWatcher } from '@/components/AlDataAuthWatcher'
 import { DungeonNavigator } from '@/components/DungeonNavigator'
@@ -93,6 +94,9 @@ export default function App() {
                 <Route path="/wtb" element={<WtbScreen />} />
                 <Route path="/logs" element={<LogsScreen />} />
                 <Route path="/metrics" element={<MetricsScreen />} />
+                <Route path="/diagnostics" element={<DiagnosticsScreen />} />
+                <Route path="/diagnostics/record/:id" element={<DiagnosticsScreen />} />
+                <Route path="/diagnostics/:ring" element={<DiagnosticsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
                 <Route path="/settings/menu" element={<SettingsMenuScreen />} />
                 <Route path="/anniversary" element={<AnniversaryScreen />} />

@@ -702,6 +702,8 @@ export interface PartyStateDynamic {
   // Console 1.5 core accountGold (telemetry/account-gold.ts): bank plus every
   // assigned slot's last carried gold, offline slots included.
   accountGold?: { carried: number | null; total: number | null } | null
+  // Core's last saved diagnostics record; the Diagnostics button reloads its alerts when it changes.
+  recordSaved?: import('./diagnostics').RecordSaved | null
   // Giveaways
   giveawayRealms?: { key: string; label: string }[]
   giveawayPlayers?: Record<string, string[]>
