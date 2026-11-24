@@ -3,6 +3,7 @@ import { useCharacterDiagnosticsMap, useCharacters, useDynamicState, useGameLogs
 import { useClock } from '@/lib/duration'
 import { classifyGameLog, defaultLogFilters, logFilters, showGameLog } from '@/lib/gameLogFilters'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
+import { settingsChangeMessage } from '@/models'
 
 const FILTERS_KEY = 'party-log-filters'
 const button = 'rounded border border-slate-500 px-2 py-1 text-sm'
@@ -16,7 +17,7 @@ function storedFilters(): Record<string, boolean> {
 }
 
 /** Logs: Game logs (category toggles) and
- *  Dashboard logs (combat, merchant/coordinator, anniversary), a character
+ *  Dashboard logs (combat, merchant/coordinator, anniversary, settings history), a character
  *  filter, the latest 1,000 matching entries in order, auto-following the end. */
 export function LogsScreen() {
   useDomainInterest('logs')
@@ -50,13 +51,18 @@ export function LogsScreen() {
     () => (anniversaryActivity || []).map((e, i) => ({ at: e.at, message: e.message || '', name: '', source: 'anniversary', category: e.level || '', key: `anniversary:${e.at}:${i}`, color: '' })),
     [anniversaryActivity],
   )
+  const settingsChanges = state.settingsChanges
+  const settings = useMemo(
+    () => (settingsChanges || []).map((e, i) => ({ at: e.at, message: settingsChangeMessage(e), name: e.character || '', source: 'settings', category: 'settings', key: `settings:${e.at}:${i}`, color: '' })),
+    [settingsChanges],
+  )
   const entries = useMemo(
     () =>
-      (tab === 'game' ? game : [...combat, ...merchant, ...anniversary])
+      (tab === 'game' ? game : [...combat, ...merchant, ...anniversary, ...settings])
         .filter((e) => (character === 'all' || e.name === character) && (tab === 'game' ? showGameLog(e.category || 'other', filters) : source === 'all' || source === e.source))
         .sort((a, b) => a.at - b.at)
         .slice(-1000),
-    [tab, game, combat, merchant, anniversary, character, source, filters],
+    [tab, game, combat, merchant, anniversary, settings, character, source, filters],
   )
   useEffect(() => {
     if (following.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight
@@ -101,6 +107,7 @@ export function LogsScreen() {
               <option value="combat">Combat</option>
               <option value="merchant">Merchant / coordinator</option>
               <option value="anniversary">Anniversary</option>
+              <option value="settings">Settings history</option>
             </select>
           )}
         </div>

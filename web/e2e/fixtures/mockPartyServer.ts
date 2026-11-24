@@ -160,7 +160,7 @@ const CONFIG_EXTRA_KEYS = ['roster', 'classChoices', 'eventStrategy', 'giveawayR
 const CATALOG_FIELDS = ['travelPlaces', 'monsterChoices', 'bestiaryCatalog', 'skillCatalog', 'appearanceChoices', 'merchantCatalog', 'bankVaults'] as const
 const BANK_FIELDS = ['bank', 'bankVaults', 'bankCurrent', 'bankQueue'] as const
 const MARKET_FIELDS = ['aldata', 'ponty', 'npcShop', 'standPriceHistory'] as const
-const LOGS_FIELDS = ['gameLogs', 'combatLogs', 'merchantActivity'] as const
+const LOGS_FIELDS = ['gameLogs', 'combatLogs', 'merchantActivity', 'settingsChanges'] as const
 
 // merchant/initial-settings.ts defaults: the keys the server accepts in
 // /merchant/routine-priorities.
@@ -288,6 +288,9 @@ export class MockPartyServer {
     { field: 'routines', label: 'Routines' },
     { field: 'appLocks', label: 'App locks' },
   ]
+  // The settings owner's audit lines (settings/coordinator/writer.ts), served in the logs section;
+  // each settings route write appends one line per change.
+  settingsChanges: { at: number; field: string; character?: string; addon?: string; key?: string; old?: unknown; new?: unknown; by: string }[] = []
   // The settings route's basis and every write it took.
   settingsAt = 1
   settingsWrites: { changes: { field: string; value: unknown; character?: string }[]; basis: unknown }[] = []
@@ -564,7 +567,7 @@ export class MockPartyServer {
       return { characters: Object.fromEntries(this.characters.map((c) => [c.name, { items: (c.items ?? []).map((item, slot) => (item ? { slot, item } : null)), slots: c.slots ?? {} }])) }
     if (section === 'bank') return { ...pick(full, BANK_FIELDS), ...(dashboard ? { bankbois: full.bankbois ?? [] } : {}) }
     if (section === 'market') return pick(full, MARKET_FIELDS)
-    if (section === 'logs') return { gameLogs: this.gameLogs, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity }
+    if (section === 'logs') return { gameLogs: this.gameLogs, combatLogs: this.combatLogs, merchantActivity: this.merchantActivity, settingsChanges: this.settingsChanges }
     if (section === 'core') {
       if (!dashboard) return omit(full, [...CATALOG_FIELDS])
       const core = omit(full, [...CONFIG_FIELDS, ...CONFIG_EXTRA_KEYS, ...CATALOG_FIELDS, 'bank', 'ponty', 'npcShop', 'combatLogs', 'merchantActivity', 'standPriceHistory'])
@@ -884,6 +887,9 @@ export class MockPartyServer {
       this.settingsWrites.push({ changes, basis: body.basis })
       if (body.basis !== this.settingsAt) return { status: 409, json: { error: 'out of date', reason: 'out of date', field: changes[0]?.field } }
       for (const change of changes) {
+        const before = change.field === 'relocateIfCompeting' ? this.relocateIfCompeting
+          : change.character !== undefined ? (this.extraState[change.field] as Record<string, unknown> | undefined)?.[change.character] : this.extraState[change.field]
+        this.settingsChanges = [...this.settingsChanges, { at: Date.now(), field: change.field, ...(change.character !== undefined ? { character: change.character } : {}), old: before ?? null, new: change.value, by: 'dashboard:settings' }]
         if (change.field === 'relocateIfCompeting') this.relocateIfCompeting = change.value === true
         else if (change.character !== undefined) {
           // A per-character change sets the character's entry; null removes it.

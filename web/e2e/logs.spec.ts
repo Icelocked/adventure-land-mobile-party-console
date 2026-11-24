@@ -68,3 +68,23 @@ test('Logs: dashboard logs combine combat, merchant and anniversary with a sourc
   await expect(page.getByText('Disconnected — showing retained logs')).toBeVisible()
   await expect(list.getByText('Kissed Wizard')).toBeVisible()
 })
+
+// OWNERS-PORT-MAP.md B19: the settings owner's audit lines (logs section `settingsChanges`) as
+// the dashboard's "Settings history" source (log-sidebar.tsx).
+test('Logs: Settings history lists each settings change with its old and new value and who made it', async ({ page }) => {
+  const server = logsServer()
+  const now = Date.now()
+  server.settingsChanges = [
+    { at: now - 3000, field: 'homeRealm', old: null, new: 'USI', by: 'dashboard:settings' },
+    { at: now - 2000, field: 'addons', addon: 'tank-hold', key: 'tank', character: 'Leada', old: 'auto', new: 'hold', by: 'app:Tracker' },
+  ]
+  await server.install(page)
+  await page.goto('/logs')
+  await page.getByRole('tab', { name: 'Dashboard logs' }).click()
+  await page.getByLabel('Dashboard log source').selectOption('settings')
+  const list = page.getByLabel('Log entries')
+  await expect.poll(() => list.locator('p').allTextContents()).toEqual([
+    expect.stringMatching(/\[settings\] homeRealm: null -> "USI" by dashboard:settings$/),
+    expect.stringMatching(/\[Leada\] tank-hold tank \(Leada\): "auto" -> "hold" by app:Tracker$/),
+  ])
+})

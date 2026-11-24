@@ -123,6 +123,7 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
     type LogsWire = {
       combatLogs?: PartyStateDynamic['combatLogs']
       merchantActivity?: PartyStateDynamic['merchantActivity']
+      settingsChanges?: PartyStateDynamic['settingsChanges']
       gameLogs?: Record<string, GameLogEntry[]>
     }
     const mergeState = (patch: Partial<PartyStateDynamic>) =>
@@ -220,8 +221,8 @@ export function PartyDataProvider({ settings, children }: { settings: ServerSett
       // A failed refresh keeps the retained logs and flags the error.
       queryClient.setQueryData(QK.logsError, result?.kind === 'failure')
       if (result?.kind !== 'success') return
-      const { combatLogs, merchantActivity, gameLogs } = result.value
-      mergeState({ ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}) })
+      const { combatLogs, merchantActivity, settingsChanges, gameLogs } = result.value
+      mergeState({ ...(combatLogs ? { combatLogs } : {}), ...(merchantActivity ? { merchantActivity } : {}), ...(settingsChanges ? { settingsChanges } : {}) })
       queryClient.setQueryData(QK.gameLogs, gameLogs ?? {})
     }
 

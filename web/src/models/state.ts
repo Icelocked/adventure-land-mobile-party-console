@@ -643,6 +643,8 @@ export interface PartyStateDynamic {
   // The party's relocation switch, a root setting the Hunt settings no longer hold (console
   // hunting/rules.ts HuntSettings).
   relocateIfCompeting?: boolean
+  // The settings owner's audit lines, in the logs section (console settings/coordinator/writer.ts).
+  settingsChanges?: SettingsChangeLine[]
   // The realm list automatic merchant work skips (console merchant-realm-blacklist-setting.tsx).
   merchantRealmBlacklist?: string[]
   // Achievement Hunt (upstream console PR #131; Ryan's v1.4.0 has none).
@@ -914,6 +916,15 @@ export function characterOnline(detail: CharacterDiagnostics | undefined): boole
  *  defaultAchievementHuntSettings); Ryan's v1.4.0 never sends the field. */
 export function consoleHasAchievementHunt(state: Pick<PartyStateDynamic, 'achievementHunt'>): boolean {
   return typeof state.achievementHunt === 'object' && state.achievementHunt !== null
+}
+
+/** One settings audit line: a field, or an add-on's setting `key`, changed from `old` to `new` by
+ *  `by` (console party-state.tsx settingsChanges). */
+export interface SettingsChangeLine { at: number; field: string; character?: string; addon?: string; key?: string; old?: unknown; new?: unknown; by: string }
+
+/** The line's words in the logs (console log-sidebar.tsx). */
+export function settingsChangeMessage(line: SettingsChangeLine): string {
+  return `${line.addon ? line.addon + ' ' : ''}${line.key ?? line.field}${line.character ? ` (${line.character})` : ''}: ${JSON.stringify(line.old ?? null)} -> ${JSON.stringify(line.new ?? null)} by ${line.by}`
 }
 
 // The slot fields' defaults (console hunting/rules.ts DEFAULT_COMBAT_MODE, DEFAULT_TARGET_MODE).

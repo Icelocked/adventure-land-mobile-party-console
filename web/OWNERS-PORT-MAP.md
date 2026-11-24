@@ -149,3 +149,7 @@ Two sets with no file in common:
     issues, switches and revokes keys over `/apps` and locks settings through `appLocks`;
     `/apps` and `/addons` posts refresh no state section. Tests: `data/appKeysDomains.test.ts`,
     e2e `app-keys.spec.ts`.
+  - B19 done. The logs poll keeps `settingsChanges`, and Logs > Dashboard logs has the
+    "Settings history" source in log-sidebar.tsx's words (`settingsChangeMessage`). The mock's
+    settings route appends a line per change. Tests: `models/settingsChanges.test.ts`, e2e
+    `logs.spec.ts` (Settings history).
