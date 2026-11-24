@@ -145,3 +145,9 @@ export function dailyResetLabel(now: number, clockOffsetMs = 0): string {
   const local = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(next)
   return `${local} (${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m ${seconds % 60}s)`
 }
+
+/** The owners release: its config always carries `handControlByCharacter` and its core
+ *  `standSlots`, and neither the fork console nor Ryan's v1.4.0 sends either. */
+export function ownersRelease(state: PartyStateDynamic): boolean {
+  return 'handControlByCharacter' in state || !!standSlots(state)
+}

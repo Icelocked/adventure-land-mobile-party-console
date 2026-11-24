@@ -149,3 +149,8 @@ the item's `src` changes reverted.
   (`e2e/owners-events.spec.ts`). Trick or Treat shows the knocks left from the schedule's
   `trickOrTreat.characters[name]`, the next daily reset and the daily note, which the fork had
   not ported either.
+- **B11 - done.** `ownersRelease` (config `handControlByCharacter` or core `standSlots`) shows the
+  reserve on every merchant-wide auto NPC sale, labelled "Number to keep reserved" and starting
+  at 0 as party-management-panels.tsx does; the fork console keeps its "Keep in storage" field
+  and v1.4.0 none. The merchant's rule list shows a character's own rule with its owner and
+  removes it with `{item, character: owner, action: 'remove'}` (`e2e/owners-items.spec.ts`).

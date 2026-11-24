@@ -77,24 +77,29 @@ export function AutoMarksSection({
   }
 
   const npc: RuleEntry[] = [
-    ...Object.entries(state.autoNpcSales)
-      .filter(([, rule]) => !rule.character)
-      .map(([key, rule]) => ({
-        key,
-        item: rule.item,
-        // Console 1.5 inventory-panel.tsx:1635-1637: the copies kept back from sale.
-        edits: [
-          {
-            id: 'reserve',
-            value: rule.keep ?? 0,
-            label: `Keep ${rule.keep ?? 0}`,
-            min: 0,
-            max: Number.MAX_SAFE_INTEGER,
-            onSave: (keep: number) => () => api.setAutoNpcSaleKeep(rule.item, keep),
-          },
-        ],
-        onRemove: () => api.autoNpcSale(undefined, rule.item, true),
-      })),
+    // inventory-panel.tsx: the merchant lists every NPC sale rule. A character's own rule carries
+    // its owner's name and removes for that owner; only a merchant-wide rule keeps copies.
+    ...Object.entries(state.autoNpcSales).map(
+      ([key, rule]): RuleEntry =>
+        rule.character
+          ? { key, item: rule.item, detail: rule.character, onRemove: () => api.autoNpcSale(rule.character, rule.item, true) }
+          : {
+              key,
+              item: rule.item,
+              // Console 1.5 inventory-panel.tsx:1635-1637: the copies kept back from sale.
+              edits: [
+                {
+                  id: 'reserve',
+                  value: rule.keep ?? 0,
+                  label: `Keep ${rule.keep ?? 0}`,
+                  min: 0,
+                  max: Number.MAX_SAFE_INTEGER,
+                  onSave: (keep: number) => () => api.setAutoNpcSaleKeep(rule.item, keep),
+                },
+              ],
+              onRemove: () => api.autoNpcSale(undefined, rule.item, true),
+            },
+    ),
     ...state.npcSaleMarks.map((mark) => ({
       key: mark.id,
       item: mark.item,

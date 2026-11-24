@@ -6,6 +6,7 @@ import { useDynamicState } from '@/data/PartyDataProvider'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { npcSaleValue } from '@/lib/itemFormulas'
 import { automaticCommerceRuleKey, consoleFeatures, deconstructionRewards } from '@/models'
+import { ownersRelease } from '@/api/ownersCards'
 import type { CatalogItem, DeconstructionCatalog, Item, ItemMeta } from '@/models'
 
 /** Deconstruction confirmation: rewards per item (each row a separate roll),
@@ -83,7 +84,8 @@ export function DeconstructionConfirmation({
 /** "Automatically sell to NPC?": what the rule matches, its scope, and the
  *  proceeds per sale. On the stable console fork a merchant-wide rule (no
  *  `character`) also takes "Keep in storage", prefilled from the saved rule
- *  (#116); Ryan's v1.4.0 ignores `keep` and sells every copy. */
+ *  (#116), and the owners release asks for it on every merchant-wide rule;
+ *  Ryan's v1.4.0 ignores `keep` and sells every copy. */
 export function AutoNpcSaleConfirmation({
   item,
   meta,
@@ -102,9 +104,12 @@ export function AutoNpcSaleConfirmation({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const state = useDynamicState()
-  const keeps = !character && consoleFeatures(state).forkCommerce
+  // The owners release (party-management-panels.tsx) asks for the reserve on every merchant-wide
+  // rule and starts a new one at 0.
+  const release = ownersRelease(state)
+  const keeps = !character && (release || consoleFeatures(state).forkCommerce)
   const savedKeep = state.autoNpcSales[automaticCommerceRuleKey(item)]?.keep
-  const [keep, setKeep] = useState(!keeps || savedKeep === undefined ? '' : String(savedKeep))
+  const [keep, setKeep] = useState(!keeps ? '' : savedKeep !== undefined ? String(savedKeep) : release ? '0' : '')
   return (
     <div role="group" aria-label="Automatically sell to NPC?" className="my-1.5 flex flex-col gap-2 rounded-md border border-orange-700/60 bg-orange-950/20 p-2.5 pl-4">
       <p className="text-sm font-medium">Automatically sell to NPC?</p>
@@ -124,9 +129,11 @@ export function AutoNpcSaleConfirmation({
       </div>
       {keeps && (
         <label className="grid gap-1 text-sm">
-          <span>Keep in storage</span>
+          <span>{release ? 'Number to keep reserved' : 'Keep in storage'}</span>
           <Input type="number" min={0} step={1} inputMode="numeric" placeholder="Sell every copy" value={keep} disabled={busy} onChange={(event) => setKeep(event.target.value)} className="font-mono" />
-          <span className="text-xs text-muted-foreground">Copies to keep across the merchant&apos;s bag, bank and BankBois. Only the rest is sold; leave blank to sell every copy.</span>
+          <span className="text-xs text-muted-foreground">
+            Copies to keep across the merchant&apos;s bag, bank and BankBois. Only the rest is sold; {release ? 'Enter 0 to sell every copy.' : 'leave blank to sell every copy.'}
+          </span>
         </label>
       )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
