@@ -250,7 +250,10 @@ test('A dungeon start opens the Party screen once; other screens show a bar back
   const server = partyServer()
   server.dailyDungeon = { state: { phase: 'idle', participants: ['Leada', 'Folla'], protectFromEvents: true, commands: {} }, members: [member('Leada'), member('Folla')] }
   await server.install(page)
+  // DungeonNavigator.tsx redirects only once it has seen an idle response.
+  const firstPoll = page.waitForResponse((response) => response.url().endsWith('/party-api/daily-dungeons'))
   await page.goto('/characters/Leada')
+  await firstPoll
   await expect(page.getByText('Cave of Many Dreams is running.')).toHaveCount(0)
 
   server.dailyDungeon = activeCave()
