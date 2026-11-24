@@ -221,6 +221,31 @@ test('Cave map: later frames without the definition keep the floor drawn (map-st
   await expect(map.getByRole('button', { name: 'Native-size view' })).toBeEnabled()
 })
 
+test('Merchant room: a done shop room reopens the shop the talking member saw (dungeon-panel.tsx:14,33-36)', async ({ page }) => {
+  const server = partyServer()
+  const view = activeCave()
+  const cave = view.members[0].observation.cave as { points: Record<string, unknown>[] }
+  cave.points.push({ id: 'p6', room: '3:shop', label: 'Merchant', map: 'zone_ab12_1', x: 30, y: 0, done: true })
+  // Folla talked to the merchant, so only Folla's observation carries the shop.
+  const shop = {
+    id: 'c9', title: 'A Wandering Merchant', text: 'Wares for sale.', deadline: 0, resolved: true, resultLabel: 'You talked.', summary: [], votes: {}, options: [],
+    shop: { room: '3:shop', name: 'ringsj', price: 80, sold: false, nearby: true },
+  }
+  view.members[1] = member('Folla', true, { cave: { ...cave, choice: shop } })
+  server.dailyDungeon = view
+  server.addCatalogEntry({ id: 'ringsj', name: 'Ring of Sweet Jacko' })
+  await server.install(page)
+
+  await page.goto('/')
+  const panel = page.getByRole('region', { name: 'Cave of Many Dreams controls' })
+  await expect(panel.getByRole('button', { name: 'Library — complete' })).toBeDisabled()
+  const merchant = panel.getByRole('button', { name: 'Merchant - reopen shop' })
+  await expect(merchant).toBeEnabled()
+  await merchant.click()
+  await expect.poll(() => server.dungeonActions[0]).toMatchObject({ action: 'move', target: 'p6', run: 'ab12' })
+  await expect(page.getByText('Ring of Sweet Jacko — 80 shared gold')).toBeVisible()
+})
+
 test('A dungeon start opens the Party screen once; other screens show a bar back to the controls', async ({ page }) => {
   const server = partyServer()
   server.dailyDungeon = { state: { phase: 'idle', participants: ['Leada', 'Folla'], protectFromEvents: true, commands: {} }, members: [member('Leada'), member('Folla')] }
