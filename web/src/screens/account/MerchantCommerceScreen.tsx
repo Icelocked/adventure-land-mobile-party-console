@@ -721,7 +721,9 @@ function groupExchangeItems(items: MerchantExchangeItem[]): GroupedExchangeItem[
   return rows
 }
 
-type Inspecting = { id: string; level: number; exchangeAdd?: { enabled: boolean; onAdd: () => void } }
+// `exchangeKey` names the exchange row whose Add the details sheet offers. The sheet reads the row's
+// owned count on each render, so a bank snapshot that lands after the sheet opens enables Add.
+type Inspecting = { id: string; level: number; exchangeKey?: string }
 
 function ExchangeScreen({
   search,
@@ -767,12 +769,17 @@ function ExchangeScreen({
   const [inspecting, setInspecting] = useState<Inspecting | null>(null)
 
   const grouped = useMemo(() => groupExchangeItems(exchangeable), [exchangeable])
+  const inspectedExchange = inspecting?.exchangeKey ? grouped.find((item) => item.key === inspecting.exchangeKey) : undefined
   const filtered = grouped.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(search.toLowerCase()))
   const selected = exchangeable.filter((item) => Number(cart[item.key]) > 0)
 
   const exchangeRequired = (id: string, level: number) =>
     exchangeable.reduce((sum, item) => sum + (item.id === id && item.level === level ? item.required * (cart[item.key] || 0) : 0), 0)
   const add = (key: string) => setCart((old) => ({ ...old, [key]: (old[key] || 0) + 1 }))
+  const exchangeAddFor = (item: GroupedExchangeItem) => ({
+    enabled: item.choices ? true : (exchangeOwned[`${item.id}@${item.level || 0}`] || 0) >= item.required * ((cart[item.key] || 0) + 1),
+    onAdd: () => (item.choices ? openRules(item) : add(item.key)),
+  })
   const exchangesAvailable = selected.every((item) => exchangeRequired(item.id, item.level) <= (exchangeOwned[`${item.id}@${item.level || 0}`] || 0))
 
   function openRules(item: GroupedExchangeItem | null) {
@@ -848,14 +855,13 @@ function ExchangeScreen({
         <div className="flex flex-col gap-1.5 px-3">
           {filtered.map((item) => {
             const ownedCount = exchangeOwned[`${item.id}@${item.level || 0}`] || 0
-            const enabled = item.choices ? true : ownedCount >= item.required * ((cart[item.key] || 0) + 1)
-            const addOrChoose = () => (item.choices ? openRules(item) : add(item.key))
+            const { enabled, onAdd: addOrChoose } = exchangeAddFor(item)
             return (
               <div key={item.key} className="flex items-center gap-2 rounded-md border border-border bg-card p-2.5">
                 <button
                   type="button"
                   aria-label={`Inspect ${item.name}`}
-                  onClick={() => setInspecting({ id: item.id, level: 0, exchangeAdd: { enabled, onAdd: addOrChoose } })}
+                  onClick={() => setInspecting({ id: item.id, level: 0, exchangeKey: item.key })}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
                   <SpriteIcon sprite={item.sprite} size={36} />
@@ -985,10 +991,10 @@ function ExchangeScreen({
               monsters={state.bestiaryCatalog}
               context={{ character: 'Exchange catalog', slot: -1 }}
               exchangeAdd={
-                inspecting.exchangeAdd && {
-                  enabled: inspecting.exchangeAdd.enabled,
+                inspectedExchange && {
+                  enabled: exchangeAddFor(inspectedExchange).enabled,
                   onAdd: () => {
-                    inspecting.exchangeAdd!.onAdd()
+                    exchangeAddFor(inspectedExchange).onAdd()
                     setInspecting(null)
                   },
                 }

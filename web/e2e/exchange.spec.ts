@@ -77,6 +77,20 @@ test('Exchange tile opens item details with Add; reward tiles in details open th
   await expect(page.getByLabel('Gem quantity')).toHaveValue('1')
 })
 
+test("The details sheet's Add follows the owned count, so a bank snapshot that lands after it opens enables Add", async ({ page }) => {
+  const server = exchangeServer()
+  await server.install(page)
+  await page.goto('/merchant/exchange')
+
+  await page.getByRole('button', { name: 'Inspect Candy' }).click()
+  const add = page.getByRole('dialog').getByRole('button', { name: 'Add', exact: true })
+  await expect(add).toBeDisabled()
+  server.bankPacks = { items0: [{ slot: 0, item: { name: 'candy0', level: 0, q: 1 } }] }
+  await expect(add).toBeEnabled({ timeout: 15_000 })
+  await add.click()
+  await expect(page.getByLabel('Candy quantity')).toHaveValue('1')
+})
+
 test('Mark multiple: stages bank and upgrade rules as Pending, Done saves them, unsupported rewards stay disabled', async ({ page }) => {
   const server = exchangeServer()
   await server.install(page)
