@@ -160,8 +160,8 @@ Two sets with no file in common:
     from `GET /diagnostics/alert?subject=&id=`, and "Show all records", which reads
     `GET /diagnostics/records?character=&rings=` per character once a report period (1 s) while it
     shows. The read marks live under `party-console-companion:diagnostics-read-alerts`; the
-    console's `party-ui:` keys are never read. `/diagnostics/movement` shows the movement ring,
-    since the PWA has no old address to keep. `/diagnostics/bounds` and `POST /diagnostics/caps`
+    console's `party-ui:` keys are never read. `/diagnostics/movement` opens the alerts list, as
+    readHash reads `#diagnostics/movement` (the finish). `/diagnostics/bounds` and `POST /diagnostics/caps`
     serve the bound record and the dashboard's own cap counts, not the button, so the PWA sends
     neither. Tests: `models/diagnostics.test.ts`, e2e `diagnostics.spec.ts`.
   - B10 done. Wire: `saveAddon` (`POST /addons {name, enabled?, settings?}`), `addonFarming`
@@ -196,60 +196,79 @@ Two sets with no file in common:
   - Runs: unit, `tsc -b`, `vite build` and the full e2e suite pass at each commit. E2e ran on
     port 4181 through an untracked `playwright.set1.config.ts` copy, so a preview server another
     worktree holds on 4173 is never reused; the copy is deleted now that set 1 is closed.
-- Half B set 2 (branch `pwa-owners-b`, merged into `pwa-owners`):
-
-Set 2 sits on branch `pwa-owners-b`. Its reads and routes live in `src/api/ownersCards.ts`, and
-its mock in `e2e/fixtures/ownersSet2Mock.ts`, a subclass of the shared mock that adds the
-release's fields to `stateSection` and registers its routes after the base ones. Unit rows sit in
-`src/api/ownersCards.test.ts`, e2e rows in `e2e/owners-cards.spec.ts`; each e2e row fails with
-the item's `src` changes reverted.
-
-- **B16 with A24 - done.** The activity line reads `characterDetails[name].activity` (text, stuck
-  notice, add-on lines) on the list and the vitals header; a `null` line shows nothing, and only a
-  console without the field (the fork console) keeps the phone's `characterActivity` label. The
-  Hunt status shows the line while its task is `hunt`. Formation gets the Pause/Manual chip with
-  the three Manual switches, sending `POST /formation {character, handControl}` with the changed
-  keys. The stand count and the full check read core `standSlots`. Not ported: the top bar's
-  "N characters on Manual" count, which sits in the party header (set 1).
-- **B9 - done.** The event rows follow the release's `eventListRows`: a member's own skip shows,
-  and its source's unless the source left by a manual move. An occurrence the member left by a
-  manual move offers Rejoin, which posts `POST /event-rejoin {character, event}`
-  (`e2e/owners-events.spec.ts`). Trick or Treat shows the knocks left from the schedule's
-  `trickOrTreat.characters[name]`, the next daily reset and the daily note, which the fork had
-  not ported either.
-- **B11 - done.** `ownersRelease` (config `handControlByCharacter` or core `standSlots`) shows the
-  reserve on every merchant-wide auto NPC sale, labelled "Number to keep reserved" and starting
-  at 0 as party-management-panels.tsx does; the fork console keeps its "Keep in storage" field
-  and v1.4.0 none. The merchant's rule list shows a character's own rule with its owner and
-  removes it with `{item, character: owner, action: 'remove'}` (`e2e/owners-items.spec.ts`).
-- **B13 - done for the inventory and the item details' exchange rewards; the bank waits for
-  set 1.** `src/components/BatchSelection.tsx` ports item-selection.tsx's selection and
-  BatchItemActions' rows. The phone has no Ctrl or Shift, so a "Select" button turns on select
-  mode, taps add or drop items, and "Actions" opens the rows as an options list once two items
-  are chosen. The inventory posts `/command {character, type, item, ...extra}` per item; the
-  rewards post the merchant's rules at `slot: -1`, with a one-level upgrade sent as
-  `auto-upgrade-mark` (`e2e/owners-items.spec.ts`, `src/components/BatchSelection.test.ts`).
-  The bank grid sits in `src/screens/account/BankScreen.tsx`, a set 1 file, so its batch rows
-  (withdraw marks, `exchange-order`, `compound-mark`) are not wired; the commerce screen's reward
-  tiles (`MerchantCommerceScreen.tsx`, set 1) need only an `ExchangeSelectionProvider` around them.
-- **B15 - done.** The Cave panel offers "reopen shop", and lets a done room be picked, only for
-  the ids in the daily-dungeons view's `reopenable` list; a console without the list keeps the
-  phone's merchant-room test (`e2e/owners-dungeon.spec.ts`).
-- **B17 - partly: merchantReady done; the market watch and listing age are built but not
-  mounted.** The merchant's logistics list holds a queued fishing or mining job as BLOCKED ("Not
-  ready in the merchant's plan") until core `merchantReady` lists its id, and drops the phone's
-  own due-mode rows on the release (`e2e/owners-market.spec.ts`). `ownersCards.ts` has
-  `useMarketWatch(settings, active)`, which holds `GET /market-watch` open, and `marketAge`
-  (market-age.ts), both unit-tested. The market and stand screens that mount them are
-  `src/screens/account/MarketScreen.tsx` and `StandScreen.tsx`, set 1 files: each needs
-  `useMarketWatch(useServerSettings(), true)`, and the market header needs
-  `marketAge(now, aldata?.merchantsUpdatedAt, ponty?.updatedAt)` beside its description.
-- **B20 and B21 - not started.** The card name strip (card-name-strip.tsx) and the map dock
-  (map-dock-state.ts) mount only while "Pin top bar" is on, and that switch lives in the
-  settings menu's Account > Display section (pin-top-bar.tsx), which is set 1's B2. The strip
-  shows the card's `activity.text`, which B16 now reads (`cardLine`); the dock moves the one live
-  map between the card and the strip. Next step: once B2 lands the switch, port the strip over
-  the character detail header and the dock over `MapSection`, then compare the item, monster,
-  skill and character cards side by side with the release.
-- Local runs: `npx playwright test -c playwright.b.config.ts` serves the preview on port 4273
-  (untracked config), so set 2 never reuses set 1's server.
+- Half B set 2 (branch `pwa-owners-b`, merged into `pwa-owners` with `--no-ff`). Its reads and
+  routes live in `src/api/ownersCards.ts`, and its mock in `e2e/fixtures/ownersSet2Mock.ts`, a
+  subclass of the shared mock that adds the release's fields to `stateSection` and registers its
+  routes after the base ones. Unit rows sit in `src/api/ownersCards.test.ts`, e2e rows in
+  `e2e/owners-*.spec.ts`; each e2e row fails with the item's `src` changes reverted.
+  - B16 with A24 done. The activity line reads `characterDetails[name].activity` (text, stuck
+    notice, add-on lines) on the list and the vitals header; a `null` line shows nothing, and only
+    a console without the field (the fork console) keeps the phone's `characterActivity` label.
+    The Hunt status shows the line while its task is `hunt`. Formation gets the Pause/Manual chip
+    with the three Manual switches, sending `POST /formation {character, handControl}` with the
+    changed keys. The stand count and the full check read core `standSlots`. The party header
+    shows hand-control.tsx's "N characters on Manual" and "on Pause" counts (`handControlCount`).
+  - B9 done. The event rows follow the release's `eventListRows`: a member's own skip shows, and
+    its source's unless the source left by a manual move. An occurrence the member left by a manual
+    move offers Rejoin, which posts `POST /event-rejoin {character, event}`
+    (`e2e/owners-events.spec.ts`). Trick or Treat shows the knocks left from the schedule's
+    `trickOrTreat.characters[name]`, the next daily reset and the daily note.
+  - B11 done. `ownersRelease` (config `handControlByCharacter` or core `standSlots`) shows the
+    reserve on every merchant-wide auto NPC sale, labelled "Number to keep reserved" and starting
+    at 0 as party-management-panels.tsx does; the fork console keeps its "Keep in storage" field
+    and v1.4.0 none. The merchant's rule list shows a character's own rule with its owner and
+    removes it with `{item, character: owner, action: 'remove'}` (`e2e/owners-items.spec.ts`).
+  - B13 done. `src/components/BatchSelection.tsx` ports item-selection.tsx's selection and
+    BatchItemActions' rows. The phone has no Ctrl or Shift, so a "Select" button turns on select
+    mode, taps add or drop items, and "Actions" opens the rows as an options list once two items
+    are chosen. The inventory posts `/command {character, type, item, ...extra}` per item. The
+    bank grid (packs and BankBoi items) posts bank-sheet.tsx's rows: `/command {character:
+    merchant, type, pack, slot, item, ...extra}` (withdraw, withdraw with `upgradeTiers: 1`, the
+    auto marks, `compound-mark`) and `/merchant/exchange-order` per item. Item details' rewards and
+    the commerce screen's exchange view share `rewardBatchHandlers`: the merchant's rules at
+    `slot: -1`, with a one-level upgrade sent as `auto-upgrade-mark` (`e2e/owners-items.spec.ts`,
+    `e2e/exchange.spec.ts`, `src/components/BatchSelection.test.ts`).
+  - B15 done. The Cave panel offers "reopen shop", and lets a done room be picked, only for the ids
+    in the daily-dungeons view's `reopenable` list; a console without the list keeps the phone's
+    merchant-room test (`e2e/owners-dungeon.spec.ts`).
+  - B17 done. The merchant's logistics list holds a queued fishing or mining job as BLOCKED ("Not
+    ready in the merchant's plan") until core `merchantReady` lists its id, and drops the phone's
+    own due-mode rows on the release. The market and stand screens hold `GET /market-watch` open
+    on the owners release (`useMarketWatch`), and the market header shows market-age.ts's ALData
+    and Ponty ages (`e2e/owners-market.spec.ts`).
+  - B20 cards done. The item, monster, skill, character and comparison cards were read side by
+    side with the release's sources, from the release's b5a272bea (where the PWA's cards were
+    ported from) to ae6563132. The visible differences are ported: the item card's Grade reads
+    the meta's upgrade flags, a CX Jar draws "Filled with", and "[i]" opens the item's JSON (the I
+    shortcut is left out, since a phone has no keyboard); the character card's Gold line and
+    game-formulas.ts `itemAttack` for the attribute attack; the comparison header's portrait
+    fallback and the stat badges' STAT_COLORS colours. The monster and skill cards and the catalog
+    comparison changed only in code structure. This was a read of the release's source, not a
+    screenshot of its running dashboard. Tests: one new e2e row each in `item-card.spec.ts`,
+    `character-card.spec.ts` and `gear-comparison.spec.ts`.
+  - B20 strip and B21 dock done. Account > Display has "Pin top bar"
+    (`settings-menu/PinTopBarSetting.tsx`, `lib/pinTopBar.ts`, device key
+    `party-console-companion:pin-top-bar`, off by default). On, the party header sticks to the
+    top, and the character screen shows the card name strip (`CardNameStrip.tsx`) under its title
+    bar once the card's name scrolls under it. The strip's location row is a second `MapSection`;
+    `components/map/mapDockState.ts` shares the open and native-size state, so the one map body
+    and stream move into the strip's resizable dock while the strip shows
+    (`e2e/owners-cards.spec.ts`).
+- The finish (branch `pwa-owners`, after the merge):
+  - B5's `/diagnostics/movement` follows the dashboard (see B5 above; `e2e/diagnostics.spec.ts`).
+  - The exchange tile's details sheet froze Add's enabled state when it opened, so a bank
+    snapshot that landed later left Add off. It now reads the row on each render
+    (`e2e/exchange.spec.ts`). This was the cause of `exchange.spec.ts` "Exchange tile opens item
+    details" failing in set 2's full runs.
+  - Set 2's other full-run failures (`achievement-hunt.spec.ts` Farming settings,
+    `notifications.spec.ts` iPhone, and `navigation.spec.ts` with a page setup timeout) share one
+    cause: too many browsers on one host. Set 1 and set 2 ran full suites at the same time, 8
+    workers each, on a 16-thread machine. Their traces show the mock fulfilling the routes in
+    time while the page never received the responses, and closing the browser taking 24 to 58 s.
+    The specs share no state: each test has its own mock and its own SSE server on port 0, and
+    each worktree serves its own preview on a strict port. The same specs repeated alone at 12
+    workers passed 440 of 440. The whole suite twice over at 12 workers failed 3 or 4 different
+    load-bound specs per run; at the default 8 workers it passed twice over with none. Blocking
+    the service worker changed nothing. So one full e2e run at a time per host; the config is
+    unchanged.
+  - Runs: unit, `tsc -b`, `vite build`, lint and the full e2e suite pass at the tip.
