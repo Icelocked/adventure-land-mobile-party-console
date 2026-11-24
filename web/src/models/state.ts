@@ -125,6 +125,16 @@ export interface BestiaryMonster {
   sprite?: Sprite | null
   drops: BestiaryDrop[]
   spawnRecords: MonsterSpawnRecord[]
+  // Console 1.5: the events that spawn this monster, when only events do.
+  eventSources?: MonsterEventSource[]
+}
+
+/** bestiaryCatalog[].eventSources: a boss, its wave, or an add raised at HP fractions `at`. */
+export interface MonsterEventSource {
+  id: string
+  name: string
+  role: 'boss' | 'wave' | 'add' | string
+  at?: number[]
 }
 
 /** A class's skill list. */

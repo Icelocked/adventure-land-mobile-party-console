@@ -97,3 +97,21 @@ test('G12 event schedule: realm time, confirmed realm schedule and the next seve
   await events.getByText('Next seven days').click()
   await expect(events.getByText(new Date(next).toLocaleString('en-US'))).toBeVisible()
 })
+
+test('G13 bestiary: event-only monsters say which event spawns them', async ({ page }) => {
+  const mock = server()
+  mock.addCharacter({ name: 'Leada', ctype: 'warrior', level: 60 })
+  mock.bestiaryCatalog = [
+    { id: 'crabxx', name: 'Giga Crab', hp: 1000, attack: 10, xp: 5, threat: 1, definition: {}, drops: [], spawnRecords: [], eventSources: [{ id: 'crabxx', name: 'Giga Crab', role: 'boss' }] },
+    { id: 'crabx', name: 'Huge Crab', hp: 500, attack: 10, xp: 5, threat: 1, definition: {}, drops: [], spawnRecords: [], eventSources: [{ id: 'crabxx', name: 'Giga Crab', role: 'add', at: [0.5, 0.25] }] },
+  ]
+  await mock.install(page)
+
+  await page.goto('/bestiary')
+  const huge = page.getByRole('button', { name: /^Huge Crab/ })
+  await expect(huge).toContainText('Event only: Giga Crab')
+  await huge.click()
+  // monster-spawns.tsx eventSourceText().
+  await expect(page.getByText('Spawns only during Giga Crab: raised by the boss at 50% and 25% HP.')).toBeVisible()
+  await expect(page.getByText('No static spawn recorded in game data.')).toHaveCount(0)
+})
