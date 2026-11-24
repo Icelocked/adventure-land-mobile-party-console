@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventDisplayNames, eventLimits, eventPolicy, eventPriorityOrder, eventTimeLabel, realmTimeLabel, selectedEvents, supportedEvents, validEventLimits } from './eventPolicy'
+import { currentKnocks, dailyResetLabel, eventDisplayNames, eventLimits, eventPolicy, eventPriorityOrder, eventTimeLabel, realmTimeLabel, selectedEvents, supportedEvents, validEventLimits } from './eventPolicy'
 
 const october = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
 
@@ -100,5 +100,21 @@ describe('the merchant inherits the leader’s Witch’s Cipher', () => {
     const plain = { ...party, eventSelectionsByCharacter: { Leada: ['anniversary'] } }
     expect(selectedEvents(plain, 'Merchy')).toEqual(['anniversary'])
     expect(eventLimits(plain, 'Merchy').witchcipher).toBeUndefined()
+  })
+})
+
+describe('Trick or Treat counts (event-selection-control.tsx)', () => {
+  const now = Date.UTC(2026, 9, 31, 22, 30, 0)
+  const counts = { day: '2026-10-31', observedAt: now - 5000, characterRemaining: 2, characterLimit: 7, accountRemainingUpperBound: 0, accountLimit: 14 }
+  it('uses a fresh count from the realm day only', () => {
+    const event = { id: 'trickortreat', name: 'Trick or Treat', trickOrTreat: { characters: { Leada: counts } } }
+    expect(currentKnocks(event, 'Leada', now)).toBe(counts)
+    expect(currentKnocks({ ...event, stale: true }, 'Leada', now)).toBeUndefined()
+    expect(currentKnocks(event, 'Leada', now + 20000)).toBeUndefined()
+    expect(currentKnocks({ ...event, clockOffsetMs: 2 * 3600000 }, 'Leada', now)).toBeUndefined()
+  })
+  it('counts down to the next 00:00 UTC on the realm clock', () => {
+    expect(dailyResetLabel(now)).toMatch(/\(1h 30m 0s\)$/)
+    expect(dailyResetLabel(now, 60000)).toMatch(/\(1h 29m 0s\)$/)
   })
 })

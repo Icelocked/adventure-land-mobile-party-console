@@ -9,6 +9,8 @@ import {
   eventPriorityOrder,
   eventTimeLabel,
   realmTimeLabel,
+  currentKnocks,
+  dailyResetLabel,
   graveyardMonsters,
   leaderCipher,
   selectedEvents,
@@ -195,6 +197,7 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
                           : event.slotAt
                             ? `Next chance: ${eventTimeLabel(event.slotAt, now, event.clockOffsetMs)}`
                             : 'Time not announced'}
+                    {event.id === 'trickortreat' && <TrickOrTreatLines event={event} name={name} now={now} />}
                     {!!event.next && event.realmOffsetHours !== undefined && <span className="block text-slate-300">{realmTimeLabel(event.next, event.realmOffsetHours)}</span>}
                     {event.confirmed && <span className="block text-cyan-200">Realm schedule confirmed</span>}
                     {event.stale ? ' · timing stale' : ''}
@@ -267,6 +270,25 @@ function EventSelectionControl({ state, name }: { state: PartyStateDynamic; name
 }
 
 /** Console 2db4d763 event-limits-dialog.tsx as an inline group under the event's row. */
+/** event-selection-control.tsx: the daily reset, the knocks left and the daily note. */
+function TrickOrTreatLines({ event, name, now }: { event: EventSchedule; name: string; now: number }) {
+  const reported = event.trickOrTreat?.characters?.[name]
+  const knocks = currentKnocks(event, name, now)
+  return (
+    <>
+      {now > 0 && <span className="block text-cyan-200">Next daily reset: {dailyResetLabel(now, event.clockOffsetMs)}</span>}
+      <span
+        className="block text-emerald-200"
+        title="Character: usable knocks remaining. Account: upper bound from observed door histories; the game does not expose a separate account counter. Other characters or realms may have spent more."
+      >
+        Knocks left · Character: {knocks?.characterRemaining ?? '—'}/{reported?.characterLimit ?? 7} · Account:{' '}
+        {knocks ? `${knocks.accountRemainingUpperBound > 0 ? 'up to ' : ''}${knocks.accountRemainingUpperBound}` : '—'}/{reported?.accountLimit ?? 14}
+      </span>
+      <span className="block text-slate-300">Once daily at 00:00 UTC · Available during Halloween</span>
+    </>
+  )
+}
+
 function EventLimitsPanel({
   event,
   label,

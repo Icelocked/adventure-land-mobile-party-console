@@ -170,3 +170,29 @@ test("Witch's Cipher: the merchant shares the leader's cipher policy and saves i
     eventLimits: { event: 'witchcipher', limits: { deathLimit: null, timeLimitMinutes: null, cipher: { minClues: 2, automatic: true, gatherMonsters: ['goo', 'arcticbee', 'plantoid', 'snake'] } } },
   })
 })
+
+// event-selection-control.tsx: Trick or Treat shows the next daily reset, the knocks left
+// from core eventSchedules[trickortreat].trickOrTreat (events/schedule-reports.ts
+// knockCounts) and the daily note. A stale or old count shows dashes.
+test('Trick or Treat: the knocks left, the next daily reset and the daily note', async ({ page }) => {
+  const server = octoberServer()
+  const now = Date.now()
+  const day = new Date(now).toISOString().slice(0, 10)
+  const counts = (observedAt: number) => ({ day, observedAt, characterRemaining: 3, characterLimit: 7, accountRemainingUpperBound: 9, accountLimit: 14 })
+  server.extraState = {
+    ...server.extraState,
+    eventSchedules: [{ id: 'trickortreat', name: 'Trick or Treat', trickOrTreat: { characters: { Leada: counts(now + 60 * 60_000), Merchy: counts(now - 60_000) } } }],
+  }
+  await server.install(page)
+
+  await page.goto('/characters/Leada')
+  await page.getByRole('button', { name: /^Events \(\d+\) ▾$/ }).click()
+  const events = page.getByRole('group', { name: 'Events' })
+  await expect(events.getByText('Knocks left · Character: 3/7 · Account: up to 9/14')).toBeVisible()
+  await expect(events.getByText(/^Next daily reset: .+\(\d+h \d+m \d+s\)$/)).toBeVisible()
+  await expect(events.getByText('Once daily at 00:00 UTC · Available during Halloween')).toBeVisible()
+
+  await page.goto('/characters/Merchy')
+  await page.getByRole('button', { name: /^Events \(\d+\) ▾$/ }).click()
+  await expect(page.getByRole('group', { name: 'Events' }).getByText('Knocks left · Character: —/7 · Account: —/14')).toBeVisible()
+})

@@ -118,6 +118,32 @@ export type EventSchedule = {
   occurrences?: { at: number; status: string }[]
   // witchcipher's realm board (cipher-controls.tsx CipherView).
   cipher?: CipherView
+  // trickortreat's knock counts per character (events/schedule-reports.ts).
+  trickOrTreat?: { characters: Record<string, TrickOrTreatCounts> }
+}
+
+export interface TrickOrTreatCounts {
+  day: string
+  observedAt: number
+  characterRemaining: number
+  characterLimit: number
+  accountRemainingUpperBound: number
+  accountLimit: number
+}
+
+/** event-selection-control.tsx: the counts hold only while fresh, unstale and from the realm's current UTC day. */
+export function currentKnocks(event: EventSchedule, name: string, now: number): TrickOrTreatCounts | undefined {
+  const reported = event.trickOrTreat?.characters?.[name]
+  return reported && !event.stale && now - reported.observedAt < 15000 && reported.day === new Date(now + (event.clockOffsetMs || 0)).toISOString().slice(0, 10) ? reported : undefined
+}
+
+/** The next 00:00 UTC on the realm clock, in local time, with the countdown. */
+export function dailyResetLabel(now: number, clockOffsetMs = 0) {
+  const serverNow = now + clockOffsetMs
+  const next = (Math.floor(serverNow / 86400000) + 1) * 86400000
+  const seconds = Math.floor((next - serverNow) / 1000)
+  const local = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(next)
+  return `${local} (${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m ${seconds % 60}s)`
 }
 
 /** Console 1.5 event-selection-control.tsx eventTimeLabel: weekday, local time and the countdown. */
