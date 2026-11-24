@@ -11,7 +11,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { TracktrixBonusList } from '@/components/Tracktrix'
 import { MonsterDetail } from '@/components/MonsterDetail'
 import { ExchangeRewardTile, PASSIVE_KINDS } from '@/components/ExchangeReward'
-import { BatchSelectionBar, ExchangeSelectionProvider, useBatchSelection, type BatchEntry, type BatchHandlers } from '@/components/BatchSelection'
+import { BatchSelectionBar, ExchangeSelectionProvider, rewardBatchHandlers, useBatchSelection, type BatchEntry } from '@/components/BatchSelection'
 import { useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
@@ -707,13 +707,7 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
         ]),
     ).values(),
   ]
-  const batchHandlers: BatchHandlers = {
-    onCommand: async (type, entry, extra) => {
-      const result = await api.post('command', { character: merchant, type: type === 'upgrade-mark' ? 'auto-upgrade-mark' : type, item: entry.item, ...extra, slot: -1 })
-      return result.kind === 'failure' ? result.message || 'Command failed' : null
-    },
-    exchangeable: (entry) => !!state.merchantCatalog?.exchangeable?.some((choice) => !choice.reward && choice.id === entry.item.name && choice.level === entry.item.level),
-  }
+  const batchHandlers = rewardBatchHandlers(api, state)
   return (
     <ExchangeSelectionProvider selection={selection}>
     <div className="flex flex-col gap-3">

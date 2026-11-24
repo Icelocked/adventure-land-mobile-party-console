@@ -3,7 +3,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { TapRow } from '@/screens/itempanel/ItemActionPanel'
 import { itemMaximumLevel } from '@/lib/itemFormulas'
-import type { Item, ItemMeta } from '@/models'
+import type { Item, ItemMeta, PartyStateDynamic } from '@/models'
+import type { PartyApiClient } from '@/api/partyApi'
 
 // The owners release's batch select (item-selection.tsx). The dashboard adds items with Ctrl or
 // Shift and opens the batch menu from any selected item. The phone has neither key, so a
@@ -142,6 +143,19 @@ export function BatchSelectionBar({ selection, entries, handlers, onDone }: { se
       )}
     </div>
   )
+}
+
+/** exchange-reward-tile.tsx batch menu: the merchant's automatic rules for prospective rewards
+ *  (slot -1), where a one-level upgrade is an auto upgrade rule. Item details and the commerce
+ *  screen's exchange view share it. */
+export function rewardBatchHandlers(api: PartyApiClient, state: PartyStateDynamic): BatchHandlers {
+  return {
+    onCommand: async (type, entry, extra) => {
+      const result = await api.post('command', { character: state.merchantCharacter, type: type === 'upgrade-mark' ? 'auto-upgrade-mark' : type, item: entry.item, ...extra, slot: -1 })
+      return result.kind === 'failure' ? result.message || 'Command failed' : null
+    },
+    exchangeable: (entry) => !!state.merchantCatalog?.exchangeable?.some((choice) => !choice.reward && choice.id === entry.item.name && choice.level === entry.item.level),
+  }
 }
 
 /** exchange-item-selection.tsx: the reward tiles of one view share a selection. */
