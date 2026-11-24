@@ -22,6 +22,7 @@ export function PairingGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('checking')
   const [error, setError] = useState('')
   const [manualInput, setManualInput] = useState('')
+  const [accessCode, setAccessCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanUnsupported, setScanUnsupported] = useState(false)
@@ -57,16 +58,18 @@ export function PairingGate({ children }: { children: ReactNode }) {
 
   useEffect(() => stopScan, [])
 
-  async function submitToken(raw: string) {
+  // tools/hosting/setup-client.ts: a typed access code wins over the link, and
+  // the server accepts it in any case, with or without the dash.
+  async function submitToken(raw: string, code = '') {
     const token = extractToken(raw)
-    if (!token) {
-      setError('Enter or scan a pairing link first')
+    if (!code && !token) {
+      setError('Enter the access code shown on a paired browser, or scan or paste a pairing link')
       return
     }
     setSubmitting(true)
     setError('')
     const api = new PartyApiClient(loadServerSettings())
-    const result = await api.postRoot('setup/pair', { token })
+    const result = await api.postRoot('setup/pair', code ? { code } : { token })
     setSubmitting(false)
     if (result.kind === 'failure') {
       setError(
@@ -171,6 +174,26 @@ export function PairingGate({ children }: { children: ReactNode }) {
       {scanUnsupported && !scanning && (
         <p className="text-xs text-muted-foreground">Camera scanning isn't available in this browser - paste the link below instead.</p>
       )}
+      <div className="space-y-2">
+        <label className="text-sm font-medium" htmlFor="pairing-code">
+          Access code
+        </label>
+        <Input
+          id="pairing-code"
+          placeholder="K7QM-4XRT"
+          autoCapitalize="characters"
+          autoComplete="off"
+          value={accessCode}
+          onChange={(event) => setAccessCode(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && accessCode.trim()) void submitToken('', accessCode.trim())
+          }}
+        />
+        <p className="text-xs text-muted-foreground">Pair another browser on the console shows a code that works once, for 10 minutes.</p>
+        <Button className="w-full" disabled={submitting || !accessCode.trim()} onClick={() => void submitToken('', accessCode.trim())}>
+          {submitting ? 'Pairing…' : 'Pair with code'}
+        </Button>
+      </div>
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor="pairing-link">
           Or paste the invite link

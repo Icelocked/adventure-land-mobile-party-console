@@ -48,3 +48,22 @@ test('pairing, then marking an inventory item auto-sell, shows it under Automati
   const sprite = row.locator('div.rounded-md.bg-muted').first()
   await expect(sprite).toHaveCSS('background-image', /e2e-sprite\.png/)
 })
+
+// Console v1.5.0 tools/hosting/setup-client.ts: a paired browser shows a short access
+// code, and setup posts {code} in place of {token}; a wrong code is refused.
+test('pairing with the access code a paired browser shows', async ({ page }) => {
+  const server = new MockPartyServer()
+  server.addCharacter({ name: 'Merchantina', ctype: 'merchant', level: 30 })
+  server.accessCode = 'K7QM4XRT'
+  await server.install(page)
+
+  await page.goto('/')
+  const code = page.getByRole('textbox', { name: 'Access code' })
+  await code.fill('AAAA-BBBB')
+  await page.getByRole('button', { name: 'Pair with code' }).click()
+  await expect(page.getByRole('alert')).toHaveText('Access code is invalid or expired')
+  await code.fill('k7qm-4xrt')
+  await page.getByRole('button', { name: 'Pair with code' }).click()
+  await expect(page.getByText('Merchantina')).toBeVisible()
+  expect(server.pairBodies).toEqual([{ code: 'AAAA-BBBB' }, { code: 'k7qm-4xrt' }])
+})

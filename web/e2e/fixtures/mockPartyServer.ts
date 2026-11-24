@@ -285,6 +285,9 @@ export class MockPartyServer {
   lastRoutineSave: Record<string, unknown> | null = null
 
   paired = false
+  // POST /setup/pair bodies, and the active access code without its dash (null: any code pairs).
+  pairBodies: Record<string, unknown>[] = []
+  accessCode: string | null = null
 
   // Console 1.4 combat: escape.
   // GET /party-api/escape's `escape`, and every escape POST path in order.
@@ -1330,6 +1333,11 @@ export class MockPartyServer {
       return route.fulfill({ status: 401, json: { error: 'not paired' } })
     })
     await page.route('**/setup/pair', (route) => {
+      const body = (route.request().postDataJSON() as Record<string, unknown>) ?? {}
+      this.pairBodies.push(body)
+      // setup-routes.ts: {code} goes through access.pairCode, which refuses any other code.
+      if (typeof body.code === 'string' && body.code && this.accessCode !== null && body.code.toUpperCase().replace(/[\s-]/g, '') !== this.accessCode)
+        return route.fulfill({ status: 400, json: { error: 'Access code is invalid or expired' } })
       this.paired = true
       return route.fulfill({ status: 200, json: { ok: true } })
     })
