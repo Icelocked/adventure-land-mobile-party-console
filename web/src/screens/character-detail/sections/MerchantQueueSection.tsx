@@ -8,6 +8,7 @@ import { dueGatheringModes, merchantAtCapacity, queuedJobStatus } from '@/lib/me
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '../SectionCard'
 import type { ActivityEntry, MerchantJob } from '@/models'
+import { gatheringJob, merchantReadyIds } from '@/api/ownersCards'
 
 // A handful of retries on the same error is normal (a realm hop, a brief
 // inventory-full moment); past this it's a stuck loop. Errors like
@@ -41,6 +42,7 @@ export function MerchantQueueSection() {
   const merchantItems = state.merchantCharacter ? characters[state.merchantCharacter]?.inventory?.items : undefined
   const atCapacity = merchantAtCapacity(merchantItems)
   const capacityReason = `Merchant capacity blocked (${merchantItems?.filter(Boolean).length}/${merchantItems?.length} slots occupied; three slots reserved)`
+  const ready = merchantReadyIds(state)
   const jobs = [
     ...(current
       ? [
@@ -57,11 +59,16 @@ export function MerchantQueueSection() {
       : []),
     // Console 1.4: jobs waiting on merchant bag space show as blocked, and
     // due fishing/mining modes get a row of their own.
-    ...queue.map((job) => ({ job, status: queuedJobStatus(job, state.merchantCharacter, atCapacity) as string })),
-    ...dueGatheringModes(state.gatheringModes, { own: merchantDetails?.gatheringCooldowns as Record<string, unknown> | undefined, party: state.gatheringCooldowns }, [current, ...queue], now).map((mode) => ({
+    // The owners release queues fishing and mining as jobs that wait until core's merchantReady
+    // lists them, and sends no separate due-mode rows.
+    ...queue.map((job) => ({
+      job,
+      status: ready && gatheringJob(job) ? (ready.has(String(job.id)) ? 'queued' : 'BLOCKED') : (queuedJobStatus(job, state.merchantCharacter, atCapacity) as string),
+    })),
+    ...(ready ? [] : dueGatheringModes(state.gatheringModes, { own: merchantDetails?.gatheringCooldowns as Record<string, unknown> | undefined, party: state.gatheringCooldowns }, [current, ...queue], now).map((mode) => ({
       job: { reason: mode, target: state.merchantCharacter || '' } as MerchantJob,
       status: atCapacity ? 'BLOCKED' : 'queued',
-    })),
+    }))),
   ]
   const mluck = state.mluckSchedule
 
@@ -88,7 +95,7 @@ export function MerchantQueueSection() {
                 {jobLabel(job)}
                 {target}
               </span>
-              <span className={`max-w-32 shrink-0 truncate ${blocked ? 'text-red-400' : 'text-muted-foreground'}`} title={blocked ? capacityReason : job.realmBlockedReason || job.pauseReason || status}>
+              <span className={`max-w-32 shrink-0 truncate ${blocked ? 'text-red-400' : 'text-muted-foreground'}`} title={blocked ? (ready && gatheringJob(job) ? "Not ready in the merchant's plan" : capacityReason) : job.realmBlockedReason || job.pauseReason || status}>
                 {side}
               </span>
               {job.realmRetryExhausted && <RetryJobButton id={job.id} />}

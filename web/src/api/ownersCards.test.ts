@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { emptyPartyStateDynamic, type PartyStateDynamic } from '@/models'
-import { caveReopenable, cardLine, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
+import { caveReopenable, cardLine, gatheringJob, marketAge, merchantReadyIds, openMarketWatch, dailyResetLabel, eventListRows, eventRejoinBody, eventSkip, handControl, handControlBody, handControlWord, knocksLabel, standFull, standSlots } from './ownersCards'
 
 // OWNERS-PORT-MAP.md B16 with A24, as the owners release's card reads its fields.
 
@@ -85,5 +85,37 @@ describe('Cave reopen (B15)', () => {
     expect(caveReopenable({ reopenable: ['p6'] }, shop)).toBe(true)
     expect(caveReopenable({}, shop)).toBe(true)
     expect(caveReopenable({}, { id: 'p2', done: true, room: 'r2' })).toBe(false)
+  })
+})
+
+describe('market watch and merchant plan (B17)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('opens /market-watch on the server and closes it again', () => {
+    const opened: { url: string; closed: boolean }[] = []
+    vi.stubGlobal('EventSource', class {
+      entry: { url: string; closed: boolean }
+      constructor(url: string) {
+        this.entry = { url, closed: false }
+        opened.push(this.entry)
+      }
+      close() {
+        this.entry.closed = true
+      }
+    })
+    const close = openMarketWatch({ baseUrl: 'https://party.example/' })
+    expect(opened).toEqual([{ url: 'https://party.example/party-api/market-watch', closed: false }])
+    close()
+    expect(opened[0].closed).toBe(true)
+  })
+  it("ages each feed in whole seconds and leaves out a feed that never loaded", () => {
+    expect(marketAge(100_000, 100_000 - 65_400, 0)).toBe('ALData 1m 5s old')
+    expect(marketAge(100_000, 99_000, 100_000)).toBe('ALData 1s old · Ponty 0s old')
+    expect(marketAge(100_000, undefined, undefined)).toBe('')
+  })
+  it("reads merchantReady's ids and holds only fishing and mining jobs", () => {
+    expect(merchantReadyIds(state({ merchantReady: [{ id: 'g1' }] }))).toEqual(new Set(['g1']))
+    expect(merchantReadyIds(state({}))).toBeNull()
+    expect(gatheringJob({ reason: 'mining', id: 'g2' })).toBe(true)
+    expect(gatheringJob({ reason: 'restock', id: 'j1' })).toBe(false)
   })
 })

@@ -167,3 +167,12 @@ the item's `src` changes reverted.
 - **B15 - done.** The Cave panel offers "reopen shop", and lets a done room be picked, only for
   the ids in the daily-dungeons view's `reopenable` list; a console without the list keeps the
   phone's merchant-room test (`e2e/owners-dungeon.spec.ts`).
+- **B17 - partly: merchantReady done; the market watch and listing age are built but not
+  mounted.** The merchant's logistics list holds a queued fishing or mining job as BLOCKED ("Not
+  ready in the merchant's plan") until core `merchantReady` lists its id, and drops the phone's
+  own due-mode rows on the release (`e2e/owners-market.spec.ts`). `ownersCards.ts` has
+  `useMarketWatch(settings, active)`, which holds `GET /market-watch` open, and `marketAge`
+  (market-age.ts), both unit-tested. The market and stand screens that mount them are
+  `src/screens/account/MarketScreen.tsx` and `StandScreen.tsx`, set 1 files: each needs
+  `useMarketWatch(useServerSettings(), true)`, and the market header needs
+  `marketAge(now, aldata?.merchantsUpdatedAt, ponty?.updatedAt)` beside its description.

@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import type { PartyStateDynamic } from '@/models'
+import { apiBase, type ServerSettings } from '@/config/serverConfig'
 
 // Set 2 of OWNERS-PORT-MAP.md reads the owners release's card, item, market and event fields
 // here, so it never edits set 1's wire files (partyApi.ts, models/state.ts). Each reader takes
@@ -158,4 +160,46 @@ export function caveReopenable(view: unknown, point: { id: string; done?: boolea
   const ids = loose(view).reopenable
   if (Array.isArray(ids)) return ids.includes(point.id)
   return !!point.done && !!point.room && /^\d+:shop$/.test(point.room)
+}
+
+/** Core `merchantReady`: the merchant jobs owner's plan, the queued jobs it would run now. null
+ *  on a console without the field. */
+export function merchantReadyIds(state: PartyStateDynamic): Set<string> | null {
+  const ready = (state as unknown as Loose).merchantReady
+  return Array.isArray(ready) ? new Set(ready.map((job) => String(loose(job).id))) : null
+}
+/** merchant-card-controls.tsx: a queued fishing or mining job waits until the plan lists it
+ *  ready. Other jobs keep the capacity rule. */
+export const gatheringJob = (job: { reason?: string; id?: unknown }) => (job.reason === 'fishing' || job.reason === 'mining') && !!job.id
+
+/** market-age.ts: how old each market feed's data is, in whole seconds. A feed that never loaded
+ *  shows no age. */
+export function marketAge(now: number, aldataAt: number | undefined, pontyAt: number | undefined): string {
+  const age = (at: number | undefined) => (at && at > 0 ? `${durationText(Math.max(0, Math.round((now - at) / 1000)))} old` : null)
+  return (
+    [
+      ['ALData', age(aldataAt)],
+      ['Ponty', age(pontyAt)],
+    ] as const
+  )
+    .flatMap(([feed, text]) => (text ? [`${feed} ${text}`] : []))
+    .join(' · ')
+}
+/** format-duration.ts formatDuration for whole seconds: "1h 2m 5s", "0s". */
+function durationText(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const rest = seconds % 60
+  return [hours ? `${hours}h` : '', minutes ? `${minutes}m` : '', rest ? `${rest}s` : ''].filter(Boolean).join(' ') || '0s'
+}
+
+/** status streams.ts `/market-watch`: the coordinator refreshes the market feeds while a viewer
+ *  holds this stream open (stand-sheet.tsx opens it while the market or stand panel shows). */
+export function openMarketWatch(settings: ServerSettings): () => void {
+  const watch = new EventSource(`${apiBase(settings)}/market-watch`)
+  return () => watch.close()
+}
+/** Holds the market watch while `active`. */
+export function useMarketWatch(settings: ServerSettings, active: boolean): void {
+  useEffect(() => (active ? openMarketWatch(settings) : undefined), [settings, active])
 }
