@@ -133,3 +133,58 @@ test('B13: exchange rewards in item details batch the merchant rules at slot -1'
     { character: 'Merchantina', type: 'auto-item-mark', item: { name: 'candy0', level: 0 }, mode: 'bank', slot: -1 },
   ])
 })
+
+test('B13: select mode batches the bank grid: withdraw marks, upgrade withdrawals and exchange orders per item', async ({ page }) => {
+  const server = new OwnersSet2Mock()
+  server.paired = true
+  server.addCharacter({ name: 'Patinder', ctype: 'merchant', level: 58 })
+  server.addCatalogEntry({ id: 'bow', name: 'Bow', upgradeable: true })
+  server.addCatalogEntry({ id: 'blade', name: 'Blade', upgradeable: true })
+  server.addCatalogEntry({ id: 'gem0', name: 'Gem' })
+  server.addCatalogEntry({ id: 'candy0', name: 'Candy' })
+  server.exchangeable = [
+    { key: 'gem0@0', id: 'gem0', level: 0, name: 'Gem', cost: 0, required: 1, results: [] },
+    { key: 'candy0@0', id: 'candy0', level: 0, name: 'Candy', cost: 0, required: 1, results: [] },
+  ]
+  server.bankPacks = {
+    items0: [
+      { slot: 0, item: { name: 'bow', level: 2 } },
+      { slot: 1, item: { name: 'blade', level: 4 } },
+      { slot: 2, item: { name: 'gem0', level: 0, q: 3 } },
+      { slot: 3, item: { name: 'candy0', level: 0, q: 2 } },
+    ],
+  }
+  await server.install(page)
+  const commands = postBodies(page, 'command')
+  const orders = postBodies(page, 'merchant/exchange-order')
+
+  await page.goto('/bank')
+  await page.getByRole('button', { name: 'Select', exact: true }).click()
+  const bar = page.getByRole('group', { name: 'Selected items' })
+  await page.getByRole('button', { name: /^Bow \+2/ }).click()
+  await page.getByRole('button', { name: /^Blade \+4/ }).click()
+  await expect(page.getByRole('button', { name: /^Bow \+2/ })).toHaveAttribute('aria-pressed', 'true')
+  await bar.getByRole('button', { name: 'Actions' }).click()
+  let actions = page.getByRole('dialog', { name: 'Batch actions' })
+  await actions.getByRole('button', { name: 'Mark selected for bank' }).click()
+  await expect.poll(() => commands).toEqual([
+    { character: 'Patinder', type: 'withdraw', pack: 'items0', slot: 0, item: { name: 'bow', level: 2 }, markAll: false },
+    { character: 'Patinder', type: 'withdraw', pack: 'items0', slot: 1, item: { name: 'blade', level: 4 }, markAll: false },
+  ])
+  await bar.getByRole('button', { name: 'Actions' }).click()
+  actions = page.getByRole('dialog', { name: 'Batch actions' })
+  await actions.getByRole('button', { name: 'Upgrade each by one level', exact: true }).click()
+  await expect.poll(() => commands.slice(2)).toEqual([
+    { character: 'Patinder', type: 'withdraw', pack: 'items0', slot: 0, item: { name: 'bow', level: 2 }, markAll: false, upgradeTiers: 1 },
+    { character: 'Patinder', type: 'withdraw', pack: 'items0', slot: 1, item: { name: 'blade', level: 4 }, markAll: false, upgradeTiers: 1 },
+  ])
+
+  await bar.getByRole('button', { name: 'Done' }).click()
+  await page.getByRole('button', { name: 'Select', exact: true }).click()
+  await page.getByRole('button', { name: /^Gem x3/ }).click()
+  await page.getByRole('button', { name: /^Candy x2/ }).click()
+  await bar.getByRole('button', { name: 'Actions' }).click()
+  actions = page.getByRole('dialog', { name: 'Batch actions' })
+  await actions.getByRole('button', { name: 'Exchange selected' }).click()
+  await expect.poll(() => orders).toEqual([{ exchanges: [{ id: 'gem0', level: 0, quantity: 3 }] }, { exchanges: [{ id: 'candy0', level: 0, quantity: 2 }] }])
+})
