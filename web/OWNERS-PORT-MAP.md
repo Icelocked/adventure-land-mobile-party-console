@@ -176,3 +176,12 @@ the item's `src` changes reverted.
   `src/screens/account/MarketScreen.tsx` and `StandScreen.tsx`, set 1 files: each needs
   `useMarketWatch(useServerSettings(), true)`, and the market header needs
   `marketAge(now, aldata?.merchantsUpdatedAt, ponty?.updatedAt)` beside its description.
+- **B20 and B21 - not started.** The card name strip (card-name-strip.tsx) and the map dock
+  (map-dock-state.ts) mount only while "Pin top bar" is on, and that switch lives in the
+  settings menu's Account > Display section (pin-top-bar.tsx), which is set 1's B2. The strip
+  shows the card's `activity.text`, which B16 now reads (`cardLine`); the dock moves the one live
+  map between the card and the strip. Next step: once B2 lands the switch, port the strip over
+  the character detail header and the dock over `MapSection`, then compare the item, monster,
+  skill and character cards side by side with the release.
+- Local runs: `npx playwright test -c playwright.b.config.ts` serves the preview on port 4273
+  (untracked config), so set 2 never reuses set 1's server.
