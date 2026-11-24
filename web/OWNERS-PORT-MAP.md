@@ -153,3 +153,15 @@ Two sets with no file in common:
     "Settings history" source in log-sidebar.tsx's words (`settingsChangeMessage`). The mock's
     settings route appends a line per change. Tests: `models/settingsChanges.test.ts`, e2e
     `logs.spec.ts` (Settings history).
+  - Stopped at the context budget. Left for set 1:
+    - B5 not started: the party header's Diagnostics button with its unread-error badge
+      (diagnostics-dialog.tsx) over `GET /diagnostics/alerts`, `GET /diagnostics/alert?subject=&id=`,
+      `GET` and `POST /diagnostics/records?character=&rings=`, `/diagnostics/bounds` and
+      `POST /diagnostics/caps` (status/coordinator/routes.ts:66-90).
+    - B10 not started: `useAddons` (data/useAddons.ts) already reads `GET /addons`; the manager
+      (`POST /addons {name, enabled?, settings?}`, hooks/http.ts `save`), the add-on sections
+      (`/addon-farming`, `/addon-command`, `/addon-read`) and the shipped add-ons' PWA pieces
+      remain. The settings menu's Addons tab lists the installed add-ons and draws nothing yet.
+  - Runs: unit, `tsc -b`, `vite build` and the full e2e suite pass at each commit. E2e ran on
+    port 4181 through an untracked `playwright.set1.config.ts` copy, so a preview server another
+    worktree holds on 4173 is never reused; delete that file when set 1 closes.
