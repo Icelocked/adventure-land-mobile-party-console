@@ -20,6 +20,8 @@ export interface CharacterVitals {
   target?: string
   server?: string
   ping?: number
+  // Code call cost, 0-200 (connected-character-card.tsx CC meter).
+  cc?: number
   primaryStat?: string
   banking?: boolean
   bankQueued?: boolean

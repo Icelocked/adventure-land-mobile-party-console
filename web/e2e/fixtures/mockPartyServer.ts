@@ -53,6 +53,8 @@ export interface MockCharacter {
   // This character's Hunt quest (state.statuses[name].monsterHunt), served in
   // characterDetails by section=core&dashboard=1.
   monsterHunt?: { id: string | null; count: number; remainingMs?: number | null; server?: string | null }
+  // Further live status fields (cc, donationLevelXp, ...) sent in both fast and the stream's vitals.
+  vitalsExtra?: Record<string, unknown>
 }
 
 export interface MockCatalogEntry {
@@ -175,6 +177,9 @@ export class MockPartyServer {
   exchangeable: Record<string, unknown>[] = []
   bankPacks: Record<string, (Record<string, unknown> | null)[]> = {}
   bankGold = 0
+  // Core's accountGold (telemetry/account-gold.ts accountGoldSnapshot). Unset, the
+  // mock sums every character's gold, since each mock character holds a slot.
+  accountGold: { carried: number | null; total: number | null } | undefined
   mailMessages: Record<string, unknown>[] = []
   mailPostage: number | null = null
   // inventory-entry.tsx operation, per character then slot (an upgrade/compound in progress).
@@ -406,7 +411,7 @@ export class MockPartyServer {
       return {
         characters: Object.fromEntries(
           // fastCharacters: the whole status minus items/slots and other omitted fields.
-          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}) }]),
+          this.characters.map((c) => [c.name, { hp: c.hp ?? 100, max_hp: c.max_hp ?? 100, mp: c.mp ?? 100, max_mp: c.max_mp ?? 100, gold: c.gold ?? 0, map: c.map ?? 'main', x: c.x ?? 0, y: c.y ?? 0, rip: false, ...(c.target ? { target: c.target } : {}), ...(c.conditions ? { conditions: c.conditions } : {}), ...c.vitalsExtra }]),
         ),
       }
     if (section === 'inventory')
@@ -438,6 +443,11 @@ export class MockPartyServer {
         characters: Object.fromEntries(this.characters.map((c) => [c.name, { name: c.name, ctype: c.ctype, level: c.level }])),
         serverNow: Date.now(),
         bankGold: this.bankGold,
+        accountGold: this.accountGold ?? (() => {
+          const balances = this.characters.map((c) => (c as { gold?: number }).gold)
+          const carried = balances.every((gold) => typeof gold === 'number') ? balances.reduce<number>((sum, gold) => sum + gold!, 0) : null
+          return { carried, total: carried === null ? null : this.bankGold + carried }
+        })(),
         // public-state.ts core: the catalog's reference revision.
         referenceRevision: 'mock',
       }
@@ -471,6 +481,7 @@ export class MockPartyServer {
           inventorySize: (c.items ?? []).length,
           ...(c.target ? { target: c.target } : {}),
           ...(c.conditions ? { conditions: c.conditions } : {}),
+          ...c.vitalsExtra,
         },
         items,
         slots: this.compactCells(c.slots),
