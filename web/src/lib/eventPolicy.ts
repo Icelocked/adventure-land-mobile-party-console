@@ -1,7 +1,11 @@
-/** Console 1.4: dashboard/lib/event-policy.ts. */
+/** Console 1.5: dashboard/lib/event-policy.ts. */
 export interface EventLimits {
   deathLimit: number | null
   timeLimitMinutes: number | null
+  // Graveyard's monster filter, a subset of zombie, ghoul and gargoyle.
+  monsters?: string[]
+  // Witch's Cipher settings (runtime/events/october.ts CipherSettings).
+  cipher?: Record<string, unknown>
 }
 /** Blank (null) means unlimited; a death limit is a whole number >= 0, a time limit a positive number of minutes. */
 export function validEventLimits(value: unknown): value is EventLimits {
@@ -25,18 +29,28 @@ interface EventFormation {
 // A saved legacy all-events flag covers the events that existed when it was saved; newer
 // fights need an explicit selection, so an upgrade never opts a character into them.
 const legacyDefaultEvents = ['anniversary', 'abtesting', 'goobrawl', 'crabxx', 'franky', 'icegolem', 'snowman']
-export const supportedEvents = [...legacyDefaultEvents, 'slenderman', 'mrgreen', 'mrpumpkin']
+// Console 1.5 dashboard lib/event-policy.ts octoberEvents. A list without them
+// makes a checkbox or reorder POST drop their saved selections and order.
+export const octoberEvents = ['horseman', 'graveyard', 'trickortreat', 'witchcipher']
+export const supportedEvents = [...legacyDefaultEvents, 'slenderman', 'mrgreen', 'mrpumpkin', ...octoberEvents]
 export const eventDisplayNames: Record<string, string> = {
   anniversary: 'Anniversary', abtesting: 'A/B Testing', goobrawl: 'Goobrawl',
   crabxx: 'Crabxx', franky: 'Franky', icegolem: 'Ice Golem', snowman: 'Snowman',
   slenderman: 'Slenderman', mrgreen: 'Mr. Green', mrpumpkin: 'Mr. Pumpkin',
+  horseman: 'Headless Horseman', graveyard: 'Graveyard Rising', trickortreat: 'Trick or Treat', witchcipher: "Witch's Cipher",
 }
 
 export function selectedEvents(party: EventFormation, name: string): string[] {
   const source = eventPolicy(party, name).source
   const saved = party.eventSelectionsByCharacter?.[source]
   const selections = saved ?? ['anniversary', ...(party.eventsByCharacter?.[source] ? legacyDefaultEvents.filter((id) => id !== 'anniversary') : [])]
-  return eventPriorityOrder(party, name).filter((id) => selections.includes(id))
+  return eventPriorityOrder(party, name).filter((id) => selections.includes(id) || (accountCipher(party, name) && id === 'witchcipher'))
+}
+
+// The merchant joins the leader's Witch's Cipher with the leader's limits
+// (dashboard lib/event-policy.ts selectedEvents, eventPolicy, eventLimits).
+function accountCipher(party: EventFormation, name: string): boolean {
+  return !!(name === party.merchantCharacter && party.leader && party.eventSelectionsByCharacter?.[party.leader]?.includes('witchcipher'))
 }
 
 export function eventEnabled(party: EventFormation, name: string, event: string) {
@@ -49,9 +63,11 @@ export function eventPolicy(party: EventFormation, name: string) {
   return {
     inherited,
     source,
-    enabled: party.eventSelectionsByCharacter?.[source]
-      ? party.eventSelectionsByCharacter[source].some((id) => id !== 'anniversary' && supportedEvents.includes(id))
-      : Boolean(party.eventsByCharacter?.[source]),
+    enabled:
+      accountCipher(party, name) ||
+      (party.eventSelectionsByCharacter?.[source]
+        ? party.eventSelectionsByCharacter[source].some((id) => id !== 'anniversary' && supportedEvents.includes(id))
+        : Boolean(party.eventsByCharacter?.[source])),
   }
 }
 
@@ -62,7 +78,9 @@ export function eventPriorityOrder(party: EventFormation, name: string): string[
 }
 
 export function eventLimits(party: EventFormation, name: string): Record<string, EventLimits> {
-  return party.eventLimitsByCharacter?.[eventPolicy(party, name).source] ?? {}
+  const limits = party.eventLimitsByCharacter?.[eventPolicy(party, name).source] ?? {}
+  if (accountCipher(party, name)) return { ...limits, witchcipher: party.eventLimitsByCharacter?.[party.leader!]?.witchcipher ?? { deathLimit: null, timeLimitMinutes: null } }
+  return limits
 }
 
 export type EventSchedule = { id: string; name: string; live?: boolean; next?: number; expires?: number; stale?: boolean; slotAt?: number; slotKind?: string }
