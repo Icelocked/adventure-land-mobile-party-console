@@ -206,6 +206,7 @@ export function CharacterStatsSheet({
       note: runSpeed !== null && character.ctype === 'merchant' ? <span className="text-[#808080]"> before movement restrictions</span> : undefined,
     },
     plain('luck', 'Luck', S.luck, `${Number(character.luck || 100).toLocaleString()}%`),
+    plain('gold', 'Gold', S.gold, `${Number(character.goldBonus || 0) >= 0 ? '+' : ''}${Number(character.goldBonus || 0).toLocaleString()}%`),
     plain('crit', 'Crit', S.crit, `${Number(combat.crit || 0).toLocaleString()}%`),
     plain('critdamage', 'Crit Damage', S.critdamage, `${(200 + Number(combat.critDamage || 0)).toLocaleString()}%`),
     plain('evasion', 'Evasion', S.evasion, `${Number(combat.evasion || 0).toLocaleString()}%`),

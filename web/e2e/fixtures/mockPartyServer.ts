@@ -24,6 +24,8 @@ export interface MockItem {
   l?: string
   acl?: number
   expires?: string
+  // A CX Jar's cosmetic id.
+  data?: string
 }
 
 export interface MockCharacter {

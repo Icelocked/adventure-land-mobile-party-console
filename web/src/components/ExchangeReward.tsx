@@ -12,6 +12,7 @@ import { AddUpgradeRule } from '@/components/Offerings'
 import { TapRow, UpgradeTierPicker, CompoundTierPicker } from '@/screens/itempanel/ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { useExchangeSelection } from '@/lib/batchSelection'
+import { ItemJsonRow } from '@/components/ItemJson'
 
 export type ExchangeMarkMode = { action: 'bank' | 'stand' | 'npc' | 'upgrade'; targetLevel?: number }
 
@@ -185,6 +186,7 @@ export function ExchangeRewardTile({ reward }: { reward: ExchangeRewardTileData 
                 reward.onInspect()
               }}
             />
+            {!passive && <ItemJsonRow item={item} meta={meta} />}
             {merchant && !passive && (
               <AutomaticItemActions
                 merchant={merchant}

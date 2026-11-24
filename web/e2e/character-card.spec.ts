@@ -41,7 +41,7 @@ const lines = (box: Locator) => box.locator('[data-line]').evaluateAll((nodes) =
 // A merchant with an open stand: the live speed is the stand-limited 10.
 const merchantStats = {
   primaryStat: 'int', attack: 33.4, frequency: 0.73, range: 82, speed: 10, unrestrictedSpeed: 82.1, standOpen: true, armor: 277, resistance: 500,
-  str: 23, int: 110, dex: 99, vit: 50, fortitude: 15, luck: 100,
+  str: 23, int: 110, dex: 99, vit: 50, fortitude: 15, luck: 100, goldBonus: 12.5,
   combatStats: { crit: 1.5, critDamage: 20, lifesteal: 2, evasion: 3, armorPiercing: 10, fireResistance: 4 },
 }
 
@@ -124,6 +124,8 @@ test("Character card: the game's panel and every extra, each effect named and co
   await expect(extras.locator('[data-line="run_speed"]')).toHaveText('Run Speed: 82.10 before movement restrictions')
   for (const [key, text] of [
     ['luck', 'Luck: 100%'],
+    // V150-PORT-MAP.md F16: character-stats-dialog.tsx's Gold line.
+    ['gold', 'Gold: +12.5%'],
     ['crit', 'Crit: 1.5%'],
     ['critdamage', 'Crit Damage: 220%'],
     ['lifesteal', 'Lifesteal: 2%'],

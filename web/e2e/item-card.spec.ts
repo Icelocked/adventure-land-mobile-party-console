@@ -344,3 +344,31 @@ test('Item card: lock, account binding and expiry show on the card; quantity and
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Item details', exact: true })).toHaveCount(1)
 })
+
+// V150-PORT-MAP.md F16: item-card-lines.ts names a CX Jar's contents after the [i] line.
+test('Item card: a CX Jar shows what it is filled with', async ({ page }) => {
+  const jar: MockCatalogEntry = { id: 'cxjar', name: 'CX Jar', definition: { type: 'jar', s: 9999, g: 100 } }
+  await serverWith([{ name: 'cxjar', data: 'hat221' }, { name: 'cxjar' }], [jar]).install(page)
+  const filled = await openDetails(page, 0)
+  await expect.poll(() => lines(filled.card)).toEqual(['[i]: Information', 'Filled with: hat221'])
+  const empty = await openDetails(page, 1)
+  await expect(line(empty.card, 'filled_with')).toHaveText('Filled with: nothing')
+})
+
+// V150-PORT-MAP.md F16: item-card.tsx's "Item information" dialog opens with I on a desktop; the
+// item's options list carries it as "Item JSON".
+test('Item options: Item JSON shows the item, its definition and the card properties', async ({ page }) => {
+  const ring: MockCatalogEntry = { id: 'dexring', name: 'Ring of Dexterity', compoundable: true, maxLevel: 7, definition: { type: 'ring', compound: { dex: 1 }, dex: 1 }, properties: { dex: 6 }, scaling: { dex: 1 } }
+  await serverWith([{ name: 'dexring', level: 5, q: 2 }], [ring]).install(page)
+  await page.goto('/characters/Mage1')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Item JSON' }).click()
+  const information = page.getByRole('dialog', { name: 'Item information' })
+  await expect(information.getByText('JSON for dexring')).toBeVisible()
+  const json = JSON.parse((await information.getByRole('region', { name: 'Item JSON' }).textContent()) ?? '')
+  expect(json.item).toEqual({ name: 'dexring', level: 5, q: 2 })
+  expect(json.definition).toMatchObject({ type: 'ring', dex: 1 })
+  expect(json.properties).toMatchObject({ dex: 6 })
+  await information.getByRole('button', { name: 'Close information' }).click()
+  await expect(information).toHaveCount(0)
+})

@@ -10,6 +10,7 @@ import { standIsFull } from '@/lib/standInspection'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
+import { ItemJsonRow } from '@/components/ItemJson'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem, type InventoryEntry } from '@/models'
 import { CLEAR_MARKS_TITLE, CompoundTierPicker, TapRow, UpgradeTierPicker } from './ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
@@ -110,6 +111,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
           <div className="my-2 border-t border-border" />
 
           <TapRow label="Item details" onClick={() => setShowingDetails(true)} />
+          <ItemJsonRow item={item} meta={meta} />
 
           <TapRow label={withdrawMarked ? 'Unmark withdrawal' : 'Mark for withdrawal'} disabled={!merchant || !!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(false)} />
           <TapRow label="Mark all for withdrawal" disabled={!merchant || !!confirmingWithdraw} onClick={() => !withdrawing && void withdraw(true)} />

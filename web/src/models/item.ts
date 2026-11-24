@@ -17,6 +17,7 @@ export interface Item {
   rid?: string
   b?: boolean
   m?: unknown // boolean | string | number
+  data?: unknown // a CX Jar's cosmetic id
 }
 
 /** Selling to an NPC destroys an upgrade/stat-scroll/shiny investment,

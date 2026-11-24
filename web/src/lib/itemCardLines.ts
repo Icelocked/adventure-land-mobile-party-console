@@ -277,6 +277,8 @@ export function itemCardLines({
       valueColor: usable ? '#56A244' : '#CC3837',
     })
   lines.push({ kind: 'prop', key: 'info', label: '[i]', value: infoPhrase(meta, level), color: COLORS.gray })
+  // Console v1.5.0 item-card-lines.ts: a CX Jar names the cosmetic it holds in item.data.
+  if (item.name === 'cxjar') lines.push({ kind: 'prop', key: 'filled_with', label: 'Filled with', value: typeof item.data === 'string' && item.data.trim() ? item.data : 'nothing', color: COLORS.gray })
   return lines
 }
 

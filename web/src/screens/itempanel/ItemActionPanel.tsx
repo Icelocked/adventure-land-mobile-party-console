@@ -12,6 +12,7 @@ import { GearComparisonSheet } from './GearComparisonSheet'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { automaticCommerceRuleKey, canDeconstruct, sameMarkedItem } from '@/models'
 import { StandListingForm } from '@/components/StandListingForm'
+import { ItemJsonRow } from '@/components/ItemJson'
 import type { BestiaryMonster, Item, ItemMeta, MerchantCatalog } from '@/models'
 
 export type ItemActionTarget = { kind: 'inventory'; slot: number; item: Item } | { kind: 'equipment'; slotName: string; item: Item }
@@ -98,6 +99,7 @@ export function ItemActionPanel({
         <div className="my-2 border-t border-border" />
 
         <TapRow label="Item details" onClick={() => setShowingDetails(true)} />
+        <ItemJsonRow item={item} meta={meta} />
         {onLuckySlotData && (
           <TapRow
             label="Show lucky slot data"
