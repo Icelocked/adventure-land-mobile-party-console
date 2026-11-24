@@ -10,6 +10,7 @@ import { SpriteIcon } from '@/components/SpriteIcon'
 import { TracktrixBonusList } from '@/components/Tracktrix'
 import { MonsterDetail } from '@/components/MonsterDetail'
 import { ExchangeRewardTile } from '@/components/ExchangeReward'
+import { ExchangeSelectButton, ExchangeSelectionBar, ExchangeSelectionProvider } from '@/components/BatchSelection'
 import { Chip } from '@/components/Chip'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -685,7 +686,9 @@ const NON_INSPECTABLE_KINDS = new Set(['empty', 'gold', 'shells', 'cx', 'cxbundl
 
 /** Exchange details: price, rewards (as reward tiles) and sources. */
 function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; box: boolean; exchanges: ExchangeSections; onNavigateItem: (id: string, level: number) => void }) {
+  // party-item-details.tsx ExchangeItemSelection: the reward tiles share one batch selection.
   return (
+    <ExchangeSelectionProvider>
     <div className="flex flex-col gap-3">
       {exchanges.prices.length > 0 && (
         <div>
@@ -705,7 +708,11 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
       )}
       {exchanges.rewards.length > 0 && (
         <div>
-          <div className="text-sm font-semibold">{box ? 'Rewards' : 'Exchange reward'}</div>
+          <div className="flex items-center justify-between text-sm font-semibold">
+            <span>{box ? 'Rewards' : 'Exchange reward'}</span>
+            <ExchangeSelectButton />
+          </div>
+          <ExchangeSelectionBar />
           {exchanges.rewards.map((entry) => {
             const [rewardId, rewardLevel] = entry.reward ? exchangeTarget(entry.reward) : [entry.id, 0]
             return (
@@ -762,6 +769,7 @@ function ExchangeSection({ id, box, exchanges, onNavigateItem }: { id: string; b
         </div>
       )}
     </div>
+    </ExchangeSelectionProvider>
   )
 }
 

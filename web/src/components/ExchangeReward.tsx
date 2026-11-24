@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDynamicState, usePartyApi, useRefreshDynamicStateNow, useConfigLoaded } from '@/data/PartyDataProvider'
 import { itemActionBanner } from '@/lib/itemActionBanner'
 import { itemMaximumLevel, upgradeRuleTiers } from '@/lib/itemFormulas'
@@ -11,6 +11,7 @@ import { AutoNpcSaleConfirmation } from '@/components/ItemConfirmations'
 import { AddUpgradeRule } from '@/components/Offerings'
 import { TapRow, UpgradeTierPicker, CompoundTierPicker } from '@/screens/itempanel/ItemActionPanel'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
+import { useExchangeSelection } from '@/lib/batchSelection'
 
 export type ExchangeMarkMode = { action: 'bank' | 'stand' | 'npc' | 'upgrade'; targetLevel?: number }
 
@@ -78,7 +79,7 @@ export interface ExchangeRewardTileData {
   onStage?: (reward: ExchangeRewardTileData, mode: ExchangeMarkMode) => void
 }
 
-const PASSIVE_KINDS = ['empty', 'gold', 'shells', 'cx', 'cxbundle', 'open']
+export const PASSIVE_KINDS = ['empty', 'gold', 'shells', 'cx', 'cxbundle', 'open']
 
 /** A prospective reward with its automatic-rule banner. Tapping opens its
  *  options list (Item details first, then the automatic actions); while
@@ -109,7 +110,19 @@ export function ExchangeRewardTile({ reward }: { reward: ExchangeRewardTileData 
   const exchange = !!state.autoExchanges?.[`${item.name}@${item.level}`]
   const bulkUnsupported =
     reward.markMode?.action === 'upgrade' && (!meta?.upgradeable || Number(reward.markMode.targetLevel) <= (item.level || 0) || Number(reward.markMode.targetLevel) > itemMaximumLevel(meta))
+  // exchange-reward-tile.tsx: a non-passive tile registers under id@level:detail, and in select
+  // mode a tap adds or drops it.
+  const exchangeSelection = useExchangeSelection()
+  const selection = exchangeSelection?.selection
+  const selectionEntry = { key: `${reward.id}@${reward.level}:${reward.detail}`, slot: -1, item, meta }
+  const selectionIdentity = JSON.stringify(selectionEntry)
+  const register = exchangeSelection?.register
+  useEffect(() => {
+    if (!passive && register) return register(JSON.parse(selectionIdentity))
+  }, [register, selectionIdentity, passive])
+  const selecting = !!selection?.active && !!merchant && !passive && !reward.marking
   function clicked() {
+    if (selecting) return selection!.toggle(selectionEntry)
     if (!reward.marking) return setOptions(true)
     if (reward.markMode && merchant && !passive && !bulkUnsupported) reward.onStage?.(reward, reward.markMode)
   }
@@ -140,9 +153,10 @@ export function ExchangeRewardTile({ reward }: { reward: ExchangeRewardTileData 
         type="button"
         disabled={disabled}
         aria-label={`Exchange reward: ${reward.id} +${reward.level}`}
+        aria-pressed={selecting ? selection!.has(selectionEntry) : undefined}
         onClick={clicked}
         title={`${name}${reward.level ? ` +${reward.level}` : ''}${passive ? '' : ` · ${banner.label}`}`}
-        className="flex h-full w-28 flex-col items-center gap-1 rounded border border-border bg-card p-2 text-center disabled:cursor-default disabled:opacity-60"
+        className={`flex h-full w-28 flex-col items-center gap-1 rounded border border-border bg-card p-2 text-center disabled:cursor-default disabled:opacity-60 ${selecting && selection!.has(selectionEntry) ? 'ring-2 ring-sky-400' : ''}`}
       >
         <span className={`relative h-14 w-14 shrink-0 overflow-hidden rounded border bg-black p-1 ${passive ? 'border-slate-600' : banner.border}`}>
           <SpriteIcon sprite={sprite} size={46} className="bg-transparent" />

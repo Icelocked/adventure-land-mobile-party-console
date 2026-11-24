@@ -11,6 +11,8 @@ import { AccountScreenScaffold, EmptyState } from './AccountScreenScaffold'
 import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
 import { MluckClover } from '@/components/ItemTileParts'
 import { bankItemBanner } from '@/lib/bankItemBanner'
+import { BatchSelectionBar, SelectButton } from '@/components/BatchSelection'
+import { useBatchSelection, type BatchEntry, type BatchHandlers } from '@/lib/batchSelection'
 import type { BankVault, CatalogItem, CharacterState, InventoryEntry } from '@/models'
 
 /** Shared bank vault browser. Item actions: mark/unmark for withdrawal
@@ -31,6 +33,35 @@ export function BankScreen() {
     !query || [entry.item.name, catalogFor(entry.item.name)?.name].some((name) => String(name || '').toLowerCase().includes(query))
   const [collapsedPacks, setCollapsedPacks] = useState<Set<string>>(new Set())
   const bank = dynamicState.bank
+  const api = usePartyApi()
+  const merchant = dynamicState.merchantCharacter ?? null
+  // bank-sheet.tsx batch menu: every bank pack and BankBoi item, keyed by pack and slot.
+  const selection = useBatchSelection()
+  const batchEntries: (BatchEntry & { pack: string })[] = [
+    ...Object.entries(bank?.packs ?? {}).flatMap(([pack, entries]) => entries.flatMap((entry) => (entry ? [{ ...entry, pack }] : []))),
+    ...dynamicState.bankbois.flatMap((bankboi) => (bankboi.items ?? []).flatMap((entry) => (entry ? [{ ...entry, pack: `bankboi:${bankboi.name}` }] : []))),
+  ].map((entry) => ({ key: `${entry.pack}:${entry.slot}`, pack: entry.pack, slot: entry.slot, item: entry.item, meta: entry.meta ?? catalogFor(entry.item.name)?.meta ?? undefined, operation: entry.operation }))
+  const batchEntry = (pack: string, entry: InventoryEntry) => batchEntries.find((candidate) => candidate.key === `${pack}:${entry.slot}`)!
+  const packOf = (entry: BatchEntry) => entry.key.slice(0, entry.key.lastIndexOf(':'))
+  const failure = (result: { kind: string; message?: string }) => (result.kind === 'failure' ? result.message || 'Command failed' : null)
+  // party-inventory-panels.tsx onBatchCommand: /command {character: merchant, type, pack, slot, item, ...extra}.
+  const bankCommand = async (type: string, entry: BatchEntry, extra: Record<string, unknown> = {}) =>
+    failure(await api.post('command', { character: merchant, type, pack: packOf(entry), slot: entry.slot, item: entry.item, ...extra }))
+  const withdrawMarked = (entry: BatchEntry) =>
+    !!merchant && (dynamicState.withdrawals[merchant] ?? []).some((w) => w.pack === packOf(entry) && w.slot === entry.slot && sameMarkedItem(w.item, entry.item))
+  const batchHandlers: BatchHandlers = {
+    // A withdrawal is a toggle, so an item already marked is left as it is.
+    onBank: async (entry) => (withdrawMarked(entry) ? null : bankCommand('withdraw', entry, { markAll: false })),
+    onUpgrade: (entry) => bankCommand('withdraw', entry, { markAll: false, upgradeTiers: 1 }),
+    onCommand: (type, entry, extra) => bankCommand(type, entry, extra),
+    onExchange: async (entry) => failure(await api.submitExchangeOrder([{ id: entry.item.name, level: entry.item.level || 0, quantity: Number(entry.item.q || 1) }])),
+    exchangeable: (entry) =>
+      (dynamicState.merchantCatalog?.exchangeable ?? []).some((choice) => !(choice as { reward?: unknown }).reward && choice.id === entry.item.name && choice.level === (entry.item.level || 0)),
+    onCompound: (entry) => bankCommand('compound-mark', entry),
+  }
+  // In select mode a tap adds or drops the item; otherwise it opens the item's options.
+  const open = (pack: string, entry: InventoryEntry) => (selection.active ? selection.toggle(batchEntry(pack, entry)) : setOpened({ pack, entry }))
+  const selected = (pack: string, entry: InventoryEntry) => (selection.active ? selection.has(batchEntry(pack, entry)) : undefined)
 
   const togglePack = (packName: string) =>
     setCollapsedPacks((old) => {
@@ -48,6 +79,14 @@ export function BankScreen() {
       <div className="px-3 pb-3">
         <Input type="search" aria-label="Search bank items" placeholder="Search by item name or ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
+      {merchant && batchEntries.length > 1 && (
+        <div className="px-3">
+          {!selection.active && (
+            <SelectButton onClick={selection.start} className="mb-2" />
+          )}
+          <BatchSelectionBar selection={selection} entries={batchEntries} handlers={batchHandlers} onDone={refreshNow} />
+        </div>
+      )}
       {!bank || Object.keys(bank.packs).length === 0 ? (
         <EmptyState message="No snapshot yet. Send a character to the bank once to load it." />
       ) : (
@@ -78,7 +117,7 @@ export function BankScreen() {
                       {filled.map((entry) => {
                         const key = `${packName}:${entry.slot}`
                         return (
-                          <BankRow key={key} entry={entry} pack={packName} catalogFor={catalogFor} dimmed={!matches(entry)} onOpen={() => setOpened({ pack: packName, entry })} />
+                          <BankRow key={key} entry={entry} pack={packName} catalogFor={catalogFor} dimmed={!matches(entry)} selected={selected(packName, entry)} onOpen={() => open(packName, entry)} />
                         )
                       })}
                     </div>
@@ -88,7 +127,7 @@ export function BankScreen() {
           })}
         </div>
       )}
-      <BankboisSection catalogFor={catalogFor} matches={matches} onOpen={(pack, entry) => setOpened({ pack, entry })} />
+      <BankboisSection catalogFor={catalogFor} matches={matches} selected={selected} onOpen={open} />
       {opened && <BankItemPanel pack={opened.pack} entry={opened.entry} onClose={() => setOpened(null)} />}
     </AccountScreenScaffold>
   )
@@ -261,7 +300,17 @@ function AdditionalStorageSection() {
  *  first reserves 7 slots of bank pane 1, so it asks), each one's state,
  *  load and error, its items (the same options as a bank item, on pack
  *  bankboi:NAME), and a two-step delete once it's empty. */
-function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: string) => CatalogItem | undefined; matches: (entry: InventoryEntry) => boolean; onOpen: (pack: string, entry: InventoryEntry) => void }) {
+function BankboisSection({
+  catalogFor,
+  matches,
+  selected,
+  onOpen,
+}: {
+  catalogFor: (id: string) => CatalogItem | undefined
+  matches: (entry: InventoryEntry) => boolean
+  selected: (pack: string, entry: InventoryEntry) => boolean | undefined
+  onOpen: (pack: string, entry: InventoryEntry) => void
+}) {
   const api = usePartyApi()
   const refreshNow = useRefreshDynamicStateNow()
   const state = useDynamicState()
@@ -358,7 +407,7 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
               </div>
               {bankboi.error && <p className="mt-1 text-xs text-destructive">{bankboi.error}</p>}
               <div className="mt-2 flex flex-col gap-1">
-                {items.map((entry) => entry && <BankRow key={`${pack}:${entry.slot}`} entry={entry} pack={pack} catalogFor={catalogFor} dimmed={!matches(entry)} onOpen={() => onOpen(pack, entry)} />)}
+                {items.map((entry) => entry && <BankRow key={`${pack}:${entry.slot}`} entry={entry} pack={pack} catalogFor={catalogFor} dimmed={!matches(entry)} selected={selected(pack, entry)} onOpen={() => onOpen(pack, entry)} />)}
               </div>
             </div>
           )
@@ -376,7 +425,22 @@ function BankboisSection({ catalogFor, matches, onOpen }: { catalogFor: (id: str
  *  BankBois exist, and one banner for the manual NPC sale mark or the
  *  automatic rules that match the item (lib/bankItemBanner.ts).
  *  Tapping opens the item's options (BankItemPanel). */
-function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: InventoryEntry; pack: string; catalogFor: (id: string) => CatalogItem | undefined; dimmed: boolean; onOpen: () => void }) {
+function BankRow({
+  entry,
+  pack,
+  catalogFor,
+  dimmed,
+  selected,
+  onOpen,
+}: {
+  entry: InventoryEntry
+  pack: string
+  catalogFor: (id: string) => CatalogItem | undefined
+  dimmed: boolean
+  // In select mode, whether the batch selection holds this item.
+  selected?: boolean
+  onOpen: () => void
+}) {
   const state = useDynamicState()
   const merchant = state.merchantCharacter ?? null
   const { item } = entry
@@ -395,7 +459,8 @@ function BankRow({ entry, pack, catalogFor, dimmed, onOpen }: { entry: Inventory
     <button
       type="button"
       onClick={onOpen}
-      className={`flex w-full items-center gap-2 rounded-md border bg-card p-2 text-left transition-opacity ${withdrawMarked ? 'border-amber-400' : reserved ? 'border-fuchsia-800' : 'border-border'} ${dimmed ? 'opacity-25' : ''}`}
+      aria-pressed={selected}
+      className={`flex w-full items-center gap-2 rounded-md border bg-card p-2 text-left transition-opacity ${withdrawMarked ? 'border-amber-400' : reserved ? 'border-fuchsia-800' : 'border-border'} ${dimmed ? 'opacity-25' : ''} ${selected ? 'ring-2 ring-sky-400' : ''}`}
     >
       <span className="relative shrink-0">
         <SpriteIcon sprite={catalogFor(item.name)?.sprite} size={36} />

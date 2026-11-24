@@ -9,6 +9,9 @@ import { aggregateSlotTracking, luckySlotSearch, normalizeSlotTracking } from '@
 import { TapRow } from '@/screens/itempanel/ItemActionPanel'
 import { automaticCommerceRuleKey, sameMarkedItem } from '@/models'
 import type { CatalogItem, InventoryEntry, Item, PartyStateDynamic } from '@/models'
+import { usePartyApi, useRefreshDynamicStateNow } from '@/data/PartyDataProvider'
+import { BatchSelectionBar, SelectButton } from '@/components/BatchSelection'
+import { useBatchSelection, type BatchEntry, type BatchHandlers } from '@/lib/batchSelection'
 
 type Mark = { slot?: number; item?: Item } | Item
 const markedIn = (list: Mark[], entry: InventoryEntry) =>
@@ -54,6 +57,9 @@ export function InventorySection({
   const [open, setOpen] = useSectionOpen('character:Inventory')
   const [details, setDetails] = useState<TileDetails | null>(null)
   const [luckyMenu, setLuckyMenu] = useState<{ slot: number } | null>(null)
+  const selection = useBatchSelection()
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
 
   // Missing inventory is still loading, not an empty bag.
   if (!loaded)
@@ -86,6 +92,21 @@ export function InventorySection({
   // Merge the character's live local stream.
   const localLuckyStream = localLucky ? normalizeSlotTracking(localLucky) : undefined
   const nextUpgradeSlot = validLuckySlot(luckyUpgradeSlot) ? luckyUpgradeSlot : luckySlotSearch(aggregateSlotTracking(state.luckySlotTracking[characterName] ?? {}, localLuckyStream)).nextSlot
+  // inventory-panel.tsx batch menu: each row posts /command {character, type, item, ...extra} per item.
+  const batchEntries: BatchEntry[] = items.flatMap((entry) =>
+    entry ? [{ key: String(entry.slot), slot: entry.slot, item: entry.item, meta: entry.meta ?? catalogFor(entry.item.name)?.meta ?? undefined, operation: entry.operation }] : [],
+  )
+  const command = async (type: string, entry: BatchEntry, extra: Record<string, unknown>) => {
+    const result = await api.post('command', { character: characterName, type, item: entry.item, ...extra })
+    return result.kind === 'failure' ? result.message || 'Command failed' : null
+  }
+  const batchHandlers: BatchHandlers = {
+    onCommand: (type, entry, extra) => command(type, entry, extra),
+    onBank: (entry) => command('mark', entry, { slot: entry.slot }),
+    onMerchant: merchant ? (entry) => command('merchant-mark', entry, { slot: entry.slot }) : undefined,
+    exchangeable: (entry) => !!merchant && Number(entry.meta?.definition.e || 0) > 0,
+  }
+  const batchEntry = (entry: InventoryEntry) => batchEntries.find((candidate) => candidate.key === String(entry.slot))!
   const luckySlotLabel = luckySlotLocked
     ? 'Locked lucky upgrade position'
     : validLuckySlot(luckyUpgradeSlot) && !luckySlotResuming
@@ -102,6 +123,10 @@ export function InventorySection({
           {occupiedSlots}/{totalSlots}
         </span>
       </button>
+      {open && !selection.active && occupiedSlots > 1 && (
+        <SelectButton onClick={selection.start} className="mb-2" />
+      )}
+      {open && <BatchSelectionBar selection={selection} entries={batchEntries} handlers={batchHandlers} onDone={refreshNow} />}
       {open && (
         <div className="grid grid-cols-5 gap-1.5">
           {(isMerchant ? physicalInventory(items) : compactInventory(items, totalSlots)).map((entry, i) => {
@@ -195,9 +220,11 @@ export function InventorySection({
                 key={entry.slot}
                 testId={`inventory-slot-${i}`}
                 label={itemName}
-                className={`${lucky ? 'overflow-visible' : 'overflow-hidden'} ${banner?.border || 'border-border'}`}
-                // Tap opens the item menu; on the lucky slot it also offers the lucky slot data.
-                onTap={() => onItemTap(entry, lucky)}
+                className={`${lucky ? 'overflow-visible' : 'overflow-hidden'} ${banner?.border || 'border-border'} ${selection.active && selection.has(batchEntry(entry)) ? 'ring-2 ring-sky-400' : ''}`}
+                selected={selection.active ? selection.has(batchEntry(entry)) : undefined}
+                // Tap opens the item menu; on the lucky slot it also offers the lucky slot data. In
+                // select mode a tap adds or drops the item instead.
+                onTap={() => (selection.active ? selection.toggle(batchEntry(entry)) : onItemTap(entry, lucky))}
                 onLongPress={tileDetails ? () => setDetails(tileDetails) : undefined}
               >
                 {lucky ? <LuckySlotOutline /> : null}
@@ -273,11 +300,14 @@ export function ItemTile({
   className,
   onTap,
   onLongPress,
+  selected,
   children,
 }: {
   testId?: string
   label: string
   className: string
+  // In select mode, whether the batch selection holds this tile.
+  selected?: boolean
   onTap: () => void
   onLongPress?: () => void
   children: ReactNode
@@ -293,6 +323,7 @@ export function ItemTile({
       type="button"
       data-testid={testId}
       aria-label={label}
+      aria-pressed={selected}
       onPointerDown={() => {
         fired.current = false
         if (!onLongPress) return

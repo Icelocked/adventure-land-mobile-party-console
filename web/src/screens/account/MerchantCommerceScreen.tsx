@@ -14,6 +14,7 @@ import { ChevronDown, ChevronUp, Settings, X } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { ExchangeMarkControls, ExchangeRewardTile, type ExchangeMarkMode, type ExchangeRewardTileData } from '@/components/ExchangeReward'
+import { ExchangeSelectButton, ExchangeSelectionBar, ExchangeSelectionProvider } from '@/components/BatchSelection'
 import type { CraftMaterial, MerchantBuyItem, MerchantCraftRecipe, MerchantExchangeItem } from '@/models'
 
 type Mode = 'buy' | 'craft' | 'exchange'
@@ -900,6 +901,8 @@ function ExchangeScreen({
       </div>
 
       {selectedExchange && (
+        // party-merchant-commerce-dialog.tsx ExchangeItemSelection: one batch selection per exchange's rewards.
+        <ExchangeSelectionProvider key={selectedExchange.key}>
         <div role="group" aria-label="Exchange details" className="fixed inset-0 z-50 flex flex-col bg-background p-3">
           <div className="flex flex-wrap items-start gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -926,7 +929,11 @@ function ExchangeScreen({
             </p>
           )}
           {markError && <p role="alert" className="mt-2 text-sm text-rose-300">{markError}</p>}
-          <p className="mt-4 font-mono text-xs uppercase text-emerald-300">{selectedExchange.choices ? 'Available rewards' : 'Potential results'}</p>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="font-mono text-xs uppercase text-emerald-300">{selectedExchange.choices ? 'Available rewards' : 'Potential results'}</p>
+            {!marking && <ExchangeSelectButton />}
+          </div>
+          <ExchangeSelectionBar />
           <div className={`mt-2 min-h-0 flex-1 content-start gap-2 overflow-y-auto ${selectedExchange.choices ? 'flex flex-col' : 'flex flex-wrap items-stretch'}`}>
             {selectedExchange.choices?.map((choice) => (
               <div key={choice.key} className="flex items-center gap-3 rounded border border-cyan-800 bg-card p-2">
@@ -974,6 +981,7 @@ function ExchangeScreen({
             ))}
           </div>
         </div>
+        </ExchangeSelectionProvider>
       )}
 
       {inspecting && (

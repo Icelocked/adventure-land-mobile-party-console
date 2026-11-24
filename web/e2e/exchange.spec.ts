@@ -115,3 +115,28 @@ test('Exchange reward options include Add upgrade rule for the merchant (upgrade
   await page.getByRole('button', { name: 'Add upgrade rule' }).click()
   await expect(page.getByRole('group', { name: 'Add upgrade rule' })).toBeVisible()
 })
+
+// V150-PORT-MAP.md F6: party-merchant-commerce-dialog.tsx shares one batch selection over the
+// exchange view's reward tiles, with item details' rows.
+test('Exchange details batch the reward tiles: one merchant rule per reward at slot -1', async ({ page }) => {
+  const server = exchangeServer()
+  await server.install(page)
+  const bodies = postBodies(page)
+  await page.goto('/merchant/exchange')
+
+  await page.getByRole('button', { name: 'Exchange rules for Gem' }).click()
+  const rules = page.getByRole('group', { name: 'Exchange details' })
+  await rules.getByRole('button', { name: 'Select', exact: true }).click()
+  await rules.getByRole('button', { name: 'Exchange reward: hpot0 +0' }).click()
+  await rules.getByRole('button', { name: 'Exchange reward: candy0 +0' }).click()
+  const bar = rules.getByRole('group', { name: 'Selected items' })
+  await expect(bar.getByText('2 selected items')).toBeVisible()
+  await bar.getByRole('button', { name: 'Actions' }).click()
+  await page.getByRole('dialog', { name: 'Batch actions' }).getByRole('button', { name: 'Auto mark for bank' }).click()
+  await expect
+    .poll(() => bodies.filter((entry) => entry.path === 'command').map((entry) => entry.body))
+    .toEqual([
+      { character: 'Merchantina', type: 'auto-item-mark', item: { name: 'hpot0', level: 0 }, mode: 'bank', slot: -1 },
+      { character: 'Merchantina', type: 'auto-item-mark', item: { name: 'candy0', level: 0 }, mode: 'bank', slot: -1 },
+    ])
+})
