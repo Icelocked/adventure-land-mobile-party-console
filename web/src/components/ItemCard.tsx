@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { GameBox, GameLine, GameText } from '@/components/GameBox'
 import { itemCardLines, type ItemCardLine } from '@/lib/itemCardLines'
 import type { Item, ItemMeta } from '@/models'
@@ -44,12 +45,47 @@ export function ItemCard({
   onSkill: (id: string) => void
 }) {
   const lines = itemCardLines({ meta, item, level, properties, setName, usable, skillName }).filter((line) => line.key !== 'explanation')
+  const [json, setJson] = useState(false)
   return (
-    <GameBox label="Item card" className="min-w-[min(100%,16rem)] flex-1">
-      {lines.map((line) => (
-        <CardLine key={line.key} line={line} skillHint={skillHint} onSkill={onSkill} />
-      ))}
-    </GameBox>
+    <>
+      <GameBox label="Item card" className="min-w-[min(100%,16rem)] flex-1">
+        {lines.map((line) =>
+          // The release's item-card.tsx: the information line opens the item, definition and properties as JSON.
+          line.key === 'info' && line.kind === 'prop' ? (
+            <button
+              key={line.key}
+              type="button"
+              data-line="info"
+              aria-label="Item information"
+              title="Item information"
+              onClick={() => setJson(true)}
+              className="block border border-transparent bg-black text-left text-[#E4E4E4] hover:border-gray-500 hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
+            >
+              <span data-label style={{ color: line.color }}>
+                {line.label}
+              </span>
+              : {line.value}
+            </button>
+          ) : (
+            <CardLine key={line.key} line={line} skillHint={skillHint} onSkill={onSkill} />
+          ),
+        )}
+      </GameBox>
+      {json && (
+        <div role="dialog" aria-label="Item information" className="fixed inset-0 z-50 flex flex-col gap-3 overflow-y-auto bg-[#0b1916] p-4 text-emerald-50">
+          <div>
+            <h2 className="font-semibold">Item information</h2>
+            <p className="text-sm text-emerald-100/70">JSON for {item.name}</p>
+          </div>
+          <pre role="region" aria-label="Item JSON" className="overflow-x-auto rounded border border-emerald-900 bg-black p-3 text-xs text-emerald-100">
+            {JSON.stringify({ item, definition: meta?.definition || {}, properties }, null, 2)}
+          </pre>
+          <button type="button" onClick={() => setJson(false)} className="self-end rounded border border-emerald-700 bg-[#07100f] px-3 py-2 text-emerald-100">
+            Close information
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 

@@ -1,4 +1,4 @@
-import { sanitizeDollHtml } from '@/lib/safeHtml'
+import { CharacterPortrait } from '@/components/CharacterPortrait'
 import { Fragment, useState } from 'react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
@@ -323,8 +323,8 @@ export function GearComparisonSheet({
     return (
       <section aria-label={proposed ? 'With this item' : 'Currently equipped'} className={`row-span-5 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-lg border p-3 ${proposed ? 'border-cyan-800' : 'border-border'}`}>
         <div className="flex items-center gap-3 pb-3">
-          {/* The game's own character doll markup. */}
-          <div className="h-20 w-16 shrink-0 overflow-hidden" dangerouslySetInnerHTML={diagnostics.characterDollHtml ? { __html: sanitizeDollHtml(diagnostics.characterDollHtml) } : undefined} />
+          {/* The game's doll, else the sprite, else the skin name, as every other portrait falls back (the release's 34820e72f). */}
+          <CharacterPortrait html={diagnostics.characterDollHtml} sprite={diagnostics.characterSprite} skin={diagnostics.skin} className="h-20 w-16 shrink-0" />
           <div className="min-w-0">
             <p className="font-semibold">{proposed ? name : equipped ? `${nameOf(equipped.item, equippedMeta)} +${leftLevel}` : 'Empty slot'}</p>
             <p className="font-mono text-[10px] text-muted-foreground">

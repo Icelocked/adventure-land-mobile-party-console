@@ -1,6 +1,6 @@
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { MluckClover } from '@/components/ItemTileParts'
-import { equipmentSlots, itemActionBanner, statBadgeClass } from '@/lib/itemActionBanner'
+import { equipmentSlots, itemActionBanner, statBadgeClass, statBadgeStyle } from '@/lib/itemActionBanner'
 import { SectionCard } from '../SectionCard'
 import { formatDurationMs, useClock } from '@/lib/duration'
 import { sameMarkedItem } from '@/models'
@@ -72,7 +72,7 @@ export function EquipmentSection({
                   </span>
                 )}
                 {equipped?.item.stat_type ? (
-                  <span className={`absolute left-0.5 top-0.5 z-10 rounded px-1 font-mono text-[8px] ring-1 ${statBadgeClass(equipped.item.stat_type)}`}>{equipped.item.stat_type}</span>
+                  <span className={`absolute left-0.5 top-0.5 z-10 rounded px-1 font-mono text-[8px] ring-1 ${statBadgeClass(equipped.item.stat_type)}`} style={statBadgeStyle(equipped.item.stat_type)}>{equipped.item.stat_type}</span>
                 ) : null}
                 {banner && <span data-item-action-banner className={`absolute inset-x-0 top-0 z-10 text-center text-[8px] leading-tight ${banner.colors}`}>{banner.label}</span>}
                 <MluckClover item={equipped?.item} />

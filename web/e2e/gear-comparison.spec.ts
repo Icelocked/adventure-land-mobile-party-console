@@ -113,3 +113,30 @@ test('Set bonuses apply at the exact piece count, not cumulatively', async ({ pa
   await expect(sets).toContainText('1 pieces: DEX +3 · LOST')
   await expect(sets).toContainText('2 pieces: DEX +10 · GAINED')
 })
+
+// OWNERS-PORT-MAP.md B20: the release's comparison header (34820e72f) and stat badges (5c378ed2d).
+test("The comparison header falls back to the skin name with no doll, and a slot's stat badge draws its stat's colour", async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  server.addCharacter({
+    name: 'Ranger1',
+    ctype: 'ranger',
+    level: 60,
+    items: [{ name: 'ringb', level: 0 }],
+    slots: { ring1: { item: { name: 'ringa', level: 0, stat_type: 'dex' } } },
+    diagnostics: { primaryStat: 'dex', str: 20, int: 10, dex: 100, vit: 30, attack: 250, armor: 80, speed: 55, skin: 'mranger' },
+  })
+  server.addCatalogEntry({ id: 'ringa', name: 'Ring A', compoundable: true, definition: { type: 'ring', name: 'Ring A', dex: 5 } })
+  server.addCatalogEntry({ id: 'ringb', name: 'Ring B', compoundable: true, definition: { type: 'ring', name: 'Ring B', dex: 10 } })
+  await server.install(page)
+
+  await page.goto('/characters/Ranger1')
+  // STAT_COLORS.dex (lib/statColors.ts), as the card's DEX line draws it.
+  const badge = page.getByText('dex', { exact: true }).first()
+  await expect(badge).toHaveCSS('color', 'rgb(68, 183, 92)')
+  await page.getByTestId('inventory-slot-0').click()
+  await page.getByRole('button', { name: 'Compare with equipped' }).click()
+  await page.getByRole('button', { name: /Ring 1\s*Ring A/ }).click()
+  await expect(page.getByRole('region', { name: 'Currently equipped' }).getByText('mranger', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'With this item' }).getByText('mranger', { exact: true })).toBeVisible()
+})

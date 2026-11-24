@@ -11,7 +11,7 @@ import { StandListingForm } from '@/components/StandListingForm'
 import { WtbDialog, WtbPreference, WtbPriorityInput, autoStandExplanation, standBuyExplanation, useWtbReplacement } from '@/components/Wtb'
 import { ItemTile } from '@/screens/character-detail/sections/InventorySection'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
-import { statBadgeClass } from '@/lib/itemActionBanner'
+import { statBadgeClass, statBadgeStyle } from '@/lib/itemActionBanner'
 import { standBuyRows, standOccupancy, standSaleRows, type StandMerchant } from '@/lib/standInspection'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
@@ -149,7 +149,7 @@ export function StandScreen() {
                       }} onLongPress={() => setSuggesting(item)}>
                         <SpriteIcon sprite={meta?.sprite ?? catalogFor(configured.item.name)?.sprite} size={58} />
                         {level > 0 && <span className="absolute left-1 top-1 z-10 rounded bg-black/80 px-1 font-mono text-[9px] font-semibold text-emerald-300">+{level}</span>}
-                        {statType && <span className={`absolute right-1 top-1 z-10 rounded px-1 font-mono text-[8px] uppercase ring-1 ${statBadgeClass(String(statType))}`}>{String(statType)}</span>}
+                        {statType && <span className={`absolute right-1 top-1 z-10 rounded px-1 font-mono text-[8px] uppercase ring-1 ${statBadgeClass(String(statType))}`} style={statBadgeStyle(String(statType))}>{String(statType)}</span>}
                         <MluckClover item={item} />
                         <span className="absolute bottom-1 left-1 z-10 rounded bg-black/80 px-1 font-mono text-[9px] text-amber-200">
                           {Math.max(1, Number(liveEntry?.item.q || configured.quantity || configured.item.q || 1))}

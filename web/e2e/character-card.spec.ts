@@ -200,3 +200,40 @@ test('Character card: a missing run speed still says so, and the boxes stack on 
   expect(await sheet.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
   await sheet.screenshot({ path: info.outputPath('character-card-phone.png') })
 })
+
+// OWNERS-PORT-MAP.md B20: the release's stats dialog since the PWA's port (character-stats-dialog.tsx
+// and game-formulas.ts itemAttack at ae6563132).
+test("Character card: the Gold line, and the attribute attack from the game's item_attack (0.7 of the offhand, stars a third)", async ({ page }) => {
+  const server = new MockPartyServer()
+  server.paired = true
+  const base = { ctype: 'merchant', level: 61, hp: 4760, max_hp: 4760, mp: 2120, max_mp: 2700 }
+  server.addCharacter({
+    ...base,
+    name: 'Merchantina',
+    slots: {
+      mainhand: { item: { name: 'dartgun', level: 0 }, meta: { definition: {}, properties: { attack: 48 } } },
+      offhand: { item: { name: 'wbook0', level: 0 }, meta: { definition: {}, properties: { attack: 20 } } },
+    },
+    diagnostics: { ...merchantStats, goldBonus: -5 },
+  })
+  server.addCharacter({
+    ...base,
+    name: 'Starry',
+    slots: {
+      mainhand: { item: { name: 'cclaw', level: 0 }, meta: { definition: { wtype: 'stars' }, properties: { attack: 48 } } },
+      offhand: { item: { name: 'wbook0', level: 0 }, meta: { definition: {}, properties: { attack: 20 } } },
+    },
+    diagnostics: { ...merchantStats, goldBonus: 12.5 },
+  })
+  await server.install(page)
+
+  let { extras } = await openStats(page, 'Merchantina')
+  // ff53b6241: a whole bonus reads "-5%", not "-5.00%".
+  await expect(extras.locator('[data-line="gold"]')).toHaveText('Gold: -5%')
+  // (48 + 0.7 * 20) * 110 / 20.
+  await expect(extras.locator('[data-line="int"] [data-effect="attack"]')).toHaveText('+341.0 Attack +3.10 per point')
+  ;({ extras } = await openStats(page, 'Starry'))
+  await expect(extras.locator('[data-line="gold"]')).toHaveText('Gold: +12.5%')
+  // Stars in the mainhand with another kind in the offhand: a third, (48 + 14) / 3 * 110 / 20.
+  await expect(extras.locator('[data-line="int"] [data-effect="attack"]')).toHaveText('+113.7 Attack +1.03 per point')
+})

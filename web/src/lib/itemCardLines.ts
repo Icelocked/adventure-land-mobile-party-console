@@ -249,7 +249,10 @@ export function itemCardLines({
   // A stat scroll folds the base stat into the scrolled stat (calculate_item_properties sets prop.stat=0).
   if (item.stat_type) prop.stat = 0
   const lines: ItemCardLine[] = [...statLines(prop, definition)]
-  const grade = GRADES[itemGrade(definition, level)]
+  // The catalog's definition drops the `upgrade` and `compound` objects (the console's bag.ts
+  // safeItemDefinition), so the grade reads the meta's flags for them, as the release's
+  // item-card-lines.ts does: cdragon carries grades and no upgrade, and shows none.
+  const grade = GRADES[itemGrade({ upgrade: meta?.upgradeable, compound: meta?.compoundable, grades: definition.grades }, level)]
   if (grade && definition.type !== 'booster') lines.push({ kind: 'prop', key: 'grade', label: 'Grade', value: grade.name, color: grade.color })
   if (definition.poisonous) lines.push({ kind: 'text', key: 'poisonous', text: 'Poisonous', color: COLORS.poison })
   if (definition.cooperative) lines.push({ kind: 'text', key: 'cooperative', text: 'Cooperative', color: '#aeaeae' })
@@ -389,6 +392,10 @@ function stateLines(item: Item): ItemCardLine[] {
   else if (item.l) lines.push({ kind: 'text', key: 'lock', text: 'Locked', color: '#8C8C8C' })
   if (item.acl) lines.push({ kind: 'text', key: 'acl', text: 'Account Bound', color: '#ADA68E' })
   if (item.expires) lines.push({ kind: 'prop', key: 'expires', label: 'Expires', value: new Date(item.expires as string | number).toLocaleString(), color: COLORS.gray })
+  // A CX Jar holds one appearance, the item's own `data`; the game prints an empty jar's line when
+  // it holds none (html.js render_item_info).
+  if (item.name === 'cxjar')
+    lines.push({ kind: 'prop', key: 'filled_with', label: 'Filled with', value: typeof item.data === 'string' && item.data.trim() ? item.data : 'nothing', color: COLORS.gray })
   return lines
 }
 

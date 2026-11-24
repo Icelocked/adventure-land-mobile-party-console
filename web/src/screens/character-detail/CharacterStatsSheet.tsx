@@ -87,9 +87,14 @@ export function CharacterStatsSheet({
   const character = { ...diagnostics, ...vitals, ctype: vitals.ctype || diagnostics.ctype || '', level: vitals.level || Number(diagnostics.level || 0) }
   const combat = (diagnostics.combatStats ?? {}) as Record<string, number | undefined>
   const primary = String(character.primaryStat || '').toLowerCase()
-  const equippedWeaponAttack = Object.entries(slots)
-    .filter(([slot]) => slot === 'mainhand' || slot === 'offhand')
-    .reduce((sum, [, entry]) => sum + Number(entry?.meta?.properties?.attack || 0), 0)
+  // calculate_player_stats's `item_attack` (the release's game-formulas.ts itemAttack): the
+  // mainhand's attack and 0.7 of the offhand's, a third of that when stars in the mainhand pair with
+  // an offhand of another kind, and at least 5.
+  const mainhand = slots.mainhand?.meta
+  const offhand = slots.offhand?.meta
+  let weaponAttack = Number(mainhand?.properties?.attack || 0) + Number(offhand?.properties?.attack || 0) * 0.7
+  if (mainhand && offhand && mainhand.definition?.wtype === 'stars' && offhand.definition?.wtype !== 'stars') weaponAttack /= 3
+  const equippedWeaponAttack = Math.max(weaponAttack, 5)
   const attributeEffects = (stat: 'str' | 'int' | 'dex', value: number): Effect[] => {
     const effects: Effect[] = []
     const attackDivisor = character.ctype === 'paladin' && stat === 'int' ? 40 : primary === stat ? 20 : 0
@@ -206,6 +211,8 @@ export function CharacterStatsSheet({
       note: runSpeed !== null && character.ctype === 'merchant' ? <span className="text-[#808080]"> before movement restrictions</span> : undefined,
     },
     plain('luck', 'Luck', S.luck, `${Number(character.luck || 100).toLocaleString()}%`),
+    // The gold find bonus, the character's own reported stat, signed and in percent.
+    plain('gold', 'Gold', S.gold, `${Number(character.goldBonus || 0) >= 0 ? '+' : ''}${Number(character.goldBonus || 0).toLocaleString()}%`),
     plain('crit', 'Crit', S.crit, `${Number(combat.crit || 0).toLocaleString()}%`),
     plain('critdamage', 'Crit Damage', S.critdamage, `${(200 + Number(combat.critDamage || 0)).toLocaleString()}%`),
     plain('evasion', 'Evasion', S.evasion, `${Number(combat.evasion || 0).toLocaleString()}%`),

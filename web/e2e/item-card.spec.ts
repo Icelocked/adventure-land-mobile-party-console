@@ -344,3 +344,26 @@ test('Item card: lock, account binding and expiry show on the card; quantity and
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Item details', exact: true })).toHaveCount(1)
 })
+
+// OWNERS-PORT-MAP.md B20: the release's item card since the PWA's port (item-card.tsx,
+// item-card-lines.ts at ae6563132).
+test("Item card: Grade reads the meta's upgrade flag, a CX Jar says what it holds, and [i] opens the item's JSON", async ({ page }) => {
+  // The release's catalog drops the definition's `upgrade` object; the meta's flag stays.
+  const blade: MockCatalogEntry = { id: 'blade', name: 'Blade', upgradeable: true, definition: { type: 'weapon', wtype: 'short_sword', attack: 20, grades: [3, 7, 9, 12] } }
+  const jar: MockCatalogEntry = { id: 'cxjar', name: 'CX Jar', definition: { type: 'cxjar', g: 1000 } }
+  await serverWith([{ name: 'blade', level: 4 }, { name: 'cxjar', data: 'hairdo42' }, { name: 'cxjar' }], [blade, jar], 'warrior').install(page)
+
+  let { card } = await openDetails(page, 0)
+  await expect(line(card, 'grade')).toHaveText('Grade: High')
+  await card.getByRole('button', { name: 'Item information' }).click()
+  const information = page.getByRole('dialog', { name: 'Item information' })
+  await expect(information.getByRole('region', { name: 'Item JSON' })).toContainText('"name": "blade"')
+  await expect(information.getByRole('region', { name: 'Item JSON' })).toContainText('"wtype": "short_sword"')
+  await information.getByRole('button', { name: 'Close information' }).click()
+  await expect(information).toHaveCount(0)
+
+  ;({ card } = await openDetails(page, 1))
+  await expect(line(card, 'filled_with')).toHaveText('Filled with: hairdo42')
+  ;({ card } = await openDetails(page, 2))
+  await expect(line(card, 'filled_with')).toHaveText('Filled with: nothing')
+})
