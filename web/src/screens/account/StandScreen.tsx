@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest, useServerSettings } from '@/data/PartyDataProvider'
+import { ownersRelease, useMarketWatch } from '@/api/ownersCards'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -39,6 +40,8 @@ export function StandScreen() {
   useDomainInterest('market')
   const api = usePartyApi()
   const state = useDynamicState()
+  // stand-sheet.tsx: the market feeds refresh while the stand or market view holds the watch.
+  useMarketWatch(useServerSettings(), ownersRelease(state))
   const refreshNow = useRefreshDynamicStateNow()
   const catalogFor = useCatalogLookup(state.merchantCatalog)
   const merchant = useStandMerchant()

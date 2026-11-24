@@ -22,8 +22,20 @@ export class OwnersSet2Mock extends MockPartyServer {
   /** Core standSlots (items owner): unset leaves the field off core. */
   standSlots: { slots: number; used: number; free: number } | undefined
 
+  /** The market feeds' ages: aldata.merchantsUpdatedAt and ponty.updatedAt (market section). */
+  marketUpdatedAt: { aldata?: number; ponty?: number } = {}
+  /** Each GET /market-watch the app opened (status streams.ts). */
+  marketWatchOpens = 0
+
   stateSection(section: string, dashboard: boolean): Record<string, unknown> {
     const payload = super.stateSection(section, dashboard)
+    if (section === 'market') {
+      return {
+        ...payload,
+        aldata: { ...(payload.aldata as Record<string, unknown>), ...(this.marketUpdatedAt.aldata ? { merchantsUpdatedAt: this.marketUpdatedAt.aldata } : {}) },
+        ponty: { ...(payload.ponty as Record<string, unknown>), ...(this.marketUpdatedAt.ponty ? { updatedAt: this.marketUpdatedAt.ponty } : {}) },
+      }
+    }
     if (section === 'config') return { ...payload, handControlByCharacter: this.handControlByCharacter }
     if (section !== 'core' || !dashboard) return payload
     const details = payload.characterDetails as Record<string, Record<string, unknown>>
@@ -48,6 +60,11 @@ export class OwnersSet2Mock extends MockPartyServer {
       const next = { ...HAND_CONTROL_DEFAULT, ...this.handControlByCharacter[name], ...(body.handControl as Partial<MockHandControl>) }
       this.handControlByCharacter = { ...this.handControlByCharacter, [name]: { on: next.on, usePotions: next.usePotions, combat: next.combat, party: next.party } }
       return route.fulfill({ json: { ok: true } })
+    })
+    // The watch stream sends nothing; `retry` keeps the browser from reopening it during a test.
+    await page.route('**/party-api/market-watch', async (route) => {
+      this.marketWatchOpens++
+      return route.fulfill({ contentType: 'text/event-stream', body: 'retry: 600000\n\n' })
     })
     // events/coordinator/routes.ts rejoin: only an occurrence left by a manual move comes back.
     await page.route('**/party-api/event-rejoin', async (route) => {

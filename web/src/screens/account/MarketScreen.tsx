@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest } from '@/data/PartyDataProvider'
+import { usePartyApi, useCharacterDiagnosticsMap, useCharacters, useDynamicState, useRefreshDynamicStateNow, useDomainInterest, useServerSettings } from '@/data/PartyDataProvider'
 import { useCatalogLookup } from '@/lib/catalogLookup'
 import { useClock } from '@/lib/duration'
 import {
@@ -39,6 +39,7 @@ import { WatchListSheet, type WatchPrefill } from '@/components/NpcShopSheet'
 import { realmName } from '@/lib/marketFilter'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
 import { AccountScreenScaffold } from './AccountScreenScaffold'
+import { marketAge, ownersRelease, useMarketWatch } from '@/api/ownersCards'
 import type { ApiResult, CommandResult } from '@/api/partyApi'
 import { consoleFeatures, type InventoryEntry, type Item } from '@/models'
 
@@ -92,6 +93,8 @@ export function MarketScreen() {
   useDomainInterest('market')
   const api = usePartyApi()
   const state = useDynamicState()
+  // stand-sheet.tsx: the market feeds refresh while the market or stand view holds the watch.
+  useMarketWatch(useServerSettings(), ownersRelease(state))
   // Check and owned-first WTB offers need the stable console fork (consoleFeatures.ts forkCommerce).
   const forkCommerce = consoleFeatures(state).forkCommerce
   const characters = useCharacters()
@@ -143,7 +146,7 @@ export function MarketScreen() {
   const catalog = state.merchantCatalog?.allItems ?? []
   const nameFor = (id: string) => catalogFor(id)?.name
   const aldata = (state.aldata ?? {}) as { listings?: unknown[]; buyOrders?: unknown[]; trades?: unknown[]; auth?: string; error?: string | null; merchantsUpdatedAt?: number; tradesUpdatedAt?: number }
-  const ponty = (state.ponty ?? {}) as { listings?: unknown[]; error?: string | null }
+  const ponty = (state.ponty ?? {}) as { listings?: unknown[]; error?: string | null; updatedAt?: number }
   const allAlData = (aldata.listings ?? []) as AlDataListing[]
   const ignoredKeys = new Set((state.marketIgnoredItems ?? []).map(marketItemKey))
   const shown = (item: { name: string; level?: number | null }, seenAt: number | undefined) => !ignoredKeys.has(marketItemKey(item)) && (!hideStale || marketListingFresh(seenAt, now))
@@ -301,7 +304,10 @@ export function MarketScreen() {
   return (
     <AccountScreenScaffold title="Market" onRefresh={() => void refreshNow()}>
       <div className="flex flex-col gap-3 p-3">
-        <p className="text-xs text-muted-foreground">Browse live offers and player-published classifieds. Public browsing requires no ALData key.</p>
+        <p className="text-xs text-muted-foreground">
+          Browse live offers and player-published classifieds. Public browsing requires no ALData key.
+          <span data-market-age className="ml-2">{marketAge(now, aldata.merchantsUpdatedAt, ponty.updatedAt)}</span>
+        </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/market/settings')}>
             Marketplace settings
