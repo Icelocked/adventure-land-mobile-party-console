@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { SectionCard } from '../SectionCard'
 import { FrankyRoutineControl } from './FrankyRoutineControl'
 import { consoleFeatures, type PartyStateDynamic } from '@/models'
+import { handControl, handControlBody, handControlWord, type HandControl } from '@/api/ownersCards'
 import { CipherControls } from '@/components/CipherControls'
 import { defaultCipherSettings, type CipherSettings, type CipherView } from '@/lib/cipher'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -72,6 +73,7 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
         >
           Follow
         </Chip>
+        <HandControlToggle name={characterName} state={dynamicState} disabled={!configLoaded} onError={setFormationError} />
         <EventSelectionControl state={dynamicState} name={characterName} combat={combat} />
       </div>
       <ConfigLoadingNote />
@@ -82,6 +84,55 @@ export function LeaderFollowerSection({ characterName, dynamicState }: { charact
       )}
       {!isLeader && dynamicState.leader && <p className="mt-1.5 text-xs text-muted-foreground">Following {dynamicState.leader}</p>}
     </SectionCard>
+  )
+}
+
+/** hand-control.tsx HandControlToggle on POST /party-api/formation
+ *  {character, handControl}, which sends only the changed keys. A Steam
+ *  character reads "Manual" and, while on, shows what the console still
+ *  runs for it; a headless one reads "Pause". */
+function HandControlToggle({ name, state, disabled, onError }: { name: string; state: PartyStateDynamic; disabled: boolean; onError: (message: string | null) => void }) {
+  const api = usePartyApi()
+  const refreshNow = useRefreshDynamicStateNow()
+  const hand = handControl(state, name)
+  const word = handControlWord(state, name)
+  const send = async (patch: Partial<HandControl>) => {
+    onError(null)
+    const result = await api.post('formation', handControlBody(name, patch))
+    if (result.kind === 'failure') onError(result.message || 'Formation update failed')
+    await refreshNow()
+  }
+  return (
+    <>
+      <Chip selected={hand.on} disabled={disabled} onClick={() => void send({ on: !hand.on })}>
+        {word}
+      </Chip>
+      {word === 'Manual' && hand.on && (
+        <fieldset data-hand-switches className="flex basis-full flex-wrap items-center gap-3 text-xs text-emerald-100/80">
+          <legend className="sr-only">While I play this character, the console still runs</legend>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" className="accent-emerald-500" checked={hand.usePotions} disabled={disabled} onChange={(e) => void send({ usePotions: e.target.checked })} />
+            Use potions
+          </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" className="accent-emerald-500" checked={hand.combat} disabled={disabled} onChange={(e) => void send({ combat: e.target.checked })} />
+            Combat
+          </label>
+          <label className="flex items-center gap-1">
+            While I play this character, the party
+            <select
+              value={hand.party}
+              disabled={disabled}
+              onChange={(e) => void send({ party: e.target.value as HandControl['party'] })}
+              className="rounded border border-border bg-card px-1 py-0.5"
+            >
+              <option value="follows-me">Follows me</option>
+              <option value="carries-on">Carries on</option>
+            </select>
+          </label>
+        </fieldset>
+      )}
+    </>
   )
 }
 

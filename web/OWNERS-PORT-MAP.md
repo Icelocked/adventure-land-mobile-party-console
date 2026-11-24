@@ -127,3 +127,19 @@ Two sets with no file in common:
   ETag revisions for bank, logs and market, heartbeats with `at` and `heartbeatMs`, no `sampledAt`.
   It keeps `fork`'s routes for the fork console's controls.
 - Half B: not started. B1 is first: it lets the console drop interface v1 (A5).
+
+## Set 2 state
+
+Set 2 sits on branch `pwa-owners-b`. Its reads and routes live in `src/api/ownersCards.ts`, and
+its mock in `e2e/fixtures/ownersSet2Mock.ts`, a subclass of the shared mock that adds the
+release's fields to `stateSection` and registers its routes after the base ones. Unit rows sit in
+`src/api/ownersCards.test.ts`, e2e rows in `e2e/owners-cards.spec.ts`; each e2e row fails with
+the item's `src` changes reverted.
+
+- **B16 with A24 - done.** The activity line reads `characterDetails[name].activity` (text, stuck
+  notice, add-on lines) on the list and the vitals header; a `null` line shows nothing, and only a
+  console without the field (the fork console) keeps the phone's `characterActivity` label. The
+  Hunt status shows the line while its task is `hunt`. Formation gets the Pause/Manual chip with
+  the three Manual switches, sending `POST /formation {character, handControl}` with the changed
+  keys. The stand count and the full check read core `standSlots`. Not ported: the top bar's
+  "N characters on Manual" count, which sits in the party header (set 1).

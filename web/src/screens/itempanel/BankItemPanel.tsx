@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { StandListingForm } from '@/components/StandListingForm'
 import { NpcSaleSheet } from '@/components/NpcSaleSheet'
 import { standIsFull } from '@/lib/standInspection'
+import { standFull as ownersStandFull } from '@/api/ownersCards'
 import { AutoNpcSaleConfirmation, DeconstructionConfirmation } from '@/components/ItemConfirmations'
 import { AddUpgradeRule, OfferingRows } from '@/components/Offerings'
 import { ItemDetailBrowser } from '@/screens/itemdetail/ItemDetailBrowser'
@@ -37,7 +38,7 @@ export function BankItemPanel({ pack, entry, onClose }: { pack: string; entry: I
   const withdrawMarked = !!merchant && (state.withdrawals[merchant] ?? []).some((w) => w.pack === pack && w.slot === entry.slot && sameMarkedItem(w.item, item))
   const standListing = state.standListings.find((l) => l.bankPack === pack && l.bankSlot === entry.slot && sameMarkedItem(l.item, item))
   // A full stand blocks new marks, but an already-marked copy can still be edited.
-  const standFull = standIsFull(state.standListings, state.standBids)
+  const standFull = ownersStandFull(state, () => standIsFull(state.standListings, state.standBids))
   // Console 1.5 bank-production-actions.tsx: no exchange or compound for a locked,
   // bound or busy item. Exchangeable means a non-reward merchantCatalog.exchangeable row.
   const producible = !!merchant && !item.l && !(item as { b?: unknown }).b && !entry.operation

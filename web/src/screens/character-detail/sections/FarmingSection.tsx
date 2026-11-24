@@ -13,6 +13,7 @@ import { SectionCard } from '../SectionCard'
 import { FarmingAreaPicker } from '@/components/FarmingAreaPicker'
 import type { Catalog } from '@/lib/farmingZones'
 import { resolveFarmingContext } from '@/models'
+import { cardLine } from '@/api/ownersCards'
 import type { BestiaryMonster, Sprite, FarmAreaState, HuntBlacklistEntry, MonsterHuntCycle, MonsterHuntStatus } from '@/models'
 
 /** Trigger-button label showing the current selection (names, or a count
@@ -103,6 +104,8 @@ export function FarmingSection({
     (diagnostics[characterName] as { farmingMode?: string } | undefined)?.farmingMode ||
     (state as { partyFarmingMode?: string }).partyFarmingMode ||
     'default'
+  const line = cardLine(diagnostics[characterName])
+  const huntLine = line?.task === 'hunt' ? line.text : undefined
   // Only the leader or a non-follower can route.
   const canRoute = canRouteToMonster({ leader: state.leader, followers: state.followers }, characterName)
   const routeDescription = canRoute ? 'Find selected monster' : FOLLOWER_ROUTE_MESSAGE
@@ -196,7 +199,7 @@ export function FarmingSection({
           <p>{achievement.achievementMessage || 'Choosing the next monster'}</p>
         </section>
       )}
-      <HuntStatusBlock effectivePolicy={effectiveMode} hunt={monsterHunt} characterHunt={characterHunt} blacklist={huntBlacklist} />
+      <HuntStatusBlock effectivePolicy={effectiveMode} hunt={monsterHunt} characterHunt={characterHunt} blacklist={huntBlacklist} huntLine={huntLine} />
       </>
       )}
 
@@ -498,8 +501,11 @@ function HuntStatusBlock({
   hunt,
   characterHunt,
   blacklist,
+  huntLine,
 }: {
   effectivePolicy: string
+  // The card line's own text while the Hunt task holds it (farming-mode-control.tsx huntLine).
+  huntLine?: string
   hunt?: MonsterHuntCycle | null
   characterHunt?: MonsterHuntStatus | null
   blacklist: Record<string, HuntBlacklistEntry>
@@ -511,7 +517,7 @@ function HuntStatusBlock({
         {effectivePolicy === 'hunt' ? 'Hunt status' : 'Last Hunt status'}
         {hunt?.stage ? ` · ${hunt.stage}` : ''}
       </p>
-      <p>{hunt?.message || (effectivePolicy === 'hunt' ? 'Preparing Monster Hunt cycle' : 'Hunt mode is not active')}</p>
+      <p>{huntLine || hunt?.message || (effectivePolicy === 'hunt' ? 'Preparing Monster Hunt cycle' : 'Hunt mode is not active')}</p>
       {effectivePolicy !== 'hunt' ? <p>Current farming mode: {effectivePolicy}. Selecting Hunt rechecks eligible quests; blacklisted quests remain skipped.</p> : null}
       {hunt?.backup ? (
         <div className="mt-1">

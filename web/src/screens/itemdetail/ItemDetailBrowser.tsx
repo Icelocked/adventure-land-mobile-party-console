@@ -5,6 +5,7 @@ import { useCharacterDiagnosticsMap, useCharacters, useDynamicState, usePartyApi
 import { loadCharacterInspection } from '@/lib/characterInspection'
 import { WtbDialog } from '@/components/Wtb'
 import { standIsFull } from '@/lib/standInspection'
+import { standFull as ownersStandFull } from '@/api/ownersCards'
 import { GearComparisonSheet } from '@/screens/itempanel/GearComparisonSheet'
 import { SpriteIcon } from '@/components/SpriteIcon'
 import { TracktrixBonusList } from '@/components/Tracktrix'
@@ -234,7 +235,7 @@ function ItemDetailContent({
   const [comparePicker, setComparePicker] = useState<string | null | false>(false)
   const [comparing, setComparing] = useState<{ character: string; slot?: string } | null>(null)
   const navigate = useNavigate()
-  const standFull = standIsFull(state.standListings, state.standBids)
+  const standFull = ownersStandFull(state, () => standIsFull(state.standListings, state.standBids))
   const partyNames = Object.keys(characters).filter((name) => characters[name]?.vitals)
   // Console 1.5 item-details.tsx:580 and party-item-details.tsx:69: saved snapshots list
   // like live characters; other roster members load their saved profile on demand.
